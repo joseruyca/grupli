@@ -17,7 +17,7 @@ class AppScreen extends StatelessWidget {
     this.scrollable = true,
     this.padding,
     this.background,
-    this.maxWidth = 520,
+    this.maxWidth = 430,
   });
 
   @override

@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/radii.dart';
-import '../theme/shadows.dart';
-import '../theme/spacing.dart';
-import '../theme/typography.dart';
 
 class PrimaryButton extends StatelessWidget {
   final String label;
@@ -17,10 +14,11 @@ class PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 54,
+      height: 56,
       child: FilledButton.icon(
         onPressed: loading ? null : onPressed,
         style: FilledButton.styleFrom(
+          elevation: 0,
           backgroundColor: AppColors.teal,
           disabledBackgroundColor: AppColors.teal.withOpacity(0.45),
           foregroundColor: Colors.white,
@@ -28,8 +26,8 @@ class PrimaryButton extends StatelessWidget {
         ),
         icon: loading
             ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-            : Icon(icon ?? Icons.arrow_forward_rounded),
-        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            : Icon(icon ?? Icons.arrow_forward_rounded, size: 18),
+        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5)),
       ),
     );
   }
@@ -45,17 +43,18 @@ class SecondaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 52,
+      height: 54,
       child: OutlinedButton.icon(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
+          elevation: 0,
           foregroundColor: AppColors.navy,
           side: const BorderSide(color: AppColors.borderStrong),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.md)),
           backgroundColor: AppColors.white,
         ),
-        icon: Icon(icon ?? Icons.add_rounded),
-        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+        icon: Icon(icon ?? Icons.add_rounded, size: 18),
+        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
       ),
     );
   }
@@ -71,17 +70,19 @@ class DestructiveButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 52,
-      child: FilledButton(
+      height: 54,
+      child: OutlinedButton.icon(
         onPressed: loading ? null : onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.danger,
-          foregroundColor: Colors.white,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.danger,
+          side: const BorderSide(color: Color(0xFFF0BBB4)),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.md)),
+          backgroundColor: AppColors.white,
         ),
-        child: loading
-            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-            : Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+        icon: loading
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.danger))
+            : const Icon(Icons.logout_rounded, size: 18),
+        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
       ),
     );
   }

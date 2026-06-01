@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/errors.dart';
+import '../../../theme/colors.dart';
 import '../../../theme/spacing.dart';
 import '../../../theme/typography.dart';
 import '../../../ui/app_header.dart';
@@ -53,22 +54,42 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const AppHeader(title: 'Iniciar sesión', subtitle: 'Entra para ver tus grupos.', showBack: true),
+            const AppHeader(title: 'Iniciar sesión', subtitle: 'Qué bueno verte de nuevo.', showBack: true),
             const SizedBox(height: AppSpacing.xxl),
-            AppTextField(controller: _email, label: 'Email', keyboardType: TextInputType.emailAddress, validator: Validators.email),
+            AppTextField(
+              controller: _email,
+              label: 'Correo electrónico',
+              hint: 'tu@email.com',
+              keyboardType: TextInputType.emailAddress,
+              validator: Validators.email,
+              prefixIcon: const Icon(Icons.mail_outline_rounded, color: AppColors.textMuted),
+            ),
             const SizedBox(height: AppSpacing.lg),
-            AppTextField(controller: _password, label: 'Contraseña', obscure: true, validator: Validators.password),
+            AppTextField(
+              controller: _password,
+              label: 'Contraseña',
+              hint: 'Tu contraseña',
+              obscure: true,
+              validator: Validators.password,
+              prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.textMuted),
+              suffixIcon: const Icon(Icons.visibility_outlined, color: AppColors.textMuted),
+            ),
             const SizedBox(height: AppSpacing.xxl),
-            PrimaryButton(label: 'Entrar', loading: _loading, onPressed: _submit),
-            const SizedBox(height: AppSpacing.md),
+            PrimaryButton(label: 'Iniciar sesión', icon: Icons.login_rounded, loading: _loading, onPressed: _submit),
+            const SizedBox(height: AppSpacing.lg),
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('¿No tienes cuenta?', style: AppTypography.muted),
-                TextButton(onPressed: () => context.go('/register'), child: const Text('Crear cuenta')),
+                const Expanded(child: Divider()),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text('o', style: AppTypography.muted),
+                ),
+                const Expanded(child: Divider()),
               ],
             ),
-            Center(child: TextButton(onPressed: () => context.go('/recover'), child: const Text('Recuperar contraseña'))),
+            const SizedBox(height: AppSpacing.md),
+            TextButton.icon(onPressed: () => context.go('/register'), icon: const Icon(Icons.person_add_alt_1_rounded), label: const Text('Crear cuenta')),
+            TextButton.icon(onPressed: () => context.go('/recover'), icon: const Icon(Icons.lock_reset_rounded), label: const Text('Recuperar contraseña')),
           ],
         ),
       ),

@@ -7,7 +7,6 @@ import '../../../ui/app_card.dart';
 import '../../../ui/app_header.dart';
 import '../../../ui/app_screen.dart';
 import '../../../ui/avatar.dart';
-import '../../../ui/list_row.dart';
 import '../../../ui/loading_state.dart';
 import '../../../ui/status_chip.dart';
 import '../../../ui/toast.dart';
@@ -23,6 +22,8 @@ class MembersScreen extends StatefulWidget {
 
 class _MembersScreenState extends State<MembersScreen> {
   late Future<Map<String, dynamic>> _future;
+  final _search = TextEditingController();
+  String _filter = 'Todos';
 
   @override
   void initState() {
@@ -73,34 +74,88 @@ class _MembersScreenState extends State<MembersScreen> {
             final rows = List<Map<String, dynamic>>.from(snapshot.data!['members'] as List);
             final myRole = (group['my_role'] ?? 'member').toString();
             final canManage = myRole == 'owner' || myRole == 'admin';
+            final query = _search.text.trim().toLowerCase();
+            final filtered = rows.where((m) {
+              final profile = Map<String, dynamic>.from((m['profiles'] ?? {}) as Map);
+              final name = (profile['full_name'] ?? profile['email'] ?? 'Usuario').toString().toLowerCase();
+              final role = (m['role'] ?? 'member').toString();
+              final roleOk = _filter == 'Todos' || (_filter == 'Admins' ? (role == 'owner' || role == 'admin') : role == 'member');
+              final searchOk = query.isEmpty || name.contains(query);
+              return roleOk && searchOk;
+            }).toList();
 
             return Column(
-              children: rows.map((m) {
-                final profile = Map<String, dynamic>.from((m['profiles'] ?? {}) as Map);
-                final name = (profile['full_name'] ?? profile['email'] ?? 'Usuario').toString();
-                final role = (m['role'] ?? 'member').toString();
-                final isOwner = role == 'owner';
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                  child: AppCard(
-                    child: Column(children: [
-                      ListRow(
-                        leading: MemberAvatar(url: profile['avatar_url'] as String?, fallback: name),
-                        title: name,
-                        subtitle: profile['email']?.toString(),
-                        trailing: StatusChip(label: role, color: isOwner ? AppColors.coral : AppColors.teal),
-                      ),
-                      if (canManage && !isOwner) ...[
-                        const Divider(),
-                        Row(children: [
-                          Expanded(child: TextButton(onPressed: () => _setRole(m['user_id'].toString(), role == 'admin' ? 'member' : 'admin'), child: Text(role == 'admin' ? 'Quitar admin' : 'Hacer admin'))),
-                          Expanded(child: TextButton(onPressed: () => _remove(m['user_id'].toString()), child: Text('Expulsar', style: AppTypography.body.copyWith(color: AppColors.danger))))
-                        ]),
-                      ],
-                    ]),
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _search,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(hintText: 'Buscar miembro', prefixIcon: Icon(Icons.search_rounded)),
+                    ),
                   ),
-                );
-              }).toList(),
+                  const SizedBox(width: 8),
+                  PopupMenuButton<String>(
+                    initialValue: _filter,
+                    onSelected: (v) => setState(() => _filter = v),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'Todos', child: Text('Todos')),
+                      PopupMenuItem(value: 'Admins', child: Text('Admins')),
+                      PopupMenuItem(value: 'Miembros', child: Text('Miembros')),
+                    ],
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [Text(_filter, style: AppTypography.small.copyWith(color: AppColors.navy)), const Icon(Icons.keyboard_arrow_down_rounded)]),
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: AppSpacing.md),
+                ...filtered.map((m) {
+                  final profile = Map<String, dynamic>.from((m['profiles'] ?? {}) as Map);
+                  final name = (profile['full_name'] ?? profile['email'] ?? 'Usuario').toString();
+                  final role = (m['role'] ?? 'member').toString();
+                  final isOwner = role == 'owner';
+                  final chipColor = isOwner ? AppColors.amber : role == 'admin' ? AppColors.success : AppColors.teal;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                    child: AppCard(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(children: [
+                        Row(
+                          children: [
+                            MemberAvatar(url: profile['avatar_url'] as String?, fallback: name, size: 44),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(name, style: AppTypography.body.copyWith(fontWeight: FontWeight.w800)),
+                                const SizedBox(height: 2),
+                                Text(profile['email']?.toString() ?? '', style: AppTypography.small),
+                              ]),
+                            ),
+                            StatusChip(label: role, color: chipColor),
+                            if (canManage && !isOwner)
+                              PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  if (value == 'toggle-admin') {
+                                    _setRole(m['user_id'].toString(), role == 'admin' ? 'member' : 'admin');
+                                  }
+                                  if (value == 'remove') {
+                                    _remove(m['user_id'].toString());
+                                  }
+                                },
+                                itemBuilder: (_) => [
+                                  PopupMenuItem(value: 'toggle-admin', child: Text(role == 'admin' ? 'Quitar admin' : 'Hacer admin')),
+                                  const PopupMenuItem(value: 'remove', child: Text('Expulsar')),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ]),
+                    ),
+                  );
+                }),
+              ],
             );
           },
         ),

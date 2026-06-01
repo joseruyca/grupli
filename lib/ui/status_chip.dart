@@ -12,11 +12,14 @@ class StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withOpacity(0.10),
         borderRadius: BorderRadius.circular(AppRadii.pill),
         border: Border.all(color: color.withOpacity(0.18)),
       ),
-      child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11.5)),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 11.5),
+      ),
     );
   }
 }

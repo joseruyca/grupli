@@ -14,39 +14,53 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppScreen(
-      background: AppColors.white,
+      background: AppColors.canvas,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: AppSpacing.xxl),
-          Row(
-            children: [
-              Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(color: AppColors.mintSoft, borderRadius: BorderRadius.circular(18)),
-                child: const Icon(Icons.groups_2_rounded, color: AppColors.teal, size: 30),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Text('Grupli', style: AppTypography.title),
-            ],
+          Center(
+            child: Column(
+              children: [
+                Container(
+                  width: 86,
+                  height: 86,
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: const Icon(Icons.groups_2_rounded, color: AppColors.teal, size: 42),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text('Grupli', style: AppTypography.title.copyWith(fontSize: 36)),
+                const SizedBox(height: AppSpacing.md),
+                Container(width: 42, height: 4, decoration: BoxDecoration(color: AppColors.teal, borderRadius: BorderRadius.circular(999))),
+              ],
+            ),
           ),
           const SizedBox(height: AppSpacing.xxxl),
-          Text('Organiza tu grupo sin caos.', style: AppTypography.hero),
+          Text('Organiza tu grupo\nsin caos.', style: AppTypography.hero, textAlign: TextAlign.left),
           const SizedBox(height: AppSpacing.md),
-          Text('Quedadas, asistencia, gastos compartidos y torneos en una app simple para grupos reales.', style: AppTypography.body.copyWith(color: AppColors.textMuted)),
+          Text(
+            'Planes, tareas y comunicación en un solo lugar. Menos idas y vueltas, más tiempo para disfrutar.',
+            style: AppTypography.body.copyWith(color: AppColors.textMuted),
+          ),
           const SizedBox(height: AppSpacing.xxl),
           if (!AppEnv.hasSupabase) ...[
             AppCard(
               color: AppColors.coralSoft,
-              border: const BorderSide(color: Color(0xFFFFCFC7)),
-              child: Text('Falta configurar Supabase. Copia .env.example a .env y añade SUPABASE_URL + SUPABASE_ANON_KEY.', style: AppTypography.muted.copyWith(color: AppColors.navy)),
+              border: const BorderSide(color: Color(0xFFF0C6BE)),
+              child: Text(
+                'Falta configurar Supabase. Copia .env.example a .env y añade SUPABASE_URL + SUPABASE_ANON_KEY.',
+                style: AppTypography.muted.copyWith(color: AppColors.navy),
+              ),
             ),
             const SizedBox(height: AppSpacing.lg),
           ],
           PrimaryButton(label: 'Iniciar sesión', icon: Icons.login_rounded, onPressed: () => context.go('/login')),
           const SizedBox(height: AppSpacing.md),
-          SecondaryButton(label: 'Crear cuenta', icon: Icons.person_add_rounded, onPressed: () => context.go('/register')),
+          SecondaryButton(label: 'Crear cuenta', icon: Icons.person_add_alt_1_rounded, onPressed: () => context.go('/register')),
           const SizedBox(height: AppSpacing.md),
           Center(
             child: TextButton(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/errors.dart';
+import '../../../theme/colors.dart';
 import '../../../theme/spacing.dart';
 import '../../../ui/app_header.dart';
 import '../../../ui/app_screen.dart';
@@ -59,22 +60,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const AppHeader(title: 'Crear cuenta', subtitle: 'Prepara tu perfil para entrar en grupos.', showBack: true),
+            const AppHeader(title: 'Crear cuenta', subtitle: 'Comencemos. Es rápido y fácil.', showBack: true),
             const SizedBox(height: AppSpacing.xxl),
-            AppTextField(controller: _name, label: 'Nombre', validator: (v) => Validators.requiredText(v, 'El nombre')),
+            AppTextField(
+              controller: _name,
+              label: 'Nombre',
+              hint: 'Tu nombre',
+              validator: (v) => Validators.requiredText(v, 'El nombre'),
+              prefixIcon: const Icon(Icons.person_outline_rounded, color: AppColors.textMuted),
+            ),
             const SizedBox(height: AppSpacing.lg),
-            AppTextField(controller: _email, label: 'Email', keyboardType: TextInputType.emailAddress, validator: Validators.email),
+            AppTextField(
+              controller: _email,
+              label: 'Correo electrónico',
+              hint: 'tu@email.com',
+              keyboardType: TextInputType.emailAddress,
+              validator: Validators.email,
+              prefixIcon: const Icon(Icons.mail_outline_rounded, color: AppColors.textMuted),
+            ),
             const SizedBox(height: AppSpacing.lg),
-            AppTextField(controller: _password, label: 'Contraseña', obscure: true, validator: Validators.password),
+            AppTextField(
+              controller: _password,
+              label: 'Contraseña',
+              hint: 'Mínimo 8 caracteres',
+              obscure: true,
+              validator: Validators.password,
+              prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.textMuted),
+              suffixIcon: const Icon(Icons.visibility_outlined, color: AppColors.textMuted),
+            ),
             const SizedBox(height: AppSpacing.lg),
             AppTextField(
               controller: _repeat,
               label: 'Repetir contraseña',
+              hint: 'Repite tu contraseña',
               obscure: true,
               validator: (value) => value != _password.text ? 'Las contraseñas no coinciden.' : null,
+              prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.textMuted),
+              suffixIcon: const Icon(Icons.visibility_outlined, color: AppColors.textMuted),
             ),
             const SizedBox(height: AppSpacing.xxl),
-            PrimaryButton(label: 'Crear cuenta', loading: _loading, onPressed: _submit),
+            PrimaryButton(label: 'Crear cuenta', icon: Icons.person_add_alt_1_rounded, loading: _loading, onPressed: _submit),
             const SizedBox(height: AppSpacing.md),
             SecondaryButton(label: 'Ya tengo cuenta', icon: Icons.login_rounded, onPressed: () => context.go('/login')),
           ],

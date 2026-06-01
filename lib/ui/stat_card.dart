@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/radii.dart';
-import '../theme/shadows.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
 import 'app_card.dart';
@@ -15,23 +14,22 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tone = color ?? AppColors.teal;
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: (color ?? AppColors.teal).withOpacity(0.1), borderRadius: BorderRadius.circular(AppRadii.md)),
-            child: Icon(icon, color: color ?? AppColors.teal),
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(color: tone.withOpacity(0.12), borderRadius: BorderRadius.circular(AppRadii.md)),
+            child: Icon(icon, color: tone, size: 19),
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(value, style: AppTypography.section),
-              Text(label, style: AppTypography.small),
-            ]),
-          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(value, style: AppTypography.section),
+          const SizedBox(height: 2),
+          Text(label, style: AppTypography.small),
         ],
       ),
     );

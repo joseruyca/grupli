@@ -3,7 +3,6 @@ import '../theme/colors.dart';
 import '../theme/radii.dart';
 import '../theme/shadows.dart';
 import '../theme/spacing.dart';
-import '../theme/typography.dart';
 
 class AppCard extends StatelessWidget {
   final Widget child;

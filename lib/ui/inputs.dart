@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
-import '../theme/radii.dart';
-import '../theme/shadows.dart';
 import '../theme/spacing.dart';
 import '../theme/typography.dart';
 
@@ -13,6 +11,8 @@ class AppTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final int maxLines;
   final String? Function(String?)? validator;
+  final Widget? prefixIcon;
+  final Widget? suffixIcon;
 
   const AppTextField({
     super.key,
@@ -23,6 +23,8 @@ class AppTextField extends StatelessWidget {
     this.keyboardType,
     this.maxLines = 1,
     this.validator,
+    this.prefixIcon,
+    this.suffixIcon,
   });
 
   @override
@@ -35,7 +37,7 @@ class AppTextField extends StatelessWidget {
         keyboardType: keyboardType,
         maxLines: obscure ? 1 : maxLines,
         validator: validator,
-        decoration: InputDecoration(hintText: hint),
+        decoration: InputDecoration(hintText: hint, prefixIcon: prefixIcon, suffixIcon: suffixIcon),
       ),
     );
   }
@@ -51,7 +53,7 @@ class FormFieldBlock extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTypography.small.copyWith(color: AppColors.navy)),
+        Text(label, style: AppTypography.small.copyWith(color: AppColors.navy, fontSize: 13)),
         const SizedBox(height: AppSpacing.sm),
         child,
       ],
