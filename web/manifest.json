@@ -1,0 +1,12 @@
+{
+  "name": "Grupli",
+  "short_name": "Grupli",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0F2A3D",
+  "description": "Organiza grupos, quedadas, gastos y torneos.",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false,
+  "icons": []
+}
