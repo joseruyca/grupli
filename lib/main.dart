@@ -4,9 +4,32 @@ import 'core/env.dart';
 import 'core/router.dart';
 import 'core/supabase_client.dart';
 import 'theme/app_theme.dart';
+import 'theme/colors.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: AppColors.canvas,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            child: Text(
+              'Error visible en Grupli:\n\n${details.exceptionAsString()}',
+              style: const TextStyle(
+                color: AppColors.danger,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  };
+
   await AppEnv.load();
   await SupabaseService.init();
   runApp(const GrupliApp());

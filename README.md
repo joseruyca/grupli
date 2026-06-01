@@ -98,3 +98,8 @@ Esta versión mejora finanzas:
 ## v6.2 UI visible shell fix
 
 Corrige la pantalla en blanco después del login: AppScreen ya no usa layouts ambiguos dentro de scroll, el contenido de grupos renderiza siempre encabezado/carga/error/estado vacío, y web/index.html evita bloquear el layout en móvil.
+
+
+## v6.3 Body render fix
+
+Rehace `AppScreen` con un `ListView` directo y añade `ErrorWidget.builder` para que cualquier error de render se vea en pantalla en vez de dejar una home en blanco.
