@@ -6,8 +6,21 @@ class CalendarRepository {
   String get _userId => _db.auth.currentUser!.id;
 
   Future<List<Map<String, dynamic>>> events(String groupId) async {
-    final rows = await _db.from('events').select().eq('group_id', groupId).order('starts_at');
+    final rows = await _db
+        .from('events')
+        .select('id,group_id,title,starts_at,location,notes,min_people,status,created_by,created_at,updated_at')
+        .eq('group_id', groupId)
+        .order('starts_at');
     return List<Map<String, dynamic>>.from(rows as List);
+  }
+
+  Future<Map<String, dynamic>> event(String eventId) async {
+    final row = await _db
+        .from('events')
+        .select('id,group_id,title,starts_at,location,notes,min_people,status,created_by,created_at,updated_at')
+        .eq('id', eventId)
+        .single();
+    return Map<String, dynamic>.from(row);
   }
 
   Future<void> createEvent({
@@ -22,19 +35,79 @@ class CalendarRepository {
       'group_id': groupId,
       'title': title.trim(),
       'starts_at': startsAt.toIso8601String(),
-      'location': location,
-      'notes': notes,
-      'min_people': minPeople,
+      'location': _emptyToNull(location),
+      'notes': _emptyToNull(notes),
+      'min_people': minPeople < 1 ? 1 : minPeople,
       'created_by': _userId,
     });
   }
 
+  Future<void> updateEvent({
+    required String eventId,
+    required String title,
+    required DateTime startsAt,
+    String? location,
+    String? notes,
+    int minPeople = 2,
+  }) async {
+    await _db.from('events').update({
+      'title': title.trim(),
+      'starts_at': startsAt.toIso8601String(),
+      'location': _emptyToNull(location),
+      'notes': _emptyToNull(notes),
+      'min_people': minPeople < 1 ? 1 : minPeople,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', eventId);
+  }
+
+  Future<void> cancelEvent(String eventId) async {
+    await _db.from('events').update({
+      'status': 'cancelled',
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', eventId);
+  }
+
+  Future<void> reactivateEvent(String eventId) async {
+    await _db.from('events').update({
+      'status': 'active',
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', eventId);
+  }
+
+  Future<void> deleteEvent(String eventId) async {
+    await _db.from('events').delete().eq('id', eventId);
+  }
+
   Future<List<Map<String, dynamic>>> attendance(String eventId) async {
-    final rows = await _db
+    final eventRow = await event(eventId);
+    final groupId = eventRow['group_id'].toString();
+
+    final membersRows = await _db
+        .from('group_members')
+        .select('user_id,role,profiles(full_name,email,avatar_url)')
+        .eq('group_id', groupId)
+        .order('created_at');
+
+    final attendanceRows = await _db
         .from('event_attendance')
-        .select('id,status,user_id,profiles(full_name,email,avatar_url)')
+        .select('user_id,status,updated_at')
         .eq('event_id', eventId);
-    return List<Map<String, dynamic>>.from(rows as List);
+
+    final attendanceByUser = <String, Map<String, dynamic>>{};
+    for (final row in List<Map<String, dynamic>>.from(attendanceRows as List)) {
+      attendanceByUser[row['user_id'].toString()] = row;
+    }
+
+    return List<Map<String, dynamic>>.from(membersRows as List).map((member) {
+      final userId = member['user_id'].toString();
+      final attendance = attendanceByUser[userId];
+      return {
+        ...member,
+        'status': attendance?['status'] ?? 'pending',
+        'attendance_updated_at': attendance?['updated_at'],
+        'is_me': userId == _userId,
+      };
+    }).toList();
   }
 
   Future<void> setAttendance(String eventId, String status) async {
@@ -43,10 +116,11 @@ class CalendarRepository {
       'user_id': _userId,
       'status': status,
       'updated_at': DateTime.now().toIso8601String(),
-    });
+    }, onConflict: 'event_id,user_id');
   }
 
-  Future<void> deleteEvent(String eventId) async {
-    await _db.from('events').delete().eq('id', eventId);
+  String? _emptyToNull(String? value) {
+    final trimmed = value?.trim() ?? '';
+    return trimmed.isEmpty ? null : trimmed;
   }
 }

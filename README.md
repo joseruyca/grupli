@@ -59,7 +59,7 @@ git commit -m "Update Grupli"
 git push -u origin main
 ```
 
-## Estado v4
+## Estado v6
 
 Esta versión aplica el concepto visual más claro y distintivo a:
 
@@ -68,10 +68,28 @@ Esta versión aplica el concepto visual más claro y distintivo a:
 - Crear/editar grupo
 - Detalle grupo
 - Miembros
-- Calendario + detalle de quedada
+- Calendario mensual completo
+- Crear y editar quedadas
+- Detalle de quedada con asistencia real
+- Respuestas Voy / Duda / No voy
+- Mínimos de personas y aviso si falta gente
+- Cancelar/reactivar quedadas
 - Finanzas + nuevo gasto
 - Torneos + vista previa de clasificación
 - Perfil
 - Ajustes
 
 También añade documentación de diseño y plan de desarrollo.
+
+## Estado v6
+
+Esta versión mejora finanzas:
+
+- reparto igual/manual
+- balances netos calculados en cliente
+- liquidaciones/pagos entre miembros
+- marcar gastos pagados, reabrir, cancelar o eliminar
+- filtros de movimientos
+- pagos registrados
+- explicación clara del reparto
+

@@ -2,12 +2,12 @@
 
 ## Estado actual
 
-Base Flutter + Supabase funcionando, con Auth, grupos, miembros, calendario, finanzas, torneos, perfil y ajustes estructurados.
+Base Flutter + Supabase funcionando, con Auth, grupos y miembros estructurados. La fase v5 consolida calendario y asistencia: calendario mensual, creación/edición de quedadas, detalle de asistencia, mínimos, estados Voy/Duda/No/Pendiente y cancelación.
 
 ## Orden correcto
 
-1. Auth + grupos estable.
-2. Calendario + asistencia real.
+1. Auth + grupos estable. ✅
+2. Calendario + asistencia real. ✅ v5
 3. Finanzas tipo Tricount.
 4. Torneos completos.
 5. Perfil + avatar + storage.
@@ -35,3 +35,11 @@ Cada ZIP debe:
 - Vercel despliega automático.
 - La UI se entiende a simple vista.
 - Los errores se muestran con mensajes humanos.
+
+## v6 completado
+
+Finanzas queda estructurado para uso real: gastos, participantes, reparto igual/manual, balances netos, pagos registrados y acciones de estado.
+
+## Siguiente fase recomendada
+
+v7 — Torneos funcionales: equipos, generación de partidos, resultados y clasificación real.
