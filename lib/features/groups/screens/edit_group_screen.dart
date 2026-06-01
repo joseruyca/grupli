@@ -13,6 +13,7 @@ import '../../../ui/loading_state.dart';
 import '../../../ui/segmented_control.dart';
 import '../../../ui/toast.dart';
 import '../../../shared/utils/validators.dart';
+import '../../../shared/utils/safe_values.dart';
 import '../groups_repository.dart';
 
 class EditGroupScreen extends StatefulWidget {
@@ -60,7 +61,7 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
       _privacy = (g['privacy'] ?? 'privado').toString();
       _time.text = (g['default_time'] ?? '').toString();
       _location.text = (g['default_location'] ?? '').toString();
-      _minPeople = ((g['min_people'] ?? 2) as num).toInt();
+      _minPeople = SafeValue.toInt(g['min_people'], 2);
       _role = (g['my_role'] ?? 'member').toString();
       _selectedDays
         ..clear()

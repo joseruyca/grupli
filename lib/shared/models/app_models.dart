@@ -1,3 +1,5 @@
+import '../utils/safe_values.dart';
+
 class GroupSummary {
   final String id;
   final String name;
@@ -27,9 +29,9 @@ class GroupSummary {
         type: (map['type'] ?? 'otro') as String,
         privacy: (map['privacy'] ?? 'privado') as String,
         inviteCode: (map['invite_code'] ?? '') as String,
-        membersCount: (map['members_count'] ?? 0) as int,
+        membersCount: SafeValue.toInt(map['members_count']),
         role: (map['role'] ?? 'member') as String,
         location: map['default_location'] as String?,
-        balance: ((map['balance'] ?? 0) as num).toDouble(),
+        balance: SafeValue.toDouble(map['balance']),
       );
 }

@@ -22,23 +22,33 @@ class AppScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: Padding(
-            padding: padding ?? const EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.lg, AppSpacing.screen, AppSpacing.lg),
-            child: child,
-          ),
+    final effectivePadding = padding ??
+        const EdgeInsets.fromLTRB(
+          AppSpacing.screen,
+          AppSpacing.lg,
+          AppSpacing.screen,
+          AppSpacing.xl,
+        );
+
+    Widget page = Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Padding(
+          padding: effectivePadding,
+          child: scrollable ? SingleChildScrollView(child: child) : child,
         ),
       ),
     );
+
+    page = SafeArea(bottom: bottomNavigationBar == null, child: page);
 
     final nav = bottomNavigationBar == null
         ? null
         : SafeArea(
             top: false,
-            child: Center(
+            child: Align(
+              alignment: Alignment.bottomCenter,
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxWidth),
                 child: bottomNavigationBar,
@@ -48,8 +58,9 @@ class AppScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: background ?? AppColors.canvas,
+      resizeToAvoidBottomInset: true,
       bottomNavigationBar: nav,
-      body: scrollable ? SingleChildScrollView(child: content) : content,
+      body: page,
     );
   }
 }

@@ -18,6 +18,7 @@ import '../../../ui/loading_state.dart';
 import '../../../ui/status_chip.dart';
 import '../../../ui/toast.dart';
 import '../../../shared/utils/formatters.dart';
+import '../../../shared/utils/safe_values.dart';
 import '../calendar_repository.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -293,7 +294,7 @@ class _EventDetailSheetState extends State<EventDetailSheet> {
         final event = data.event;
         final rows = data.attendance;
         final starts = DateTime.parse(event['starts_at'].toString());
-        final minPeople = ((event['min_people'] ?? 2) as num).toInt();
+        final minPeople = SafeValue.toInt(event['min_people'], 2);
         final yes = _count(rows, 'yes');
         final maybe = _count(rows, 'maybe');
         final no = _count(rows, 'no');
@@ -559,7 +560,7 @@ class _EditEventSheetState extends State<EditEventSheet> {
     _notes = TextEditingController(text: widget.event['notes']?.toString() ?? '');
     _date = DateTime(starts.year, starts.month, starts.day);
     _time = TimeOfDay(hour: starts.hour, minute: starts.minute);
-    _minPeople = ((widget.event['min_people'] ?? 2) as num).toInt();
+    _minPeople = SafeValue.toInt(widget.event['min_people'], 2);
   }
 
   Future<void> _save() async {
