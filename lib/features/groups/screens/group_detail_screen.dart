@@ -321,6 +321,7 @@ class _QuickAction extends StatelessWidget {
 }
 
 class _InviteCard extends StatelessWidget {
+  final String code;
   final VoidCallback onCopy;
   final VoidCallback onShare;
   const _InviteCard({required this.code, required this.onCopy, required this.onShare});

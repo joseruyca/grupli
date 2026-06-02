@@ -1,0 +1,1 @@
+ C:\\Users\\Jose\\Desktop\\grupliv2\\build\\web\\manifest.json:  C:\\Users\\Jose\\Desktop\\grupliv2\\web\\index.html C:\\Users\\Jose\\Desktop\\grupliv2\\web\\manifest.json

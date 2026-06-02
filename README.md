@@ -196,3 +196,12 @@ Cambios clave:
 ## v11.1 Vercel build fix
 
 Elimina la referencia a la carpeta vacía `assets/` en `pubspec.yaml` para evitar fallo de compilación web en Vercel cuando Git no sube carpetas vacías.
+
+
+## v11.2 Vercel build diagnostic fix
+
+Reduce dependencias no usadas, limpia build en Vercel, ejecuta analyze antes del build y desactiva tree-shake-icons para evitar fallos silenciosos de compilación web.
+
+## v11.3 Vercel compile fix
+
+Corrige el error real de compilación en `group_detail_screen.dart`: el widget `_InviteCard` usaba `required this.code` y `code` en el build, pero no tenía declarado el campo `final String code;`.
