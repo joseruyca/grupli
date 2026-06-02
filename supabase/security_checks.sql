@@ -54,3 +54,25 @@ SELECT * FROM public.v_grupli_security_diagnostics ORDER BY check_name;
 -- - B no abre URL directa de grupo ajeno.
 -- - B no modifica miembros si no es admin.
 -- - Nadie degrada/expulsa al owner.
+
+
+-- v9.1 private groups checks
+SELECT
+  'ensure_current_profile exists' AS check_name,
+  to_regprocedure('public.ensure_current_profile()') IS NOT NULL AS ok;
+
+SELECT
+  'all groups are private' AS check_name,
+  NOT EXISTS(SELECT 1 FROM public.groups WHERE privacy <> 'privado') AS ok;
+
+SELECT
+  'groups private-only constraint exists' AS check_name,
+  EXISTS (
+    SELECT 1
+    FROM pg_constraint c
+    JOIN pg_class t ON t.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    WHERE n.nspname = 'public'
+      AND t.relname = 'groups'
+      AND c.conname = 'groups_privacy_private_only'
+  ) AS ok;

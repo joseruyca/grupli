@@ -7,7 +7,7 @@ Cambia solo el filtro del ZIP si la versión cambia.
 ```powershell
 $Dest = "$env:USERPROFILE\Desktop\grupliv2"
 
-$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v9-bug-security-review*.zip" |
+$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v9.1-private-groups-profile-fix*.zip" |
   Sort-Object LastWriteTime -Descending |
   Select-Object -First 1
 
@@ -84,3 +84,13 @@ El remoto debe ser:
 origin  https://github.com/joseruyca/grupli.git (fetch)
 origin  https://github.com/joseruyca/grupli.git (push)
 ```
+
+
+## SQL v9.1
+
+```powershell
+cd "$env:USERPROFILE\Desktop\grupliv2"
+Get-Content ".\supabase\patch_v9_1_private_group_creation.sql" | Set-Clipboard
+```
+
+Pegar en Supabase SQL Editor y ejecutar.

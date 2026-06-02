@@ -161,3 +161,8 @@ Get-Content ".\supabase\patch_v9_rls_hardening.sql" | Set-Clipboard
 ```
 
 Luego pegar en `Supabase → SQL Editor → New query → Run`.
+
+
+## v9.1 — grupos privados y fix de creación
+
+La creación de grupo ahora asegura `profiles` antes de insertar en `groups`, evitando el error `groups_owner_id_fkey`. La pantalla de crear grupo queda simplificada: solo nombre + grupo privado. Días, hora, ubicación y mínimos se gestionan en quedadas/eventos, no en el grupo.

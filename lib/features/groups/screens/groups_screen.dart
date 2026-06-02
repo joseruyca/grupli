@@ -151,8 +151,7 @@ class _HomeContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final totalBalance = groups.fold<double>(0, (sum, g) => sum + SafeValue.toDouble(g['balance']));
     final members = groups.fold<int>(0, (sum, g) => sum + SafeValue.toInt(g['members_count']));
-    final privateGroups = groups.where((g) => (g['privacy'] ?? '').toString().toLowerCase() == 'privado').length;
-
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -189,14 +188,11 @@ class _HomeContent extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: AppSpacing.md),
                 child: _GroupCard(group: g, onTap: () => onOpen(g['id'].toString())),
               )),
-        if (groups.isNotEmpty && privateGroups > 0) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Text('$privateGroups grupo(s) privados protegidos por código.', style: AppTypography.small),
-        ],
       ],
     );
   }
 }
+
 
 class _GroupCard extends StatelessWidget {
   final Map<String, dynamic> group;
@@ -205,13 +201,9 @@ class _GroupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final type = SafeValue.toText(group['type'], 'otro');
-    final privacy = SafeValue.toText(group['privacy'], 'privado');
     final balance = SafeValue.toDouble(group['balance']);
-    final location = SafeValue.toText(group['default_location'], 'Sin ubicación');
-    final time = SafeValue.toText(group['default_time'], 'Sin hora');
-    final days = SafeValue.toText(group['default_days'], 'Sin días');
     final members = SafeValue.toInt(group['members_count']);
+    final code = SafeValue.toText(group['invite_code'], '');
 
     return AppCard(
       onTap: onTap,
@@ -222,8 +214,8 @@ class _GroupCard extends StatelessWidget {
           Container(
             width: 62,
             height: 62,
-            decoration: BoxDecoration(color: _toneFor(type), shape: BoxShape.circle),
-            child: Icon(_iconFor(type), color: AppColors.navy, size: 28),
+            decoration: const BoxDecoration(color: AppColors.tealSoft, shape: BoxShape.circle),
+            child: const Icon(Icons.groups_2_rounded, color: AppColors.navy, size: 28),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -236,9 +228,9 @@ class _GroupCard extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: [
-                  StatusChip(label: _prettyType(type), color: AppColors.success),
-                  StatusChip(label: _prettyPrivacy(privacy), color: privacy.toLowerCase() == 'privado' ? AppColors.textMuted : AppColors.lilac),
+                children: const [
+                  StatusChip(label: 'Privado', color: AppColors.teal),
+                  StatusChip(label: 'Solo invitación', color: AppColors.textMuted),
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
@@ -246,15 +238,15 @@ class _GroupCard extends StatelessWidget {
                 spacing: 12,
                 runSpacing: 8,
                 children: [
-                  _Meta(icon: Icons.calendar_today_outlined, text: days),
-                  _Meta(icon: Icons.access_time_rounded, text: time),
-                  _Meta(icon: Icons.location_on_outlined, text: location),
+                  _Meta(icon: Icons.people_outline_rounded, text: '$members miembros'),
+                  _Meta(icon: Icons.qr_code_rounded, text: code.isEmpty ? 'Sin código' : code),
+                  _Meta(icon: Icons.lock_outline_rounded, text: 'Cerrado'),
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
               Row(
                 children: [
-                  Text('$members miembros', style: AppTypography.small),
+                  Text('Grupo privado', style: AppTypography.small),
                   const Spacer(),
                   Text(
                     Fmt.money.format(balance),
@@ -270,51 +262,6 @@ class _GroupCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  IconData _iconFor(String type) {
-    switch (type.toLowerCase()) {
-      case 'deporte':
-        return Icons.sports_soccer_rounded;
-      case 'cartas':
-        return Icons.style_rounded;
-      default:
-        return Icons.groups_2_rounded;
-    }
-  }
-
-  Color _toneFor(String type) {
-    switch (type.toLowerCase()) {
-      case 'deporte':
-        return AppColors.greenSoft;
-      case 'cartas':
-        return AppColors.lilacSoft;
-      default:
-        return AppColors.tealSoft;
-    }
-  }
-
-  String _prettyType(String type) {
-    switch (type.toLowerCase()) {
-      case 'deporte':
-        return 'Deportivo';
-      case 'cartas':
-        return 'Social';
-      default:
-        return 'Otro';
-    }
-  }
-
-  String _prettyPrivacy(String privacy) {
-    switch (privacy.toLowerCase()) {
-      case 'privado':
-        return 'Privado';
-      case 'público':
-      case 'publico':
-        return 'Público';
-      default:
-        return 'Semiprivado';
-    }
   }
 }
 

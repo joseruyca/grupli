@@ -24,25 +24,21 @@ class GroupsRepository {
 
   Future<String> createGroup({
     required String name,
-    required String type,
-    required String privacy,
+    String type = 'otro',
+    String privacy = 'privado',
     String? defaultDays,
     String? defaultTime,
     String? defaultLocation,
-    int minPeople = 2,
+    int minPeople = 1,
   }) async {
-    // Important: group creation must be atomic.
-    // Direct insert into groups + group_members can fail with RLS because the user
-    // is not yet a member during the first insert/returning step.
-    // The SQL function creates the group and its owner membership in one safe transaction.
     final result = await _db.rpc('create_group_atomic', params: {
       'p_name': name.trim(),
       'p_type': type,
-      'p_privacy': privacy,
-      'p_default_days': defaultDays?.trim(),
-      'p_default_time': defaultTime?.trim(),
-      'p_default_location': defaultLocation?.trim(),
-      'p_min_people': minPeople < 1 ? 1 : minPeople,
+      'p_privacy': 'privado',
+      'p_default_days': null,
+      'p_default_time': null,
+      'p_default_location': null,
+      'p_min_people': 1,
     });
 
     final groupId = result?.toString() ?? '';
@@ -60,6 +56,11 @@ class GroupsRepository {
   Future<void> updateGroup(String groupId, Map<String, dynamic> values) async {
     await _db.from('groups').update({
       ...values,
+      'privacy': 'privado',
+      'default_days': null,
+      'default_time': null,
+      'default_location': null,
+      'min_people': 1,
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', groupId);
   }
