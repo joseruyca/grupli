@@ -2,20 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/errors.dart';
-import '../../../core/supabase_client.dart';
 import '../../../features/auth/auth_service.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../theme/colors.dart';
-import '../../../theme/radii.dart';
 import '../../../theme/spacing.dart';
 import '../../../theme/typography.dart';
-import '../../../ui/app_card.dart';
 import '../../../ui/app_screen.dart';
-import '../../../ui/avatar.dart';
 import '../../../ui/bottom_nav.dart';
 import '../../../ui/buttons.dart';
 import '../../../ui/inputs.dart';
 import '../../../ui/loading_state.dart';
+import '../../../ui/mock_ui.dart';
 import '../../../ui/toast.dart';
 import '../profile_repository.dart';
 
@@ -54,7 +51,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (file == null) return;
       await ProfileRepository().uploadAvatar(file);
       _refresh();
-      if (mounted) AppToast.show(context, 'Foto de perfil actualizada.');
+      if (mounted) AppToast.show(context, 'Foto actualizada.');
     } catch (e) {
       if (mounted) AppToast.show(context, humanError(e), error: true);
     } finally {
@@ -100,88 +97,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = SupabaseService.currentUser;
-
     return AppScreen(
       bottomNavigationBar: AppBottomNav(
-        index: 1,
+        index: 2,
         onChanged: (i) {
           if (i == 0) context.go('/app');
-          if (i == 2) context.go('/app/settings');
+          if (i == 1) context.go('/app/settings');
+          if (i == 2) context.go('/app/profile');
         },
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Text('Perfil', style: AppTypography.title),
-          const Spacer(),
-          IconButton.filledTonal(onPressed: _refresh, icon: const Icon(Icons.refresh_rounded)),
-        ]),
-        const SizedBox(height: AppSpacing.xs),
-        Text('Tu identidad dentro de los grupos.', style: AppTypography.muted),
-        const SizedBox(height: AppSpacing.lg),
-        if (user == null)
-          AppCard(child: Text('Inicia sesión para ver tu perfil.', style: AppTypography.body))
-        else
-          FutureBuilder<ProfileSummary>(
-            future: _future,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) return const LoadingState();
-              if (snapshot.hasError) return AppCard(child: Text(humanError(snapshot.error!), style: AppTypography.body));
+      child: FutureBuilder<ProfileSummary>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) return const LoadingState();
+          if (snapshot.hasError) return MockCard(child: Text(humanError(snapshot.error!), style: AppTypography.body));
+          final summary = snapshot.data!;
+          final profile = summary.profile;
+          final name = (profile['full_name'] ?? profile['email'] ?? 'Usuario').toString();
+          final email = (profile['email'] ?? '').toString();
+          final avatar = profile['avatar_url']?.toString();
+          _name.text = name;
 
-              final summary = snapshot.data!;
-              final profile = summary.profile;
-              final name = (profile['full_name'] ?? user.email ?? 'Usuario').toString();
-              final email = (profile['email'] ?? user.email ?? '').toString();
-              final avatar = profile['avatar_url'] as String?;
-
-              if (_name.text.isEmpty) _name.text = name;
-
-              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _ProfileHero(
-                  name: name,
-                  email: email,
-                  avatarUrl: avatar,
-                  avatarBusy: _avatarBusy,
-                  onAvatarTap: _pickAvatar,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Row(children: [
-                  Expanded(child: _ProfileStat(label: 'Grupos', value: '${summary.groupsCount}', icon: Icons.groups_rounded)),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(child: _ProfileStat(label: 'Saldo total', value: Fmt.money.format(summary.balanceTotal), icon: Icons.wallet_rounded, color: AppColors.teal)),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(child: _ProfileStat(label: 'Asistencia', value: '${(summary.attendanceRate * 100).round()}%', icon: Icons.trending_up_rounded, color: AppColors.success)),
-                ]),
-                const SizedBox(height: AppSpacing.lg),
-                Text('Acciones', style: AppTypography.section.copyWith(fontSize: 18)),
-                const SizedBox(height: AppSpacing.sm),
-                AppCard(
-                  padding: EdgeInsets.zero,
-                  child: Column(children: [
-                    _ProfileAction(icon: Icons.edit_rounded, label: 'Editar perfil', onTap: () => _showEditName(context)),
-                    const Divider(height: 1),
-                    _ProfileAction(icon: Icons.camera_alt_outlined, label: 'Cambiar foto de perfil', onTap: _pickAvatar),
-                    const Divider(height: 1),
-                    _ProfileAction(icon: Icons.delete_outline_rounded, label: 'Quitar foto de perfil', onTap: _removeAvatar),
-                    const Divider(height: 1),
-                    _ProfileAction(icon: Icons.bar_chart_rounded, label: 'Mis estadísticas', onTap: () => _showStats(context, summary)),
-                  ]),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                DestructiveButton(label: 'Cerrar sesión', onPressed: _logout),
-              ]);
-            },
-          ),
-      ]),
+          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [const Spacer(), IconButton(onPressed: _refresh, icon: const Icon(Icons.more_horiz_rounded), color: AppColors.navy)]),
+            Center(child: _Avatar(url: avatar, busy: _avatarBusy, onTap: _pickAvatar)),
+            const SizedBox(height: 12),
+            Center(child: Text(name, style: AppTypography.title.copyWith(fontSize: 24), textAlign: TextAlign.center)),
+            const SizedBox(height: 3),
+            Center(child: Text(email, style: AppTypography.small, textAlign: TextAlign.center)),
+            const SizedBox(height: 22),
+            Row(children: [
+              Expanded(child: MockStat(value: '${summary.groupsCount}', label: 'Grupos', icon: Icons.groups_rounded)),
+              const SizedBox(width: 8),
+              Expanded(child: MockStat(value: Fmt.money.format(summary.balanceTotal), label: 'Saldo', icon: Icons.euro_rounded, color: AppColors.success)),
+              const SizedBox(width: 8),
+              Expanded(child: MockStat(value: '${(summary.attendanceRate * 100).round()}%', label: 'Asistencia', icon: Icons.event_available_rounded, color: AppColors.lilac)),
+            ]),
+            const SizedBox(height: 18),
+            MockCard(padding: EdgeInsets.zero, child: Column(children: [
+              _ProfileAction(icon: Icons.edit_rounded, label: 'Editar perfil', onTap: () => _showEditName(context)),
+              const Divider(height: 1),
+              _ProfileAction(icon: Icons.camera_alt_outlined, label: 'Cambiar foto', onTap: _pickAvatar),
+              const Divider(height: 1),
+              _ProfileAction(icon: Icons.no_photography_outlined, label: 'Quitar foto', onTap: _removeAvatar),
+              const Divider(height: 1),
+              _ProfileAction(icon: Icons.settings_outlined, label: 'Ajustes', onTap: () => context.go('/app/settings')),
+            ])),
+            const SizedBox(height: 22),
+            DestructiveButton(label: 'Cerrar sesión', onPressed: _logout),
+          ]);
+        },
+      ),
     );
   }
 
   void _showEditName(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.canvas,
-      showDragHandle: true,
       isScrollControlled: true,
+      backgroundColor: AppColors.white,
+      showDragHandle: true,
       builder: (_) => Padding(
         padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -194,105 +169,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-
-  void _showStats(BuildContext context, ProfileSummary summary) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.canvas,
-      showDragHandle: true,
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Mis estadísticas', style: AppTypography.section),
-          const SizedBox(height: AppSpacing.md),
-          AppCard(child: Column(children: [
-            _DataLine(label: 'Grupos activos', value: '${summary.groupsCount}'),
-            _DataLine(label: 'Saldo total', value: Fmt.money.format(summary.balanceTotal)),
-            _DataLine(label: 'Confirmaciones de asistencia', value: '${summary.attendanceYes}/${summary.attendanceTotal}'),
-            _DataLine(label: 'Asistencia media', value: '${(summary.attendanceRate * 100).round()}%'),
-          ])),
-        ]),
-      ),
-    );
-  }
 }
 
-class _ProfileHero extends StatelessWidget {
-  final String name;
-  final String email;
-  final String? avatarUrl;
-  final bool avatarBusy;
-  final VoidCallback onAvatarTap;
-
-  const _ProfileHero({
-    required this.name,
-    required this.email,
-    required this.avatarUrl,
-    required this.avatarBusy,
-    required this.onAvatarTap,
-  });
+class _Avatar extends StatelessWidget {
+  final String? url;
+  final bool busy;
+  final VoidCallback onTap;
+  const _Avatar({required this.url, required this.busy, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      child: Row(children: [
-        Stack(alignment: Alignment.bottomRight, children: [
-          AvatarPicker(url: avatarUrl, fallback: name, onTap: onAvatarTap),
-          if (avatarBusy)
-            Positioned.fill(
-              child: Container(
-                decoration: const BoxDecoration(color: Color(0x66FFFFFF), shape: BoxShape.circle),
-                child: const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
-              ),
-            ),
-        ]),
-        const SizedBox(width: AppSpacing.lg),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(name, style: AppTypography.section.copyWith(fontSize: 22)),
-            const SizedBox(height: 4),
-            Text(email, style: AppTypography.muted),
-            const SizedBox(height: AppSpacing.md),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: AppColors.mintSoft, borderRadius: BorderRadius.circular(AppRadii.pill)),
-              child: Text('Perfil activo', style: AppTypography.small.copyWith(color: AppColors.tealDark)),
-            ),
-          ]),
+    final hasImage = url != null && url!.isNotEmpty;
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(clipBehavior: Clip.none, children: [
+        CircleAvatar(
+          radius: 48,
+          backgroundColor: AppColors.tealSoft,
+          backgroundImage: hasImage ? NetworkImage(url!) : null,
+          child: hasImage ? null : const Icon(Icons.person_rounded, color: AppColors.teal, size: 46),
         ),
-      ]),
-    );
-  }
-}
-
-class _ProfileStat extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  const _ProfileStat({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.color = AppColors.teal,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.all(12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(color: color.withOpacity(0.11), borderRadius: BorderRadius.circular(12)),
-          child: Icon(icon, color: color, size: 18),
+        Positioned(
+          right: -2,
+          bottom: 2,
+          child: Container(width: 30, height: 30, decoration: const BoxDecoration(color: AppColors.teal, shape: BoxShape.circle), child: busy ? const Padding(padding: EdgeInsets.all(7), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16)),
         ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.section.copyWith(fontSize: 18)),
-        const SizedBox(height: 2),
-        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.small),
       ]),
     );
   }
@@ -302,34 +203,15 @@ class _ProfileAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-
   const _ProfileAction({required this.icon, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       leading: Icon(icon, color: AppColors.navy),
-      title: Text(label, style: AppTypography.body.copyWith(fontWeight: FontWeight.w700)),
+      title: Text(label, style: AppTypography.body.copyWith(fontWeight: FontWeight.w800)),
       trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
       onTap: onTap,
-    );
-  }
-}
-
-class _DataLine extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _DataLine({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Row(children: [
-        Expanded(child: Text(label, style: AppTypography.muted)),
-        Text(value, style: AppTypography.body.copyWith(fontWeight: FontWeight.w800)),
-      ]),
     );
   }
 }

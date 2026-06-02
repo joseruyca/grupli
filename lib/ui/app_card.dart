@@ -11,14 +11,7 @@ class AppCard extends StatelessWidget {
   final Color? color;
   final BorderSide? border;
 
-  const AppCard({
-    super.key,
-    required this.child,
-    this.padding,
-    this.onTap,
-    this.color,
-    this.border,
-  });
+  const AppCard({super.key, required this.child, this.padding, this.onTap, this.color, this.border});
 
   @override
   Widget build(BuildContext context) {
@@ -29,18 +22,11 @@ class AppCard extends StatelessWidget {
         color: color ?? AppColors.white,
         borderRadius: BorderRadius.circular(AppRadii.lg),
         border: Border.fromBorderSide(border ?? const BorderSide(color: AppColors.border)),
-        boxShadow: AppShadows.soft,
+        boxShadow: AppShadows.tiny,
       ),
       child: child,
     );
     if (onTap == null) return box;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-        onTap: onTap,
-        child: box,
-      ),
-    );
+    return Material(color: Colors.transparent, child: InkWell(borderRadius: BorderRadius.circular(AppRadii.lg), onTap: onTap, child: box));
   }
 }

@@ -210,3 +210,10 @@ Corrige el error real de compilación en `group_detail_screen.dart`: el widget `
 ## v11.4 Body layout fix
 
 Corrige el layout base de `AppScreen`: el `ListView` ahora siempre tiene alto acotado dentro del `Scaffold`, evitando que tras login se vea solo la barra inferior. También se elimina `RefreshIndicator` mal anidado en Home.
+
+## v11.5 Premium mockup replica pass
+
+- Home, welcome, login, crear grupo, detalle de grupo, perfil y navegación se acercan al mockup aprobado.
+- Se refuerza AppScreen para evitar pantallas en blanco con bottom nav visible.
+- Se mantiene Supabase y SQL sin cambios.
+- Se añade docs/MOCKUP_PAGE_SPEC_V11_5.md con descripción detallada de pantallas.

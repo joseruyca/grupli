@@ -22,13 +22,21 @@ class AppScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectivePadding = padding ??
-        const EdgeInsets.fromLTRB(
-          AppSpacing.screen,
-          AppSpacing.lg,
-          AppSpacing.screen,
-          AppSpacing.xl,
-        );
+    final effectivePadding = padding ?? const EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.lg, AppSpacing.screen, AppSpacing.xl);
+
+    final page = Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: scrollable
+            ? SingleChildScrollView(
+                padding: effectivePadding,
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                child: child,
+              )
+            : Padding(padding: effectivePadding, child: child),
+      ),
+    );
 
     return Scaffold(
       backgroundColor: background ?? AppColors.white,
@@ -37,8 +45,8 @@ class AppScreen extends StatelessWidget {
           ? null
           : SafeArea(
               top: false,
-              child: Center(
-                heightFactor: 1,
+              child: Align(
+                alignment: Alignment.bottomCenter,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: maxWidth),
                   child: DecoratedBox(
@@ -51,36 +59,7 @@ class AppScreen extends StatelessWidget {
                 ),
               ),
             ),
-      body: SafeArea(
-        bottom: bottomNavigationBar == null,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final availableWidth = constraints.maxWidth.isFinite ? constraints.maxWidth : maxWidth;
-            final availableHeight = constraints.maxHeight.isFinite ? constraints.maxHeight : MediaQuery.sizeOf(context).height;
-            final pageWidth = availableWidth < maxWidth ? availableWidth : maxWidth;
-
-            final page = SizedBox(
-              width: pageWidth,
-              height: availableHeight,
-              child: scrollable
-                  ? ListView(
-                      padding: effectivePadding,
-                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                      children: [child],
-                    )
-                  : Padding(
-                      padding: effectivePadding,
-                      child: child,
-                    ),
-            );
-
-            return Align(
-              alignment: Alignment.topCenter,
-              child: page,
-            );
-          },
-        ),
-      ),
+      body: SafeArea(bottom: bottomNavigationBar == null, child: page),
     );
   }
 }

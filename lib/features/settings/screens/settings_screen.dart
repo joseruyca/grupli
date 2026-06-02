@@ -59,10 +59,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return AppScreen(
       bottomNavigationBar: AppBottomNav(
-        index: 2,
+        index: 1,
         onChanged: (i) {
           if (i == 0) context.go('/app');
-          if (i == 1) context.go('/app/profile');
+          if (i == 1) context.go('/app/settings');
+          if (i == 2) context.go('/app/profile');
         },
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

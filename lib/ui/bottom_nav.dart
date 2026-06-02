@@ -11,15 +11,15 @@ class AppBottomNav extends StatelessWidget {
     return NavigationBar(
       selectedIndex: index,
       onDestinationSelected: onChanged,
-      height: 68,
+      height: 60,
       elevation: 0,
       backgroundColor: AppColors.white,
       indicatorColor: AppColors.tealSoft,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       destinations: const [
-        NavigationDestination(icon: Icon(Icons.groups_outlined), selectedIcon: Icon(Icons.groups_rounded), label: 'Grupos'),
+        NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Inicio'),
+        NavigationDestination(icon: Icon(Icons.notifications_none_rounded), selectedIcon: Icon(Icons.notifications_rounded), label: 'Avisos'),
         NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'Perfil'),
-        NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings_rounded), label: 'Ajustes'),
       ],
     );
   }

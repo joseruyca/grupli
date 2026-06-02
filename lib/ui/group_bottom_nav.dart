@@ -32,27 +32,21 @@ class GroupBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        border: Border(top: BorderSide(color: AppColors.border)),
-      ),
-      child: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (i) => _go(context, i),
-        height: 66,
-        elevation: 0,
-        backgroundColor: AppColors.white,
-        indicatorColor: AppColors.tealSoft,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.event_available_outlined), selectedIcon: Icon(Icons.event_available_rounded), label: 'Eventos'),
-          NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month_rounded), label: 'Calendario'),
-          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet_rounded), label: 'Finanzas'),
-          NavigationDestination(icon: Icon(Icons.emoji_events_outlined), selectedIcon: Icon(Icons.emoji_events_rounded), label: 'Torneos'),
-          NavigationDestination(icon: Icon(Icons.more_horiz_rounded), selectedIcon: Icon(Icons.more_horiz_rounded), label: 'Más'),
-        ],
-      ),
+    return NavigationBar(
+      selectedIndex: index,
+      onDestinationSelected: (i) => _go(context, i),
+      height: 60,
+      elevation: 0,
+      backgroundColor: AppColors.white,
+      indicatorColor: AppColors.tealSoft,
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      destinations: const [
+        NavigationDestination(icon: Icon(Icons.event_available_outlined), selectedIcon: Icon(Icons.event_available_rounded), label: 'Eventos'),
+        NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month_rounded), label: 'Calendario'),
+        NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet_rounded), label: 'Finanzas'),
+        NavigationDestination(icon: Icon(Icons.emoji_events_outlined), selectedIcon: Icon(Icons.emoji_events_rounded), label: 'Torneos'),
+        NavigationDestination(icon: Icon(Icons.more_horiz_rounded), selectedIcon: Icon(Icons.more_horiz_rounded), label: 'Más'),
+      ],
     );
   }
 }
@@ -63,13 +57,7 @@ class GroupContextHeader extends StatelessWidget {
   final Widget? trailing;
   final bool showBack;
 
-  const GroupContextHeader({
-    super.key,
-    required this.title,
-    required this.subtitle,
-    this.trailing,
-    this.showBack = true,
-  });
+  const GroupContextHeader({super.key, required this.title, required this.subtitle, this.trailing, this.showBack = true});
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +73,7 @@ class GroupContextHeader extends StatelessWidget {
       ],
       Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.title.copyWith(fontSize: 24)),
+          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.title.copyWith(fontSize: 22)),
           const SizedBox(height: 2),
           Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTypography.small),
         ]),

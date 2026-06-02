@@ -4,12 +4,10 @@ import '../../../core/errors.dart';
 import '../../../theme/colors.dart';
 import '../../../theme/spacing.dart';
 import '../../../theme/typography.dart';
-import '../../../ui/app_card.dart';
-import '../../../ui/app_header.dart';
 import '../../../ui/app_screen.dart';
-import '../../../ui/app_ui_helpers.dart';
 import '../../../ui/buttons.dart';
 import '../../../ui/inputs.dart';
+import '../../../ui/mock_ui.dart';
 import '../../../ui/toast.dart';
 import '../../../shared/utils/validators.dart';
 import '../groups_repository.dart';
@@ -35,7 +33,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   Future<void> _submit() async {
     if (_loading) return;
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _loading = true);
     try {
       final id = await GroupsRepository().createGroup(name: _name.text);
@@ -53,60 +50,31 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       child: Form(
         key: _formKey,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const AppHeader(
-            title: 'Nuevo grupo',
-            subtitle: 'Crea un espacio privado para organizar quedadas, calendario, gastos y torneos.',
-            showBack: true,
+          const MockHeader(title: 'Nuevo grupo', showBack: true),
+          const SizedBox(height: 34),
+          Center(
+            child: Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(color: AppColors.lilacSoft, borderRadius: BorderRadius.circular(32)),
+              child: const Icon(Icons.groups_2_rounded, color: AppColors.teal, size: 48),
+            ),
           ),
-          const SizedBox(height: AppSpacing.xl),
-          AppCard(
+          const SizedBox(height: 28),
+          AppTextField(controller: _name, label: 'Nombre del grupo', hint: 'Ej. Pádel los miércoles', validator: (v) => Validators.requiredText(v, 'El nombre')),
+          const SizedBox(height: 22),
+          MockCard(
+            color: AppColors.canvasWarm,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              AppTextField(
-                controller: _name,
-                label: 'Nombre del grupo',
-                hint: 'Ej. Pádel viernes, Amigos, Fútbol sala…',
-                validator: (v) => Validators.requiredText(v, 'El nombre'),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              const _PrincipleLine(icon: Icons.lock_outline_rounded, title: 'Privado por defecto', body: 'Nadie puede encontrarlo públicamente.'),
-              const SizedBox(height: AppSpacing.md),
-              const _PrincipleLine(icon: Icons.link_rounded, title: 'Acceso por invitación', body: 'Código ahora. Enlace y QR cuando activemos invitaciones.'),
-              const SizedBox(height: AppSpacing.md),
-              const _PrincipleLine(icon: Icons.event_available_rounded, title: 'La organización va dentro', body: 'Cada quedada tendrá su fecha, hora, lugar y asistencia.'),
+              Text('Todos los grupos son privados.', style: AppTypography.body.copyWith(fontWeight: FontWeight.w900, color: AppColors.navy)),
+              const SizedBox(height: 6),
+              Text('El acceso será solo por invitación, código o QR. Los eventos, gastos y torneos se configuran dentro del grupo.', style: AppTypography.muted),
             ]),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          InfoPanel(
-            icon: Icons.auto_awesome_rounded,
-            title: 'Qué tendrá dentro',
-            body: 'Eventos con asistencia, calendario, finanzas tipo Tricount y ligas/torneos. El creador será admin del grupo.',
-            color: AppColors.teal,
-          ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: 26),
           PrimaryButton(label: 'Crear grupo', icon: Icons.check_rounded, loading: _loading, onPressed: _submit),
         ]),
       ),
     );
-  }
-}
-
-class _PrincipleLine extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String body;
-
-  const _PrincipleLine({required this.icon, required this.title, required this.body});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SoftIconBox(icon: icon, color: AppColors.teal, size: 38),
-      const SizedBox(width: AppSpacing.md),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: AppTypography.body.copyWith(fontWeight: FontWeight.w900, color: AppColors.navy)),
-        const SizedBox(height: 2),
-        Text(body, style: AppTypography.muted),
-      ])),
-    ]);
   }
 }
