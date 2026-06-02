@@ -5,7 +5,6 @@ import '../../../theme/spacing.dart';
 import '../../../theme/typography.dart';
 import '../../../ui/app_card.dart';
 import '../../../ui/app_header.dart';
-import '../../../ui/app_screen.dart';
 import '../../../ui/app_ui_helpers.dart';
 import '../../../ui/bottom_sheet.dart';
 import '../../../ui/buttons.dart';
@@ -16,7 +15,7 @@ import '../../../ui/loading_state.dart';
 import '../../../ui/segmented_control.dart';
 import '../../../ui/status_chip.dart';
 import '../../../ui/toast.dart';
-import '../../../ui/group_bottom_nav.dart';
+import '../../../ui/group_page_scaffold.dart';
 import '../tournament_calculator.dart';
 import '../tournaments_repository.dart';
 
@@ -51,8 +50,9 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AppScreen(
-      bottomNavigationBar: GroupBottomNav(groupId: widget.groupId, index: 3),
+    return GroupPageScaffold(
+      groupId: widget.groupId,
+      navIndex: 3,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         AppHeader(
           title: 'Torneos',

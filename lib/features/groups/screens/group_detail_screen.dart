@@ -6,10 +6,9 @@ import '../../../core/errors.dart';
 import '../../../theme/colors.dart';
 import '../../../theme/spacing.dart';
 import '../../../theme/typography.dart';
-import '../../../ui/app_screen.dart';
 import '../../../ui/buttons.dart';
 import '../../../ui/confirm_dialog.dart';
-import '../../../ui/group_bottom_nav.dart';
+import '../../../ui/group_page_scaffold.dart';
 import '../../../ui/loading_state.dart';
 import '../../../ui/mock_ui.dart';
 import '../../../ui/toast.dart';
@@ -85,14 +84,18 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AppScreen(
-      bottomNavigationBar: GroupBottomNav(groupId: widget.groupId, index: 4),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+    return GroupPageScaffold(
+      groupId: widget.groupId,
+      navIndex: 4,
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       child: FutureBuilder<Map<String, dynamic>>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) return const LoadingState(label: 'Cargando grupo...');
           if (snapshot.hasError) return MockCard(child: Text(humanError(snapshot.error!), style: AppTypography.body));
+          if (!snapshot.hasData || snapshot.data == null) {
+            return MockCard(child: Text('No se pudo cargar este grupo. Vuelve atrás y entra de nuevo.', style: AppTypography.body));
+          }
 
           final g = snapshot.data!;
           final name = SafeValue.toText(g['name'], 'Grupo');

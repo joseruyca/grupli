@@ -6,7 +6,6 @@ import '../../../theme/spacing.dart';
 import '../../../theme/typography.dart';
 import '../../../ui/app_card.dart';
 import '../../../ui/app_header.dart';
-import '../../../ui/app_screen.dart';
 import '../../../ui/app_ui_helpers.dart';
 import '../../../ui/avatar.dart';
 import '../../../ui/bottom_sheet.dart';
@@ -17,7 +16,7 @@ import '../../../ui/inputs.dart';
 import '../../../ui/loading_state.dart';
 import '../../../ui/status_chip.dart';
 import '../../../ui/toast.dart';
-import '../../../ui/group_bottom_nav.dart';
+import '../../../ui/group_page_scaffold.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/utils/safe_values.dart';
 import '../calendar_repository.dart';
@@ -66,8 +65,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AppScreen(
-      bottomNavigationBar: GroupBottomNav(groupId: widget.groupId, index: widget.initialTab == 0 ? 0 : 1),
+    return GroupPageScaffold(
+      groupId: widget.groupId,
+      navIndex: widget.initialTab == 0 ? 0 : 1,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         AppHeader(
           title: widget.initialTab == 0 ? 'Eventos' : 'Calendario',

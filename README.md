@@ -217,3 +217,8 @@ Corrige el layout base de `AppScreen`: el `ListView` ahora siempre tiene alto ac
 - Se refuerza AppScreen para evitar pantallas en blanco con bottom nav visible.
 - Se mantiene Supabase y SQL sin cambios.
 - Se añade docs/MOCKUP_PAGE_SPEC_V11_5.md con descripción detallada de pantallas.
+
+
+## v11.7 no blank group shell
+
+Añade `GroupPageScaffold` y lo aplica a Detalle, Eventos/Calendario, Finanzas y Torneos para evitar pantallas blancas con solo la barra inferior del grupo.
