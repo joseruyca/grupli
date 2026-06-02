@@ -166,3 +166,28 @@ Luego pegar en `Supabase → SQL Editor → New query → Run`.
 ## v9.1 — grupos privados y fix de creación
 
 La creación de grupo ahora asegura `profiles` antes de insertar en `groups`, evitando el error `groups_owner_id_fkey`. La pantalla de crear grupo queda simplificada: solo nombre + grupo privado. Días, hora, ubicación y mínimos se gestionan en quedadas/eventos, no en el grupo.
+
+## v10 — product reset premium foundation
+
+Esta versión resetea la dirección de Grupli:
+
+- Fondo base blanco.
+- Grupos siempre privados/cerrados.
+- Crear grupo pide solo el nombre.
+- Días, hora, ubicación y mínimo pertenecen a eventos, no al grupo.
+- Detalle de grupo gira alrededor de las 4 funciones clave: eventos/calendario, finanzas y ligas.
+- Perfil queda escueto.
+- Se añade `supabase/patch_v10_product_reset.sql` para corregir perfiles ausentes y reforzar creación privada de grupos.
+- Se añade `docs/PRODUCT_APP_CONTRACT_V10.md` como contrato de producto.
+
+## v11 — mockup app premium aplicado
+
+Esta versión aplica el mockup aprobado como base real de la app: fondo blanco, navegación inferior dentro de cada grupo, detalle del grupo con cuatro funciones principales y documentación de todas las pantallas en `docs/MOCKUP_PAGE_SPEC_V11.md`.
+
+Cambios clave:
+- Barra inferior fija dentro del grupo: Eventos, Calendario, Finanzas, Torneos y Más.
+- Nueva ruta `/app/groups/:groupId/events` para acceder directamente a eventos.
+- Detalle del grupo rehecho como overview premium con hero, acciones rápidas, código y módulos.
+- Eventos y Calendario usan la misma base funcional, pero entran desde pestañas distintas.
+- Finanzas, Torneos, Miembros y Editar grupo mantienen la navegación interna del grupo.
+- Welcome rediseñado con hero teal y fondo blanco.

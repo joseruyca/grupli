@@ -12,28 +12,39 @@ class GroupsRepository {
 
   Future<Map<String, dynamic>> getGroup(String groupId) async {
     final group = await _db.from('groups').select().eq('id', groupId).single();
-    final members = await _db.from('group_members').select('role').eq('group_id', groupId).eq('user_id', _userId).maybeSingle();
+    final membership = await _db.from('group_members').select('role').eq('group_id', groupId).eq('user_id', _userId).maybeSingle();
 
     final data = Map<String, dynamic>.from(group);
-    data['my_role'] = members == null ? 'member' : (members['role'] ?? 'member').toString();
+    data['my_role'] = membership == null ? 'member' : (membership['role'] ?? 'member').toString();
 
-    final countRows = await _db.from('group_members').select('id').eq('group_id', groupId);
-    data['members_count'] = (countRows as List).length;
+    final membersRows = await _db.from('group_members').select('id').eq('group_id', groupId);
+    data['members_count'] = (membersRows as List).length;
+
+    final eventsRows = await _db.from('events').select('id,status,starts_at').eq('group_id', groupId);
+    final events = List<Map<String, dynamic>>.from(eventsRows as List);
+    data['events_count'] = events.length;
+    data['next_events_count'] = events.where((e) {
+      if ((e['status'] ?? 'active').toString() == 'cancelled') return false;
+      final raw = e['starts_at'];
+      if (raw == null) return false;
+      return DateTime.tryParse(raw.toString())?.isAfter(DateTime.now().subtract(const Duration(hours: 2))) ?? false;
+    }).length;
+
+    final expensesRows = await _db.from('expenses').select('id,status').eq('group_id', groupId);
+    data['expenses_count'] = (expensesRows as List).length;
+
+    final tournamentsRows = await _db.from('tournaments').select('id,status').eq('group_id', groupId);
+    final tournaments = List<Map<String, dynamic>>.from(tournamentsRows as List);
+    data['tournaments_count'] = tournaments.length;
+    data['active_tournaments_count'] = tournaments.where((t) => (t['status'] ?? 'draft').toString() != 'finished').length;
+
     return data;
   }
 
-  Future<String> createGroup({
-    required String name,
-    String type = 'otro',
-    String privacy = 'privado',
-    String? defaultDays,
-    String? defaultTime,
-    String? defaultLocation,
-    int minPeople = 1,
-  }) async {
+  Future<String> createGroup({required String name}) async {
     final result = await _db.rpc('create_group_atomic', params: {
       'p_name': name.trim(),
-      'p_type': type,
+      'p_type': 'otro',
       'p_privacy': 'privado',
       'p_default_days': null,
       'p_default_time': null,
@@ -55,7 +66,7 @@ class GroupsRepository {
 
   Future<void> updateGroup(String groupId, Map<String, dynamic> values) async {
     await _db.from('groups').update({
-      ...values,
+      'name': values['name'],
       'privacy': 'privado',
       'default_days': null,
       'default_time': null,

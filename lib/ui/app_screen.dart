@@ -30,27 +30,47 @@ class AppScreen extends StatelessWidget {
           AppSpacing.xl,
         );
 
-    final body = SafeArea(
-      bottom: bottomNavigationBar == null,
-      child: scrollable
-          ? ListView(
-              padding: effectivePadding,
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              children: [child],
-            )
-          : Padding(
-              padding: effectivePadding,
-              child: child,
-            ),
+    Widget content = Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: scrollable
+            ? ListView(
+                padding: effectivePadding,
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                children: [child],
+              )
+            : Padding(
+                padding: effectivePadding,
+                child: child,
+              ),
+      ),
     );
 
+    content = SafeArea(bottom: bottomNavigationBar == null, child: content);
+
     return Scaffold(
-      backgroundColor: background ?? AppColors.canvas,
+      backgroundColor: background ?? AppColors.white,
       resizeToAvoidBottomInset: true,
       bottomNavigationBar: bottomNavigationBar == null
           ? null
-          : SafeArea(top: false, child: bottomNavigationBar!),
-      body: body,
+          : SafeArea(
+              top: false,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(
+                      color: AppColors.white,
+                      border: Border(top: BorderSide(color: AppColors.border)),
+                    ),
+                    child: bottomNavigationBar!,
+                  ),
+                ),
+              ),
+            ),
+      body: content,
     );
   }
 }

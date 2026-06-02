@@ -17,13 +17,15 @@ import '../../../ui/inputs.dart';
 import '../../../ui/loading_state.dart';
 import '../../../ui/status_chip.dart';
 import '../../../ui/toast.dart';
+import '../../../ui/group_bottom_nav.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/utils/safe_values.dart';
 import '../calendar_repository.dart';
 
 class CalendarScreen extends StatefulWidget {
   final String groupId;
-  const CalendarScreen({super.key, required this.groupId});
+  final int initialTab;
+  const CalendarScreen({super.key, required this.groupId, this.initialTab = 1});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
@@ -65,10 +67,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScreen(
+      bottomNavigationBar: GroupBottomNav(groupId: widget.groupId, index: widget.initialTab == 0 ? 0 : 1),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         AppHeader(
-          title: 'Calendario',
-          subtitle: 'Quedadas y asistencia del grupo.',
+          title: widget.initialTab == 0 ? 'Eventos' : 'Calendario',
+          subtitle: widget.initialTab == 0 ? 'Próximas quedadas, detalles y asistencia.' : 'Vista mensual para organizar al grupo.',
           showBack: true,
           trailing: IconButton.filled(onPressed: () => _createEvent(), icon: const Icon(Icons.add_rounded)),
         ),
@@ -80,12 +83,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
             if (snapshot.hasError) return AppCard(child: Text(humanError(snapshot.error!), style: AppTypography.body));
             final events = snapshot.data ?? [];
             final selectedEvents = _eventsFor(events, _selected);
-            final upcoming = events.where((e) {
+            final upcomingEvents = events.where((e) {
               final status = (e['status'] ?? 'active').toString();
               final raw = e['starts_at'];
               if (raw == null || status == 'cancelled') return false;
               return DateTime.parse(raw.toString()).isAfter(DateTime.now().subtract(const Duration(hours: 2)));
-            }).length;
+            }).toList();
+            final upcoming = upcomingEvents.length;
             return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Expanded(child: _MiniMetric(label: 'Este mes', value: '${events.length}', icon: Icons.event_available_rounded)),
@@ -93,6 +97,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 Expanded(child: _MiniMetric(label: 'Próximas', value: '$upcoming', icon: Icons.upcoming_rounded, color: AppColors.success)),
               ]),
               const SizedBox(height: AppSpacing.lg),
+              if (widget.initialTab == 0) ...[
+                SectionTitle(title: 'Próximas quedadas', actionLabel: 'Nueva', onAction: () => _createEvent()),
+                const SizedBox(height: AppSpacing.sm),
+                if (upcomingEvents.isEmpty)
+                  EmptyState(icon: Icons.event_available_rounded, title: 'No hay próximos eventos', body: 'Crea una quedada para que el grupo pueda confirmar asistencia.')
+                else
+                  ...upcomingEvents.take(5).map((event) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                    child: _EventCard(event: event, onTap: () => _openEvent(event)),
+                  )),
+                const SizedBox(height: AppSpacing.lg),
+                SectionTitle(title: 'Calendario rápido'),
+                const SizedBox(height: AppSpacing.sm),
+              ],
               AppCard(
                 padding: const EdgeInsets.all(AppSpacing.sm),
                 child: TableCalendar<Map<String, dynamic>>(

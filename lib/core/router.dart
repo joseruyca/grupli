@@ -33,6 +33,10 @@ class AppRouter {
         builder: (_, state) => GroupDetailScreen(groupId: state.pathParameters['groupId']!),
       ),
       GoRoute(
+        path: '/app/groups/:groupId/events',
+        builder: (_, state) => CalendarScreen(groupId: state.pathParameters['groupId']!, initialTab: 0),
+      ),
+      GoRoute(
         path: '/app/groups/:groupId/edit',
         builder: (_, state) => EditGroupScreen(groupId: state.pathParameters['groupId']!),
       ),
@@ -42,7 +46,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/app/groups/:groupId/calendar',
-        builder: (_, state) => CalendarScreen(groupId: state.pathParameters['groupId']!),
+        builder: (_, state) => CalendarScreen(groupId: state.pathParameters['groupId']!, initialTab: 1),
       ),
       GoRoute(
         path: '/app/groups/:groupId/finances',

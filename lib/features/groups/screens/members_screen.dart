@@ -12,6 +12,7 @@ import '../../../ui/avatar.dart';
 import '../../../ui/loading_state.dart';
 import '../../../ui/status_chip.dart';
 import '../../../ui/toast.dart';
+import '../../../ui/group_bottom_nav.dart';
 import '../groups_repository.dart';
 
 class MembersScreen extends StatefulWidget {
@@ -81,6 +82,7 @@ class _MembersScreenState extends State<MembersScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScreen(
+      bottomNavigationBar: GroupBottomNav(groupId: widget.groupId, index: 4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         AppHeader(
           title: 'Miembros',

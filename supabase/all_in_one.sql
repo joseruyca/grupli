@@ -65,11 +65,11 @@ CREATE TABLE public.groups (
   owner_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   name text NOT NULL CHECK (char_length(name) BETWEEN 2 AND 80),
   type text NOT NULL DEFAULT 'otro' CHECK (type IN ('deporte','cartas','otro')),
-  privacy text NOT NULL DEFAULT 'privado' CHECK (privacy IN ('privado','público','publico')),
+  privacy text NOT NULL DEFAULT 'privado' CHECK (privacy = 'privado'),
   default_days text,
   default_time text,
   default_location text,
-  min_people int NOT NULL DEFAULT 2 CHECK (min_people > 0),
+  min_people int NOT NULL DEFAULT 1 CHECK (min_people > 0),
   invite_code text NOT NULL UNIQUE DEFAULT public.random_invite_code(),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -898,6 +898,66 @@ $$;
 
 REVOKE ALL ON FUNCTION public.join_group_with_code(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.join_group_with_code(text) TO authenticated;
+
+
+
+-- Grupli v10 - perfiles robustos para app real
+-- Backfill: crea profiles/settings para usuarios ya existentes en auth.users.
+INSERT INTO public.profiles (id, email, full_name)
+SELECT
+  u.id,
+  u.email,
+  COALESCE(
+    NULLIF(u.raw_user_meta_data->>'full_name', ''),
+    NULLIF(u.raw_user_meta_data->>'name', ''),
+    NULLIF(split_part(COALESCE(u.email, 'Usuario'), '@', 1), ''),
+    'Usuario'
+  ) AS full_name
+FROM auth.users u
+ON CONFLICT (id) DO UPDATE SET
+  email = COALESCE(public.profiles.email, EXCLUDED.email),
+  full_name = COALESCE(NULLIF(public.profiles.full_name, ''), EXCLUDED.full_name),
+  updated_at = now();
+
+INSERT INTO public.user_settings (user_id)
+SELECT p.id FROM public.profiles p
+ON CONFLICT (user_id) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(
+      NULLIF(NEW.raw_user_meta_data->>'full_name', ''),
+      NULLIF(NEW.raw_user_meta_data->>'name', ''),
+      NULLIF(split_part(COALESCE(NEW.email, 'Usuario'), '@', 1), ''),
+      'Usuario'
+    )
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = COALESCE(public.profiles.email, EXCLUDED.email),
+    full_name = COALESCE(NULLIF(public.profiles.full_name, ''), EXCLUDED.full_name),
+    updated_at = now();
+
+  INSERT INTO public.user_settings (user_id)
+  VALUES (NEW.id)
+  ON CONFLICT (user_id) DO NOTHING;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created_grupli ON auth.users;
+CREATE TRIGGER on_auth_user_created_grupli
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user();
 
 COMMIT;
 

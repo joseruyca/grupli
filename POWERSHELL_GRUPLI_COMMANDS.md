@@ -7,7 +7,7 @@ Cambia solo el filtro del ZIP si la versión cambia.
 ```powershell
 $Dest = "$env:USERPROFILE\Desktop\grupliv2"
 
-$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v9.1-private-groups-profile-fix*.zip" |
+$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v11-premium-mockup-app*.zip" |
   Sort-Object LastWriteTime -Descending |
   Select-Object -First 1
 
@@ -74,7 +74,7 @@ cd "$env:USERPROFILE\Desktop\grupliv2"
 git remote -v
 
 git add .
-git commit -m "Update Grupli"
+git commit -m "Apply premium mockup navigation"
 git push -u origin main
 ```
 
@@ -86,11 +86,6 @@ origin  https://github.com/joseruyca/grupli.git (push)
 ```
 
 
-## SQL v9.1
+## SQL
 
-```powershell
-cd "$env:USERPROFILE\Desktop\grupliv2"
-Get-Content ".\supabase\patch_v9_1_private_group_creation.sql" | Set-Clipboard
-```
-
-Pegar en Supabase SQL Editor y ejecutar.
+Esta versión v11 no añade tablas nuevas. Si vienes de cero o Supabase está desordenado, ejecuta `supabase/all_in_one.sql`.

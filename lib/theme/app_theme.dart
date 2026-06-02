@@ -6,7 +6,7 @@ class AppTheme {
   static ThemeData get light {
     final base = ThemeData.light(useMaterial3: true);
     return base.copyWith(
-      scaffoldBackgroundColor: AppColors.canvas,
+      scaffoldBackgroundColor: AppColors.white,
       splashColor: Colors.transparent,
       highlightColor: Colors.transparent,
       colorScheme: ColorScheme.fromSeed(
@@ -18,7 +18,7 @@ class AppTheme {
         error: AppColors.danger,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.canvas,
+        backgroundColor: AppColors.white,
         foregroundColor: AppColors.navy,
         elevation: 0,
         centerTitle: false,
@@ -30,7 +30,7 @@ class AppTheme {
         hintStyle: const TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w500),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadii.md),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: const BorderSide(color: AppColors.borderStrong),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadii.md),
@@ -38,7 +38,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadii.md),
-          borderSide: const BorderSide(color: AppColors.teal, width: 1.6),
+          borderSide: const BorderSide(color: AppColors.teal, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadii.md),
@@ -46,8 +46,24 @@ class AppTheme {
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadii.md),
-          borderSide: const BorderSide(color: AppColors.danger, width: 1.6),
+          borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
         ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: AppColors.white,
+        indicatorColor: AppColors.tealSoft,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            color: selected ? AppColors.navy : AppColors.textMuted,
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            fontSize: 12,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(color: selected ? AppColors.tealDark : AppColors.textMuted, size: 24);
+        }),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(foregroundColor: AppColors.teal),

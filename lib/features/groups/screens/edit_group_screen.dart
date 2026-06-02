@@ -11,6 +11,7 @@ import '../../../ui/buttons.dart';
 import '../../../ui/inputs.dart';
 import '../../../ui/loading_state.dart';
 import '../../../ui/toast.dart';
+import '../../../ui/group_bottom_nav.dart';
 import '../../../shared/utils/validators.dart';
 import '../groups_repository.dart';
 
@@ -88,6 +89,7 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScreen(
+      bottomNavigationBar: GroupBottomNav(groupId: widget.groupId, index: 4),
       child: _loading
           ? const LoadingState()
           : Form(

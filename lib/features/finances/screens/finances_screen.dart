@@ -16,6 +16,7 @@ import '../../../ui/inputs.dart';
 import '../../../ui/loading_state.dart';
 import '../../../ui/status_chip.dart';
 import '../../../ui/toast.dart';
+import '../../../ui/group_bottom_nav.dart';
 import '../../../shared/utils/formatters.dart';
 import '../finance_calculator.dart';
 import '../finances_repository.dart';
@@ -88,6 +89,7 @@ class _FinancesScreenState extends State<FinancesScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScreen(
+      bottomNavigationBar: GroupBottomNav(groupId: widget.groupId, index: 2),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         AppHeader(
           title: 'Finanzas',
