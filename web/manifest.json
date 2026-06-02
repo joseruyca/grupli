@@ -4,8 +4,8 @@
   "start_url": ".",
   "display": "standalone",
   "background_color": "#FFFFFF",
-  "theme_color": "#0F2A3D",
-  "description": "Organiza grupos, quedadas, gastos y torneos.",
+  "theme_color": "#008F86",
+  "description": "Organiza grupos privados, eventos, calendario, finanzas y torneos.",
   "orientation": "portrait-primary",
   "prefer_related_applications": false,
   "icons": []

@@ -10,17 +10,13 @@ export CI=true
 if [ ! -d "$FLUTTER_HOME/.git" ]; then
   rm -rf "$FLUTTER_HOME"
   git clone https://github.com/flutter/flutter.git -b stable --depth 1 "$FLUTTER_HOME"
-else
-  git -C "$FLUTTER_HOME" status --short || true
 fi
 
 flutter --version
-flutter doctor -v
 flutter config --enable-web --no-analytics
 
 if [ "$1" = "install" ]; then
   flutter pub get
-  flutter pub deps --style=compact
 fi
 
 if [ "$1" = "build" ]; then

@@ -1,27 +1,26 @@
--- Grupli all_in_one.sql
--- Ejecutar en Supabase SQL Editor. Resetea las tablas propias de Grupli y crea RLS.
+-- Grupli v12 clean rebuild
+-- Ejecutar en Supabase SQL Editor para resetear la base de datos de Grupli.
+-- Borra SOLO las tablas propias de Grupli y las recrea con RLS.
 
 create extension if not exists "pgcrypto";
 
--- RESET ORDENADO
+begin;
+
+-- Drop policies/functions/tables safely
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+DROP FUNCTION IF EXISTS public.random_invite_code() CASCADE;
+DROP FUNCTION IF EXISTS public.ensure_current_profile() CASCADE;
 DROP FUNCTION IF EXISTS public.is_group_member(uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.is_group_admin(uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.is_group_owner(uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.create_group_atomic(text) CASCADE;
 DROP FUNCTION IF EXISTS public.join_group_with_code(text) CASCADE;
-DROP FUNCTION IF EXISTS public.regenerate_group_invite_code(uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.get_my_groups() CASCADE;
-DROP FUNCTION IF EXISTS public.get_group_balances(uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.create_group_atomic(text,text,text,text,text,text,int) CASCADE;
-DROP FUNCTION IF EXISTS public.ensure_current_profile() CASCADE;
-DROP FUNCTION IF EXISTS public.protect_group_owner_role() CASCADE;
+DROP FUNCTION IF EXISTS public.protect_owner_role() CASCADE;
 
 DROP TABLE IF EXISTS public.matches CASCADE;
-DROP TABLE IF EXISTS public.tournament_team_members CASCADE;
 DROP TABLE IF EXISTS public.tournament_teams CASCADE;
 DROP TABLE IF EXISTS public.tournaments CASCADE;
-DROP TABLE IF EXISTS public.settlements CASCADE;
 DROP TABLE IF EXISTS public.expense_participants CASCADE;
 DROP TABLE IF EXISTS public.expenses CASCADE;
 DROP TABLE IF EXISTS public.event_attendance CASCADE;
@@ -31,7 +30,6 @@ DROP TABLE IF EXISTS public.groups CASCADE;
 DROP TABLE IF EXISTS public.user_settings CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
 
--- HELPERS
 CREATE OR REPLACE FUNCTION public.random_invite_code()
 RETURNS text
 LANGUAGE sql
@@ -39,7 +37,6 @@ AS $$
   SELECT upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6));
 $$;
 
--- TABLES
 CREATE TABLE public.profiles (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email text,
@@ -49,13 +46,11 @@ CREATE TABLE public.profiles (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-
 CREATE TABLE public.user_settings (
   user_id uuid PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
   notify_events boolean NOT NULL DEFAULT true,
   notify_expenses boolean NOT NULL DEFAULT true,
   notify_tournaments boolean NOT NULL DEFAULT true,
-  theme text NOT NULL DEFAULT 'light' CHECK (theme IN ('light')),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -63,13 +58,9 @@ CREATE TABLE public.user_settings (
 CREATE TABLE public.groups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  name text NOT NULL CHECK (char_length(name) BETWEEN 2 AND 80),
+  name text NOT NULL CHECK (char_length(trim(name)) BETWEEN 2 AND 80),
   type text NOT NULL DEFAULT 'otro' CHECK (type IN ('deporte','cartas','otro')),
   privacy text NOT NULL DEFAULT 'privado' CHECK (privacy = 'privado'),
-  default_days text,
-  default_time text,
-  default_location text,
-  min_people int NOT NULL DEFAULT 1 CHECK (min_people > 0),
   invite_code text NOT NULL UNIQUE DEFAULT public.random_invite_code(),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -87,11 +78,11 @@ CREATE TABLE public.group_members (
 CREATE TABLE public.events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id uuid NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
-  title text NOT NULL,
+  title text NOT NULL CHECK (char_length(trim(title)) >= 2),
   starts_at timestamptz NOT NULL,
   location text,
   notes text,
-  min_people int NOT NULL DEFAULT 2,
+  min_people int NOT NULL DEFAULT 2 CHECK (min_people > 0),
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','cancelled')),
   created_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -111,7 +102,7 @@ CREATE TABLE public.event_attendance (
 CREATE TABLE public.expenses (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id uuid NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
-  concept text NOT NULL,
+  concept text NOT NULL CHECK (char_length(trim(concept)) >= 2),
   amount numeric(12,2) NOT NULL CHECK (amount > 0),
   paid_by uuid NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
   created_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -131,26 +122,12 @@ CREATE TABLE public.expense_participants (
   UNIQUE(expense_id, user_id)
 );
 
-CREATE TABLE public.settlements (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  group_id uuid NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
-  from_user uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  to_user uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  amount numeric(12,2) NOT NULL CHECK (amount > 0),
-  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','cancelled')),
-  created_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
 CREATE TABLE public.tournaments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id uuid NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
-  name text NOT NULL,
+  name text NOT NULL CHECK (char_length(trim(name)) >= 2),
   format text NOT NULL DEFAULT 'liga' CHECK (format IN ('liga','eliminatoria','americano')),
-  team_type text NOT NULL DEFAULT 'individual' CHECK (team_type IN ('individual','pareja','equipo')),
-  points_win int NOT NULL DEFAULT 3,
-  points_draw int NOT NULL DEFAULT 1,
+  team_type text NOT NULL DEFAULT 'equipo' CHECK (team_type IN ('individual','pareja','equipo')),
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','finished')),
   created_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -160,16 +137,8 @@ CREATE TABLE public.tournaments (
 CREATE TABLE public.tournament_teams (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tournament_id uuid NOT NULL REFERENCES public.tournaments(id) ON DELETE CASCADE,
-  name text NOT NULL,
+  name text NOT NULL CHECK (char_length(trim(name)) >= 2),
   created_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE public.tournament_team_members (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_id uuid NOT NULL REFERENCES public.tournament_teams(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(team_id, user_id)
 );
 
 CREATE TABLE public.matches (
@@ -186,557 +155,11 @@ CREATE TABLE public.matches (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- FUNCTIONS RLS SAFE
-CREATE OR REPLACE FUNCTION public.is_group_member(target_group_id uuid)
-RETURNS boolean
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.group_members gm
-    WHERE gm.group_id = target_group_id AND gm.user_id = auth.uid()
-  );
-$$;
-
-CREATE OR REPLACE FUNCTION public.is_group_admin(target_group_id uuid)
-RETURNS boolean
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.group_members gm
-    WHERE gm.group_id = target_group_id AND gm.user_id = auth.uid() AND gm.role IN ('owner','admin')
-  );
-$$;
-
-CREATE OR REPLACE FUNCTION public.is_group_owner(target_group_id uuid)
-RETURNS boolean
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.groups g
-    WHERE g.id = target_group_id AND g.owner_id = auth.uid()
-  );
-$$;
-
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email, full_name)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1), 'Usuario')
-  )
-  ON CONFLICT (id) DO UPDATE SET
-    email = EXCLUDED.email,
-    full_name = COALESCE(profiles.full_name, EXCLUDED.full_name),
-    updated_at = now();
-  RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER on_auth_user_created
-AFTER INSERT ON auth.users
-FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
-
--- Grupli v6.5 - Fix creación de grupos con RLS
--- Ejecutar en Supabase SQL Editor.
-
-CREATE OR REPLACE FUNCTION public.create_group_atomic(
-  p_name text,
-  p_type text DEFAULT 'otro',
-  p_privacy text DEFAULT 'privado',
-  p_default_days text DEFAULT NULL,
-  p_default_time text DEFAULT NULL,
-  p_default_location text DEFAULT NULL,
-  p_min_people int DEFAULT 2
-)
-RETURNS uuid
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  new_group_id uuid;
-  clean_name text;
-  clean_type text;
-  clean_privacy text;
-BEGIN
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'Usuario no autenticado';
-  END IF;
-
-  clean_name := trim(coalesce(p_name, ''));
-  IF char_length(clean_name) < 2 THEN
-    RAISE EXCEPTION 'El nombre del grupo es demasiado corto';
-  END IF;
-
-  clean_type := lower(trim(coalesce(p_type, 'otro')));
-  IF clean_type NOT IN ('deporte', 'cartas', 'otro') THEN
-    clean_type := 'otro';
-  END IF;
-
-  clean_privacy := lower(trim(coalesce(p_privacy, 'privado')));
-  IF clean_privacy NOT IN ('privado', 'público', 'publico') THEN
-    clean_privacy := 'privado';
-  END IF;
-
-  INSERT INTO public.groups (
-    owner_id,
-    name,
-    type,
-    privacy,
-    default_days,
-    default_time,
-    default_location,
-    min_people
-  ) VALUES (
-    auth.uid(),
-    clean_name,
-    clean_type,
-    clean_privacy,
-    NULLIF(trim(coalesce(p_default_days, '')), ''),
-    NULLIF(trim(coalesce(p_default_time, '')), ''),
-    NULLIF(trim(coalesce(p_default_location, '')), ''),
-    greatest(coalesce(p_min_people, 2), 1)
-  )
-  RETURNING id INTO new_group_id;
-
-  INSERT INTO public.group_members (group_id, user_id, role)
-  VALUES (new_group_id, auth.uid(), 'owner')
-  ON CONFLICT (group_id, user_id) DO NOTHING;
-
-  RETURN new_group_id;
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.create_group_atomic(
-  text, text, text, text, text, text, int
-) TO authenticated;
-
-CREATE OR REPLACE FUNCTION public.join_group_with_code(code text)
-RETURNS uuid
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  gid uuid;
-BEGIN
-  SELECT id INTO gid FROM public.groups WHERE invite_code = upper(trim(code));
-  IF gid IS NULL THEN
-    RAISE EXCEPTION 'Código de invitación no válido.';
-  END IF;
-
-  INSERT INTO public.group_members(group_id, user_id, role)
-  VALUES (gid, auth.uid(), 'member')
-  ON CONFLICT (group_id, user_id) DO NOTHING;
-
-  RETURN gid;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.regenerate_group_invite_code(target_group_id uuid)
-RETURNS text
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  new_code text;
-BEGIN
-  IF NOT public.is_group_admin(target_group_id) THEN
-    RAISE EXCEPTION 'Solo admin u owner pueden regenerar el código.';
-  END IF;
-
-  new_code := public.random_invite_code();
-  UPDATE public.groups SET invite_code = new_code, updated_at = now() WHERE id = target_group_id;
-  RETURN new_code;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.get_my_groups()
-RETURNS TABLE (
-  id uuid,
-  name text,
-  type text,
-  privacy text,
-  default_days text,
-  default_time text,
-  default_location text,
-  min_people int,
-  invite_code text,
-  role text,
-  members_count int,
-  balance numeric
-)
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT
-    g.id,
-    g.name,
-    g.type,
-    g.privacy,
-    g.default_days,
-    g.default_time,
-    g.default_location,
-    g.min_people,
-    g.invite_code,
-    gm.role,
-    (SELECT count(*)::int FROM public.group_members x WHERE x.group_id = g.id) AS members_count,
-    0::numeric AS balance
-  FROM public.groups g
-  JOIN public.group_members gm ON gm.group_id = g.id
-  WHERE gm.user_id = auth.uid()
-  ORDER BY g.created_at DESC;
-$$;
-
-CREATE OR REPLACE FUNCTION public.get_group_balances(target_group_id uuid)
-RETURNS TABLE (
-  debtor_id uuid,
-  debtor_name text,
-  creditor_id uuid,
-  creditor_name text,
-  amount numeric
-)
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT
-    ep.user_id AS debtor_id,
-    COALESCE(dp.full_name, dp.email, 'Usuario') AS debtor_name,
-    e.paid_by AS creditor_id,
-    COALESCE(cp.full_name, cp.email, 'Usuario') AS creditor_name,
-    round(sum(ep.share_amount), 2) AS amount
-  FROM public.expense_participants ep
-  JOIN public.expenses e ON e.id = ep.expense_id
-  LEFT JOIN public.profiles dp ON dp.id = ep.user_id
-  LEFT JOIN public.profiles cp ON cp.id = e.paid_by
-  WHERE e.group_id = target_group_id
-    AND ep.user_id <> e.paid_by
-    AND e.status <> 'cancelled'
-  GROUP BY ep.user_id, dp.full_name, dp.email, e.paid_by, cp.full_name, cp.email
-  HAVING round(sum(ep.share_amount), 2) > 0
-  ORDER BY amount DESC;
-$$;
-
-CREATE OR REPLACE FUNCTION public.protect_group_owner_role()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  IF OLD.role = 'owner' AND (TG_OP = 'DELETE' OR NEW.role <> 'owner') THEN
-    RAISE EXCEPTION 'No se puede expulsar ni degradar al owner del grupo.';
-  END IF;
-  RETURN COALESCE(NEW, OLD);
-END;
-$$;
-
-CREATE TRIGGER protect_group_owner_update
-BEFORE UPDATE OR DELETE ON public.group_members
-FOR EACH ROW EXECUTE FUNCTION public.protect_group_owner_role();
-
--- RLS
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.groups ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.group_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.event_attendance ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.expense_participants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.settlements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tournaments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tournament_teams ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tournament_team_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.matches ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY profiles_select_own_or_group ON public.profiles FOR SELECT TO authenticated USING (
-  id = auth.uid() OR EXISTS (
-    SELECT 1 FROM public.group_members a
-    JOIN public.group_members b ON b.group_id = a.group_id
-    WHERE a.user_id = auth.uid() AND b.user_id = profiles.id
-  )
-);
-CREATE POLICY profiles_insert_own ON public.profiles FOR INSERT TO authenticated WITH CHECK (id = auth.uid());
-CREATE POLICY profiles_update_own ON public.profiles FOR UPDATE TO authenticated USING (id = auth.uid()) WITH CHECK (id = auth.uid());
-
-
-CREATE POLICY user_settings_select_self ON public.user_settings FOR SELECT TO authenticated USING (user_id = auth.uid());
-CREATE POLICY user_settings_insert_self ON public.user_settings FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
-CREATE POLICY user_settings_update_self ON public.user_settings FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
-CREATE POLICY user_settings_delete_self ON public.user_settings FOR DELETE TO authenticated USING (user_id = auth.uid());
-
-CREATE POLICY groups_select_member ON public.groups FOR SELECT TO authenticated USING (public.is_group_member(id));
-CREATE POLICY groups_insert_owner ON public.groups FOR INSERT TO authenticated WITH CHECK (owner_id = auth.uid());
-CREATE POLICY groups_update_admin ON public.groups FOR UPDATE TO authenticated USING (public.is_group_admin(id)) WITH CHECK (public.is_group_admin(id));
-CREATE POLICY groups_delete_owner ON public.groups FOR DELETE TO authenticated USING (public.is_group_owner(id));
-
-CREATE POLICY group_members_select_member ON public.group_members FOR SELECT TO authenticated USING (public.is_group_member(group_id));
-CREATE POLICY group_members_insert_admin ON public.group_members FOR INSERT TO authenticated WITH CHECK (
-  public.is_group_admin(group_id)
-  OR (user_id = auth.uid() AND role = 'owner' AND EXISTS (SELECT 1 FROM public.groups g WHERE g.id = group_id AND g.owner_id = auth.uid()))
-);
-CREATE POLICY group_members_update_admin ON public.group_members FOR UPDATE TO authenticated USING (public.is_group_admin(group_id)) WITH CHECK (public.is_group_admin(group_id));
-CREATE POLICY group_members_delete_admin_or_self ON public.group_members FOR DELETE TO authenticated USING (public.is_group_admin(group_id) OR user_id = auth.uid());
-
-CREATE POLICY events_select_member ON public.events FOR SELECT TO authenticated USING (public.is_group_member(group_id));
-CREATE POLICY events_insert_member ON public.events FOR INSERT TO authenticated WITH CHECK (public.is_group_member(group_id));
-CREATE POLICY events_update_admin ON public.events FOR UPDATE TO authenticated USING (public.is_group_admin(group_id)) WITH CHECK (public.is_group_admin(group_id));
-CREATE POLICY events_delete_admin ON public.events FOR DELETE TO authenticated USING (public.is_group_admin(group_id));
-
-CREATE POLICY attendance_select_member ON public.event_attendance FOR SELECT TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.events e WHERE e.id = event_id AND public.is_group_member(e.group_id))
-);
-CREATE POLICY attendance_insert_self_member ON public.event_attendance FOR INSERT TO authenticated WITH CHECK (
-  user_id = auth.uid() AND EXISTS (SELECT 1 FROM public.events e WHERE e.id = event_id AND public.is_group_member(e.group_id))
-);
-CREATE POLICY attendance_update_self_member ON public.event_attendance FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY expenses_select_member ON public.expenses FOR SELECT TO authenticated USING (public.is_group_member(group_id));
-CREATE POLICY expenses_insert_member ON public.expenses FOR INSERT TO authenticated WITH CHECK (public.is_group_member(group_id));
-CREATE POLICY expenses_update_admin_or_creator ON public.expenses FOR UPDATE TO authenticated USING (public.is_group_admin(group_id) OR created_by = auth.uid()) WITH CHECK (public.is_group_member(group_id));
-CREATE POLICY expenses_delete_admin_or_creator ON public.expenses FOR DELETE TO authenticated USING (public.is_group_admin(group_id) OR created_by = auth.uid());
-
-CREATE POLICY expense_participants_select_member ON public.expense_participants FOR SELECT TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.expenses e WHERE e.id = expense_id AND public.is_group_member(e.group_id))
-);
-CREATE POLICY expense_participants_insert_member ON public.expense_participants FOR INSERT TO authenticated WITH CHECK (
-  EXISTS (SELECT 1 FROM public.expenses e WHERE e.id = expense_id AND public.is_group_member(e.group_id))
-);
-CREATE POLICY expense_participants_update_member ON public.expense_participants FOR UPDATE TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.expenses e WHERE e.id = expense_id AND public.is_group_member(e.group_id))
-) WITH CHECK (
-  EXISTS (SELECT 1 FROM public.expenses e WHERE e.id = expense_id AND public.is_group_member(e.group_id))
-);
-
-CREATE POLICY settlements_all_member ON public.settlements FOR ALL TO authenticated USING (public.is_group_member(group_id)) WITH CHECK (public.is_group_member(group_id));
-CREATE POLICY tournaments_all_member ON public.tournaments FOR ALL TO authenticated USING (public.is_group_member(group_id)) WITH CHECK (public.is_group_member(group_id));
-CREATE POLICY tournament_teams_all_member ON public.tournament_teams FOR ALL TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id))
-) WITH CHECK (
-  EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id))
-);
-CREATE POLICY tournament_team_members_all_member ON public.tournament_team_members FOR ALL TO authenticated USING (
-  EXISTS (
-    SELECT 1 FROM public.tournament_teams tt
-    JOIN public.tournaments t ON t.id = tt.tournament_id
-    WHERE tt.id = team_id AND public.is_group_member(t.group_id)
-  )
-) WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.tournament_teams tt
-    JOIN public.tournaments t ON t.id = tt.tournament_id
-    WHERE tt.id = team_id AND public.is_group_member(t.group_id)
-  )
-);
-CREATE POLICY matches_all_member ON public.matches FOR ALL TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id))
-) WITH CHECK (
-  EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id))
-);
-
--- STORAGE
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('avatars', 'avatars', true)
-ON CONFLICT (id) DO UPDATE SET public = true;
-
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('group-assets', 'group-assets', true)
-ON CONFLICT (id) DO UPDATE SET public = true;
-
-DROP POLICY IF EXISTS avatars_select_public ON storage.objects;
-DROP POLICY IF EXISTS avatars_insert_own ON storage.objects;
-DROP POLICY IF EXISTS avatars_update_own ON storage.objects;
-DROP POLICY IF EXISTS avatars_delete_own ON storage.objects;
-DROP POLICY IF EXISTS group_assets_select_member ON storage.objects;
-DROP POLICY IF EXISTS group_assets_insert_member ON storage.objects;
-DROP POLICY IF EXISTS group_assets_update_admin ON storage.objects;
-DROP POLICY IF EXISTS group_assets_delete_admin ON storage.objects;
-
-CREATE POLICY avatars_select_public ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
-CREATE POLICY avatars_insert_own ON storage.objects FOR INSERT TO authenticated WITH CHECK (
-  bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text
-);
-CREATE POLICY avatars_update_own ON storage.objects FOR UPDATE TO authenticated USING (
-  bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text
-) WITH CHECK (
-  bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text
-);
-CREATE POLICY avatars_delete_own ON storage.objects FOR DELETE TO authenticated USING (
-  bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text
-);
-
-CREATE POLICY group_assets_select_member ON storage.objects FOR SELECT TO authenticated USING (
-  bucket_id = 'group-assets' AND public.is_group_member(((storage.foldername(name))[1])::uuid)
-);
-CREATE POLICY group_assets_insert_member ON storage.objects FOR INSERT TO authenticated WITH CHECK (
-  bucket_id = 'group-assets' AND public.is_group_member(((storage.foldername(name))[1])::uuid)
-);
-CREATE POLICY group_assets_update_admin ON storage.objects FOR UPDATE TO authenticated USING (
-  bucket_id = 'group-assets' AND public.is_group_admin(((storage.foldername(name))[1])::uuid)
-) WITH CHECK (
-  bucket_id = 'group-assets' AND public.is_group_admin(((storage.foldername(name))[1])::uuid)
-);
-CREATE POLICY group_assets_delete_admin ON storage.objects FOR DELETE TO authenticated USING (
-  bucket_id = 'group-assets' AND public.is_group_admin(((storage.foldername(name))[1])::uuid)
-);
-
--- Realtime preparado
-ALTER PUBLICATION supabase_realtime ADD TABLE public.groups;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.group_members;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.event_attendance;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.expenses;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.tournaments;
--- Grupli v9 - RLS hardening + security diagnostics
--- Ejecutar después del SQL principal y después de patch_v8_profile_settings.sql.
--- Objetivo: cerrar funciones SECURITY DEFINER y evitar lecturas/modificaciones cruzadas.
-
--- 1) get_group_balances debe comprobar que el usuario autenticado pertenece al grupo.
-CREATE OR REPLACE FUNCTION public.get_group_balances(target_group_id uuid)
-RETURNS TABLE (
-  debtor_id uuid,
-  debtor_name text,
-  creditor_id uuid,
-  creditor_name text,
-  amount numeric
-)
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT
-    ep.user_id AS debtor_id,
-    COALESCE(dp.full_name, dp.email, 'Usuario') AS debtor_name,
-    e.paid_by AS creditor_id,
-    COALESCE(cp.full_name, cp.email, 'Usuario') AS creditor_name,
-    round(sum(ep.share_amount), 2) AS amount
-  FROM public.expense_participants ep
-  JOIN public.expenses e ON e.id = ep.expense_id
-  LEFT JOIN public.profiles dp ON dp.id = ep.user_id
-  LEFT JOIN public.profiles cp ON cp.id = e.paid_by
-  WHERE public.is_group_member(target_group_id)
-    AND e.group_id = target_group_id
-    AND ep.user_id <> e.paid_by
-    AND e.status <> 'cancelled'
-  GROUP BY ep.user_id, dp.full_name, dp.email, e.paid_by, cp.full_name, cp.email
-  HAVING round(sum(ep.share_amount), 2) > 0
-  ORDER BY amount DESC;
-$$;
-
-REVOKE ALL ON FUNCTION public.get_group_balances(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.get_group_balances(uuid) TO authenticated;
-
--- 2) Restringir ejecución pública de funciones SECURITY DEFINER críticas.
-REVOKE ALL ON FUNCTION public.create_group_atomic(text,text,text,text,text,text,int) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.join_group_with_code(text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.regenerate_group_invite_code(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.get_my_groups() FROM PUBLIC;
-
-GRANT EXECUTE ON FUNCTION public.create_group_atomic(text,text,text,text,text,text,int) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.join_group_with_code(text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.regenerate_group_invite_code(uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_my_groups() TO authenticated;
-
--- 3) Endurecer expense_participants: solo admin o creador del gasto puede crear/editar participantes.
-DROP POLICY IF EXISTS expense_participants_insert_member ON public.expense_participants;
-DROP POLICY IF EXISTS expense_participants_update_member ON public.expense_participants;
-DROP POLICY IF EXISTS expense_participants_delete_member ON public.expense_participants;
-
-CREATE POLICY expense_participants_insert_admin_or_expense_creator
-ON public.expense_participants
-FOR INSERT TO authenticated
-WITH CHECK (
-  EXISTS (
-    SELECT 1
-    FROM public.expenses e
-    WHERE e.id = expense_id
-      AND public.is_group_member(e.group_id)
-      AND (public.is_group_admin(e.group_id) OR e.created_by = auth.uid())
-  )
-);
-
-CREATE POLICY expense_participants_update_admin_or_expense_creator
-ON public.expense_participants
-FOR UPDATE TO authenticated
-USING (
-  EXISTS (
-    SELECT 1
-    FROM public.expenses e
-    WHERE e.id = expense_id
-      AND public.is_group_member(e.group_id)
-      AND (public.is_group_admin(e.group_id) OR e.created_by = auth.uid())
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1
-    FROM public.expenses e
-    WHERE e.id = expense_id
-      AND public.is_group_member(e.group_id)
-      AND (public.is_group_admin(e.group_id) OR e.created_by = auth.uid())
-  )
-);
-
-CREATE POLICY expense_participants_delete_admin_or_expense_creator
-ON public.expense_participants
-FOR DELETE TO authenticated
-USING (
-  EXISTS (
-    SELECT 1
-    FROM public.expenses e
-    WHERE e.id = expense_id
-      AND public.is_group_member(e.group_id)
-      AND (public.is_group_admin(e.group_id) OR e.created_by = auth.uid())
-  )
-);
-
--- 4) Diagnóstico rápido: debe devolver solo filas con ok = true.
-CREATE OR REPLACE VIEW public.v_grupli_security_diagnostics AS
-SELECT 'profiles RLS enabled' AS check_name, rowsecurity AS ok FROM pg_tables WHERE schemaname = 'public' AND tablename = 'profiles'
-UNION ALL SELECT 'groups RLS enabled', rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename = 'groups'
-UNION ALL SELECT 'group_members RLS enabled', rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename = 'group_members'
-UNION ALL SELECT 'events RLS enabled', rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename = 'events'
-UNION ALL SELECT 'event_attendance RLS enabled', rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename = 'event_attendance'
-UNION ALL SELECT 'expenses RLS enabled', rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename = 'expenses'
-UNION ALL SELECT 'expense_participants RLS enabled', rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename = 'expense_participants'
-UNION ALL SELECT 'settlements RLS enabled', rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename = 'settlements'
-UNION ALL SELECT 'tournaments RLS enabled', rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename = 'tournaments'
-UNION ALL SELECT 'tournament_teams RLS enabled', rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename = 'tournament_teams'
-UNION ALL SELECT 'matches RLS enabled', rowsecurity FROM pg_tables WHERE schemaname = 'public' AND tablename = 'matches'
-UNION ALL SELECT 'avatars bucket exists', EXISTS(SELECT 1 FROM storage.buckets WHERE id = 'avatars')
-UNION ALL SELECT 'group-assets bucket exists', EXISTS(SELECT 1 FROM storage.buckets WHERE id = 'group-assets')
-UNION ALL SELECT 'create_group_atomic exists', to_regprocedure('public.create_group_atomic(text,text,text,text,text,text,int)') IS NOT NULL
-UNION ALL SELECT 'get_group_balances exists', to_regprocedure('public.get_group_balances(uuid)') IS NOT NULL;
-
-GRANT SELECT ON public.v_grupli_security_diagnostics TO authenticated;
-
-
-
--- Grupli v9.1 - grupos privados simples + fix perfil ausente
--- Ejecutar en Supabase SQL Editor si vienes de una versión anterior.
--- Soluciona:
--- 1) foreign key groups_owner_id_fkey cuando el usuario autenticado no existe en profiles
--- 2) creación de grupos siempre privados/cerrados
--- 3) acceso por código creando antes el perfil del usuario invitado
-
-BEGIN;
+CREATE INDEX idx_group_members_group ON public.group_members(group_id);
+CREATE INDEX idx_group_members_user ON public.group_members(user_id);
+CREATE INDEX idx_events_group_start ON public.events(group_id, starts_at);
+CREATE INDEX idx_expenses_group_created ON public.expenses(group_id, created_at DESC);
+CREATE INDEX idx_tournaments_group_created ON public.tournaments(group_id, created_at DESC);
 
 CREATE OR REPLACE FUNCTION public.ensure_current_profile()
 RETURNS void
@@ -763,8 +186,8 @@ BEGIN
   INSERT INTO public.profiles (id, email, full_name)
   VALUES (auth.uid(), clean_email, clean_name)
   ON CONFLICT (id) DO UPDATE SET
-    email = COALESCE(profiles.email, EXCLUDED.email),
-    full_name = COALESCE(NULLIF(profiles.full_name, ''), EXCLUDED.full_name),
+    email = COALESCE(EXCLUDED.email, profiles.email),
+    full_name = COALESCE(NULLIF(profiles.full_name, ''), EXCLUDED.full_name, 'Usuario'),
     updated_at = now();
 
   INSERT INTO public.user_settings (user_id)
@@ -773,39 +196,57 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.ensure_current_profile() TO authenticated;
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1), 'Usuario')
+  )
+  ON CONFLICT (id) DO NOTHING;
 
--- Pasar cualquier grupo antiguo a la nueva regla: cerrado, sin planificación global.
-UPDATE public.groups
-SET
-  privacy = 'privado',
-  default_days = NULL,
-  default_time = NULL,
-  default_location = NULL,
-  min_people = 1,
-  updated_at = now()
-WHERE privacy <> 'privado'
-   OR default_days IS NOT NULL
-   OR default_time IS NOT NULL
-   OR default_location IS NOT NULL
-   OR min_people <> 1;
+  INSERT INTO public.user_settings (user_id)
+  VALUES (NEW.id)
+  ON CONFLICT (user_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
 
-ALTER TABLE public.groups ALTER COLUMN min_people SET DEFAULT 1;
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
-ALTER TABLE public.groups DROP CONSTRAINT IF EXISTS groups_privacy_check;
-ALTER TABLE public.groups DROP CONSTRAINT IF EXISTS groups_privacy_private_only;
-ALTER TABLE public.groups
-  ADD CONSTRAINT groups_privacy_private_only CHECK (privacy = 'privado');
+CREATE OR REPLACE FUNCTION public.is_group_member(target_group_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.group_members gm
+    WHERE gm.group_id = target_group_id AND gm.user_id = auth.uid()
+  );
+$$;
 
-CREATE OR REPLACE FUNCTION public.create_group_atomic(
-  p_name text,
-  p_type text DEFAULT 'otro',
-  p_privacy text DEFAULT 'privado',
-  p_default_days text DEFAULT NULL,
-  p_default_time text DEFAULT NULL,
-  p_default_location text DEFAULT NULL,
-  p_min_people int DEFAULT 1
-)
+CREATE OR REPLACE FUNCTION public.is_group_admin(target_group_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.group_members gm
+    WHERE gm.group_id = target_group_id AND gm.user_id = auth.uid() AND gm.role IN ('owner','admin')
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.create_group_atomic(p_name text)
 RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -814,43 +255,20 @@ AS $$
 DECLARE
   new_group_id uuid;
   clean_name text;
-  clean_type text;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Usuario no autenticado';
   END IF;
 
   PERFORM public.ensure_current_profile();
-
   clean_name := trim(coalesce(p_name, ''));
+
   IF char_length(clean_name) < 2 THEN
     RAISE EXCEPTION 'El nombre del grupo es demasiado corto';
   END IF;
 
-  clean_type := lower(trim(coalesce(p_type, 'otro')));
-  IF clean_type NOT IN ('deporte', 'cartas', 'otro') THEN
-    clean_type := 'otro';
-  END IF;
-
-  INSERT INTO public.groups (
-    owner_id,
-    name,
-    type,
-    privacy,
-    default_days,
-    default_time,
-    default_location,
-    min_people
-  ) VALUES (
-    auth.uid(),
-    clean_name,
-    clean_type,
-    'privado',
-    NULL,
-    NULL,
-    NULL,
-    1
-  )
+  INSERT INTO public.groups (owner_id, name, type, privacy)
+  VALUES (auth.uid(), clean_name, 'otro', 'privado')
   RETURNING id INTO new_group_id;
 
   INSERT INTO public.group_members (group_id, user_id, role)
@@ -860,9 +278,6 @@ BEGIN
   RETURN new_group_id;
 END;
 $$;
-
-REVOKE ALL ON FUNCTION public.create_group_atomic(text,text,text,text,text,text,int) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.create_group_atomic(text,text,text,text,text,text,int) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.join_group_with_code(code text)
 RETURNS uuid
@@ -879,13 +294,9 @@ BEGIN
 
   PERFORM public.ensure_current_profile();
 
-  SELECT id INTO gid
-  FROM public.groups
-  WHERE invite_code = upper(trim(code))
-    AND privacy = 'privado';
-
+  SELECT id INTO gid FROM public.groups WHERE invite_code = upper(trim(code));
   IF gid IS NULL THEN
-    RAISE EXCEPTION 'Código de invitación no válido.';
+    RAISE EXCEPTION 'Código de invitación no válido';
   END IF;
 
   INSERT INTO public.group_members(group_id, user_id, role)
@@ -896,68 +307,124 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.join_group_with_code(text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.join_group_with_code(text) TO authenticated;
+CREATE OR REPLACE FUNCTION public.get_my_groups()
+RETURNS TABLE (
+  id uuid,
+  name text,
+  type text,
+  privacy text,
+  invite_code text,
+  role text,
+  members_count int,
+  events_count int,
+  balance numeric,
+  created_at timestamptz
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    g.id,
+    g.name,
+    g.type,
+    g.privacy,
+    g.invite_code,
+    gm.role,
+    (SELECT count(*)::int FROM public.group_members x WHERE x.group_id = g.id) AS members_count,
+    (SELECT count(*)::int FROM public.events e WHERE e.group_id = g.id AND e.status = 'active' AND e.starts_at >= now() - interval '2 hours') AS events_count,
+    0::numeric AS balance,
+    g.created_at
+  FROM public.groups g
+  JOIN public.group_members gm ON gm.group_id = g.id
+  WHERE gm.user_id = auth.uid()
+  ORDER BY g.created_at DESC;
+$$;
 
-
-
--- Grupli v10 - perfiles robustos para app real
--- Backfill: crea profiles/settings para usuarios ya existentes en auth.users.
-INSERT INTO public.profiles (id, email, full_name)
-SELECT
-  u.id,
-  u.email,
-  COALESCE(
-    NULLIF(u.raw_user_meta_data->>'full_name', ''),
-    NULLIF(u.raw_user_meta_data->>'name', ''),
-    NULLIF(split_part(COALESCE(u.email, 'Usuario'), '@', 1), ''),
-    'Usuario'
-  ) AS full_name
-FROM auth.users u
-ON CONFLICT (id) DO UPDATE SET
-  email = COALESCE(public.profiles.email, EXCLUDED.email),
-  full_name = COALESCE(NULLIF(public.profiles.full_name, ''), EXCLUDED.full_name),
-  updated_at = now();
-
-INSERT INTO public.user_settings (user_id)
-SELECT p.id FROM public.profiles p
-ON CONFLICT (user_id) DO NOTHING;
-
-CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
+CREATE OR REPLACE FUNCTION public.protect_owner_role()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, full_name)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE(
-      NULLIF(NEW.raw_user_meta_data->>'full_name', ''),
-      NULLIF(NEW.raw_user_meta_data->>'name', ''),
-      NULLIF(split_part(COALESCE(NEW.email, 'Usuario'), '@', 1), ''),
-      'Usuario'
-    )
-  )
-  ON CONFLICT (id) DO UPDATE SET
-    email = COALESCE(public.profiles.email, EXCLUDED.email),
-    full_name = COALESCE(NULLIF(public.profiles.full_name, ''), EXCLUDED.full_name),
-    updated_at = now();
-
-  INSERT INTO public.user_settings (user_id)
-  VALUES (NEW.id)
-  ON CONFLICT (user_id) DO NOTHING;
-
-  RETURN NEW;
+  IF OLD.role = 'owner' AND (TG_OP = 'DELETE' OR NEW.role <> 'owner') THEN
+    RAISE EXCEPTION 'No se puede expulsar ni degradar al creador del grupo';
+  END IF;
+  RETURN COALESCE(NEW, OLD);
 END;
 $$;
 
-DROP TRIGGER IF EXISTS on_auth_user_created_grupli ON auth.users;
-CREATE TRIGGER on_auth_user_created_grupli
-AFTER INSERT ON auth.users
-FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user();
+CREATE TRIGGER protect_owner_role_trigger
+BEFORE UPDATE OR DELETE ON public.group_members
+FOR EACH ROW EXECUTE FUNCTION public.protect_owner_role();
 
-COMMIT;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_attendance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.expense_participants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tournaments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tournament_teams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.matches ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY profiles_select_related ON public.profiles FOR SELECT TO authenticated USING (
+  id = auth.uid() OR EXISTS (
+    SELECT 1 FROM public.group_members a JOIN public.group_members b ON b.group_id = a.group_id
+    WHERE a.user_id = auth.uid() AND b.user_id = profiles.id
+  )
+);
+CREATE POLICY profiles_insert_self ON public.profiles FOR INSERT TO authenticated WITH CHECK (id = auth.uid());
+CREATE POLICY profiles_update_self ON public.profiles FOR UPDATE TO authenticated USING (id = auth.uid()) WITH CHECK (id = auth.uid());
+
+CREATE POLICY settings_self ON public.user_settings FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY groups_select_member ON public.groups FOR SELECT TO authenticated USING (public.is_group_member(id));
+CREATE POLICY groups_insert_owner ON public.groups FOR INSERT TO authenticated WITH CHECK (owner_id = auth.uid() AND privacy = 'privado');
+CREATE POLICY groups_update_admin ON public.groups FOR UPDATE TO authenticated USING (public.is_group_admin(id)) WITH CHECK (public.is_group_admin(id) AND privacy = 'privado');
+CREATE POLICY groups_delete_owner ON public.groups FOR DELETE TO authenticated USING (owner_id = auth.uid());
+
+CREATE POLICY group_members_select_member ON public.group_members FOR SELECT TO authenticated USING (public.is_group_member(group_id));
+CREATE POLICY group_members_insert_admin ON public.group_members FOR INSERT TO authenticated WITH CHECK (
+  public.is_group_admin(group_id) OR (user_id = auth.uid() AND role = 'owner' AND EXISTS (SELECT 1 FROM public.groups g WHERE g.id = group_id AND g.owner_id = auth.uid()))
+);
+CREATE POLICY group_members_update_admin ON public.group_members FOR UPDATE TO authenticated USING (public.is_group_admin(group_id)) WITH CHECK (public.is_group_admin(group_id));
+CREATE POLICY group_members_delete_admin_or_self ON public.group_members FOR DELETE TO authenticated USING (public.is_group_admin(group_id) OR user_id = auth.uid());
+
+CREATE POLICY events_select_member ON public.events FOR SELECT TO authenticated USING (public.is_group_member(group_id));
+CREATE POLICY events_insert_member ON public.events FOR INSERT TO authenticated WITH CHECK (public.is_group_member(group_id));
+CREATE POLICY events_update_admin_or_creator ON public.events FOR UPDATE TO authenticated USING (public.is_group_admin(group_id) OR created_by = auth.uid()) WITH CHECK (public.is_group_member(group_id));
+CREATE POLICY events_delete_admin_or_creator ON public.events FOR DELETE TO authenticated USING (public.is_group_admin(group_id) OR created_by = auth.uid());
+
+CREATE POLICY attendance_select_member ON public.event_attendance FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM public.events e WHERE e.id = event_id AND public.is_group_member(e.group_id)));
+CREATE POLICY attendance_insert_self ON public.event_attendance FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid() AND EXISTS (SELECT 1 FROM public.events e WHERE e.id = event_id AND public.is_group_member(e.group_id)));
+CREATE POLICY attendance_update_self ON public.event_attendance FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+CREATE POLICY attendance_delete_self ON public.event_attendance FOR DELETE TO authenticated USING (user_id = auth.uid());
+
+CREATE POLICY expenses_select_member ON public.expenses FOR SELECT TO authenticated USING (public.is_group_member(group_id));
+CREATE POLICY expenses_insert_member ON public.expenses FOR INSERT TO authenticated WITH CHECK (public.is_group_member(group_id));
+CREATE POLICY expenses_update_admin_or_creator ON public.expenses FOR UPDATE TO authenticated USING (public.is_group_admin(group_id) OR created_by = auth.uid()) WITH CHECK (public.is_group_member(group_id));
+CREATE POLICY expenses_delete_admin_or_creator ON public.expenses FOR DELETE TO authenticated USING (public.is_group_admin(group_id) OR created_by = auth.uid());
+
+CREATE POLICY expense_participants_select_member ON public.expense_participants FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM public.expenses e WHERE e.id = expense_id AND public.is_group_member(e.group_id)));
+CREATE POLICY expense_participants_insert_member ON public.expense_participants FOR INSERT TO authenticated WITH CHECK (EXISTS (SELECT 1 FROM public.expenses e WHERE e.id = expense_id AND public.is_group_member(e.group_id)));
+CREATE POLICY expense_participants_update_member ON public.expense_participants FOR UPDATE TO authenticated USING (EXISTS (SELECT 1 FROM public.expenses e WHERE e.id = expense_id AND public.is_group_member(e.group_id))) WITH CHECK (EXISTS (SELECT 1 FROM public.expenses e WHERE e.id = expense_id AND public.is_group_member(e.group_id)));
+CREATE POLICY expense_participants_delete_member ON public.expense_participants FOR DELETE TO authenticated USING (EXISTS (SELECT 1 FROM public.expenses e WHERE e.id = expense_id AND public.is_group_member(e.group_id)));
+
+CREATE POLICY tournaments_member_all ON public.tournaments FOR ALL TO authenticated USING (public.is_group_member(group_id)) WITH CHECK (public.is_group_member(group_id));
+CREATE POLICY tournament_teams_member_all ON public.tournament_teams FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id))) WITH CHECK (EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id)));
+CREATE POLICY matches_member_all ON public.matches FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id))) WITH CHECK (EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id)));
+
+REVOKE ALL ON FUNCTION public.ensure_current_profile() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.create_group_atomic(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.join_group_with_code(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_my_groups() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ensure_current_profile() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_group_atomic(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.join_group_with_code(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_my_groups() TO authenticated;
+
+commit;

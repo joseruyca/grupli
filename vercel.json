@@ -3,9 +3,6 @@
   "buildCommand": "bash vercel_build.sh build",
   "outputDirectory": "build/web",
   "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
