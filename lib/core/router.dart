@@ -13,6 +13,7 @@ import '../features/groups/screens/groups_screen.dart';
 import '../features/groups/screens/members_screen.dart';
 import '../features/profile/screens/profile_screen.dart';
 import '../features/settings/screens/settings_screen.dart';
+import '../features/settings/screens/settings_info_screen.dart';
 import '../features/settings/screens/test_checklist_screen.dart';
 import '../features/tournaments/screens/tournaments_screen.dart';
 
@@ -53,6 +54,9 @@ class AppRouter {
       ),
       GoRoute(path: '/app/profile', builder: (_, __) => const ProfileScreen()),
       GoRoute(path: '/app/settings', builder: (_, __) => const SettingsScreen()),
+      GoRoute(path: '/app/settings/terms', builder: (_, __) => const SettingsInfoScreen(type: 'terms')),
+      GoRoute(path: '/app/settings/privacy', builder: (_, __) => const SettingsInfoScreen(type: 'privacy')),
+      GoRoute(path: '/app/settings/help', builder: (_, __) => const SettingsInfoScreen(type: 'help')),
       GoRoute(path: '/app/test-checklist', builder: (_, __) => const TestChecklistScreen()),
     ],
   );

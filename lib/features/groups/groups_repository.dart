@@ -31,25 +31,24 @@ class GroupsRepository {
     String? defaultLocation,
     int minPeople = 2,
   }) async {
-    final row = await _db.from('groups').insert({
-      'name': name.trim(),
-      'type': type,
-      'privacy': privacy,
-      'owner_id': _userId,
-      'default_days': defaultDays?.trim(),
-      'default_time': defaultTime?.trim(),
-      'default_location': defaultLocation?.trim(),
-      'min_people': minPeople < 1 ? 1 : minPeople,
-    }).select().single();
-
-    final groupId = row['id'].toString();
-
-    await _db.from('group_members').insert({
-      'group_id': groupId,
-      'user_id': _userId,
-      'role': 'owner',
+    // Important: group creation must be atomic.
+    // Direct insert into groups + group_members can fail with RLS because the user
+    // is not yet a member during the first insert/returning step.
+    // The SQL function creates the group and its owner membership in one safe transaction.
+    final result = await _db.rpc('create_group_atomic', params: {
+      'p_name': name.trim(),
+      'p_type': type,
+      'p_privacy': privacy,
+      'p_default_days': defaultDays?.trim(),
+      'p_default_time': defaultTime?.trim(),
+      'p_default_location': defaultLocation?.trim(),
+      'p_min_people': minPeople < 1 ? 1 : minPeople,
     });
 
+    final groupId = result?.toString() ?? '';
+    if (groupId.isEmpty) {
+      throw Exception('No se pudo crear el grupo.');
+    }
     return groupId;
   }
 

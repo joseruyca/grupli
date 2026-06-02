@@ -43,3 +43,8 @@ Finanzas queda estructurado para uso real: gastos, participantes, reparto igual/
 ## Siguiente fase recomendada
 
 v7 — Torneos funcionales: equipos, generación de partidos, resultados y clasificación real.
+
+
+## v8 — Perfil, avatar y ajustes reales
+
+Añade perfil real con estadísticas básicas, avatar en Supabase Storage, ajustes persistentes por usuario, pantallas legales/base de ayuda y SQL `patch_v8_profile_settings.sql`.

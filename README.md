@@ -103,3 +103,61 @@ Corrige la pantalla en blanco después del login: AppScreen ya no usa layouts am
 ## v6.3 Body render fix
 
 Rehace `AppScreen` con un `ListView` directo y añade `ErrorWidget.builder` para que cualquier error de render se vea en pantalla en vez de dejar una home en blanco.
+
+
+## v6.4 visible home proof
+
+La pantalla `/app` ya no depende de `AppScreen`: usa un `Scaffold` directo con `ListView` y un marcador visible `V6.4 HOME CARGADA`. Si ese marcador no aparece, el navegador/Vercel/local no está cargando este código.
+
+
+## v6.5 RLS group creation fix
+
+La creación de grupos ahora usa `create_group_atomic`, una función SQL `SECURITY DEFINER` que crea el grupo y añade al usuario como owner en una sola transacción. Esto evita el error RLS:
+
+```text
+new row violates row-level security policy for table "groups"
+```
+
+Ejecutar primero en Supabase:
+
+```text
+supabase/patch_v6_5_create_group_atomic.sql
+```
+
+
+## v6.6
+
+Pulido visual de Home + Crear grupo, manteniendo el fix RLS de creación atómica de grupos. El objetivo es acercarse al mockup y dejar la base usable antes de seguir con más funcionalidades.
+
+
+## v6.7 Detail + Members polish
+
+Pulido visual de Detalle de grupo y Miembros para acercarlo más al mockup: hero cards, código de invitación, resumen rápido, grid de accesos, métricas de miembros, búsqueda, filtros y acciones de admin más claras.
+
+
+## v7 Torneos funcionales
+
+Añade equipos, generación de partidos todos contra todos, registro de resultados, clasificación real, finalizar/reabrir torneo y documentación de arquitectura.
+
+
+## v8 — Perfil, avatar y ajustes reales
+
+Añade perfil real con estadísticas básicas, avatar en Supabase Storage, ajustes persistentes por usuario, pantallas legales/base de ayuda y SQL `patch_v8_profile_settings.sql`.
+
+## Estado v9
+
+Fase de revisión antes de rediseñar cada página:
+
+- Checklist multiusuario interactivo.
+- Revisión de RLS.
+- `patch_v9_rls_hardening.sql`.
+- `security_checks.sql` ampliado.
+- Documentación de reglas para rediseños posteriores.
+
+Ejecutar en Supabase:
+
+```powershell
+Get-Content ".\supabase\patch_v9_rls_hardening.sql" | Set-Clipboard
+```
+
+Luego pegar en `Supabase → SQL Editor → New query → Run`.

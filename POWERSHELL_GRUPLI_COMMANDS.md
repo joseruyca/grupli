@@ -7,7 +7,7 @@ Cambia solo el filtro del ZIP si la versión cambia.
 ```powershell
 $Dest = "$env:USERPROFILE\Desktop\grupliv2"
 
-$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v4*.zip" |
+$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v9-bug-security-review*.zip" |
   Sort-Object LastWriteTime -Descending |
   Select-Object -First 1
 

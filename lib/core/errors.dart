@@ -22,6 +22,12 @@ String humanError(Object error) {
     return 'La contraseña es demasiado corta o débil.';
   }
   if (raw.contains('Código de invitación no válido')) return 'Ese código de invitación no existe o ya no sirve.';
+  if (raw.contains('create_group_atomic') || raw.contains('Could not find the function')) {
+    return 'Falta ejecutar el parche SQL de creación de grupos en Supabase.';
+  }
+  if (raw.contains('row-level security policy') || raw.contains('42501')) {
+    return 'Supabase ha bloqueado la acción por permisos RLS. Ejecuta el parche SQL de permisos y vuelve a probar.';
+  }
   if (raw.contains('No se puede expulsar ni degradar al owner')) {
     return 'No se puede expulsar ni degradar al propietario del grupo.';
   }
