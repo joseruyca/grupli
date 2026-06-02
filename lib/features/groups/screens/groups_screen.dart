@@ -56,45 +56,41 @@ class _GroupsScreenState extends State<GroupsScreen> {
           if (i == 2) context.go('/app/settings');
         },
       ),
-      child: RefreshIndicator(
-        onRefresh: () async => _refresh(),
-        color: AppColors.teal,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _HomeTopBar(onRefresh: _refresh),
-          const SizedBox(height: AppSpacing.xl),
-          Text('Hola, $_displayName', style: AppTypography.title),
-          const SizedBox(height: 6),
-          Text('Tus grupos privados, con eventos, gastos y torneos en un solo sitio.', style: AppTypography.muted),
-          const SizedBox(height: AppSpacing.xl),
-          _CreateJoinPanel(
-            onCreate: () => context.go('/app/groups/new'),
-            onJoin: () => showAppBottomSheet(context, const JoinCodeSheet()).then((_) => _refresh()),
-          ),
-          const SizedBox(height: 26),
-          FutureBuilder<List<Map<String, dynamic>>>(
-            future: _future,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) return const _HomeLoading();
-              if (snapshot.hasError) {
-                return _HomeError(
-                  message: snapshot.error.toString(),
-                  onRetry: _refresh,
-                  onCreate: () => context.go('/app/groups/new'),
-                );
-              }
-
-              final groups = snapshot.data ?? <Map<String, dynamic>>[];
-              return _HomeContent(
-                groups: groups,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _HomeTopBar(onRefresh: _refresh),
+        const SizedBox(height: AppSpacing.xl),
+        Text('Hola, $_displayName', style: AppTypography.title),
+        const SizedBox(height: 6),
+        Text('Tus grupos privados, con eventos, gastos y torneos en un solo sitio.', style: AppTypography.muted),
+        const SizedBox(height: AppSpacing.xl),
+        _CreateJoinPanel(
+          onCreate: () => context.go('/app/groups/new'),
+          onJoin: () => showAppBottomSheet(context, const JoinCodeSheet()).then((_) => _refresh()),
+        ),
+        const SizedBox(height: 26),
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) return const _HomeLoading();
+            if (snapshot.hasError) {
+              return _HomeError(
+                message: snapshot.error.toString(),
+                onRetry: _refresh,
                 onCreate: () => context.go('/app/groups/new'),
-                onJoin: () => showAppBottomSheet(context, const JoinCodeSheet()).then((_) => _refresh()),
-                onOpen: (id) => context.go('/app/groups/$id'),
-                onRefresh: _refresh,
               );
-            },
-          ),
-        ]),
-      ),
+            }
+
+            final groups = snapshot.data ?? <Map<String, dynamic>>[];
+            return _HomeContent(
+              groups: groups,
+              onCreate: () => context.go('/app/groups/new'),
+              onJoin: () => showAppBottomSheet(context, const JoinCodeSheet()).then((_) => _refresh()),
+              onOpen: (id) => context.go('/app/groups/$id'),
+              onRefresh: _refresh,
+            );
+          },
+        ),
+      ]),
     );
   }
 }

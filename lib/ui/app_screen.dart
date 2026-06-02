@@ -30,25 +30,6 @@ class AppScreen extends StatelessWidget {
           AppSpacing.xl,
         );
 
-    Widget content = Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: scrollable
-            ? ListView(
-                padding: effectivePadding,
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                children: [child],
-              )
-            : Padding(
-                padding: effectivePadding,
-                child: child,
-              ),
-      ),
-    );
-
-    content = SafeArea(bottom: bottomNavigationBar == null, child: content);
-
     return Scaffold(
       backgroundColor: background ?? AppColors.white,
       resizeToAvoidBottomInset: true,
@@ -56,8 +37,8 @@ class AppScreen extends StatelessWidget {
           ? null
           : SafeArea(
               top: false,
-              child: Align(
-                alignment: Alignment.bottomCenter,
+              child: Center(
+                heightFactor: 1,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: maxWidth),
                   child: DecoratedBox(
@@ -70,7 +51,36 @@ class AppScreen extends StatelessWidget {
                 ),
               ),
             ),
-      body: content,
+      body: SafeArea(
+        bottom: bottomNavigationBar == null,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final availableWidth = constraints.maxWidth.isFinite ? constraints.maxWidth : maxWidth;
+            final availableHeight = constraints.maxHeight.isFinite ? constraints.maxHeight : MediaQuery.sizeOf(context).height;
+            final pageWidth = availableWidth < maxWidth ? availableWidth : maxWidth;
+
+            final page = SizedBox(
+              width: pageWidth,
+              height: availableHeight,
+              child: scrollable
+                  ? ListView(
+                      padding: effectivePadding,
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                      children: [child],
+                    )
+                  : Padding(
+                      padding: effectivePadding,
+                      child: child,
+                    ),
+            );
+
+            return Align(
+              alignment: Alignment.topCenter,
+              child: page,
+            );
+          },
+        ),
+      ),
     );
   }
 }

@@ -205,3 +205,8 @@ Reduce dependencias no usadas, limpia build en Vercel, ejecuta analyze antes del
 ## v11.3 Vercel compile fix
 
 Corrige el error real de compilación en `group_detail_screen.dart`: el widget `_InviteCard` usaba `required this.code` y `code` en el build, pero no tenía declarado el campo `final String code;`.
+
+
+## v11.4 Body layout fix
+
+Corrige el layout base de `AppScreen`: el `ListView` ahora siempre tiene alto acotado dentro del `Scaffold`, evitando que tras login se vea solo la barra inferior. También se elimina `RefreshIndicator` mal anidado en Home.
