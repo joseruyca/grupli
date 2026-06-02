@@ -22,44 +22,53 @@ class AppScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectivePadding = padding ?? const EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.lg, AppSpacing.screen, AppSpacing.xl);
+    final effectivePadding = padding ??
+        const EdgeInsets.fromLTRB(
+          AppSpacing.screen,
+          AppSpacing.lg,
+          AppSpacing.screen,
+          AppSpacing.xl,
+        );
 
-    final page = Align(
-      alignment: Alignment.topCenter,
+    final content = Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: scrollable
-            ? SingleChildScrollView(
+            ? ListView(
                 padding: effectivePadding,
                 keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                child: child,
+                children: [child],
               )
-            : Padding(padding: effectivePadding, child: child),
+            : Padding(
+                padding: effectivePadding,
+                child: child,
+              ),
       ),
     );
+
+    final nav = bottomNavigationBar == null
+        ? null
+        : SafeArea(
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: DecoratedBox(
+                  decoration: const BoxDecoration(
+                    color: AppColors.white,
+                    border: Border(top: BorderSide(color: AppColors.border)),
+                  ),
+                  child: bottomNavigationBar!,
+                ),
+              ),
+            ),
+          );
 
     return Scaffold(
       backgroundColor: background ?? AppColors.white,
       resizeToAvoidBottomInset: true,
-      bottomNavigationBar: bottomNavigationBar == null
-          ? null
-          : SafeArea(
-              top: false,
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: maxWidth),
-                  child: DecoratedBox(
-                    decoration: const BoxDecoration(
-                      color: AppColors.white,
-                      border: Border(top: BorderSide(color: AppColors.border)),
-                    ),
-                    child: bottomNavigationBar!,
-                  ),
-                ),
-              ),
-            ),
-      body: SafeArea(bottom: bottomNavigationBar == null, child: page),
+      bottomNavigationBar: nav,
+      body: SafeArea(bottom: bottomNavigationBar == null, child: content),
     );
   }
 }
