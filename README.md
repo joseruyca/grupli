@@ -191,3 +191,8 @@ Cambios clave:
 - Eventos y Calendario usan la misma base funcional, pero entran desde pestañas distintas.
 - Finanzas, Torneos, Miembros y Editar grupo mantienen la navegación interna del grupo.
 - Welcome rediseñado con hero teal y fondo blanco.
+
+
+## v11.1 Vercel build fix
+
+Elimina la referencia a la carpeta vacía `assets/` en `pubspec.yaml` para evitar fallo de compilación web en Vercel cuando Git no sube carpetas vacías.
