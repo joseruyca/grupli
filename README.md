@@ -20,3 +20,7 @@ Esta versión rehace la app desde cero a nivel de interfaz Flutter.
 ## SQL
 
 Para esta versión se recomienda ejecutar `supabase/all_in_one.sql` porque es una base limpia.
+
+## v12.2 — Corrección de producto
+
+Se elimina la pestaña Eventos como navegación principal. Dentro de cada grupo, la primera pestaña ahora es Inicio: resumen real del grupo con próximos eventos y asistencia directa. Calendario es donde se visualizan y crean eventos por día. Se han eliminado los ejemplos falsos de actividad reciente.

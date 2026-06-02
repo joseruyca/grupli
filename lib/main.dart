@@ -349,6 +349,28 @@ String money(double value) {
   return '$sign€ ${value.abs().toStringAsFixed(2).replaceAll('.', ',')}';
 }
 
+int attendanceCount(Map<String, dynamic> event, String status) {
+  final attendance = event['event_attendance'];
+  if (attendance is! List) return 0;
+  return attendance.where((item) {
+    if (item is! Map) return false;
+    return item['status']?.toString() == status;
+  }).length;
+}
+
+String myAttendanceStatus(Map<String, dynamic> event) {
+  final uid = AppData.user?.id;
+  final attendance = event['event_attendance'];
+  if (uid == null || attendance is! List) return '';
+  for (final item in attendance) {
+    if (item is Map && item['user_id']?.toString() == uid) {
+      return item['status']?.toString() ?? '';
+    }
+  }
+  return '';
+}
+
+
 Future<void> showToast(BuildContext context, String message, {bool danger = false}) async {
   if (!context.mounted) return;
   ScaffoldMessenger.of(context).clearSnackBars();
@@ -767,7 +789,7 @@ class GroupShell extends StatefulWidget {
 }
 
 class _GroupShellState extends State<GroupShell> {
-  int tab = 4;
+  int tab = 0;
   int refreshKey = 0;
   late Future<Map<String, dynamic>> groupFuture;
 
@@ -796,7 +818,7 @@ class _GroupShellState extends State<GroupShell> {
         final group = snapshot.data ?? {};
         final name = AppData.text(group['name'], 'Grupo');
         final pages = [
-          EventsTab(group: group, refreshSeed: refreshKey),
+          GroupDashboardTab(group: group, refreshSeed: refreshKey),
           CalendarTab(group: group, refreshSeed: refreshKey),
           FinancesTab(group: group, refreshSeed: refreshKey),
           TournamentsTab(group: group, refreshSeed: refreshKey),
@@ -812,6 +834,191 @@ class _GroupShellState extends State<GroupShell> {
   }
 }
 
+class GroupDashboardTab extends StatefulWidget {
+  final Map<String, dynamic> group;
+  final int refreshSeed;
+  const GroupDashboardTab({super.key, required this.group, required this.refreshSeed});
+
+  @override
+  State<GroupDashboardTab> createState() => _GroupDashboardTabState();
+}
+
+class _GroupDashboardTabState extends State<GroupDashboardTab> {
+  late Future<_GroupDashboardData> future;
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  @override
+  void didUpdateWidget(covariant GroupDashboardTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshSeed != widget.refreshSeed) load();
+  }
+
+  void load() {
+    final groupId = widget.group['id'].toString();
+    future = _GroupDashboardData.load(groupId);
+  }
+
+  void reload() => setState(load);
+
+  @override
+  Widget build(BuildContext context) {
+    final group = widget.group;
+    final groupId = group['id'].toString();
+    final name = AppData.text(group['name'], 'Grupo');
+    final code = AppData.text(group['invite_code'], '------');
+
+    return SafeArea(
+      bottom: false,
+      child: Stack(
+        children: [
+          FutureBuilder<_GroupDashboardData>(
+            future: future,
+            builder: (context, snapshot) {
+              final data = snapshot.data;
+              final events = data?.events ?? <Map<String, dynamic>>[];
+              final upcoming = data?.upcomingEvents ?? <Map<String, dynamic>>[];
+              final nextEvent = upcoming.isNotEmpty ? upcoming.first : null;
+              final confirmed = upcoming.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
+              final pendingDecisions = upcoming.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
+              final expensesTotal = data?.expensesTotal ?? 0;
+              final tournamentsActive = data?.activeTournaments ?? 0;
+
+              return RefreshIndicator(
+                color: AppColors.teal,
+                onRefresh: () async => reload(),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 112),
+                  children: [
+                    Row(children: [
+                      RoundBackButton(onTap: () => Navigator.of(context).pop()),
+                      const Spacer(),
+                      CircleIconButton(icon: Icons.more_horiz_rounded, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group)))),
+                    ]),
+                    const SizedBox(height: 12),
+                    GroupHeroCard(name: name, code: code, onInvite: () => Share.share('Únete a $name en Grupli con el código $code'), onCode: () => showCodeSheet(context, code, name)),
+                    const SizedBox(height: 14),
+                    Row(children: [
+                      Expanded(child: MiniAction(icon: Icons.person_add_alt_1_rounded, label: 'Invitar', onTap: () => Share.share('Únete a $name en Grupli con el código $code'))),
+                      const SizedBox(width: 8),
+                      Expanded(child: MiniAction(icon: Icons.qr_code_rounded, label: 'Código', onTap: () => showCodeSheet(context, code, name))),
+                      const SizedBox(width: 8),
+                      Expanded(child: MiniAction(icon: Icons.groups_rounded, label: 'Miembros', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group))))),
+                      const SizedBox(width: 8),
+                      Expanded(child: MiniAction(icon: Icons.settings_rounded, label: 'Ajustes', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group))))),
+                    ]),
+                    const SizedBox(height: 18),
+                    if (snapshot.connectionState == ConnectionState.waiting)
+                      const CenterLoader(label: 'Cargando resumen...')
+                    else if (snapshot.hasError)
+                      ErrorBlock(message: snapshot.error.toString(), onRetry: reload)
+                    else ...[
+                      Row(children: [
+                        Expanded(child: StatCard(icon: Icons.event_available_rounded, value: upcoming.length.toString(), label: 'Próximos', color: AppColors.teal)),
+                        const SizedBox(width: 10),
+                        Expanded(child: StatCard(icon: Icons.check_circle_rounded, value: confirmed.toString(), label: 'Confirmados', color: AppColors.green)),
+                        const SizedBox(width: 10),
+                        Expanded(child: StatCard(icon: Icons.emoji_events_rounded, value: tournamentsActive.toString(), label: 'Torneos', color: AppColors.orange)),
+                      ]),
+                      const SizedBox(height: 18),
+                      SectionHeader(title: 'Resumen del grupo', action: 'Actualizar', onTap: reload),
+                      const SizedBox(height: 10),
+                      if (nextEvent == null)
+                        EmptyBlock(
+                          icon: Icons.event_available_rounded,
+                          title: 'No hay ninguna quedada creada',
+                          body: 'Crea el primer evento para que el grupo pueda confirmar asistencia desde esta pantalla.',
+                        )
+                      else
+                        DashboardEventCard(event: nextEvent, group: group, onChanged: reload),
+                      const SizedBox(height: 18),
+                      SectionHeader(title: 'Próximos eventos', action: 'Crear evento', onTap: () async {
+                        final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: group)));
+                        if (ok == true) reload();
+                      }),
+                      const SizedBox(height: 10),
+                      if (upcoming.isEmpty)
+                        EmptySlim(icon: Icons.calendar_month_rounded, title: 'Agenda vacía', body: 'El calendario del grupo aún no tiene eventos próximos.')
+                      else
+                        ...upcoming.take(4).map((e) => EventCard(event: e, onTap: () async {
+                          await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: e, group: group)));
+                          reload();
+                        })),
+                      const SizedBox(height: 18),
+                      Text('Estado rápido', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 10),
+                      Grid2(children: [
+                        FeatureTile(icon: Icons.calendar_month_rounded, title: 'Calendario', body: '${events.length} eventos totales', color: AppColors.blue, onTap: () {}),
+                        FeatureTile(icon: Icons.account_balance_wallet_rounded, title: 'Finanzas', body: money(expensesTotal), color: AppColors.green, onTap: () {}),
+                        FeatureTile(icon: Icons.help_outline_rounded, title: 'Por decidir', body: '$pendingDecisions respuestas en duda', color: AppColors.amber, onTap: () {}),
+                        FeatureTile(icon: Icons.lock_rounded, title: 'Privado', body: 'Solo por invitación', color: AppColors.teal, onTap: () {}),
+                      ]),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+          Positioned(
+            right: 20,
+            bottom: 20,
+            child: FloatingActionButton(
+              heroTag: 'create-event-$groupId',
+              backgroundColor: AppColors.teal,
+              foregroundColor: Colors.white,
+              onPressed: () async {
+                final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: group)));
+                if (ok == true) reload();
+              },
+              child: const Icon(Icons.add_rounded),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GroupDashboardData {
+  final List<Map<String, dynamic>> events;
+  final List<Map<String, dynamic>> expenses;
+  final List<Map<String, dynamic>> tournaments;
+
+  const _GroupDashboardData({required this.events, required this.expenses, required this.tournaments});
+
+  static Future<_GroupDashboardData> load(String groupId) async {
+    final results = await Future.wait([
+      AppData.events(groupId),
+      AppData.expenses(groupId),
+      AppData.tournaments(groupId),
+    ]);
+    return _GroupDashboardData(events: results[0], expenses: results[1], tournaments: results[2]);
+  }
+
+  List<Map<String, dynamic>> get upcomingEvents {
+    final now = DateTime.now().subtract(const Duration(hours: 2));
+    final list = events.where((event) {
+      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
+      return date != null && date.isAfter(now);
+    }).toList();
+    list.sort((a, b) {
+      final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
+      final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now();
+      return da.compareTo(db);
+    });
+    return list;
+  }
+
+  double get expensesTotal => expenses.fold<double>(0, (sum, e) => sum + AppData.doubleValue(e['amount']));
+  int get activeTournaments => tournaments.where((t) => AppData.text(t['status'], 'active') != 'finished').length;
+}
+
+
+
 class GroupMoreTab extends StatelessWidget {
   final Map<String, dynamic> group;
   final VoidCallback refresh;
@@ -819,69 +1026,26 @@ class GroupMoreTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final groupId = group['id'].toString();
     final name = AppData.text(group['name'], 'Grupo');
     final code = AppData.text(group['invite_code'], '------');
     return SafeArea(
       bottom: false,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
         children: [
-          Row(children: [RoundBackButton(onTap: () => Navigator.of(context).pop()), const Spacer(), CircleIconButton(icon: Icons.more_horiz_rounded, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group))))]),
-          const SizedBox(height: 10),
-          Container(
-            height: 150,
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), gradient: const LinearGradient(colors: [Color(0xFF044D68), Color(0xFF008F86)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
-            child: Stack(children: [
-              Positioned.fill(child: Opacity(opacity: .12, child: PatternIcons())),
-              Positioned(left: 18, bottom: 18, right: 18, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [Expanded(child: Text(name, style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900))), const Icon(Icons.lock_rounded, color: Colors.white, size: 16)]),
-                const SizedBox(height: 4),
-                const Text('Grupo privado', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
-              ])),
-            ]),
+          PageHeader(title: 'Más', subtitle: name, leading: true),
+          const SizedBox(height: 18),
+          SettingsRow(icon: Icons.person_add_alt_1_rounded, title: 'Invitar miembros', subtitle: 'Compartir el código del grupo', onTap: () => Share.share('Únete a $name en Grupli con el código $code')),
+          SettingsRow(icon: Icons.qr_code_rounded, title: 'Código de invitación', subtitle: code, onTap: () => showCodeSheet(context, code, name)),
+          SettingsRow(icon: Icons.groups_rounded, title: 'Miembros y admins', subtitle: 'Ver miembros, owner y administradores', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
+          SettingsRow(icon: Icons.lock_rounded, title: 'Privacidad del grupo', subtitle: 'Todos los grupos son privados por invitación', onTap: () => showToast(context, 'Los grupos de Grupli son privados por diseño.')),
+          SettingsRow(icon: Icons.settings_rounded, title: 'Ajustes del grupo', subtitle: 'Nombre, permisos y acciones de admin', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group)))),
+          const SizedBox(height: 18),
+          EmptySlim(
+            icon: Icons.info_outline_rounded,
+            title: 'Inicio es el resumen real del grupo',
+            body: 'Las quedadas se ven en Inicio y Calendario. Aquí solo quedan utilidades, miembros y ajustes.',
           ),
-          const SizedBox(height: 14),
-          Row(children: [
-            Expanded(child: MiniAction(icon: Icons.person_add_alt_1_rounded, label: 'Invitar', onTap: () => Share.share('Únete a $name en Grupli con el código $code'))),
-            const SizedBox(width: 8),
-            Expanded(child: MiniAction(icon: Icons.qr_code_rounded, label: 'Código', onTap: () => showCodeSheet(context, code, name))),
-            const SizedBox(width: 8),
-            Expanded(child: MiniAction(icon: Icons.groups_rounded, label: 'Miembros', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group))))),
-            const SizedBox(width: 8),
-            Expanded(child: MiniAction(icon: Icons.settings_rounded, label: 'Ajustes', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group))))),
-          ]),
-          const SizedBox(height: 18),
-          FutureBuilder<List<Map<String, dynamic>>>(
-            future: AppData.events(groupId),
-            builder: (context, eventsSnap) {
-              final events = eventsSnap.data ?? [];
-              final next = events.where((e) => DateTime.tryParse(e['starts_at']?.toString() ?? '')?.isAfter(DateTime.now().subtract(const Duration(hours: 2))) ?? false).toList();
-              final first = next.isNotEmpty ? next.first : null;
-              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Próximo evento', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 9),
-                if (first == null) EmptySlim(icon: Icons.event_available_rounded, title: 'Aún no hay eventos', body: 'Crea el primer plan del grupo desde la pestaña Eventos.') else EventMiniCard(event: first),
-              ]);
-            },
-          ),
-          const SizedBox(height: 18),
-          Text('Funciones principales', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 10),
-          Grid2(children: [
-            FeatureTile(icon: Icons.event_available_rounded, title: 'Eventos', body: 'Quedadas y asistencia', color: AppColors.teal, onTap: () {}),
-            FeatureTile(icon: Icons.calendar_month_rounded, title: 'Calendario', body: 'Vista mensual del grupo', color: AppColors.blue, onTap: () {}),
-            FeatureTile(icon: Icons.account_balance_wallet_rounded, title: 'Finanzas', body: 'Gastos y balances', color: AppColors.green, onTap: () {}),
-            FeatureTile(icon: Icons.emoji_events_rounded, title: 'Torneos', body: 'Ligas y partidos', color: AppColors.orange, onTap: () {}),
-          ]),
-          const SizedBox(height: 18),
-          Text('Actividad reciente', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 10),
-          AppCard(child: Column(children: const [
-            ActivityRow(icon: Icons.event_rounded, title: 'Ana creó un evento', meta: 'Hace 2 h'),
-            Divider(height: 1),
-            ActivityRow(icon: Icons.account_balance_wallet_rounded, title: 'Javi añadió un gasto', meta: 'Ayer'),
-          ])),
         ],
       ),
     );
@@ -968,7 +1132,8 @@ class _EventsTabState extends State<EventsTab> {
 
 class CreateEventScreen extends StatefulWidget {
   final Map<String, dynamic> group;
-  const CreateEventScreen({super.key, required this.group});
+  final DateTime? initialDate;
+  const CreateEventScreen({super.key, required this.group, this.initialDate});
 
   @override
   State<CreateEventScreen> createState() => _CreateEventScreenState();
@@ -978,10 +1143,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final title = TextEditingController();
   final location = TextEditingController();
   final notes = TextEditingController();
-  DateTime date = DateTime.now().add(const Duration(days: 1));
+  late DateTime date;
   TimeOfDay time = const TimeOfDay(hour: 20, minute: 0);
   int minPeople = 2;
   bool loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    date = widget.initialDate ?? DateTime.now().add(const Duration(days: 1));
+  }
 
   @override
   void dispose() {
@@ -1103,29 +1274,85 @@ class _CalendarTabState extends State<CalendarTab> {
   DateTime month = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime selected = DateTime.now();
   late Future<List<Map<String, dynamic>>> future;
-  @override void initState() { super.initState(); future = AppData.events(widget.group['id'].toString()); }
-  @override void didUpdateWidget(covariant CalendarTab oldWidget) { super.didUpdateWidget(oldWidget); if (oldWidget.refreshSeed != widget.refreshSeed) future = AppData.events(widget.group['id'].toString()); }
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  @override
+  void didUpdateWidget(covariant CalendarTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshSeed != widget.refreshSeed) load();
+  }
+
+  void load() => future = AppData.events(widget.group['id'].toString());
+  void reload() => setState(load);
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(bottom: false, child: FutureBuilder<List<Map<String, dynamic>>>(future: future, builder: (context, snapshot) {
-      final events = snapshot.data ?? [];
-      final selectedEvents = events.where((e) {
-        final d = DateTime.tryParse(e['starts_at']?.toString() ?? '')?.toLocal();
-        return d != null && d.year == selected.year && d.month == selected.month && d.day == selected.day;
-      }).toList();
-      return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 100), children: [
-        PageHeader(title: 'Calendario', subtitle: AppData.text(widget.group['name']), leading: true),
-        const SizedBox(height: 18),
-        Row(children: [IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month - 1)), icon: const Icon(Icons.chevron_left_rounded)), Expanded(child: Center(child: Text(DateFormat('MMMM yyyy').format(month), style: Theme.of(context).textTheme.titleMedium))), IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month + 1)), icon: const Icon(Icons.chevron_right_rounded))]),
-        const SizedBox(height: 10),
-        MonthGrid(month: month, selected: selected, events: events, onSelect: (d) => setState(() => selected = d)),
-        const SizedBox(height: 24),
-        Row(children: [Text(DateFormat('EEEE dd/MM').format(selected), style: Theme.of(context).textTheme.titleLarge), const Spacer(), Text('${selectedEvents.length} eventos', style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w800))]),
-        const SizedBox(height: 10),
-        if (selectedEvents.isEmpty) EmptySlim(icon: Icons.calendar_month_rounded, title: 'Día libre', body: 'No hay eventos para este día.') else ...selectedEvents.map((e) => EventCard(event: e, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: e, group: widget.group))))),
-      ]);
-    }));
+    return SafeArea(
+      bottom: false,
+      child: Stack(children: [
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const CenterLoader(label: 'Cargando calendario...');
+            }
+            if (snapshot.hasError) {
+              return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 100), children: [ErrorBlock(message: snapshot.error.toString(), onRetry: reload)]);
+            }
+            final events = snapshot.data ?? [];
+            final selectedEvents = events.where((e) {
+              final d = DateTime.tryParse(e['starts_at']?.toString() ?? '')?.toLocal();
+              return d != null && d.year == selected.year && d.month == selected.month && d.day == selected.day;
+            }).toList();
+            return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 112), children: [
+              PageHeader(title: 'Calendario', subtitle: AppData.text(widget.group['name']), leading: true),
+              const SizedBox(height: 18),
+              AppCard(child: Column(children: [
+                Row(children: [
+                  IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month - 1)), icon: const Icon(Icons.chevron_left_rounded)),
+                  Expanded(child: Center(child: Text(DateFormat('MMMM yyyy').format(month), style: Theme.of(context).textTheme.titleMedium))),
+                  IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month + 1)), icon: const Icon(Icons.chevron_right_rounded)),
+                ]),
+                const SizedBox(height: 10),
+                MonthGrid(month: month, selected: selected, events: events, onSelect: (d) => setState(() => selected = d)),
+              ])),
+              const SizedBox(height: 22),
+              SectionHeader(title: DateFormat('EEEE dd/MM').format(selected), action: 'Añadir', onTap: () async {
+                final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: widget.group, initialDate: selected)));
+                if (ok == true) reload();
+              }),
+              const SizedBox(height: 10),
+              if (selectedEvents.isEmpty)
+                EmptySlim(icon: Icons.calendar_month_rounded, title: 'Día sin eventos', body: 'Puedes crear una quedada para este día con el botón +.')
+              else
+                ...selectedEvents.map((e) => EventCard(event: e, onTap: () async {
+                  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: e, group: widget.group)));
+                  reload();
+                })),
+            ]);
+          },
+        ),
+        Positioned(
+          right: 20,
+          bottom: 20,
+          child: FloatingActionButton(
+            heroTag: 'calendar-create-event-${widget.group['id']}',
+            backgroundColor: AppColors.teal,
+            foregroundColor: Colors.white,
+            onPressed: () async {
+              final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: widget.group, initialDate: selected)));
+              if (ok == true) reload();
+            },
+            child: const Icon(Icons.add_rounded),
+          ),
+        ),
+      ]),
+    );
   }
 }
 
@@ -1367,6 +1594,127 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
+class GroupHeroCard extends StatelessWidget {
+  final String name;
+  final String code;
+  final VoidCallback onInvite;
+  final VoidCallback onCode;
+  const GroupHeroCard({super.key, required this.name, required this.code, required this.onInvite, required this.onCode});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 150,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: const LinearGradient(colors: [Color(0xFF044D68), Color(0xFF008F86)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      ),
+      child: Stack(children: [
+        Positioned.fill(child: Opacity(opacity: .13, child: PatternIcons())),
+        Positioned(left: 18, right: 18, bottom: 18, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900))), const Icon(Icons.lock_rounded, color: Colors.white, size: 17)]),
+          const SizedBox(height: 5),
+          const Text('Grupo privado · Resumen general', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: GestureDetector(onTap: onCode, child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), decoration: BoxDecoration(color: Colors.white.withOpacity(.15), borderRadius: BorderRadius.circular(14)), child: Text('Código $code', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900))))),
+            const SizedBox(width: 10),
+            InkWell(onTap: onInvite, borderRadius: BorderRadius.circular(14), child: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.ios_share_rounded, color: AppColors.teal, size: 20))),
+          ]),
+        ])),
+      ]),
+    );
+  }
+}
+
+class SectionHeader extends StatelessWidget {
+  final String title;
+  final String? action;
+  final VoidCallback? onTap;
+  const SectionHeader({super.key, required this.title, this.action, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
+      if (action != null) TextButton(onPressed: onTap, child: Text(action!)),
+    ]);
+  }
+}
+
+class DashboardEventCard extends StatefulWidget {
+  final Map<String, dynamic> event;
+  final Map<String, dynamic> group;
+  final VoidCallback onChanged;
+  const DashboardEventCard({super.key, required this.event, required this.group, required this.onChanged});
+
+  @override
+  State<DashboardEventCard> createState() => _DashboardEventCardState();
+}
+
+class _DashboardEventCardState extends State<DashboardEventCard> {
+  bool saving = false;
+
+  Future<void> setStatus(String status) async {
+    setState(() => saving = true);
+    try {
+      await AppData.setAttendance(widget.event['id'].toString(), status);
+      widget.onChanged();
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final event = widget.event;
+    final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+    final minPeople = AppData.intValue(event['min_people'], 1);
+    final yes = attendanceCount(event, 'yes');
+    final maybe = attendanceCount(event, 'maybe');
+    final no = attendanceCount(event, 'no');
+    final mine = myAttendanceStatus(event);
+
+    return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 62,
+          height: 62,
+          decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Text(DateFormat('EEE').format(date).replaceAll('.', '').toUpperCase(), style: const TextStyle(color: AppColors.teal, fontSize: 11, fontWeight: FontWeight.w900)),
+            Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 23, fontWeight: FontWeight.w900)),
+          ]),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(AppData.text(event['title'], 'Evento'), style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 5),
+          MetaLine(icon: Icons.schedule_rounded, text: DateFormat('HH:mm').format(date)),
+          MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
+        ])),
+        IconButton(onPressed: () async {
+          await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: widget.group)));
+          widget.onChanged();
+        }, icon: const Icon(Icons.chevron_right_rounded)),
+      ]),
+      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(child: AttendancePick(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
+        const SizedBox(width: 8),
+        Expanded(child: AttendancePick(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
+        const SizedBox(width: 8),
+        Expanded(child: AttendancePick(label: 'No voy', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
+      ]),
+      const SizedBox(height: 12),
+      StatusNotice(ok: yes >= minPeople, text: yes >= minPeople ? 'Mínimo alcanzado: $yes de $minPeople asistentes.' : 'Faltan ${max(0, minPeople - yes)} para alcanzar el mínimo.'),
+    ]));
+  }
+}
+
+
 // ---------- UI components ----------
 
 class FieldLabel extends StatelessWidget {
@@ -1469,7 +1817,7 @@ class GroupBottomNav extends StatelessWidget {
   const GroupBottomNav({super.key, required this.groupName, required this.index, required this.onTap});
   @override Widget build(BuildContext context) => Container(color: Colors.white, child: Column(mainAxisSize: MainAxisSize.min, children: [
     Container(width: double.infinity, padding: const EdgeInsets.only(top: 9), child: Center(child: Text('Estás dentro de $groupName 🔒', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.ink)))),
-    BottomBar(items: const [NavSpec(Icons.event_available_rounded, 'Eventos'), NavSpec(Icons.calendar_month_rounded, 'Calendario'), NavSpec(Icons.account_balance_wallet_rounded, 'Finanzas'), NavSpec(Icons.emoji_events_rounded, 'Torneos'), NavSpec(Icons.more_horiz_rounded, 'Más')], index: index, onTap: onTap),
+    BottomBar(items: const [NavSpec(Icons.home_rounded, 'Inicio'), NavSpec(Icons.calendar_month_rounded, 'Calendario'), NavSpec(Icons.account_balance_wallet_rounded, 'Finanzas'), NavSpec(Icons.emoji_events_rounded, 'Torneos'), NavSpec(Icons.more_horiz_rounded, 'Más')], index: index, onTap: onTap),
   ]));
 }
 
