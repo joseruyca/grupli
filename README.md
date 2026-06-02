@@ -24,3 +24,17 @@ Para esta versión se recomienda ejecutar `supabase/all_in_one.sql` porque es un
 ## v12.2 — Corrección de producto
 
 Se elimina la pestaña Eventos como navegación principal. Dentro de cada grupo, la primera pestaña ahora es Inicio: resumen real del grupo con próximos eventos y asistencia directa. Calendario es donde se visualizan y crean eventos por día. Se han eliminado los ejemplos falsos de actividad reciente.
+
+
+## v12.3 — Torneos y ligas
+
+Rehace el flujo de torneos/ligas: creación guiada, formatos liga/eliminatoria/americano, participantes, generación automática de partidos, resultados, clasificación y rondas.
+
+## v12.4 — Finanzas estilo Tricount
+
+Mejora completa de Finanzas: balances por miembro, quién debe a quién, formulario de gasto guiado, detalle de gasto, liquidación y reapertura de pagos. No requiere SQL nuevo si ya está ejecutado el `all_in_one.sql` de v12.
+
+
+## v12.5 Calendario + eventos unidos
+
+Mejora el flujo de eventos/quedadas: Inicio muestra próximos eventos con asistencia directa; Calendario permite crear eventos desde el día seleccionado, responder asistencia, abrir detalle, editar y cancelar. No añade SQL nuevo.

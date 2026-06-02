@@ -268,7 +268,7 @@ class AppData {
   }
 
   static Future<List<Map<String, dynamic>>> events(String groupId) async {
-    final res = await sb.from('events').select('*, event_attendance(status,user_id)').eq('group_id', groupId).order('starts_at');
+    final res = await sb.from('events').select('*, event_attendance(status,user_id)').eq('group_id', groupId).neq('status', 'cancelled').order('starts_at');
     return asList(res);
   }
 
@@ -283,6 +283,29 @@ class AppData {
       'created_by': user?.id,
     }).select('id').single();
     return row['id'].toString();
+  }
+
+  static Future<Map<String, dynamic>> eventById(String eventId) async {
+    final res = await sb.from('events').select('*, event_attendance(status,user_id)').eq('id', eventId).single();
+    return asMap(res);
+  }
+
+  static Future<void> updateEvent(String eventId, String title, DateTime startsAt, String location, String notes, int minPeople) async {
+    await sb.from('events').update({
+      'title': title.trim(),
+      'starts_at': startsAt.toUtc().toIso8601String(),
+      'location': location.trim().isEmpty ? null : location.trim(),
+      'notes': notes.trim().isEmpty ? null : notes.trim(),
+      'min_people': minPeople,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', eventId);
+  }
+
+  static Future<void> cancelEvent(String eventId) async {
+    await sb.from('events').update({
+      'status': 'cancelled',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', eventId);
   }
 
   static Future<void> setAttendance(String eventId, String status) async {
@@ -303,6 +326,8 @@ class AppData {
 
   static Future<String> createExpense(String groupId, String concept, double amount, String paidBy, List<String> participantIds, String note) async {
     final current = user?.id;
+    final participantSet = <String>{...participantIds, paidBy};
+    final participants = participantSet.where((id) => id.trim().isNotEmpty).toList();
     final expense = await sb.from('expenses').insert({
       'group_id': groupId,
       'concept': concept.trim(),
@@ -310,10 +335,11 @@ class AppData {
       'paid_by': paidBy,
       'created_by': current,
       'note': note.trim().isEmpty ? null : note.trim(),
+      'status': 'pending',
     }).select('id').single();
     final expenseId = expense['id'].toString();
-    final share = participantIds.isEmpty ? amount : amount / participantIds.length;
-    final rows = participantIds.map((id) => {
+    final share = participants.isEmpty ? amount : amount / participants.length;
+    final rows = participants.map((id) => {
       'expense_id': expenseId,
       'user_id': id,
       'share_amount': double.parse(share.toStringAsFixed(2)),
@@ -323,20 +349,175 @@ class AppData {
     return expenseId;
   }
 
+  static Future<void> setExpenseParticipantPaid(String expenseId, String userId, bool paid) async {
+    await sb.from('expense_participants').update({'paid': paid}).eq('expense_id', expenseId).eq('user_id', userId);
+  }
+
+  static Future<void> markExpenseSettled(String expenseId) async {
+    await sb.from('expense_participants').update({'paid': true}).eq('expense_id', expenseId);
+    await sb.from('expenses').update({'status': 'paid', 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', expenseId);
+  }
+
+  static Future<void> reopenExpense(String expenseId) async {
+    final expense = await sb.from('expenses').select('paid_by').eq('id', expenseId).single();
+    final paidBy = expense['paid_by']?.toString();
+    await sb.from('expense_participants').update({'paid': false}).eq('expense_id', expenseId);
+    if (paidBy != null && paidBy.isNotEmpty) {
+      await sb.from('expense_participants').update({'paid': true}).eq('expense_id', expenseId).eq('user_id', paidBy);
+    }
+    await sb.from('expenses').update({'status': 'pending', 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', expenseId);
+  }
+
+  static Future<void> deleteExpense(String expenseId) async {
+    await sb.from('expenses').delete().eq('id', expenseId);
+  }
+
   static Future<List<Map<String, dynamic>>> tournaments(String groupId) async {
-    final res = await sb.from('tournaments').select('*, tournament_teams(id), matches(id,status)').eq('group_id', groupId).order('created_at', ascending: false);
+    final res = await sb
+        .from('tournaments')
+        .select('*, tournament_teams(id,name), matches(id,team_a,team_b,score_a,score_b,round,status,played_at)')
+        .eq('group_id', groupId)
+        .order('created_at', ascending: false);
     return asList(res);
   }
 
-  static Future<String> createTournament(String groupId, String name) async {
+  static Future<Map<String, dynamic>> tournament(String tournamentId) async {
+    final res = await sb
+        .from('tournaments')
+        .select('*, tournament_teams(id,name), matches(id,team_a,team_b,score_a,score_b,round,status,played_at,created_at)')
+        .eq('id', tournamentId)
+        .single();
+    return asMap(res);
+  }
+
+  static Future<String> createTournament(
+    String groupId,
+    String name, {
+    String format = 'liga',
+    String teamType = 'equipo',
+  }) async {
     final row = await sb.from('tournaments').insert({
       'group_id': groupId,
       'name': name.trim(),
-      'format': 'liga',
-      'team_type': 'equipo',
+      'format': format,
+      'team_type': teamType,
       'created_by': user?.id,
     }).select('id').single();
     return row['id'].toString();
+  }
+
+  static Future<void> updateTournamentStatus(String tournamentId, String status) async {
+    await sb.from('tournaments').update({'status': status, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', tournamentId);
+  }
+
+  static Future<void> deleteTournament(String tournamentId) async {
+    await sb.from('tournaments').delete().eq('id', tournamentId);
+  }
+
+  static Future<String> addTournamentTeam(String tournamentId, String name) async {
+    final row = await sb.from('tournament_teams').insert({
+      'tournament_id': tournamentId,
+      'name': name.trim(),
+    }).select('id').single();
+    return row['id'].toString();
+  }
+
+  static Future<void> deleteTournamentTeam(String teamId) async {
+    await sb.from('tournament_teams').delete().eq('id', teamId);
+  }
+
+  static Future<void> clearTournamentMatches(String tournamentId) async {
+    await sb.from('matches').delete().eq('tournament_id', tournamentId);
+  }
+
+  static Future<void> generateMatches(String tournamentId, String format, List<Map<String, dynamic>> teams) async {
+    if (teams.length < 2) {
+      throw Exception('Añade al menos 2 participantes.');
+    }
+
+    await clearTournamentMatches(tournamentId);
+
+    final rows = <Map<String, dynamic>>[];
+    if (format == 'eliminatoria') {
+      if (teams.length < 2) throw Exception('Añade al menos 2 participantes.');
+      if (teams.length % 2 != 0) {
+        throw Exception('Para una eliminatoria simple usa 2, 4, 8 o 16 participantes. Añade o quita uno para cerrar el cuadro.');
+      }
+      for (var i = 0; i < teams.length; i += 2) {
+        rows.add({
+          'tournament_id': tournamentId,
+          'team_a': teams[i]['id'],
+          'team_b': teams[i + 1]['id'],
+          'round': 1,
+          'status': 'pending',
+        });
+      }
+    } else {
+      var round = 1;
+      for (var i = 0; i < teams.length; i++) {
+        for (var j = i + 1; j < teams.length; j++) {
+          rows.add({
+            'tournament_id': tournamentId,
+            'team_a': teams[i]['id'],
+            'team_b': teams[j]['id'],
+            'round': round,
+            'status': 'pending',
+          });
+          round++;
+        }
+      }
+    }
+
+    if (rows.isEmpty) throw Exception('No se han podido generar partidos.');
+    await sb.from('matches').insert(rows);
+  }
+
+  static Future<void> generateNextEliminationRound(String tournamentId, List<Map<String, dynamic>> matches) async {
+    final played = matches.where((m) => text(m['status']) == 'played').toList();
+    final latestRound = matches.fold<int>(0, (maxRound, m) => max(maxRound, intValue(m['round'])));
+    final latestMatches = played.where((m) => intValue(m['round']) == latestRound).toList();
+    if (latestMatches.isEmpty) throw Exception('No hay resultados cerrados para generar la siguiente ronda.');
+    if (latestMatches.length == 1) throw Exception('La eliminatoria ya tiene final registrada.');
+
+    final winners = <String>[];
+    for (final match in latestMatches) {
+      final a = intValue(match['score_a']);
+      final b = intValue(match['score_b']);
+      if (a == b) throw Exception('No puede haber empates en eliminatoria.');
+      winners.add((a > b ? match['team_a'] : match['team_b']).toString());
+    }
+    if (winners.length % 2 != 0) throw Exception('Número impar de ganadores. Revisa resultados.');
+    final rows = <Map<String, dynamic>>[];
+    for (var i = 0; i < winners.length; i += 2) {
+      rows.add({
+        'tournament_id': tournamentId,
+        'team_a': winners[i],
+        'team_b': winners[i + 1],
+        'round': latestRound + 1,
+        'status': 'pending',
+      });
+    }
+    await sb.from('matches').insert(rows);
+  }
+
+  static Future<void> setMatchResult(String matchId, int scoreA, int scoreB) async {
+    await sb.from('matches').update({
+      'score_a': scoreA,
+      'score_b': scoreB,
+      'status': 'played',
+      'played_at': DateTime.now().toUtc().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', matchId);
+  }
+
+  static Future<void> reopenMatch(String matchId) async {
+    await sb.from('matches').update({
+      'score_a': null,
+      'score_b': null,
+      'status': 'pending',
+      'played_at': null,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', matchId);
   }
 }
 
@@ -358,18 +539,203 @@ int attendanceCount(Map<String, dynamic> event, String status) {
   }).length;
 }
 
-String myAttendanceStatus(Map<String, dynamic> event) {
+String? myAttendanceStatus(Map<String, dynamic> event) {
   final uid = AppData.user?.id;
   final attendance = event['event_attendance'];
-  if (uid == null || attendance is! List) return '';
+  if (uid == null || attendance is! List) return null;
   for (final item in attendance) {
-    if (item is Map && item['user_id']?.toString() == uid) {
-      return item['status']?.toString() ?? '';
-    }
+    if (item is! Map) continue;
+    if (item['user_id']?.toString() == uid) return item['status']?.toString();
   }
-  return '';
+  return null;
 }
 
+String eventStatusForUser(Map<String, dynamic> event, String userId) {
+  final attendance = event['event_attendance'];
+  if (attendance is! List) return 'pending';
+  for (final item in attendance) {
+    if (item is! Map) continue;
+    if (item['user_id']?.toString() == userId) return item['status']?.toString() ?? 'pending';
+  }
+  return 'pending';
+}
+
+bool sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+
+int eventsInMonth(List<Map<String, dynamic>> events, DateTime month) {
+  return events.where((e) {
+    final d = DateTime.tryParse(e['starts_at']?.toString() ?? '')?.toLocal();
+    return d != null && d.year == month.year && d.month == month.month;
+  }).length;
+}
+
+String memberDisplayName(Map<String, dynamic> member) {
+  final profile = AppData.asMap(member['profiles']);
+  final fullName = AppData.text(profile['full_name']);
+  if (fullName.isNotEmpty) return fullName;
+  final email = AppData.text(profile['email']);
+  if (email.contains('@')) return email.split('@').first;
+  return 'Miembro';
+}
+
+String initialsFor(String name) {
+  final words = name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+  if (words.isEmpty) return '?';
+  if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
+  return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'.toUpperCase();
+}
+
+String attendanceLabel(String status) {
+  switch (status) {
+    case 'yes': return 'Va';
+    case 'maybe': return 'Duda';
+    case 'no': return 'No va';
+    default: return 'Sin responder';
+  }
+}
+
+Color attendanceColor(String status) {
+  switch (status) {
+    case 'yes': return AppColors.green;
+    case 'maybe': return AppColors.amber;
+    case 'no': return AppColors.red;
+    default: return AppColors.muted;
+  }
+}
+
+
+String tournamentFormatLabel(String format) {
+  switch (format) {
+    case 'eliminatoria':
+      return 'Eliminatoria';
+    case 'americano':
+      return 'Americano';
+    default:
+      return 'Liga';
+  }
+}
+
+String tournamentFormatSubtitle(String format) {
+  switch (format) {
+    case 'eliminatoria':
+      return 'Cuadro directo: quien gana avanza y quien pierde queda fuera.';
+    case 'americano':
+      return 'Rondas rápidas para rotar participantes y mantener ranking.';
+    default:
+      return 'Todos contra todos con clasificación automática.';
+  }
+}
+
+String teamTypeLabel(String type) {
+  switch (type) {
+    case 'individual':
+      return 'Individual';
+    case 'pareja':
+      return 'Parejas';
+    default:
+      return 'Equipos';
+  }
+}
+
+List<Map<String, dynamic>> tournamentTeams(Map<String, dynamic> tournament) {
+  final value = tournament['tournament_teams'];
+  if (value is! List) return [];
+  final teams = value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  teams.sort((a, b) => AppData.text(a['name']).toLowerCase().compareTo(AppData.text(b['name']).toLowerCase()));
+  return teams;
+}
+
+List<Map<String, dynamic>> tournamentMatches(Map<String, dynamic> tournament) {
+  final value = tournament['matches'];
+  if (value is! List) return [];
+  final matches = value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  matches.sort((a, b) {
+    final roundCompare = AppData.intValue(a['round']).compareTo(AppData.intValue(b['round']));
+    if (roundCompare != 0) return roundCompare;
+    return AppData.text(a['created_at']).compareTo(AppData.text(b['created_at']));
+  });
+  return matches;
+}
+
+String teamName(String? id, Map<String, String> names) {
+  if (id == null || id.isEmpty || id == 'null') return 'Pendiente';
+  return names[id] ?? 'Participante';
+}
+
+Map<String, String> teamNameMap(List<Map<String, dynamic>> teams) {
+  return {for (final team in teams) team['id'].toString(): AppData.text(team['name'], 'Participante')};
+}
+
+List<TeamStanding> calculateStandings(List<Map<String, dynamic>> teams, List<Map<String, dynamic>> matches) {
+  final table = <String, TeamStanding>{
+    for (final team in teams)
+      team['id'].toString(): TeamStanding(
+        id: team['id'].toString(),
+        name: AppData.text(team['name'], 'Participante'),
+      ),
+  };
+
+  for (final match in matches) {
+    if (AppData.text(match['status']) != 'played') continue;
+    final aId = AppData.text(match['team_a']);
+    final bId = AppData.text(match['team_b']);
+    final a = table[aId];
+    final b = table[bId];
+    if (a == null || b == null) continue;
+    final scoreA = AppData.intValue(match['score_a']);
+    final scoreB = AppData.intValue(match['score_b']);
+
+    a.played++;
+    b.played++;
+    a.goalsFor += scoreA;
+    a.goalsAgainst += scoreB;
+    b.goalsFor += scoreB;
+    b.goalsAgainst += scoreA;
+
+    if (scoreA > scoreB) {
+      a.wins++;
+      b.losses++;
+      a.points += 3;
+    } else if (scoreA < scoreB) {
+      b.wins++;
+      a.losses++;
+      b.points += 3;
+    } else {
+      a.draws++;
+      b.draws++;
+      a.points += 1;
+      b.points += 1;
+    }
+  }
+
+  final rows = table.values.toList();
+  rows.sort((a, b) {
+    final points = b.points.compareTo(a.points);
+    if (points != 0) return points;
+    final diff = b.goalDifference.compareTo(a.goalDifference);
+    if (diff != 0) return diff;
+    final gf = b.goalsFor.compareTo(a.goalsFor);
+    if (gf != 0) return gf;
+    return a.name.compareTo(b.name);
+  });
+  return rows;
+}
+
+class TeamStanding {
+  final String id;
+  final String name;
+  int played = 0;
+  int wins = 0;
+  int draws = 0;
+  int losses = 0;
+  int goalsFor = 0;
+  int goalsAgainst = 0;
+  int points = 0;
+
+  TeamStanding({required this.id, required this.name});
+
+  int get goalDifference => goalsFor - goalsAgainst;
+}
 
 Future<void> showToast(BuildContext context, String message, {bool danger = false}) async {
   if (!context.mounted) return;
@@ -1130,10 +1496,12 @@ class _EventsTabState extends State<EventsTab> {
   }
 }
 
+
 class CreateEventScreen extends StatefulWidget {
   final Map<String, dynamic> group;
   final DateTime? initialDate;
-  const CreateEventScreen({super.key, required this.group, this.initialDate});
+  final Map<String, dynamic>? event;
+  const CreateEventScreen({super.key, required this.group, this.initialDate, this.event});
 
   @override
   State<CreateEventScreen> createState() => _CreateEventScreenState();
@@ -1148,55 +1516,116 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   int minPeople = 2;
   bool loading = false;
 
+  bool get editing => widget.event != null;
+
   @override
   void initState() {
     super.initState();
-    date = widget.initialDate ?? DateTime.now().add(const Duration(days: 1));
+    final event = widget.event;
+    final eventDate = DateTime.tryParse(event?['starts_at']?.toString() ?? '')?.toLocal();
+    date = widget.initialDate ?? eventDate ?? DateTime.now().add(const Duration(days: 1));
+    if (eventDate != null) time = TimeOfDay.fromDateTime(eventDate);
+    title.text = AppData.text(event?['title']);
+    location.text = AppData.text(event?['location']);
+    notes.text = AppData.text(event?['notes']);
+    minPeople = AppData.intValue(event?['min_people'], 2);
   }
 
   @override
   void dispose() {
-    title.dispose(); location.dispose(); notes.dispose(); super.dispose();
+    title.dispose();
+    location.dispose();
+    notes.dispose();
+    super.dispose();
+  }
+
+  void applyTemplate(String value) {
+    if (title.text.trim().isEmpty) title.text = value;
   }
 
   Future<void> save() async {
-    if (title.text.trim().isEmpty) { await showToast(context, 'Pon un título para el evento.', danger: true); return; }
+    final cleanTitle = title.text.trim();
+    if (cleanTitle.length < 2) {
+      await showToast(context, 'Pon un título claro para el evento.', danger: true);
+      return;
+    }
     final start = DateTime(date.year, date.month, date.day, time.hour, time.minute);
     setState(() => loading = true);
     try {
-      await AppData.createEvent(widget.group['id'].toString(), title.text, start, location.text, notes.text, minPeople);
+      if (editing) {
+        await AppData.updateEvent(widget.event!['id'].toString(), cleanTitle, start, location.text, notes.text, minPeople);
+      } else {
+        await AppData.createEvent(widget.group['id'].toString(), cleanTitle, start, location.text, notes.text, minPeople);
+      }
       if (mounted) Navigator.pop(context, true);
-    } catch (e) { await showToast(context, e.toString(), danger: true); }
-    finally { if (mounted) setState(() => loading = false); }
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final groupName = AppData.text(widget.group['name'], 'Grupo');
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: 'Nuevo evento', subtitle: AppData.text(widget.group['name']), leading: true),
-      const SizedBox(height: 20),
-      FieldLabel('Título del evento'),
-      TextField(controller: title, decoration: const InputDecoration(hintText: 'Ej. Partido amistoso')),
+      PageHeader(title: editing ? 'Editar evento' : 'Nuevo evento', subtitle: groupName, leading: true),
+      const SizedBox(height: 16),
+      AppCard(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(width: 46, height: 46, decoration: const BoxDecoration(color: AppColors.tealSoft, shape: BoxShape.circle), child: const Icon(Icons.event_available_rounded, color: AppColors.teal)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Crea una quedada fácil de responder', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 5),
+            const Text('El grupo verá el evento en Inicio y Calendario, y podrá marcar Voy, Duda o No voy.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, height: 1.35)),
+          ])),
+        ]),
+      ),
+      const SizedBox(height: 16),
+      FieldLabel('Plantillas rápidas'),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        QuickTemplateChip(label: 'Partido', onTap: () => applyTemplate('Partido')),
+        QuickTemplateChip(label: 'Entrenamiento', onTap: () => applyTemplate('Entrenamiento')),
+        QuickTemplateChip(label: 'Cena del grupo', onTap: () => applyTemplate('Cena del grupo')),
+        QuickTemplateChip(label: 'Reunión', onTap: () => applyTemplate('Reunión')),
+      ]),
+      const SizedBox(height: 16),
+      FieldLabel('Título'),
+      TextField(controller: title, decoration: const InputDecoration(hintText: 'Ej. Partido semanal')),
       const SizedBox(height: 14),
       Row(children: [
-        Expanded(child: SmallPick(label: 'Fecha', value: DateFormat('dd/MM/yyyy').format(date), icon: Icons.calendar_month_rounded, onTap: () async { final d = await showDatePicker(context: context, initialDate: date, firstDate: DateTime.now().subtract(const Duration(days: 1)), lastDate: DateTime.now().add(const Duration(days: 730))); if (d != null) setState(() => date = d); })),
+        Expanded(child: SmallPick(label: 'Fecha', value: DateFormat('dd/MM/yyyy').format(date), icon: Icons.calendar_month_rounded, onTap: () async {
+          final d = await showDatePicker(context: context, initialDate: date, firstDate: DateTime.now().subtract(const Duration(days: 1)), lastDate: DateTime.now().add(const Duration(days: 730)));
+          if (d != null) setState(() => date = d);
+        })),
         const SizedBox(width: 10),
-        Expanded(child: SmallPick(label: 'Hora', value: time.format(context), icon: Icons.schedule_rounded, onTap: () async { final t = await showTimePicker(context: context, initialTime: time); if (t != null) setState(() => time = t); })),
+        Expanded(child: SmallPick(label: 'Hora', value: time.format(context), icon: Icons.schedule_rounded, onTap: () async {
+          final t = await showTimePicker(context: context, initialTime: time);
+          if (t != null) setState(() => time = t);
+        })),
       ]),
       const SizedBox(height: 14),
       FieldLabel('Lugar'),
-      TextField(controller: location, decoration: const InputDecoration(prefixIcon: Icon(Icons.place_outlined), hintText: 'Ej. Club de Pádel La Moraleja')),
+      TextField(controller: location, decoration: const InputDecoration(prefixIcon: Icon(Icons.place_outlined), hintText: 'Ej. Pista 3, club, casa...')),
       const SizedBox(height: 14),
-      FieldLabel('Descripción opcional'),
-      TextField(controller: notes, maxLines: 4, decoration: const InputDecoration(hintText: 'Añade detalles...')),
+      FieldLabel('Mínimo para confirmar el plan'),
+      AppCard(padding: const EdgeInsets.all(12), child: Row(children: [
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('$minPeople asistentes', style: Theme.of(context).textTheme.titleMedium),
+          const Text('Cuando se alcance este número, el evento se marcará como viable.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600)),
+        ])),
+        SizedBox(width: 150, child: StepperRow(value: minPeople, onMinus: () => setState(() => minPeople = max(1, minPeople - 1)), onPlus: () => setState(() => minPeople++))),
+      ])),
       const SizedBox(height: 14),
-      FieldLabel('Mínimo de asistentes'),
-      StepperRow(value: minPeople, onMinus: () => setState(() => minPeople = max(1, minPeople - 1)), onPlus: () => setState(() => minPeople++)),
+      FieldLabel('Notas opcionales'),
+      TextField(controller: notes, maxLines: 4, decoration: const InputDecoration(hintText: 'Material, normas, instrucciones, coste aproximado...')),
       const SizedBox(height: 22),
-      PrimaryButton(label: 'Guardar evento', loading: loading, onTap: save),
+      PrimaryButton(label: editing ? 'Guardar cambios' : 'Crear evento', icon: editing ? Icons.save_rounded : Icons.add_rounded, loading: loading, onTap: save),
     ]));
   }
 }
+
 
 class EventDetailScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -1208,60 +1637,148 @@ class EventDetailScreen extends StatefulWidget {
 }
 
 class _EventDetailScreenState extends State<EventDetailScreen> {
-  String? myStatus;
+  late Future<_EventDetailData> future;
   bool saving = false;
 
   @override
   void initState() {
     super.initState();
-    final uid = AppData.user?.id;
-    final att = widget.event['event_attendance'];
-    if (att is List && uid != null) {
-      for (final item in att) {
-        final row = Map<String, dynamic>.from(item as Map);
-        if (row['user_id'] == uid) myStatus = row['status']?.toString();
-      }
+    load();
+  }
+
+  void load() {
+    future = _EventDetailData.load(widget.event['id'].toString(), widget.group['id'].toString());
+  }
+
+  void reload() => setState(load);
+
+  Future<void> setStatus(String eventId, String status) async {
+    setState(() => saving = true);
+    try {
+      await AppData.setAttendance(eventId, status);
+      reload();
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    } finally {
+      if (mounted) setState(() => saving = false);
     }
   }
 
-  Future<void> setStatus(String status) async {
-    setState(() { saving = true; myStatus = status; });
-    try { await AppData.setAttendance(widget.event['id'].toString(), status); }
-    catch (e) { await showToast(context, e.toString(), danger: true); }
-    finally { if (mounted) setState(() => saving = false); }
+  Future<void> editEvent(Map<String, dynamic> event) async {
+    final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: widget.group, event: event)));
+    if (ok == true) reload();
+  }
+
+  Future<void> cancelEvent(Map<String, dynamic> event) async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Cancelar evento'),
+        content: const Text('El evento dejará de aparecer en el calendario del grupo. Esta acción no borra el grupo.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cancelar evento')),
+        ],
+      ),
+    );
+    if (yes != true) return;
+    try {
+      await AppData.cancelEvent(event['id'].toString());
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final event = widget.event;
-    final date = DateTime.tryParse(event['starts_at']?.toString() ?? '') ?? DateTime.now();
-    final att = event['event_attendance'];
-    final yes = att is List ? att.where((x) => (x as Map)['status'] == 'yes').length : 0;
-    final maybe = att is List ? att.where((x) => (x as Map)['status'] == 'maybe').length : 0;
-    final no = att is List ? att.where((x) => (x as Map)['status'] == 'no').length : 0;
-    final minPeople = AppData.intValue(event['min_people'], 2);
-    return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: AppData.text(event['title'], 'Evento'), subtitle: dateLabel(date), leading: true),
-      const SizedBox(height: 10),
-      MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
-      const SizedBox(height: 14),
-      if (AppData.text(event['notes']).isNotEmpty) AppCard(child: Text(AppData.text(event['notes']), style: Theme.of(context).textTheme.bodyMedium)),
-      const SizedBox(height: 18),
-      Text('Asistencia', style: Theme.of(context).textTheme.titleLarge),
-      const SizedBox(height: 10),
-      Row(children: [
-        Expanded(child: AttendancePick(label: 'Voy', count: yes, selected: myStatus == 'yes', color: AppColors.green, onTap: () => setStatus('yes'))),
-        const SizedBox(width: 8),
-        Expanded(child: AttendancePick(label: 'Duda', count: maybe, selected: myStatus == 'maybe', color: AppColors.amber, onTap: () => setStatus('maybe'))),
-        const SizedBox(width: 8),
-        Expanded(child: AttendancePick(label: 'No voy', count: no, selected: myStatus == 'no', color: AppColors.red, onTap: () => setStatus('no'))),
-      ]),
-      const SizedBox(height: 12),
-      StatusNotice(ok: yes >= minPeople, text: yes >= minPeople ? '¡Genial! Se alcanzó el mínimo de $minPeople asistentes.' : 'Faltan ${max(0, minPeople - yes)} confirmaciones para llegar al mínimo.'),
-      if (saving) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
-    ]));
+    return FutureBuilder<_EventDetailData>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const DirectPage(child: CenterLoader(label: 'Cargando evento...'));
+        }
+        if (snapshot.hasError) {
+          return DirectPage(child: ErrorBlock(message: snapshot.error.toString(), onRetry: reload));
+        }
+        final data = snapshot.data!;
+        final event = data.event;
+        final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+        final yes = attendanceCount(event, 'yes');
+        final maybe = attendanceCount(event, 'maybe');
+        final no = attendanceCount(event, 'no');
+        final minPeople = AppData.intValue(event['min_people'], 2);
+        final mine = myAttendanceStatus(event);
+        final pending = max(0, data.members.length - yes - maybe - no);
+
+        return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          PageHeader(title: AppData.text(event['title'], 'Evento'), subtitle: dateLabel(date), leading: true),
+          const SizedBox(height: 12),
+          AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              DateBadge(date: date),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(AppData.text(event['title'], 'Evento'), style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 5),
+                MetaLine(icon: Icons.schedule_rounded, text: DateFormat('EEEE dd MMMM · HH:mm').format(date)),
+                MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
+              ])),
+            ]),
+            if (AppData.text(event['notes']).isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Container(width: double.infinity, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(14)), child: Text(AppData.text(event['notes']), style: const TextStyle(color: AppColors.ink, height: 1.35))),
+            ],
+          ])),
+          const SizedBox(height: 16),
+          Text('Tu respuesta', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: AttendancePick(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus(event['id'].toString(), 'yes'))),
+            const SizedBox(width: 8),
+            Expanded(child: AttendancePick(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus(event['id'].toString(), 'maybe'))),
+            const SizedBox(width: 8),
+            Expanded(child: AttendancePick(label: 'No voy', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus(event['id'].toString(), 'no'))),
+          ]),
+          if (saving) const Padding(padding: EdgeInsets.only(top: 10), child: LinearProgressIndicator()),
+          const SizedBox(height: 12),
+          StatusNotice(ok: yes >= minPeople, text: yes >= minPeople ? 'Evento viable: $yes de $minPeople asistentes confirmados.' : 'Faltan ${max(0, minPeople - yes)} confirmaciones para llegar al mínimo de $minPeople.'),
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(child: StatCard(icon: Icons.check_circle_rounded, value: yes.toString(), label: 'Van', color: AppColors.green)),
+            const SizedBox(width: 9),
+            Expanded(child: StatCard(icon: Icons.help_rounded, value: maybe.toString(), label: 'Duda', color: AppColors.amber)),
+            const SizedBox(width: 9),
+            Expanded(child: StatCard(icon: Icons.hourglass_empty_rounded, value: pending.toString(), label: 'Sin responder', color: AppColors.muted)),
+          ]),
+          const SizedBox(height: 18),
+          SectionHeader(title: 'Asistencia del grupo', action: 'Actualizar', onTap: reload),
+          const SizedBox(height: 10),
+          EventMemberRoster(event: event, members: data.members),
+          const SizedBox(height: 18),
+          SecondaryButton(label: 'Editar evento', icon: Icons.edit_rounded, onTap: () => editEvent(event)),
+          const SizedBox(height: 10),
+          DangerButton(label: 'Cancelar evento', icon: Icons.event_busy_rounded, onTap: () => cancelEvent(event)),
+        ]));
+      },
+    );
   }
 }
+
+class _EventDetailData {
+  final Map<String, dynamic> event;
+  final List<Map<String, dynamic>> members;
+  const _EventDetailData({required this.event, required this.members});
+
+  static Future<_EventDetailData> load(String eventId, String groupId) async {
+    final results = await Future.wait([
+      AppData.eventById(eventId),
+      AppData.members(groupId),
+    ]);
+    return _EventDetailData(event: results[0] as Map<String, dynamic>, members: List<Map<String, dynamic>>.from(results[1] as List));
+  }
+}
+
 
 class CalendarTab extends StatefulWidget {
   final Map<String, dynamic> group;
@@ -1290,6 +1807,11 @@ class _CalendarTabState extends State<CalendarTab> {
   void load() => future = AppData.events(widget.group['id'].toString());
   void reload() => setState(load);
 
+  Future<void> createFor(DateTime day) async {
+    final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: widget.group, initialDate: day)));
+    if (ok == true) reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -1304,51 +1826,72 @@ class _CalendarTabState extends State<CalendarTab> {
             if (snapshot.hasError) {
               return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 100), children: [ErrorBlock(message: snapshot.error.toString(), onRetry: reload)]);
             }
-            final events = snapshot.data ?? [];
+            final events = (snapshot.data ?? []).where((e) => AppData.text(e['status'], 'active') != 'cancelled').toList();
             final selectedEvents = events.where((e) {
               final d = DateTime.tryParse(e['starts_at']?.toString() ?? '')?.toLocal();
-              return d != null && d.year == selected.year && d.month == selected.month && d.day == selected.day;
-            }).toList();
-            return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 112), children: [
-              PageHeader(title: 'Calendario', subtitle: AppData.text(widget.group['name']), leading: true),
-              const SizedBox(height: 18),
-              AppCard(child: Column(children: [
-                Row(children: [
-                  IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month - 1)), icon: const Icon(Icons.chevron_left_rounded)),
-                  Expanded(child: Center(child: Text(DateFormat('MMMM yyyy').format(month), style: Theme.of(context).textTheme.titleMedium))),
-                  IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month + 1)), icon: const Icon(Icons.chevron_right_rounded)),
-                ]),
+              return d != null && sameDay(d, selected);
+            }).toList()
+              ..sort((a, b) => (DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now()).compareTo(DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now()));
+            final upcoming = events.where((e) {
+              final d = DateTime.tryParse(e['starts_at']?.toString() ?? '')?.toLocal();
+              return d != null && d.isAfter(DateTime.now().subtract(const Duration(hours: 2)));
+            }).toList()
+              ..sort((a, b) => (DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now()).compareTo(DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now()));
+            final selectedYes = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
+            final selectedMaybe = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
+
+            return RefreshIndicator(
+              color: AppColors.teal,
+              onRefresh: () async => reload(),
+              child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 112), children: [
+                PageHeader(title: 'Calendario', subtitle: AppData.text(widget.group['name']), leading: true),
+                const SizedBox(height: 14),
+                AppCard(child: Column(children: [
+                  Row(children: [
+                    IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month - 1)), icon: const Icon(Icons.chevron_left_rounded)),
+                    Expanded(child: Column(children: [
+                      Text(DateFormat('MMMM yyyy').format(month), style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 2),
+                      Text('${eventsInMonth(events, month)} eventos este mes', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+                    ])),
+                    IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month + 1)), icon: const Icon(Icons.chevron_right_rounded)),
+                  ]),
+                  const SizedBox(height: 8),
+                  MonthGrid(month: month, selected: selected, events: events, onSelect: (d) => setState(() { selected = d; month = DateTime(d.year, d.month); })),
+                ])),
+                const SizedBox(height: 14),
+                CalendarDaySummary(day: selected, events: selectedEvents, confirmed: selectedYes, maybe: selectedMaybe, onCreate: () => createFor(selected)),
+                const SizedBox(height: 18),
+                SectionHeader(title: 'Agenda del día', action: 'Crear', onTap: () => createFor(selected)),
                 const SizedBox(height: 10),
-                MonthGrid(month: month, selected: selected, events: events, onSelect: (d) => setState(() => selected = d)),
-              ])),
-              const SizedBox(height: 22),
-              SectionHeader(title: DateFormat('EEEE dd/MM').format(selected), action: 'Añadir', onTap: () async {
-                final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: widget.group, initialDate: selected)));
-                if (ok == true) reload();
-              }),
-              const SizedBox(height: 10),
-              if (selectedEvents.isEmpty)
-                EmptySlim(icon: Icons.calendar_month_rounded, title: 'Día sin eventos', body: 'Puedes crear una quedada para este día con el botón +.')
-              else
-                ...selectedEvents.map((e) => EventCard(event: e, onTap: () async {
-                  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: e, group: widget.group)));
-                  reload();
-                })),
-            ]);
+                if (selectedEvents.isEmpty)
+                  EmptyBlock(icon: Icons.calendar_month_rounded, title: 'No hay nada este día', body: 'Crea una quedada, partido, cena o reunión para organizar al grupo.')
+                else
+                  ...selectedEvents.map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
+                const SizedBox(height: 18),
+                SectionHeader(title: 'Próximos eventos', action: 'Hoy', onTap: () => setState(() { selected = DateTime.now(); month = DateTime(DateTime.now().year, DateTime.now().month); })),
+                const SizedBox(height: 10),
+                if (upcoming.isEmpty)
+                  EmptySlim(icon: Icons.event_available_rounded, title: 'Agenda vacía', body: 'Crea el primer evento desde el botón +.')
+                else
+                  ...upcoming.take(5).map((e) => EventCard(event: e, onTap: () async {
+                    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: e, group: widget.group)));
+                    reload();
+                  })),
+              ]),
+            );
           },
         ),
         Positioned(
           right: 20,
           bottom: 20,
-          child: FloatingActionButton(
+          child: FloatingActionButton.extended(
             heroTag: 'calendar-create-event-${widget.group['id']}',
             backgroundColor: AppColors.teal,
             foregroundColor: Colors.white,
-            onPressed: () async {
-              final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: widget.group, initialDate: selected)));
-              if (ok == true) reload();
-            },
-            child: const Icon(Icons.add_rounded),
+            onPressed: () => createFor(selected),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Evento', style: TextStyle(fontWeight: FontWeight.w900)),
           ),
         ),
       ]),
@@ -1360,65 +1903,146 @@ class FinancesTab extends StatefulWidget {
   final Map<String, dynamic> group;
   final int refreshSeed;
   const FinancesTab({super.key, required this.group, required this.refreshSeed});
-  @override State<FinancesTab> createState() => _FinancesTabState();
+  @override
+  State<FinancesTab> createState() => _FinancesTabState();
 }
 
 class _FinancesTabState extends State<FinancesTab> {
-  late Future<List<Map<String, dynamic>>> expensesFuture;
-  @override void initState() { super.initState(); load(); }
-  @override void didUpdateWidget(covariant FinancesTab oldWidget) { super.didUpdateWidget(oldWidget); if (oldWidget.refreshSeed != widget.refreshSeed) load(); }
-  void load() => expensesFuture = AppData.expenses(widget.group['id'].toString());
+  late Future<_FinanceData> future;
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  @override
+  void didUpdateWidget(covariant FinancesTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshSeed != widget.refreshSeed) load();
+  }
+
+  void load() => future = _FinanceData.load(widget.group['id'].toString());
   void reload() => setState(load);
 
   @override
   Widget build(BuildContext context) {
     final groupId = widget.group['id'].toString();
-    return SafeArea(bottom: false, child: Stack(children: [
-      FutureBuilder<List<Map<String, dynamic>>>(future: expensesFuture, builder: (context, snapshot) {
-        final expenses = snapshot.data ?? [];
-        final total = expenses.fold<double>(0, (sum, e) => sum + AppData.doubleValue(e['amount']));
-        final myId = AppData.user?.id;
-        double paidByMe = 0;
-        double myShare = 0;
-        for (final e in expenses) {
-          if (e['paid_by'] == myId) paidByMe += AppData.doubleValue(e['amount']);
-          final participants = e['expense_participants'];
-          if (participants is List) {
-            for (final p in participants) {
-              final row = Map<String, dynamic>.from(p as Map);
-              if (row['user_id'] == myId) myShare += AppData.doubleValue(row['share_amount']);
+    return SafeArea(
+      bottom: false,
+      child: Stack(children: [
+        FutureBuilder<_FinanceData>(
+          future: future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const CenterLoader(label: 'Calculando balances...');
             }
-          }
-        }
-        return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 100), children: [
-          PageHeader(title: 'Finanzas', subtitle: AppData.text(widget.group['name']), leading: true),
-          const SizedBox(height: 18),
-          Row(children: [
-            Expanded(child: MoneyStat(label: 'Saldo total', value: paidByMe - myShare, positiveMeansGood: true)),
-            const SizedBox(width: 10),
-            Expanded(child: MoneyStat(label: 'A pagar', value: -myShare, positiveMeansGood: false)),
-          ]),
-          const SizedBox(height: 10),
-          Row(children: [
-            Expanded(child: StatCard(icon: Icons.receipt_long_rounded, value: money(total), label: 'Gastos totales', color: AppColors.teal)),
-            const SizedBox(width: 10),
-            Expanded(child: StatCard(icon: Icons.check_circle_outline_rounded, value: expenses.length.toString(), label: 'Pagos', color: AppColors.violet)),
-          ]),
-          const SizedBox(height: 24),
-          Row(children: [Text('Gastos recientes', style: Theme.of(context).textTheme.titleLarge), const Spacer(), TextButton(onPressed: reload, child: const Text('Actualizar'))]),
-          const SizedBox(height: 8),
-          if (snapshot.connectionState == ConnectionState.waiting) const CenterLoader(label: 'Cargando gastos...') else if (snapshot.hasError) ErrorBlock(message: snapshot.error.toString(), onRetry: reload) else if (expenses.isEmpty) EmptyBlock(icon: Icons.account_balance_wallet_rounded, title: 'Sin gastos', body: 'Añade una cena, pista, gasolina o cualquier gasto compartido.') else ...expenses.map((e) => ExpenseCard(expense: e)),
-        ]);
-      }),
-      Positioned(right: 20, bottom: 20, child: FloatingActionButton(backgroundColor: AppColors.teal, foregroundColor: Colors.white, onPressed: () async { final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateExpenseScreen(groupId: groupId))); if (ok == true) reload(); }, child: const Icon(Icons.add_rounded))),
-    ]));
+            if (snapshot.hasError) {
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
+                children: [ErrorBlock(message: snapshot.error.toString(), onRetry: reload)],
+              );
+            }
+            final data = snapshot.data ?? _FinanceData.empty();
+            final summary = data.summary;
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
+              children: [
+                PageHeader(title: 'Finanzas', subtitle: AppData.text(widget.group['name']), leading: true),
+                const SizedBox(height: 14),
+                AppCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: const BoxDecoration(color: AppColors.tealSoft, shape: BoxShape.circle),
+                        child: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.teal),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(_financeMainTitle(summary), style: Theme.of(context).textTheme.titleLarge),
+                        const SizedBox(height: 3),
+                        Text(_financeMainSubtitle(summary), style: Theme.of(context).textTheme.bodyMedium),
+                      ])),
+                    ]),
+                    const SizedBox(height: 16),
+                    Row(children: [
+                      Expanded(child: MoneyStat(label: 'Tu saldo', value: summary.myNet, positiveMeansGood: true)),
+                      const SizedBox(width: 10),
+                      Expanded(child: MoneyStat(label: 'Pendiente', value: -summary.pendingAmount, positiveMeansGood: false)),
+                    ]),
+                  ]),
+                ),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(child: StatCard(icon: Icons.receipt_long_rounded, value: money(summary.totalExpenses), label: 'Gasto total', color: AppColors.teal)),
+                  const SizedBox(width: 10),
+                  Expanded(child: StatCard(icon: Icons.people_alt_rounded, value: data.members.length.toString(), label: 'Participantes', color: AppColors.violet)),
+                ]),
+                const SizedBox(height: 22),
+                SectionHeader(title: 'Quién debe a quién', action: 'Actualizar', onTap: reload),
+                const SizedBox(height: 8),
+                if (summary.settlements.isEmpty)
+                  EmptySlim(icon: Icons.verified_rounded, title: 'Todo está cuadrado', body: 'No hay pagos pendientes entre los miembros del grupo.')
+                else
+                  AppCard(child: Column(children: [
+                    ...summary.settlements.take(4).map((d) => SettlementRow(debt: d)),
+                    if (summary.settlements.length > 4) Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text('+ ${summary.settlements.length - 4} pagos más para dejarlo a cero', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+                    ),
+                  ])),
+                const SizedBox(height: 22),
+                SectionHeader(title: 'Balances individuales'),
+                const SizedBox(height: 8),
+                AppCard(child: Column(children: summary.balances.entries.map((entry) {
+                  final name = summary.names[entry.key] ?? 'Miembro';
+                  return BalanceRow(name: name, value: entry.value);
+                }).toList())),
+                const SizedBox(height: 22),
+                SectionHeader(title: 'Gastos recientes'),
+                const SizedBox(height: 8),
+                if (data.expenses.isEmpty)
+                  EmptyBlock(icon: Icons.account_balance_wallet_rounded, title: 'Sin gastos', body: 'Añade pistas, cenas, gasolina, reservas o compras comunes. Grupli calculará quién debe a quién.')
+                else
+                  ...data.expenses.map((e) => ExpenseCard(
+                    expense: e,
+                    members: data.members,
+                    onTap: () async {
+                      final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ExpenseDetailScreen(expense: e, members: data.members)));
+                      if (ok == true) reload();
+                    },
+                  )),
+              ],
+            );
+          },
+        ),
+        Positioned(
+          right: 20,
+          bottom: 20,
+          child: FloatingActionButton.extended(
+            backgroundColor: AppColors.teal,
+            foregroundColor: Colors.white,
+            onPressed: () async {
+              final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateExpenseScreen(groupId: groupId)));
+              if (ok == true) reload();
+            },
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Gasto', style: TextStyle(fontWeight: FontWeight.w900)),
+          ),
+        ),
+      ]),
+    );
   }
 }
 
 class CreateExpenseScreen extends StatefulWidget {
   final String groupId;
   const CreateExpenseScreen({super.key, required this.groupId});
-  @override State<CreateExpenseScreen> createState() => _CreateExpenseScreenState();
+  @override
+  State<CreateExpenseScreen> createState() => _CreateExpenseScreenState();
 }
 
 class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
@@ -1426,92 +2050,1317 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
   final amount = TextEditingController();
   final note = TextEditingController();
   bool loading = false;
+  bool initialized = false;
   String? paidBy;
+  String splitMode = 'all';
   final selected = <String>{};
   late Future<List<Map<String, dynamic>>> membersFuture;
-  @override void initState() { super.initState(); membersFuture = AppData.members(widget.groupId); }
-  @override void dispose() { concept.dispose(); amount.dispose(); note.dispose(); super.dispose(); }
+
+  @override
+  void initState() {
+    super.initState();
+    membersFuture = AppData.members(widget.groupId);
+  }
+
+  @override
+  void dispose() {
+    concept.dispose();
+    amount.dispose();
+    note.dispose();
+    super.dispose();
+  }
+
+  void initMembers(List<Map<String, dynamic>> members) {
+    if (initialized || members.isEmpty) return;
+    paidBy = members.any((m) => m['user_id']?.toString() == AppData.user?.id) ? AppData.user?.id : members.first['user_id'].toString();
+    selected.addAll(members.map((m) => m['user_id'].toString()));
+    initialized = true;
+  }
 
   Future<void> save() async {
     final value = double.tryParse(amount.text.replaceAll(',', '.')) ?? 0;
-    if (concept.text.trim().isEmpty || value <= 0 || paidBy == null || selected.isEmpty) { await showToast(context, 'Completa concepto, importe, pagador y participantes.', danger: true); return; }
+    if (concept.text.trim().isEmpty || value <= 0 || paidBy == null || selected.isEmpty) {
+      await showToast(context, 'Completa concepto, importe, pagador y participantes.', danger: true);
+      return;
+    }
     setState(() => loading = true);
-    try { await AppData.createExpense(widget.groupId, concept.text, value, paidBy!, selected.toList(), note.text); if (mounted) Navigator.pop(context, true); }
-    catch (e) { await showToast(context, e.toString(), danger: true); }
-    finally { if (mounted) setState(() => loading = false); }
+    try {
+      await AppData.createExpense(widget.groupId, concept.text, value, paidBy!, selected.toList(), note.text);
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: 'Nuevo gasto', subtitle: 'Reparto estilo Tricount', leading: true),
+      PageHeader(title: 'Nuevo gasto', subtitle: 'Divide claro, sin cálculos raros', leading: true),
       const SizedBox(height: 18),
-      FieldLabel('Concepto'), TextField(controller: concept, decoration: const InputDecoration(hintText: 'Cena después del partido')),
-      const SizedBox(height: 12),
-      FieldLabel('Importe'), TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0,00 €')),
-      const SizedBox(height: 18),
-      FutureBuilder<List<Map<String, dynamic>>>(future: membersFuture, builder: (context, snapshot) {
-        final members = snapshot.data ?? [];
-        if (paidBy == null && members.isNotEmpty) paidBy = members.first['user_id'].toString();
-        if (selected.isEmpty && members.isNotEmpty) selected.addAll(members.map((m) => m['user_id'].toString()));
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          FieldLabel('Pagado por'),
-          DropdownButtonFormField<String>(value: paidBy, items: members.map((m) => DropdownMenuItem(value: m['user_id'].toString(), child: Text(memberName(m)))).toList(), onChanged: (v) => setState(() => paidBy = v)),
-          const SizedBox(height: 18),
-          FieldLabel('Dividido entre'),
-          Wrap(spacing: 9, runSpacing: 9, children: members.map((m) {
-            final id = m['user_id'].toString();
-            final active = selected.contains(id);
-            return FilterChip(label: Text(memberName(m)), selected: active, onSelected: (v) => setState(() { if (v) selected.add(id); else selected.remove(id); }));
-          }).toList()),
-        ]);
-      }),
-      const SizedBox(height: 18), FieldLabel('Nota opcional'), TextField(controller: note, maxLines: 3, decoration: const InputDecoration(hintText: 'Añade notas...')),
-      const SizedBox(height: 24), PrimaryButton(label: 'Guardar gasto', loading: loading, onTap: save),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        FieldLabel('Concepto'),
+        TextField(controller: concept, decoration: const InputDecoration(hintText: 'Ej. Pista de pádel, cena, gasolina...')),
+        const SizedBox(height: 12),
+        FieldLabel('Importe total'),
+        TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0,00 €')),
+      ])),
+      const SizedBox(height: 14),
+      FutureBuilder<List<Map<String, dynamic>>>(
+        future: membersFuture,
+        builder: (context, snapshot) {
+          final members = snapshot.data ?? [];
+          initMembers(members);
+          final value = double.tryParse(amount.text.replaceAll(',', '.')) ?? 0;
+          final share = selected.isEmpty ? 0 : value / selected.length;
+          if (snapshot.connectionState == ConnectionState.waiting) return const CenterLoader(label: 'Cargando miembros...');
+          if (snapshot.hasError) return ErrorBlock(message: snapshot.error.toString(), onRetry: () => setState(() => membersFuture = AppData.members(widget.groupId)));
+          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              FieldLabel('Pagado por'),
+              DropdownButtonFormField<String>(
+                value: paidBy,
+                items: members.map((m) => DropdownMenuItem(value: m['user_id'].toString(), child: Text(memberName(m)))).toList(),
+                onChanged: (v) => setState(() {
+                  paidBy = v;
+                  if (v != null) selected.add(v);
+                }),
+              ),
+            ])),
+            const SizedBox(height: 14),
+            AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              FieldLabel('Dividir entre'),
+              Row(children: [
+                Expanded(child: ChoicePill(label: 'Todos', active: splitMode == 'all', onTap: () => setState(() { splitMode = 'all'; selected..clear()..addAll(members.map((m) => m['user_id'].toString())); }))),
+                const SizedBox(width: 8),
+                Expanded(child: ChoicePill(label: 'Algunos', active: splitMode == 'some', onTap: () => setState(() => splitMode = 'some'))),
+              ]),
+              const SizedBox(height: 12),
+              Wrap(spacing: 9, runSpacing: 9, children: members.map((m) {
+                final id = m['user_id'].toString();
+                final active = selected.contains(id);
+                return FilterChip(
+                  label: Text(memberName(m)),
+                  selected: active,
+                  onSelected: (v) => setState(() {
+                    splitMode = 'some';
+                    if (v) selected.add(id); else selected.remove(id);
+                    if (paidBy != null) selected.add(paidBy!);
+                  }),
+                );
+              }).toList()),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)),
+                child: Row(children: [
+                  const Icon(Icons.calculate_rounded, color: AppColors.teal),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(selected.isEmpty ? 'Elige al menos un participante.' : '${selected.length} participantes · cada uno debe ${money(share)}', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
+                ]),
+              ),
+            ])),
+          ]);
+        },
+      ),
+      const SizedBox(height: 14),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        FieldLabel('Nota opcional'),
+        TextField(controller: note, maxLines: 3, decoration: const InputDecoration(hintText: 'Ej. Reserva incluida, se pagó con tarjeta...')),
+      ])),
+      const SizedBox(height: 24),
+      PrimaryButton(label: 'Guardar gasto', loading: loading, onTap: save),
     ]));
   }
+}
+
+class ExpenseDetailScreen extends StatefulWidget {
+  final Map<String, dynamic> expense;
+  final List<Map<String, dynamic>> members;
+  const ExpenseDetailScreen({super.key, required this.expense, required this.members});
+
+  @override
+  State<ExpenseDetailScreen> createState() => _ExpenseDetailScreenState();
+}
+
+class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
+  bool loading = false;
+
+  Future<void> run(Future<void> Function() action) async {
+    setState(() => loading = true);
+    try {
+      await action();
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final expense = widget.expense;
+    final expenseId = expense['id'].toString();
+    final paidBy = AppData.text(expense['paid_by']);
+    final participants = expenseParticipants(expense);
+    final total = AppData.doubleValue(expense['amount']);
+    final unpaid = unpaidAmount(expense);
+    final status = AppData.text(expense['status'], 'pending');
+    return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      PageHeader(title: AppData.text(expense['concept'], 'Gasto'), subtitle: 'Detalle y pagos', leading: true),
+      const SizedBox(height: 18),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const CircleAvatar(backgroundColor: AppColors.teal, child: Icon(Icons.receipt_long_rounded, color: Colors.white)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(money(total), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: AppColors.ink)),
+            Text('Pagado por ${financeMemberName(paidBy, widget.members)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+          ])),
+          _MiniChip(text: status == 'paid' || unpaid <= .01 ? 'Liquidado' : 'Pendiente', color: status == 'paid' || unpaid <= .01 ? AppColors.green : AppColors.orange),
+        ]),
+        if (AppData.text(expense['note']).isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Text(AppData.text(expense['note']), style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ])),
+      const SizedBox(height: 18),
+      SectionHeader(title: 'Participantes y pagos'),
+      const SizedBox(height: 8),
+      AppCard(child: Column(children: participants.map((p) {
+        final userId = p['user_id'].toString();
+        final paid = p['paid'] == true;
+        final share = AppData.doubleValue(p['share_amount']);
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(children: [
+            CircleAvatar(radius: 17, backgroundColor: AppColors.tealSoft, child: Text(financeMemberName(userId, widget.members).substring(0, 1).toUpperCase(), style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900))),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(financeMemberName(userId, widget.members), style: const TextStyle(fontWeight: FontWeight.w900)),
+              Text(userId == paidBy ? 'Pagó el gasto' : paid ? 'Pago registrado' : 'Pendiente de pagar', style: TextStyle(color: paid ? AppColors.green : AppColors.muted, fontSize: 12)),
+            ])),
+            Text(money(share), style: const TextStyle(fontWeight: FontWeight.w900)),
+            const SizedBox(width: 8),
+            Icon(paid ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, color: paid ? AppColors.green : AppColors.muted),
+          ]),
+        );
+      }).toList())),
+      const SizedBox(height: 18),
+      if (unpaid > .01) PrimaryButton(label: 'Marcar gasto liquidado', icon: Icons.verified_rounded, loading: loading, onTap: () => run(() => AppData.markExpenseSettled(expenseId))),
+      if (unpaid <= .01 || status == 'paid') ...[
+        SecondaryButton(label: 'Reabrir pagos', icon: Icons.restart_alt_rounded, onTap: () => run(() => AppData.reopenExpense(expenseId))),
+      ],
+      const SizedBox(height: 10),
+      DangerButton(label: 'Eliminar gasto', icon: Icons.delete_outline_rounded, onTap: () => run(() => AppData.deleteExpense(expenseId))),
+    ]));
+  }
+}
+
+class _FinanceData {
+  final List<Map<String, dynamic>> expenses;
+  final List<Map<String, dynamic>> members;
+  late final FinanceSummary summary;
+
+  _FinanceData({required this.expenses, required this.members}) {
+    summary = FinanceSummary.from(expenses, members);
+  }
+
+  static _FinanceData empty() => _FinanceData(expenses: const [], members: const []);
+
+  static Future<_FinanceData> load(String groupId) async {
+    final results = await Future.wait([AppData.expenses(groupId), AppData.members(groupId)]);
+    return _FinanceData(expenses: results[0], members: results[1]);
+  }
+}
+
+class FinanceSummary {
+  final Map<String, String> names;
+  final Map<String, double> balances;
+  final List<SettlementDebt> settlements;
+  final double totalExpenses;
+  final double pendingAmount;
+  final double myNet;
+
+  FinanceSummary({required this.names, required this.balances, required this.settlements, required this.totalExpenses, required this.pendingAmount, required this.myNet});
+
+  factory FinanceSummary.from(List<Map<String, dynamic>> expenses, List<Map<String, dynamic>> members) {
+    final names = <String, String>{};
+    final balances = <String, double>{};
+    for (final m in members) {
+      final id = m['user_id']?.toString() ?? '';
+      if (id.isEmpty) continue;
+      names[id] = memberName(m);
+      balances[id] = 0;
+    }
+
+    double total = 0;
+    double pending = 0;
+    for (final e in expenses) {
+      if (AppData.text(e['status']) == 'cancelled') continue;
+      total += AppData.doubleValue(e['amount']);
+      final paidBy = e['paid_by']?.toString() ?? '';
+      names.putIfAbsent(paidBy, () => financeMemberName(paidBy, members));
+      balances.putIfAbsent(paidBy, () => 0);
+      for (final p in expenseParticipants(e)) {
+        final userId = p['user_id']?.toString() ?? '';
+        if (userId.isEmpty || userId == paidBy) continue;
+        final share = AppData.doubleValue(p['share_amount']);
+        final alreadyPaid = p['paid'] == true;
+        names.putIfAbsent(userId, () => financeMemberName(userId, members));
+        balances.putIfAbsent(userId, () => 0);
+        if (!alreadyPaid) {
+          balances[paidBy] = (balances[paidBy] ?? 0) + share;
+          balances[userId] = (balances[userId] ?? 0) - share;
+          pending += share;
+        }
+      }
+    }
+
+    final settlements = buildSettlements(balances, names);
+    final myId = AppData.user?.id ?? '';
+    return FinanceSummary(names: names, balances: balances, settlements: settlements, totalExpenses: total, pendingAmount: pending, myNet: balances[myId] ?? 0);
+  }
+}
+
+class SettlementDebt {
+  final String fromId;
+  final String toId;
+  final String fromName;
+  final String toName;
+  final double amount;
+  const SettlementDebt({required this.fromId, required this.toId, required this.fromName, required this.toName, required this.amount});
+}
+
+List<SettlementDebt> buildSettlements(Map<String, double> balances, Map<String, String> names) {
+  final debtors = balances.entries.where((e) => e.value < -0.01).map((e) => MapEntry(e.key, -e.value)).toList();
+  final creditors = balances.entries.where((e) => e.value > 0.01).map((e) => MapEntry(e.key, e.value)).toList();
+  debtors.sort((a, b) => b.value.compareTo(a.value));
+  creditors.sort((a, b) => b.value.compareTo(a.value));
+  final result = <SettlementDebt>[];
+  var i = 0;
+  var j = 0;
+  while (i < debtors.length && j < creditors.length) {
+    final amount = min(debtors[i].value, creditors[j].value);
+    if (amount > 0.01) {
+      result.add(SettlementDebt(
+        fromId: debtors[i].key,
+        toId: creditors[j].key,
+        fromName: names[debtors[i].key] ?? 'Miembro',
+        toName: names[creditors[j].key] ?? 'Miembro',
+        amount: double.parse(amount.toStringAsFixed(2)),
+      ));
+    }
+    debtors[i] = MapEntry(debtors[i].key, debtors[i].value - amount);
+    creditors[j] = MapEntry(creditors[j].key, creditors[j].value - amount);
+    if (debtors[i].value <= 0.01) i++;
+    if (creditors[j].value <= 0.01) j++;
+  }
+  return result;
+}
+
+List<Map<String, dynamic>> expenseParticipants(Map<String, dynamic> expense) {
+  final raw = expense['expense_participants'];
+  if (raw is! List) return [];
+  return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+}
+
+double unpaidAmount(Map<String, dynamic> expense) {
+  final paidBy = expense['paid_by']?.toString();
+  return expenseParticipants(expense).fold<double>(0, (sum, p) {
+    if (p['user_id']?.toString() == paidBy) return sum;
+    return p['paid'] == true ? sum : sum + AppData.doubleValue(p['share_amount']);
+  });
+}
+
+String financeMemberName(String userId, List<Map<String, dynamic>> members) {
+  for (final m in members) {
+    if (m['user_id']?.toString() == userId) return memberName(m);
+  }
+  return userId == AppData.user?.id ? 'Tú' : 'Miembro';
+}
+
+String _financeMainTitle(FinanceSummary summary) {
+  if (summary.pendingAmount <= 0.01) return 'Todo está cuadrado';
+  if (summary.myNet > 0.01) return 'Te deben ${money(summary.myNet)}';
+  if (summary.myNet < -0.01) return 'Debes ${money(-summary.myNet)}';
+  return 'Hay pagos pendientes';
+}
+
+String _financeMainSubtitle(FinanceSummary summary) {
+  if (summary.pendingAmount <= 0.01) return 'No hay deudas abiertas en este grupo.';
+  return 'Con ${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} se puede dejar el grupo a cero.';
+}
+
+class SettlementRow extends StatelessWidget {
+  final SettlementDebt debt;
+  const SettlementRow({super.key, required this.debt});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Row(children: [
+      Expanded(child: Text('${debt.fromName} paga a ${debt.toName}', style: const TextStyle(fontWeight: FontWeight.w900))),
+      Text(money(debt.amount), style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900)),
+    ]),
+  );
+}
+
+class BalanceRow extends StatelessWidget {
+  final String name;
+  final double value;
+  const BalanceRow({super.key, required this.name, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Row(children: [
+      CircleAvatar(radius: 15, backgroundColor: value >= 0 ? AppColors.tealSoft : const Color(0xFFFFECEC), child: Text(name.substring(0, 1).toUpperCase(), style: TextStyle(color: value >= 0 ? AppColors.teal : AppColors.red, fontWeight: FontWeight.w900))),
+      const SizedBox(width: 10),
+      Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w900))),
+      Text(money(value), style: TextStyle(color: value >= 0 ? AppColors.green : AppColors.red, fontWeight: FontWeight.w900)),
+    ]),
+  );
+}
+
+class ChoicePill extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  const ChoicePill({super.key, required this.label, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(14),
+    child: Container(
+      height: 44,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: active ? AppColors.teal : Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: active ? AppColors.teal : AppColors.line)),
+      child: Text(label, style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900)),
+    ),
+  );
 }
 
 class TournamentsTab extends StatefulWidget {
   final Map<String, dynamic> group;
   final int refreshSeed;
   const TournamentsTab({super.key, required this.group, required this.refreshSeed});
-  @override State<TournamentsTab> createState() => _TournamentsTabState();
+
+  @override
+  State<TournamentsTab> createState() => _TournamentsTabState();
 }
 
 class _TournamentsTabState extends State<TournamentsTab> {
   late Future<List<Map<String, dynamic>>> future;
-  @override void initState() { super.initState(); load(); }
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  @override
+  void didUpdateWidget(covariant TournamentsTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshSeed != widget.refreshSeed) load();
+  }
+
   void load() => future = AppData.tournaments(widget.group['id'].toString());
   void reload() => setState(load);
 
-  Future<void> createTournament() async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(context: context, builder: (context) => AlertDialog(
-      title: const Text('Crear torneo'),
-      content: TextField(controller: controller, decoration: const InputDecoration(hintText: 'Liga de Pádel')),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')), FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Crear'))],
-    ));
-    if (result == null || result.trim().isEmpty) return;
-    try { await AppData.createTournament(widget.group['id'].toString(), result); reload(); }
-    catch (e) { await showToast(context, e.toString(), danger: true); }
+  Future<void> openCreate() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => CreateTournamentScreen(group: widget.group)),
+    );
+    if (created == true) reload();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(bottom: false, child: Stack(children: [
-      FutureBuilder<List<Map<String, dynamic>>>(future: future, builder: (context, snapshot) {
-        final tournaments = snapshot.data ?? [];
-        return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 100), children: [
-          PageHeader(title: 'Torneos / Ligas', subtitle: AppData.text(widget.group['name']), leading: true),
-          const SizedBox(height: 18),
-          if (snapshot.connectionState == ConnectionState.waiting) const CenterLoader(label: 'Cargando torneos...') else if (snapshot.hasError) ErrorBlock(message: snapshot.error.toString(), onRetry: reload) else if (tournaments.isEmpty) EmptyBlock(icon: Icons.emoji_events_rounded, title: 'Sin torneos todavía', body: 'Crea una liga, copa o torneo para organizar la competición del grupo.') else ...tournaments.map((t) => TournamentCard(tournament: t)),
-        ]);
-      }),
-      Positioned(right: 20, bottom: 20, child: FloatingActionButton(backgroundColor: AppColors.teal, foregroundColor: Colors.white, onPressed: createTournament, child: const Icon(Icons.add_rounded))),
-    ]));
+    return SafeArea(
+      bottom: false,
+      child: Stack(
+        children: [
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: future,
+            builder: (context, snapshot) {
+              final tournaments = snapshot.data ?? [];
+              final active = tournaments.where((t) => AppData.text(t['status']) != 'finished').length;
+              final finished = tournaments.where((t) => AppData.text(t['status']) == 'finished').length;
+
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                children: [
+                  PageHeader(
+                    title: 'Torneos / Ligas',
+                    subtitle: 'Competiciones de ${AppData.text(widget.group['name'], 'tu grupo')}',
+                    leading: true,
+                  ),
+                  const SizedBox(height: 16),
+                  AppCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        Container(
+                          width: 54,
+                          height: 54,
+                          decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(17)),
+                          child: const Icon(Icons.emoji_events_rounded, color: AppColors.teal, size: 31),
+                        ),
+                        const SizedBox(width: 13),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('Crea una competición sin líos', style: Theme.of(context).textTheme.titleMedium),
+                          const SizedBox(height: 3),
+                          Text('Elige formato, añade participantes, genera partidos y registra resultados con clasificación automática.', style: Theme.of(context).textTheme.bodyMedium),
+                        ])),
+                      ]),
+                      const SizedBox(height: 14),
+                      Row(children: [
+                        Expanded(child: StatCard(icon: Icons.play_circle_outline_rounded, value: active.toString(), label: 'Activos', color: AppColors.teal)),
+                        const SizedBox(width: 10),
+                        Expanded(child: StatCard(icon: Icons.flag_circle_rounded, value: finished.toString(), label: 'Finalizados', color: AppColors.violet)),
+                      ]),
+                    ]),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(children: [
+                    Text('Tus competiciones', style: Theme.of(context).textTheme.titleLarge),
+                    const Spacer(),
+                    TextButton.icon(onPressed: openCreate, icon: const Icon(Icons.add_rounded), label: const Text('Crear')),
+                  ]),
+                  const SizedBox(height: 8),
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    const CenterLoader(label: 'Cargando torneos...')
+                  else if (snapshot.hasError)
+                    ErrorBlock(message: snapshot.error.toString(), onRetry: reload)
+                  else if (tournaments.isEmpty)
+                    AppCard(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(children: [
+                        Container(
+                          width: 70,
+                          height: 70,
+                          decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(22)),
+                          child: const Icon(Icons.emoji_events_rounded, color: AppColors.teal, size: 36),
+                        ),
+                        const SizedBox(height: 14),
+                        Text('Aún no hay ligas ni torneos', style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
+                        const SizedBox(height: 6),
+                        Text('Empieza con una liga todos contra todos, una copa eliminatoria o un formato americano para pádel/tenis.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+                        const SizedBox(height: 16),
+                        PrimaryButton(label: 'Crear competición', icon: Icons.add_rounded, onTap: openCreate),
+                      ]),
+                    )
+                  else
+                    ...tournaments.map((t) => TournamentCard(
+                      tournament: t,
+                      onTap: () async {
+                        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TournamentDetailScreen(tournamentId: t['id'].toString(), group: widget.group)));
+                        reload();
+                      },
+                    )),
+                ],
+              );
+            },
+          ),
+          Positioned(
+            right: 20,
+            bottom: 20,
+            child: FloatingActionButton(
+              heroTag: 'create_tournament',
+              backgroundColor: AppColors.teal,
+              foregroundColor: Colors.white,
+              onPressed: openCreate,
+              child: const Icon(Icons.add_rounded),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
+
+class CreateTournamentScreen extends StatefulWidget {
+  final Map<String, dynamic> group;
+  const CreateTournamentScreen({super.key, required this.group});
+
+  @override
+  State<CreateTournamentScreen> createState() => _CreateTournamentScreenState();
+}
+
+class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
+  final name = TextEditingController();
+  String format = 'liga';
+  String teamType = 'pareja';
+  bool loading = false;
+
+  @override
+  void dispose() {
+    name.dispose();
+    super.dispose();
+  }
+
+  Future<void> create() async {
+    if (name.text.trim().length < 2) {
+      await showToast(context, 'Pon un nombre para la competición.', danger: true);
+      return;
+    }
+
+    setState(() => loading = true);
+    try {
+      final id = await AppData.createTournament(
+        widget.group['id'].toString(),
+        name.text,
+        format: format,
+        teamType: teamType,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => TournamentDetailScreen(tournamentId: id, group: widget.group),
+      ));
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DirectPage(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        PageHeader(title: 'Nueva competición', subtitle: AppData.text(widget.group['name']), leading: true),
+        const SizedBox(height: 20),
+        FieldLabel('Nombre'),
+        TextField(controller: name, textInputAction: TextInputAction.next, decoration: const InputDecoration(hintText: 'Ej. Liga de pádel de los jueves')),
+        const SizedBox(height: 22),
+        Text('Formato', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        TournamentFormatOption(
+          selected: format == 'liga',
+          icon: Icons.table_chart_rounded,
+          title: 'Liga todos contra todos',
+          body: 'Ideal para grupos estables. Todos juegan contra todos y se calcula la clasificación.',
+          onTap: () => setState(() => format = 'liga'),
+        ),
+        TournamentFormatOption(
+          selected: format == 'eliminatoria',
+          icon: Icons.account_tree_rounded,
+          title: 'Eliminatoria / Copa',
+          body: 'Rondas directas. Perfecta para torneos rápidos con semifinal y final.',
+          onTap: () => setState(() => format = 'eliminatoria'),
+        ),
+        TournamentFormatOption(
+          selected: format == 'americano',
+          icon: Icons.sync_alt_rounded,
+          title: 'Americano / Ranking',
+          body: 'Pensado para rotaciones de pádel, tenis o juegos donde importa sumar resultados.',
+          onTap: () => setState(() => format = 'americano'),
+        ),
+        const SizedBox(height: 18),
+        Text('Participantes', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: PickPill(label: 'Individual', selected: teamType == 'individual', onTap: () => setState(() => teamType = 'individual'))),
+          const SizedBox(width: 8),
+          Expanded(child: PickPill(label: 'Parejas', selected: teamType == 'pareja', onTap: () => setState(() => teamType = 'pareja'))),
+          const SizedBox(width: 8),
+          Expanded(child: PickPill(label: 'Equipos', selected: teamType == 'equipo', onTap: () => setState(() => teamType = 'equipo'))),
+        ]),
+        const SizedBox(height: 16),
+        StatusNotice(
+          ok: true,
+          text: 'Después añadirás participantes y la app generará el calendario de partidos automáticamente.',
+        ),
+        const SizedBox(height: 22),
+        PrimaryButton(label: 'Crear competición', icon: Icons.emoji_events_rounded, loading: loading, onTap: create),
+      ]),
+    );
+  }
+}
+
+class TournamentDetailScreen extends StatefulWidget {
+  final String tournamentId;
+  final Map<String, dynamic> group;
+  const TournamentDetailScreen({super.key, required this.tournamentId, required this.group});
+
+  @override
+  State<TournamentDetailScreen> createState() => _TournamentDetailScreenState();
+}
+
+class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
+  late Future<Map<String, dynamic>> future;
+  int section = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    reload();
+  }
+
+  void reload() => setState(() => future = AppData.tournament(widget.tournamentId));
+
+  Future<void> addParticipant() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Añadir participante'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Ej. Ana y Javi / Equipo azul'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Añadir')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result.trim().length < 2) return;
+    try {
+      await AppData.addTournamentTeam(widget.tournamentId, result);
+      reload();
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    }
+  }
+
+  Future<void> generate(Map<String, dynamic> tournament) async {
+    final teams = tournamentTeams(tournament);
+    try {
+      await AppData.generateMatches(widget.tournamentId, AppData.text(tournament['format'], 'liga'), teams);
+      reload();
+      if (mounted) await showToast(context, 'Partidos generados.');
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    }
+  }
+
+  Future<void> generateNext(Map<String, dynamic> tournament) async {
+    try {
+      await AppData.generateNextEliminationRound(widget.tournamentId, tournamentMatches(tournament));
+      reload();
+      if (mounted) await showToast(context, 'Siguiente ronda generada.');
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    }
+  }
+
+  Future<void> finish(String status) async {
+    try {
+      await AppData.updateTournamentStatus(widget.tournamentId, status);
+      reload();
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    }
+  }
+
+  Future<void> removeTournament() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar competición'),
+        content: const Text('Se borrarán participantes, partidos y resultados. Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Eliminar')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await AppData.deleteTournament(widget.tournamentId);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DirectPage(
+      padding: EdgeInsets.zero,
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Padding(padding: EdgeInsets.all(22), child: CenterLoader(label: 'Cargando competición...'));
+          }
+          if (snapshot.hasError) {
+            return Padding(padding: const EdgeInsets.all(22), child: ErrorBlock(message: snapshot.error.toString(), onRetry: reload));
+          }
+
+          final tournament = snapshot.data ?? {};
+          final teams = tournamentTeams(tournament);
+          final matches = tournamentMatches(tournament);
+          final format = AppData.text(tournament['format'], 'liga');
+          final status = AppData.text(tournament['status'], 'active');
+          final played = matches.where((m) => AppData.text(m['status']) == 'played').length;
+          final pending = matches.length - played;
+          final standings = calculateStandings(teams, matches);
+
+          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: [Color(0xFF009E91), Color(0xFF006B69)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    RoundBackButton(onTap: () => Navigator.pop(context)),
+                    const Spacer(),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_horiz_rounded, color: Colors.white),
+                      onSelected: (value) {
+                        if (value == 'finish') finish('finished');
+                        if (value == 'reopen') finish('active');
+                        if (value == 'delete') removeTournament();
+                      },
+                      itemBuilder: (_) => [
+                        if (status != 'finished') const PopupMenuItem(value: 'finish', child: Text('Marcar como finalizada')),
+                        if (status == 'finished') const PopupMenuItem(value: 'reopen', child: Text('Reabrir competición')),
+                        const PopupMenuItem(value: 'delete', child: Text('Eliminar competición')),
+                      ],
+                    ),
+                  ]),
+                  const SizedBox(height: 18),
+                  Container(
+                    width: 62,
+                    height: 62,
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(.17), borderRadius: BorderRadius.circular(19)),
+                    child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 36),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(AppData.text(tournament['name'], 'Competición'), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, height: 1.05)),
+                  const SizedBox(height: 7),
+                  Text('${tournamentFormatLabel(format)} · ${teamTypeLabel(AppData.text(tournament['team_type'], 'equipo'))} · ${status == 'finished' ? 'Finalizada' : 'En curso'}', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
+                ]),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _TournamentNextStepCard(
+                  tournament: tournament,
+                  teams: teams,
+                  matches: matches,
+                  onAddTeam: addParticipant,
+                  onGenerate: () => generate(tournament),
+                  onGenerateNext: () => generateNext(tournament),
+                ),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(child: StatCard(icon: Icons.groups_rounded, value: teams.length.toString(), label: 'Participantes', color: AppColors.teal)),
+                  const SizedBox(width: 10),
+                  Expanded(child: StatCard(icon: Icons.sports_score_rounded, value: matches.length.toString(), label: 'Partidos', color: AppColors.violet)),
+                  const SizedBox(width: 10),
+                  Expanded(child: StatCard(icon: Icons.check_circle_rounded, value: '$played/$pending', label: 'Jug./Pend.', color: AppColors.orange)),
+                ]),
+                const SizedBox(height: 16),
+                _TournamentSegment(index: section, onChanged: (i) => setState(() => section = i)),
+                const SizedBox(height: 16),
+                if (section == 0)
+                  _TournamentSummarySection(
+                    tournament: tournament,
+                    standings: standings,
+                    teams: teams,
+                    matches: matches,
+                    onAddTeam: addParticipant,
+                    onGenerate: () => generate(tournament),
+                  )
+                else if (section == 1)
+                  _TournamentStandingsSection(standings: standings, format: format)
+                else if (section == 2)
+                  _TournamentMatchesSection(
+                    matches: matches,
+                    teams: teams,
+                    onResultChanged: reload,
+                  )
+                else
+                  _TournamentTeamsSection(
+                    teams: teams,
+                    matches: matches,
+                    onAddTeam: addParticipant,
+                    onDeleted: reload,
+                  ),
+              ]),
+            ),
+          ]);
+        },
+      ),
+    );
+  }
+}
+
+class _TournamentNextStepCard extends StatelessWidget {
+  final Map<String, dynamic> tournament;
+  final List<Map<String, dynamic>> teams;
+  final List<Map<String, dynamic>> matches;
+  final VoidCallback onAddTeam;
+  final VoidCallback onGenerate;
+  final VoidCallback onGenerateNext;
+
+  const _TournamentNextStepCard({
+    required this.tournament,
+    required this.teams,
+    required this.matches,
+    required this.onAddTeam,
+    required this.onGenerate,
+    required this.onGenerateNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final format = AppData.text(tournament['format'], 'liga');
+    final played = matches.where((m) => AppData.text(m['status']) == 'played').length;
+    final pending = matches.where((m) => AppData.text(m['status']) != 'played').length;
+    final latestRound = matches.fold<int>(0, (maxRound, m) => max(maxRound, AppData.intValue(m['round'])));
+    final latestRoundMatches = matches.where((m) => AppData.intValue(m['round']) == latestRound).toList();
+    final latestRoundPlayed = latestRoundMatches.isNotEmpty && latestRoundMatches.every((m) => AppData.text(m['status']) == 'played');
+
+    IconData icon = Icons.checklist_rounded;
+    String title = 'Siguiente paso';
+    String body = 'Todo listo.';
+    String action = '';
+    VoidCallback? onTap;
+
+    if (teams.length < 2) {
+      icon = Icons.group_add_rounded;
+      title = 'Añade participantes';
+      body = 'Crea los jugadores, parejas o equipos que van a competir.';
+      action = 'Añadir';
+      onTap = onAddTeam;
+    } else if (matches.isEmpty) {
+      icon = Icons.auto_awesome_motion_rounded;
+      title = 'Genera el calendario';
+      body = format == 'eliminatoria'
+          ? 'Crearemos el primer cuadro de eliminatoria con los participantes actuales.'
+          : 'Crearemos todos los enfrentamientos automáticamente.';
+      action = 'Generar partidos';
+      onTap = onGenerate;
+    } else if (pending > 0) {
+      icon = Icons.edit_note_rounded;
+      title = 'Registra resultados';
+      body = 'Hay $pending partidos pendientes. Al guardar resultados se actualiza la clasificación.';
+    } else if (format == 'eliminatoria' && latestRoundMatches.length > 1 && latestRoundPlayed) {
+      icon = Icons.account_tree_rounded;
+      title = 'Genera la siguiente ronda';
+      body = 'La ronda $latestRound está completa. Crea la siguiente ronda con los ganadores.';
+      action = 'Siguiente ronda';
+      onTap = onGenerateNext;
+    } else {
+      icon = Icons.emoji_events_rounded;
+      title = 'Competición completa';
+      body = 'Todos los partidos están jugados. Puedes marcarla como finalizada desde el menú superior.';
+    }
+
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)), child: Icon(icon, color: AppColors.teal)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(body, style: Theme.of(context).textTheme.bodyMedium),
+          if (played > 0) ...[
+            const SizedBox(height: 8),
+            Text('$played resultados registrados', style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 12)),
+          ],
+        ])),
+        if (onTap != null && action.isNotEmpty)
+          TextButton(onPressed: onTap, child: Text(action, style: const TextStyle(fontWeight: FontWeight.w900))),
+      ]),
+    );
+  }
+}
+
+class _TournamentSegment extends StatelessWidget {
+  final int index;
+  final ValueChanged<int> onChanged;
+  const _TournamentSegment({required this.index, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = ['Resumen', 'Tabla', 'Partidos', 'Participantes'];
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.line)),
+      child: Row(children: List.generate(labels.length, (i) {
+        final selected = index == i;
+        return Expanded(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(13),
+            onTap: () => onChanged(i),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(color: selected ? Colors.white : Colors.transparent, borderRadius: BorderRadius.circular(13), boxShadow: selected ? [BoxShadow(color: Colors.black.withOpacity(.04), blurRadius: 12, offset: const Offset(0, 5))] : null),
+              child: Text(labels[i], textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: selected ? AppColors.ink : AppColors.muted)),
+            ),
+          ),
+        );
+      })),
+    );
+  }
+}
+
+class _TournamentSummarySection extends StatelessWidget {
+  final Map<String, dynamic> tournament;
+  final List<TeamStanding> standings;
+  final List<Map<String, dynamic>> teams;
+  final List<Map<String, dynamic>> matches;
+  final VoidCallback onAddTeam;
+  final VoidCallback onGenerate;
+
+  const _TournamentSummarySection({
+    required this.tournament,
+    required this.standings,
+    required this.teams,
+    required this.matches,
+    required this.onAddTeam,
+    required this.onGenerate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final format = AppData.text(tournament['format'], 'liga');
+    final names = teamNameMap(teams);
+    final pending = matches.where((m) => AppData.text(m['status']) != 'played').take(3).toList();
+    final top = standings.take(3).toList();
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SectionHeader(title: 'Cómo funciona', action: tournamentFormatLabel(format)),
+      AppCard(
+        padding: const EdgeInsets.all(16),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(Icons.info_rounded, color: AppColors.teal),
+          const SizedBox(width: 12),
+          Expanded(child: Text(tournamentFormatSubtitle(format), style: Theme.of(context).textTheme.bodyMedium)),
+        ]),
+      ),
+      const SizedBox(height: 16),
+      SectionHeader(title: 'Próximos partidos', action: pending.isEmpty ? '' : '${pending.length} pendientes'),
+      if (pending.isEmpty)
+        EmptySlim(icon: Icons.sports_score_rounded, title: 'Sin partidos pendientes')
+      else
+        ...pending.map((m) => MatchCompactCard(match: m, names: names)),
+      const SizedBox(height: 16),
+      SectionHeader(title: 'Top clasificación'),
+      if (top.isEmpty)
+        EmptySlim(icon: Icons.leaderboard_rounded, title: 'Añade participantes para ver la tabla')
+      else
+        ...top.asMap().entries.map((entry) => StandingRow(position: entry.key + 1, standing: entry.value)),
+      const SizedBox(height: 14),
+      if (teams.length < 2)
+        PrimaryButton(label: 'Añadir participantes', icon: Icons.group_add_rounded, onTap: onAddTeam)
+      else if (matches.isEmpty)
+        PrimaryButton(label: 'Generar partidos', icon: Icons.auto_awesome_motion_rounded, onTap: onGenerate),
+    ]);
+  }
+}
+
+class _TournamentStandingsSection extends StatelessWidget {
+  final List<TeamStanding> standings;
+  final String format;
+  const _TournamentStandingsSection({required this.standings, required this.format});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SectionHeader(title: format == 'eliminatoria' ? 'Rendimiento' : 'Clasificación', action: 'PTS · DG · PJ'),
+      if (standings.isEmpty)
+        EmptyBlock(icon: Icons.leaderboard_rounded, title: 'Sin clasificación', body: 'Añade participantes y registra resultados para calcular la tabla.')
+      else
+        ...standings.asMap().entries.map((entry) => StandingRow(position: entry.key + 1, standing: entry.value, detailed: true)),
+    ]);
+  }
+}
+
+class _TournamentMatchesSection extends StatelessWidget {
+  final List<Map<String, dynamic>> matches;
+  final List<Map<String, dynamic>> teams;
+  final VoidCallback onResultChanged;
+  const _TournamentMatchesSection({required this.matches, required this.teams, required this.onResultChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final names = teamNameMap(teams);
+    if (matches.isEmpty) {
+      return EmptyBlock(icon: Icons.sports_score_rounded, title: 'Sin partidos', body: 'Cuando generes partidos aparecerán aquí por rondas.');
+    }
+
+    final rounds = <int, List<Map<String, dynamic>>>{};
+    for (final match in matches) {
+      final round = AppData.intValue(match['round'], 1);
+      rounds.putIfAbsent(round, () => []).add(match);
+    }
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      ...rounds.entries.map((entry) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SectionHeader(title: 'Ronda ${entry.key}', action: '${entry.value.length} partidos'),
+        ...entry.value.map((m) => MatchResultCard(match: m, names: names, onChanged: onResultChanged)),
+        const SizedBox(height: 8),
+      ])),
+    ]);
+  }
+}
+
+class _TournamentTeamsSection extends StatelessWidget {
+  final List<Map<String, dynamic>> teams;
+  final List<Map<String, dynamic>> matches;
+  final VoidCallback onAddTeam;
+  final VoidCallback onDeleted;
+  const _TournamentTeamsSection({required this.teams, required this.matches, required this.onAddTeam, required this.onDeleted});
+
+  Future<void> deleteTeam(BuildContext context, Map<String, dynamic> team) async {
+    if (matches.isNotEmpty) {
+      await showToast(context, 'No puedes borrar participantes cuando ya hay partidos generados. Borra/recrea la competición para empezar de cero.', danger: true);
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Quitar ${AppData.text(team['name'])}?'),
+        content: const Text('Solo se puede quitar antes de generar partidos.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Quitar')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await AppData.deleteTournamentTeam(team['id'].toString());
+      onDeleted();
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text('Participantes', style: Theme.of(context).textTheme.titleLarge),
+        const Spacer(),
+        TextButton.icon(onPressed: onAddTeam, icon: const Icon(Icons.add_rounded), label: const Text('Añadir')),
+      ]),
+      const SizedBox(height: 8),
+      if (teams.isEmpty)
+        EmptyBlock(icon: Icons.group_add_rounded, title: 'Añade participantes', body: 'Pueden ser jugadores, parejas o equipos según el formato.')
+      else
+        ...teams.asMap().entries.map((entry) {
+          final team = entry.value;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 9),
+            child: AppCard(
+              child: Row(children: [
+                Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14)), child: Center(child: Text('${entry.key + 1}', style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900)))),
+                const SizedBox(width: 12),
+                Expanded(child: Text(AppData.text(team['name'], 'Participante'), style: const TextStyle(fontWeight: FontWeight.w900))),
+                IconButton(onPressed: () => deleteTeam(context, team), icon: const Icon(Icons.delete_outline_rounded, color: AppColors.muted)),
+              ]),
+            ),
+          );
+        }),
+    ]);
+  }
+}
+
+class TournamentFormatOption extends StatelessWidget {
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String body;
+  final VoidCallback onTap;
+  const TournamentFormatOption({super.key, required this.selected, required this.icon, required this.title, required this.body, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.tealSoft : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: selected ? AppColors.teal : AppColors.line),
+        ),
+        child: Row(children: [
+          Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: selected ? AppColors.teal : AppColors.muted)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+            const SizedBox(height: 3),
+            Text(body, style: Theme.of(context).textTheme.bodyMedium),
+          ])),
+          Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: selected ? AppColors.teal : AppColors.muted),
+        ]),
+      ),
+    ),
+  );
+}
+
+class PickPill extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const PickPill({super.key, required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(14),
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      decoration: BoxDecoration(color: selected ? AppColors.tealSoft : Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: selected ? AppColors.teal : AppColors.line)),
+      child: Text(label, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, color: selected ? AppColors.tealDark : AppColors.muted)),
+    ),
+  );
+}
+
+class MatchCompactCard extends StatelessWidget {
+  final Map<String, dynamic> match;
+  final Map<String, String> names;
+  const MatchCompactCard({super.key, required this.match, required this.names});
+
+  @override
+  Widget build(BuildContext context) {
+    final a = teamName(AppData.text(match['team_a']), names);
+    final b = teamName(AppData.text(match['team_b']), names);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: AppCard(
+        padding: const EdgeInsets.all(12),
+        child: Row(children: [
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(13)), child: Center(child: Text('R${AppData.intValue(match['round'], 1)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.muted)))),
+          const SizedBox(width: 10),
+          Expanded(child: Text('$a  vs  $b', style: const TextStyle(fontWeight: FontWeight.w900))),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        ]),
+      ),
+    );
+  }
+}
+
+class MatchResultCard extends StatelessWidget {
+  final Map<String, dynamic> match;
+  final Map<String, String> names;
+  final VoidCallback onChanged;
+  const MatchResultCard({super.key, required this.match, required this.names, required this.onChanged});
+
+  Future<void> editResult(BuildContext context) async {
+    final aController = TextEditingController(text: AppData.text(match['score_a']));
+    final bController = TextEditingController(text: AppData.text(match['score_b']));
+    final result = await showDialog<List<int>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Resultado'),
+        content: Row(children: [
+          Expanded(child: TextField(controller: aController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Local'))),
+          const SizedBox(width: 12),
+          Expanded(child: TextField(controller: bController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Visitante'))),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(onPressed: () {
+            final a = int.tryParse(aController.text.trim());
+            final b = int.tryParse(bController.text.trim());
+            if (a == null || b == null || a < 0 || b < 0) return;
+            Navigator.pop(context, [a, b]);
+          }, child: const Text('Guardar')),
+        ],
+      ),
+    );
+    aController.dispose();
+    bController.dispose();
+    if (result == null) return;
+    try {
+      await AppData.setMatchResult(match['id'].toString(), result[0], result[1]);
+      onChanged();
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    }
+  }
+
+  Future<void> reopen(BuildContext context) async {
+    try {
+      await AppData.reopenMatch(match['id'].toString());
+      onChanged();
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final played = AppData.text(match['status']) == 'played';
+    final a = teamName(AppData.text(match['team_a']), names);
+    final b = teamName(AppData.text(match['team_b']), names);
+    final score = played ? '${AppData.intValue(match['score_a'])} - ${AppData.intValue(match['score_b'])}' : 'Pendiente';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: AppCard(
+        padding: const EdgeInsets.all(13),
+        child: Column(children: [
+          Row(children: [
+            Expanded(child: Text(a, style: const TextStyle(fontWeight: FontWeight.w900))),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: played ? AppColors.tealSoft : AppColors.faint, borderRadius: BorderRadius.circular(99)), child: Text(score, style: TextStyle(fontWeight: FontWeight.w900, color: played ? AppColors.tealDark : AppColors.muted))),
+            Expanded(child: Text(b, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w900))),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            Text('Ronda ${AppData.intValue(match['round'], 1)}', style: Theme.of(context).textTheme.bodyMedium),
+            const Spacer(),
+            if (played)
+              TextButton(onPressed: () => reopen(context), child: const Text('Reabrir'))
+            else
+              TextButton.icon(onPressed: () => editResult(context), icon: const Icon(Icons.edit_rounded, size: 18), label: const Text('Resultado')),
+          ]),
+        ]),
+      ),
+    );
+  }
+}
+
+class StandingRow extends StatelessWidget {
+  final int position;
+  final TeamStanding standing;
+  final bool detailed;
+  const StandingRow({super.key, required this.position, required this.standing, this.detailed = false});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+      child: Row(children: [
+        Container(width: 32, height: 32, decoration: BoxDecoration(color: position == 1 ? AppColors.tealSoft : AppColors.faint, borderRadius: BorderRadius.circular(11)), child: Center(child: Text('$position', style: TextStyle(fontWeight: FontWeight.w900, color: position == 1 ? AppColors.teal : AppColors.muted)))),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(standing.name, style: const TextStyle(fontWeight: FontWeight.w900)),
+          if (detailed) Text('${standing.wins}G · ${standing.draws}E · ${standing.losses}P · GF ${standing.goalsFor} · GC ${standing.goalsAgainst}', style: Theme.of(context).textTheme.bodyMedium),
+        ])),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text('${standing.points}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.teal)),
+          Text('PTS · DG ${standing.goalDifference}', style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w800)),
+        ]),
+      ]),
+    ),
+  );
+}
+
 
 class MembersScreen extends StatefulWidget {
   final Map<String, dynamic> group;
@@ -1859,13 +3708,323 @@ class FeatureTile extends StatelessWidget { final IconData icon; final String ti
 
 class ActivityRow extends StatelessWidget { final IconData icon; final String title; final String meta; const ActivityRow({super.key, required this.icon, required this.title, required this.meta}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Row(children: [CircleAvatar(radius: 16, backgroundColor: AppColors.tealSoft, child: Icon(icon, color: AppColors.teal, size: 17)), const SizedBox(width: 11), Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800))), Text(meta, style: const TextStyle(color: AppColors.muted, fontSize: 12))])); }
 
-class EventCard extends StatelessWidget { final Map<String, dynamic> event; final VoidCallback onTap; const EventCard({super.key, required this.event, required this.onTap}); @override Widget build(BuildContext context) { final d = DateTime.tryParse(event['starts_at']?.toString() ?? '') ?? DateTime.now(); final att = event['event_attendance']; final yes = att is List ? att.where((x) => (x as Map)['status'] == 'yes').length : 0; return Padding(padding: const EdgeInsets.only(bottom: 10), child: AppCard(onTap: onTap, child: Row(children: [Container(width: 78, height: 70, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.event_available_rounded, color: AppColors.teal, size: 34)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(AppData.text(event['title'], 'Evento'), style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 5), MetaLine(icon: Icons.schedule_rounded, text: dateLabel(d)), MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación'))])), Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(99)), child: Text('$yes van', style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 12)))])) ); }}
 
-class EventMiniCard extends StatelessWidget { final Map<String, dynamic> event; const EventMiniCard({super.key, required this.event}); @override Widget build(BuildContext context) { final d = DateTime.tryParse(event['starts_at']?.toString() ?? '') ?? DateTime.now(); return AppCard(child: Row(children: [Container(width: 56, height: 56, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.event_available_rounded, color: AppColors.teal)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(AppData.text(event['title'], 'Evento'), style: const TextStyle(fontWeight: FontWeight.w900)), Text(dateLabel(d), style: const TextStyle(color: AppColors.muted))]))])); }}
+class QuickTemplateChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const QuickTemplateChip({super.key, required this.label, required this.onTap});
+  @override
+  Widget build(BuildContext context) => ActionChip(
+    label: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+    avatar: const Icon(Icons.add_rounded, size: 17),
+    backgroundColor: AppColors.faint,
+    side: const BorderSide(color: AppColors.line),
+    onPressed: onTap,
+  );
+}
 
-class ExpenseCard extends StatelessWidget { final Map<String, dynamic> expense; const ExpenseCard({super.key, required this.expense}); @override Widget build(BuildContext context) { final profile = AppData.asMap(expense['profiles']); return Padding(padding: const EdgeInsets.only(bottom: 8), child: AppCard(child: Row(children: [const CircleAvatar(backgroundColor: AppColors.teal, child: Icon(Icons.restaurant_rounded, color: Colors.white)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(AppData.text(expense['concept'], 'Gasto'), style: const TextStyle(fontWeight: FontWeight.w900)), Text('Pagado por ${AppData.text(profile['full_name'], AppData.text(profile['email'], 'Miembro'))}', style: const TextStyle(color: AppColors.muted, fontSize: 12))])), Text(money(AppData.doubleValue(expense['amount'])), style: const TextStyle(fontWeight: FontWeight.w900))]))); }}
+class DateBadge extends StatelessWidget {
+  final DateTime date;
+  const DateBadge({super.key, required this.date});
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 62,
+    height: 66,
+    decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)),
+    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Text(DateFormat('EEE').format(date).replaceAll('.', '').toUpperCase(), style: const TextStyle(color: AppColors.teal, fontSize: 11, fontWeight: FontWeight.w900)),
+      Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 24, fontWeight: FontWeight.w900)),
+    ]),
+  );
+}
 
-class TournamentCard extends StatelessWidget { final Map<String, dynamic> tournament; const TournamentCard({super.key, required this.tournament}); @override Widget build(BuildContext context) { final teams = tournament['tournament_teams'] is List ? (tournament['tournament_teams'] as List).length : 0; final matches = tournament['matches'] is List ? (tournament['matches'] as List).length : 0; return Padding(padding: const EdgeInsets.only(bottom: 10), child: AppCard(child: Row(children: [Container(width: 64, height: 64, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.emoji_events_rounded, color: AppColors.orange, size: 34)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(AppData.text(tournament['name'], 'Torneo'), style: Theme.of(context).textTheme.titleMedium), Text('$teams equipos · $matches partidos', style: Theme.of(context).textTheme.bodyMedium), Text(AppData.text(tournament['status'], 'active') == 'finished' ? 'Finalizado' : 'En curso', style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 12))])), const Icon(Icons.chevron_right_rounded, color: AppColors.muted)]))); }}
+class CalendarDaySummary extends StatelessWidget {
+  final DateTime day;
+  final List<Map<String, dynamic>> events;
+  final int confirmed;
+  final int maybe;
+  final VoidCallback onCreate;
+  const CalendarDaySummary({super.key, required this.day, required this.events, required this.confirmed, required this.maybe, required this.onCreate});
+  @override
+  Widget build(BuildContext context) => AppCard(child: Row(children: [
+    DateBadge(date: day),
+    const SizedBox(width: 12),
+    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(DateFormat('EEEE dd MMMM').format(day), style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 5),
+      Text(events.isEmpty ? 'No hay eventos creados para este día.' : '${events.length} evento${events.length == 1 ? '' : 's'} · $confirmed confirmados · $maybe en duda', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+    ])),
+    IconButton(onPressed: onCreate, icon: const Icon(Icons.add_circle_rounded, color: AppColors.teal, size: 30)),
+  ]));
+}
+
+class EventAgendaCard extends StatefulWidget {
+  final Map<String, dynamic> event;
+  final Map<String, dynamic> group;
+  final VoidCallback onChanged;
+  const EventAgendaCard({super.key, required this.event, required this.group, required this.onChanged});
+  @override
+  State<EventAgendaCard> createState() => _EventAgendaCardState();
+}
+
+class _EventAgendaCardState extends State<EventAgendaCard> {
+  bool saving = false;
+
+  Future<void> setStatus(String status) async {
+    setState(() => saving = true);
+    try {
+      await AppData.setAttendance(widget.event['id'].toString(), status);
+      widget.onChanged();
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> open() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: widget.event, group: widget.group)));
+    widget.onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final event = widget.event;
+    final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+    final yes = attendanceCount(event, 'yes');
+    final maybe = attendanceCount(event, 'maybe');
+    final no = attendanceCount(event, 'no');
+    final minPeople = AppData.intValue(event['min_people'], 2);
+    final mine = myAttendanceStatus(event);
+    final viable = yes >= minPeople;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        InkWell(
+          onTap: open,
+          borderRadius: BorderRadius.circular(16),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            DateBadge(date: date),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(child: Text(AppData.text(event['title'], 'Evento'), style: Theme.of(context).textTheme.titleMedium)),
+                Icon(viable ? Icons.verified_rounded : Icons.info_rounded, color: viable ? AppColors.green : AppColors.amber, size: 20),
+              ]),
+              const SizedBox(height: 5),
+              MetaLine(icon: Icons.schedule_rounded, text: DateFormat('HH:mm').format(date)),
+              MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
+              const SizedBox(height: 7),
+              Text(viable ? 'Mínimo alcanzado: $yes/$minPeople' : 'Faltan ${max(0, minPeople - yes)} para llegar al mínimo', style: TextStyle(color: viable ? AppColors.green : AppColors.amber, fontWeight: FontWeight.w900, fontSize: 12)),
+            ])),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: CompactAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
+          const SizedBox(width: 7),
+          Expanded(child: CompactAttendanceButton(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
+          const SizedBox(width: 7),
+          Expanded(child: CompactAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
+        ]),
+      ])),
+    );
+  }
+}
+
+class CompactAttendanceButton extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+  const CompactAttendanceButton({super.key, required this.label, required this.count, required this.selected, required this.color, required this.onTap});
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(14),
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      decoration: BoxDecoration(color: selected ? color.withOpacity(.11) : AppColors.faint, borderRadius: BorderRadius.circular(14), border: Border.all(color: selected ? color : AppColors.line)),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, size: 16, color: color),
+        const SizedBox(width: 5),
+        Text('$label · $count', style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900)),
+      ]),
+    ),
+  );
+}
+
+class EventMemberRoster extends StatelessWidget {
+  final Map<String, dynamic> event;
+  final List<Map<String, dynamic>> members;
+  const EventMemberRoster({super.key, required this.event, required this.members});
+  @override
+  Widget build(BuildContext context) {
+    if (members.isEmpty) return EmptySlim(icon: Icons.groups_rounded, title: 'Sin miembros cargados', body: 'Cuando haya miembros, aquí verás quién va y quién falta por responder.');
+    return Column(children: members.map((m) {
+      final userId = AppData.text(m['user_id']);
+      final status = eventStatusForUser(event, userId);
+      final name = memberDisplayName(m);
+      final color = attendanceColor(status);
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: AppCard(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11), child: Row(children: [
+          CircleAvatar(radius: 18, backgroundColor: color.withOpacity(.11), child: Text(initialsFor(name), style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12))),
+          const SizedBox(width: 11),
+          Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w900))),
+          Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(99)), child: Text(attendanceLabel(status), style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12))),
+        ])),
+      );
+    }).toList());
+  }
+}
+
+class EventCard extends StatelessWidget {
+  final Map<String, dynamic> event;
+  final VoidCallback onTap;
+  const EventCard({super.key, required this.event, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final d = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+    final yes = attendanceCount(event, 'yes');
+    final maybe = attendanceCount(event, 'maybe');
+    final minPeople = AppData.intValue(event['min_people'], 2);
+    final viable = yes >= minPeople;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AppCard(onTap: onTap, child: Row(children: [
+        DateBadge(date: d),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(AppData.text(event['title'], 'Evento'), style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 5),
+          MetaLine(icon: Icons.schedule_rounded, text: DateFormat('dd/MM · HH:mm').format(d)),
+          MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
+        ])),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: viable ? const Color(0xFFEAF8F0) : const Color(0xFFFFF6DF), borderRadius: BorderRadius.circular(99)), child: Text(viable ? '$yes/$minPeople OK' : '$yes/$minPeople', style: TextStyle(color: viable ? AppColors.green : AppColors.amber, fontWeight: FontWeight.w900, fontSize: 12))),
+          const SizedBox(height: 6),
+          Text('$maybe en duda', style: const TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700)),
+        ]),
+      ])),
+    );
+  }
+}
+
+class EventMiniCard extends StatelessWidget {
+  final Map<String, dynamic> event;
+  const EventMiniCard({super.key, required this.event});
+  @override
+  Widget build(BuildContext context) {
+    final d = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+    return AppCard(child: Row(children: [
+      DateBadge(date: d),
+      const SizedBox(width: 12),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(AppData.text(event['title'], 'Evento'), style: const TextStyle(fontWeight: FontWeight.w900)),
+        Text(dateLabel(d), style: const TextStyle(color: AppColors.muted)),
+      ])),
+    ]));
+  }
+}
+
+class ExpenseCard extends StatelessWidget {
+  final Map<String, dynamic> expense;
+  final List<Map<String, dynamic>> members;
+  final VoidCallback? onTap;
+  const ExpenseCard({super.key, required this.expense, required this.members, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final paidBy = expense['paid_by']?.toString() ?? '';
+    final amount = AppData.doubleValue(expense['amount']);
+    final unpaid = unpaidAmount(expense);
+    final settled = unpaid <= 0.01 || AppData.text(expense['status']) == 'paid';
+    final participants = expenseParticipants(expense).length;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: AppCard(
+        onTap: onTap,
+        child: Row(children: [
+          CircleAvatar(
+            backgroundColor: settled ? AppColors.tealSoft : AppColors.teal,
+            child: Icon(settled ? Icons.verified_rounded : Icons.receipt_long_rounded, color: settled ? AppColors.teal : Colors.white),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AppData.text(expense['concept'], 'Gasto'), style: const TextStyle(fontWeight: FontWeight.w900)),
+            const SizedBox(height: 2),
+            Text('Pagó ${financeMemberName(paidBy, members)} · $participants participantes', style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 7),
+            _MiniChip(text: settled ? 'Liquidado' : 'Pendiente ${money(unpaid)}', color: settled ? AppColors.green : AppColors.orange),
+          ])),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(money(amount), style: const TextStyle(fontWeight: FontWeight.w900)),
+            const SizedBox(height: 3),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+          ]),
+        ]),
+      ),
+    );
+  }
+}
+
+class TournamentCard extends StatelessWidget {
+  final Map<String, dynamic> tournament;
+  final VoidCallback? onTap;
+  const TournamentCard({super.key, required this.tournament, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final teams = tournament['tournament_teams'] is List ? (tournament['tournament_teams'] as List).length : 0;
+    final matches = tournament['matches'] is List ? (tournament['matches'] as List).length : 0;
+    final played = tournament['matches'] is List ? (tournament['matches'] as List).where((m) => m is Map && m['status'] == 'played').length : 0;
+    final format = AppData.text(tournament['format'], 'liga');
+    final status = AppData.text(tournament['status'], 'active');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AppCard(
+        onTap: onTap,
+        child: Row(children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14)),
+            child: Icon(format == 'eliminatoria' ? Icons.account_tree_rounded : format == 'americano' ? Icons.sync_alt_rounded : Icons.emoji_events_rounded, color: AppColors.teal, size: 34),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AppData.text(tournament['name'], 'Torneo'), style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 3),
+            Text('${tournamentFormatLabel(format)} · ${teamTypeLabel(AppData.text(tournament['team_type'], 'equipo'))}', style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 5),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              _MiniChip(text: '$teams participantes', color: AppColors.teal),
+              _MiniChip(text: '$played/$matches jugados', color: AppColors.violet),
+              _MiniChip(text: status == 'finished' ? 'Finalizado' : 'En curso', color: status == 'finished' ? AppColors.muted : AppColors.green),
+            ]),
+          ])),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        ]),
+      ),
+    );
+  }
+}
+
+class _MiniChip extends StatelessWidget {
+  final String text;
+  final Color color;
+  const _MiniChip({required this.text, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(99)),
+    child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11)),
+  );
+}
 
 class MemberCard extends StatelessWidget { final Map<String, dynamic> member; const MemberCard({super.key, required this.member}); @override Widget build(BuildContext context) { final profile = AppData.asMap(member['profiles']); final role = AppData.text(member['role'], 'member'); return Padding(padding: const EdgeInsets.only(bottom: 8), child: AppCard(child: Row(children: [CircleAvatar(backgroundColor: AppColors.tealSoft, child: Text(memberName(member).substring(0, 1).toUpperCase(), style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900))), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(memberName(member), style: const TextStyle(fontWeight: FontWeight.w900)), Text(AppData.text(profile['email'], 'sin email'), style: const TextStyle(color: AppColors.muted, fontSize: 12))])), Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5), decoration: BoxDecoration(color: role == 'member' ? AppColors.faint : AppColors.tealSoft, borderRadius: BorderRadius.circular(99)), child: Text(role == 'owner' ? 'OWNER' : role == 'admin' ? 'ADMIN' : 'MIEMBRO', style: TextStyle(color: role == 'member' ? AppColors.muted : AppColors.teal, fontWeight: FontWeight.w900, fontSize: 11)))]))); }}
 

@@ -1,9 +1,9 @@
-# Instalar Grupli v12
+# Instalar Grupli v12.4
 
 ```powershell
 $Dest = "$env:USERPROFILE\Desktop\grupliv2"
 
-$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v12-clean-rebuild-premium-app*.zip" |
+$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v12.4-finances-tricount-real*.zip" |
   Sort-Object LastWriteTime -Descending |
   Select-Object -First 1
 
