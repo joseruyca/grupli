@@ -138,3 +138,6 @@ SQL obligatorio: `supabase/patch_v15_6_security_delete_account.sql`.
 
 Última mejora incluida: `docs/V15_7_BLUE_VISUAL_GROUP_COVER.md`.
 SQL nuevo: `supabase/patch_v15_7_visual_group_cover.sql`.
+
+
+Última corrección incluida: `docs/V15_7_1_VERCEL_BUILD_FIX.md`.
