@@ -63,3 +63,6 @@ Calendario en español y perfil real con nombre/foto. Ejecutar `supabase/patch_v
 cd "$env:USERPROFILE\Desktop\grupliv2"
 Get-Content ".\supabase\patch_v12_10_create_group_rpc_overload_fix.sql" | Set-Clipboard
 ```
+
+
+# v15.5: recuerda ejecutar supabase/patch_v15_5_push_notifications.sql en Supabase SQL Editor.

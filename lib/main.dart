@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -9,6 +8,9 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
@@ -50,22 +52,40 @@ class AppConfig {
   static const fallbackSupabaseUrl = 'https://izusbttdgtwbnuyzjrpw.supabase.co';
   static const fallbackSupabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6dXNidHRkZ3R3Ym51eXpqcnB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNjI2MDAsImV4cCI6MjA5NTYzODYwMH0.S6GqpaZuPpQsM4ZPbvMC4nzbFVtT-r47fPdT59PdDxU';
 
+  static const appBaseUrlDefine = String.fromEnvironment('APP_BASE_URL');
+  static const fallbackAppBaseUrl = 'https://grupli.vercel.app';
+
+  static const firebaseApiKey = String.fromEnvironment('FIREBASE_API_KEY');
+  static const firebaseAppId = String.fromEnvironment('FIREBASE_APP_ID');
+  static const firebaseMessagingSenderId = String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
+  static const firebaseProjectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
+  static const firebaseVapidKey = String.fromEnvironment('FIREBASE_VAPID_KEY');
+
   static String get supabaseUrl => supabaseUrlDefine.trim().isNotEmpty ? supabaseUrlDefine.trim() : fallbackSupabaseUrl;
   static String get supabaseAnonKey => supabaseAnonDefine.trim().isNotEmpty ? supabaseAnonDefine.trim() : fallbackSupabaseAnonKey;
+  static String get appBaseUrl => appBaseUrlDefine.trim().isNotEmpty ? appBaseUrlDefine.trim().replaceFirst(RegExp(r'/+$'), '') : fallbackAppBaseUrl;
+
+  static bool get firebaseConfigured =>
+      firebaseApiKey.trim().isNotEmpty &&
+      firebaseAppId.trim().isNotEmpty &&
+      firebaseMessagingSenderId.trim().isNotEmpty &&
+      firebaseProjectId.trim().isNotEmpty;
 }
 
 class AppColors {
-  static const bgShell = Color(0xFFEEF3F8);
+  static const bgShell = Color(0xFFF2F6F8);
   static const white = Color(0xFFFFFFFF);
-  static const ink = Color(0xFF10172F);
+  static const ink = Color(0xFF111827);
   static const muted = Color(0xFF667085);
-  static const faint = Color(0xFFF7F9FC);
-  static const surface = Color(0xFFF9FBFD);
-  static const line = Color(0xFFE4E9F1);
+  static const faint = Color(0xFFF6F8FB);
+  static const surface = Color(0xFFFAFBFC);
+  static const line = Color(0xFFE6EBF2);
+  static const lineSoft = Color(0xFFF0F3F7);
   static const teal = Color(0xFF008F86);
-  static const tealDark = Color(0xFF006B69);
-  static const tealSoft = Color(0xFFE7F8F6);
+  static const tealDark = Color(0xFF005F5E);
+  static const tealSoft = Color(0xFFE5F7F5);
   static const blue = Color(0xFF3767FF);
+  static const blueSoft = Color(0xFFEEF3FF);
   static const violet = Color(0xFF6E56E8);
   static const violetSoft = Color(0xFFF0EEFF);
   static const orange = Color(0xFFF28B20);
@@ -75,6 +95,7 @@ class AppColors {
   static const red = Color(0xFFE24A4A);
   static const redSoft = Color(0xFFFFEEEE);
   static const amber = Color(0xFFE6A600);
+  static const amberSoft = Color(0xFFFFF7D6);
 }
 
 class GrupliApp extends StatelessWidget {
@@ -90,14 +111,23 @@ class GrupliApp extends StatelessWidget {
         scaffoldBackgroundColor: AppColors.white,
         fontFamily: 'Roboto',
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, surface: AppColors.white),
+        visualDensity: VisualDensity.compact,
+        dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1, space: 1),
+        chipTheme: ChipThemeData(
+          backgroundColor: AppColors.surface,
+          selectedColor: AppColors.tealSoft,
+          side: const BorderSide(color: AppColors.line),
+          labelStyle: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        ),
         textTheme: const TextTheme(
-          headlineLarge: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.04, letterSpacing: -0.8),
-          headlineMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.08, letterSpacing: -0.45),
-          titleLarge: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: AppColors.ink, letterSpacing: -0.25),
-          titleMedium: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+          headlineLarge: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.02, letterSpacing: -0.9),
+          headlineMedium: TextStyle(fontSize: 23.5, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.06, letterSpacing: -0.55),
+          titleLarge: TextStyle(fontSize: 18.5, fontWeight: FontWeight.w900, color: AppColors.ink, letterSpacing: -0.25),
+          titleMedium: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.18),
           bodyLarge: TextStyle(fontSize: 15, color: AppColors.ink, height: 1.35),
-          bodyMedium: TextStyle(fontSize: 13.2, color: AppColors.muted, height: 1.35),
-          labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+          bodyMedium: TextStyle(fontSize: 13.2, color: AppColors.muted, height: 1.36, fontWeight: FontWeight.w600),
+          labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
@@ -162,12 +192,21 @@ class AppSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.bgShell,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFF8FAFC), Color(0xFFEEF6F5)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 430),
         child: Container(
-          color: AppColors.white,
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            boxShadow: [BoxShadow(color: Color(0x10111B34), blurRadius: 32, offset: Offset(0, 10))],
+          ),
           child: child,
         ),
       ),
@@ -380,6 +419,57 @@ class AppData {
       'created_by': user?.id,
     }).select('id').single();
     return row['id'].toString();
+  }
+
+  static Future<int> createEventSeries(
+    String groupId,
+    String title,
+    DateTime firstStartsAt,
+    String location,
+    String notes,
+    int minPeople,
+    String frequency,
+    int occurrences,
+  ) async {
+    final total = max(2, min(52, occurrences));
+    final cleanTitle = title.trim();
+    final cleanLocation = location.trim();
+    final frequencyLabel = switch (frequency) {
+      'biweekly' => 'cada 2 semanas',
+      'monthly' => 'cada mes',
+      _ => 'cada semana',
+    };
+    final routineLine = 'Rutina: $frequencyLabel · $total eventos generados';
+    final cleanNotes = notes.trim().isEmpty ? routineLine : '${notes.trim()}\n\n$routineLine';
+
+    DateTime occurrenceDate(int index) {
+      if (frequency == 'biweekly') return firstStartsAt.add(Duration(days: 14 * index));
+      if (frequency == 'monthly') {
+        final monthIndex = firstStartsAt.month + index;
+        final year = firstStartsAt.year + ((monthIndex - 1) ~/ 12);
+        final month = ((monthIndex - 1) % 12) + 1;
+        final lastDay = DateTime(year, month + 1, 0).day;
+        final day = min(firstStartsAt.day, lastDay);
+        return DateTime(year, month, day, firstStartsAt.hour, firstStartsAt.minute);
+      }
+      return firstStartsAt.add(Duration(days: 7 * index));
+    }
+
+    final rows = List.generate(total, (index) {
+      final startsAt = occurrenceDate(index);
+      return {
+        'group_id': groupId,
+        'title': cleanTitle,
+        'starts_at': startsAt.toUtc().toIso8601String(),
+        'location': cleanLocation.isEmpty ? null : cleanLocation,
+        'notes': cleanNotes,
+        'min_people': minPeople,
+        'created_by': user?.id,
+      };
+    });
+
+    await sb.from('events').insert(rows);
+    return total;
   }
 
   static Future<Map<String, dynamic>> eventById(String eventId) async {
@@ -650,7 +740,150 @@ class AppData {
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', matchId);
   }
+
+  static Future<List<Map<String, dynamic>>> notifications() async {
+    await ensureProfile();
+    try {
+      final res = await sb.from('notifications').select().order('created_at', ascending: false).limit(80);
+      return asList(res);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<int> unreadNotificationCount() async {
+    await ensureProfile();
+    try {
+      final res = await sb.from('notifications').select('id').filter('read_at', 'is', null);
+      return asList(res).length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  static Future<void> markNotificationRead(String notificationId) async {
+    await sb.from('notifications').update({'read_at': DateTime.now().toUtc().toIso8601String()}).eq('id', notificationId);
+  }
+
+  static Future<void> markAllNotificationsRead() async {
+    await sb.from('notifications').update({'read_at': DateTime.now().toUtc().toIso8601String()}).filter('read_at', 'is', null);
+  }
+
+  static Future<Map<String, dynamic>> notificationSettings() async {
+    await ensureProfile();
+    final uid = user?.id;
+    if (uid == null) return <String, dynamic>{};
+    try {
+      final res = await sb.from('user_settings').select().eq('user_id', uid).maybeSingle();
+      return asMap(res);
+    } catch (_) {
+      return <String, dynamic>{};
+    }
+  }
+
+  static Future<void> updateNotificationSettings(Map<String, bool> values) async {
+    await ensureProfile();
+    final uid = user?.id;
+    if (uid == null) return;
+    await sb.from('user_settings').upsert({
+      'user_id': uid,
+      ...values,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'user_id');
+  }
+
+  static Future<void> registerDeviceToken(String token, String platform) async {
+    final uid = user?.id;
+    if (uid == null || token.trim().isEmpty) return;
+    await ensureProfile();
+    await sb.from('user_devices').upsert({
+      'user_id': uid,
+      'fcm_token': token.trim(),
+      'platform': platform,
+      'device_label': kIsWeb ? 'Web' : platform,
+      'enabled': true,
+      'last_seen_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'fcm_token');
+    await updateNotificationSettings({'push_enabled': true});
+  }
 }
+
+class PushNotificationService {
+  static bool _initializing = false;
+  static bool _configured = false;
+  static bool _listenersReady = false;
+
+  static FirebaseOptions get _options => const FirebaseOptions(
+    apiKey: AppConfig.firebaseApiKey,
+    appId: AppConfig.firebaseAppId,
+    messagingSenderId: AppConfig.firebaseMessagingSenderId,
+    projectId: AppConfig.firebaseProjectId,
+  );
+
+  static String get platformLabel {
+    if (kIsWeb) return 'web';
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android => 'android',
+      TargetPlatform.iOS => 'ios',
+      TargetPlatform.macOS => 'macos',
+      TargetPlatform.windows => 'windows',
+      TargetPlatform.linux => 'linux',
+      _ => 'unknown',
+    };
+  }
+
+  static Future<bool> configureIfPossible() async {
+    if (_configured) return true;
+    if (_initializing) return false;
+    if (!AppConfig.firebaseConfigured) return false;
+    _initializing = true;
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(options: _options);
+      }
+      _configured = true;
+      if (!_listenersReady) {
+        _listenersReady = true;
+        FirebaseMessaging.onMessage.listen((message) {
+          // Las notificaciones visibles dentro de la app se leen desde Supabase.
+          // Este listener queda preparado para foreground push al empaquetar móvil.
+        });
+      }
+      return true;
+    } catch (_) {
+      _configured = false;
+      return false;
+    } finally {
+      _initializing = false;
+    }
+  }
+
+  static Future<String?> enableForCurrentDevice() async {
+    final ready = await configureIfPossible();
+    if (!ready) return null;
+    final messaging = FirebaseMessaging.instance;
+    await messaging.requestPermission(alert: true, badge: true, sound: true);
+    final token = await messaging.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
+    if (token != null && token.trim().isNotEmpty) {
+      await AppData.registerDeviceToken(token, platformLabel);
+    }
+    return token;
+  }
+
+  static Future<void> tryRegisterSilently() async {
+    try {
+      final ready = await configureIfPossible();
+      if (!ready) return;
+      final token = await FirebaseMessaging.instance.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
+      if (token != null && token.trim().isNotEmpty) {
+        await AppData.registerDeviceToken(token, platformLabel);
+      }
+    } catch (_) {
+      // No bloquear la app si Firebase todavía no está configurado.
+    }
+  }
+}
+
 
 String dateLabel(DateTime date) {
   return DateFormat('dd/MM · HH:mm', 'es_ES').format(date.toLocal());
@@ -669,6 +902,75 @@ String shortWeekday(DateTime date) => _cap(DateFormat('EEE', 'es_ES').format(dat
 String money(double value) {
   final sign = value < 0 ? '-' : '';
   return '$sign€ ${value.abs().toStringAsFixed(2).replaceAll('.', ',')}';
+}
+
+String eventKind(Map<String, dynamic> event) {
+  final explicit = AppData.text(event['kind']).toLowerCase();
+  final title = AppData.text(event['title']).toLowerCase();
+  final joined = '$explicit $title';
+  if (joined.contains('partido') || joined.contains('fútbol') || joined.contains('futbol') || joined.contains('pádel') || joined.contains('padel') || joined.contains('tenis')) return 'partido';
+  if (joined.contains('entrenamiento') || joined.contains('entreno') || joined.contains('gym')) return 'entrenamiento';
+  if (joined.contains('cena') || joined.contains('comida') || joined.contains('bar') || joined.contains('restaurante')) return 'cena';
+  if (joined.contains('reunión') || joined.contains('reunion') || joined.contains('meeting')) return 'reunion';
+  if (joined.contains('torneo') || joined.contains('liga') || joined.contains('copa')) return 'torneo';
+  return 'quedada';
+}
+
+bool eventIsRoutine(Map<String, dynamic> event) {
+  final notes = AppData.text(event['notes']).toLowerCase();
+  final title = AppData.text(event['title']).toLowerCase();
+  return notes.contains('rutina:') || title.contains('semanal') || title.contains('mensual');
+}
+
+String eventRoutineBadge(Map<String, dynamic> event) {
+  final notes = AppData.text(event['notes']);
+  final match = RegExp(r'Rutina:\s*([^·\n]+)', caseSensitive: false).firstMatch(notes);
+  if (match != null) return _cap(match.group(1)?.trim() ?? 'rutina');
+  return 'Rutina';
+}
+
+String eventKindLabel(Map<String, dynamic> event) {
+  switch (eventKind(event)) {
+    case 'partido': return 'Partido';
+    case 'entrenamiento': return 'Entrenamiento';
+    case 'cena': return 'Cena';
+    case 'reunion': return 'Reunión';
+    case 'torneo': return 'Torneo';
+    default: return 'Quedada';
+  }
+}
+
+IconData eventKindIcon(Map<String, dynamic> event) {
+  switch (eventKind(event)) {
+    case 'partido': return Icons.sports_soccer_rounded;
+    case 'entrenamiento': return Icons.fitness_center_rounded;
+    case 'cena': return Icons.restaurant_rounded;
+    case 'reunion': return Icons.forum_rounded;
+    case 'torneo': return Icons.emoji_events_rounded;
+    default: return Icons.groups_rounded;
+  }
+}
+
+Color eventKindColor(Map<String, dynamic> event) {
+  switch (eventKind(event)) {
+    case 'partido': return AppColors.teal;
+    case 'entrenamiento': return AppColors.blue;
+    case 'cena': return AppColors.violet;
+    case 'reunion': return AppColors.amber;
+    case 'torneo': return AppColors.orange;
+    default: return AppColors.teal;
+  }
+}
+
+Color eventKindSoftColor(Map<String, dynamic> event) {
+  switch (eventKind(event)) {
+    case 'partido': return AppColors.tealSoft;
+    case 'entrenamiento': return const Color(0xFFEAF0FF);
+    case 'cena': return AppColors.violetSoft;
+    case 'reunion': return const Color(0xFFFFF7DB);
+    case 'torneo': return AppColors.orangeSoft;
+    default: return AppColors.tealSoft;
+  }
 }
 
 int attendanceCount(Map<String, dynamic> event, String status) {
@@ -893,15 +1195,98 @@ Future<void> showToast(BuildContext context, String message, {bool danger = fals
   );
 }
 
+
+class InviteLinks {
+  static String normalizeCode(String value) {
+    final clean = value.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    return clean.length > 24 ? clean.substring(0, 24) : clean;
+  }
+
+  static String joinUrl(String code) => '${AppConfig.appBaseUrl}/join/${normalizeCode(code)}';
+
+  static String? codeFromUri(Uri uri) {
+    final segments = uri.pathSegments.where((s) => s.trim().isNotEmpty).toList();
+
+    if (uri.scheme.toLowerCase() == 'grupli' && uri.host.toLowerCase() == 'join' && segments.isNotEmpty) {
+      final code = normalizeCode(segments.first);
+      return code.length >= 4 ? code : null;
+    }
+
+    if (segments.length >= 2 && segments.first.toLowerCase() == 'join') {
+      final code = normalizeCode(segments[1]);
+      return code.length >= 4 ? code : null;
+    }
+
+    for (final key in ['join', 'code', 'invite']) {
+      final value = uri.queryParameters[key];
+      if (value != null) {
+        final code = normalizeCode(value);
+        if (code.length >= 4) return code;
+      }
+    }
+    return null;
+  }
+
+  static String? codeFromText(String value) {
+    final raw = value.trim();
+    if (raw.isEmpty) return null;
+
+    final parsed = Uri.tryParse(raw);
+    if (parsed != null && (parsed.hasScheme || raw.contains('/join/'))) {
+      final fromUri = codeFromUri(parsed);
+      if (fromUri != null) return fromUri;
+    }
+
+    final clean = normalizeCode(raw);
+    return clean.length >= 4 ? clean : null;
+  }
+
+  static String? get currentCode => codeFromUri(Uri.base);
+}
+
+class PendingInviteStore {
+  static const _key = 'grupli_pending_invite_code';
+
+  static Future<void> save(String? code) async {
+    final clean = code == null ? null : InviteLinks.normalizeCode(code);
+    if (clean == null || clean.length < 4) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, clean);
+  }
+
+  static Future<String?> read() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key);
+    final clean = raw == null ? null : InviteLinks.normalizeCode(raw);
+    return clean != null && clean.length >= 4 ? clean : null;
+  }
+
+  static Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key);
+  }
+}
+
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
+  Future<void> _openAuth(BuildContext context, {required bool register}) async {
+    await PendingInviteStore.save(InviteLinks.currentCode);
+    if (!context.mounted) return;
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => AuthScreen(register: register, inviteCode: InviteLinks.currentCode)));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final inviteCode = InviteLinks.currentCode;
     return DirectPage(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 30),
       child: Column(
         children: [
+          if (inviteCode != null) ...[
+            InviteLandingBanner(code: inviteCode),
+            const SizedBox(height: 14),
+          ],
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(24, 46, 24, 38),
@@ -929,8 +1314,8 @@ class WelcomeScreen extends StatelessWidget {
                 const SizedBox(height: 10),
                 const Text('Organiza tu grupo.\nDisfruta más.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, height: 1.16, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 28),
-                SizedBox(width: double.infinity, child: WhiteButton(label: 'Comenzar', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AuthScreen(register: true))))),
-                TextButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AuthScreen(register: false))), child: const Text('Iniciar sesión', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
+                SizedBox(width: double.infinity, child: WhiteButton(label: inviteCode == null ? 'Comenzar' : 'Crear cuenta y unirme', onTap: () => _openAuth(context, register: true))),
+                TextButton(onPressed: () => _openAuth(context, register: false), child: Text(inviteCode == null ? 'Iniciar sesión' : 'Ya tengo cuenta', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
               ],
             ),
           ),
@@ -949,9 +1334,32 @@ class WelcomeScreen extends StatelessWidget {
   }
 }
 
+class InviteLandingBanner extends StatelessWidget {
+  final String code;
+  const InviteLandingBanner({super.key, required this.code});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      color: AppColors.tealSoft,
+      padding: const EdgeInsets.all(14),
+      child: Row(children: [
+        Container(width: 42, height: 42, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: const Icon(Icons.mark_email_unread_rounded, color: AppColors.teal)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Te han invitado a un grupo', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 3),
+          Text('Código $code · inicia sesión y entraremos automáticamente.', style: Theme.of(context).textTheme.bodyMedium),
+        ])),
+      ]),
+    );
+  }
+}
+
 class AuthScreen extends StatefulWidget {
   final bool register;
-  const AuthScreen({super.key, required this.register});
+  final String? inviteCode;
+  const AuthScreen({super.key, required this.register, this.inviteCode});
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -977,6 +1385,7 @@ class _AuthScreenState extends State<AuthScreen> {
     }
     setState(() => loading = true);
     try {
+      await PendingInviteStore.save(widget.inviteCode ?? InviteLinks.currentCode);
       if (widget.register) {
         await AppData.sb.auth.signUp(email: email.text.trim(), password: password.text.trim());
       } else {
@@ -993,6 +1402,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> oauth(OAuthProvider provider) async {
     try {
+      await PendingInviteStore.save(widget.inviteCode ?? InviteLinks.currentCode);
       await AppData.sb.auth.signInWithOAuth(provider, redirectTo: Uri.base.origin);
     } catch (e) {
       await showToast(context, e.toString(), danger: true);
@@ -1030,7 +1440,7 @@ class _AuthScreenState extends State<AuthScreen> {
         const SizedBox(height: 22),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           Text(widget.register ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?', style: Theme.of(context).textTheme.bodyMedium),
-          TextButton(onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => AuthScreen(register: !widget.register))), child: Text(widget.register ? 'Inicia sesión' : 'Regístrate')),
+          TextButton(onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => AuthScreen(register: !widget.register, inviteCode: widget.inviteCode))), child: Text(widget.register ? 'Inicia sesión' : 'Regístrate')),
         ]),
       ]),
     );
@@ -1047,6 +1457,29 @@ class AuthedShell extends StatefulWidget {
 class _AuthedShellState extends State<AuthedShell> {
   int tab = 0;
   int refreshKey = 0;
+  bool handledInitialInvite = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handleInitialInvite();
+      PushNotificationService.tryRegisterSilently();
+    });
+  }
+
+  Future<void> _handleInitialInvite() async {
+    if (handledInitialInvite || !mounted) return;
+    handledInitialInvite = true;
+    final code = InviteLinks.currentCode ?? await PendingInviteStore.read();
+    if (code == null || code.length < 4) return;
+    await PendingInviteStore.clear();
+    if (!mounted) return;
+    final joined = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => JoinInviteScreen(inviteCode: code)),
+    );
+    if (joined == true && mounted) refresh();
+  }
 
   void refresh() => setState(() => refreshKey++);
 
@@ -1238,7 +1671,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 }
 
 class JoinGroupScreen extends StatefulWidget {
-  const JoinGroupScreen({super.key});
+  final String? initialCode;
+  const JoinGroupScreen({super.key, this.initialCode});
 
   @override
   State<JoinGroupScreen> createState() => _JoinGroupScreenState();
@@ -1249,22 +1683,29 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
   bool loading = false;
 
   @override
+  void initState() {
+    super.initState();
+    code.text = InviteLinks.normalizeCode(widget.initialCode ?? '');
+  }
+
+  @override
   void dispose() {
     code.dispose();
     super.dispose();
   }
 
   Future<void> join() async {
-    if (code.text.trim().length < 4) {
-      await showToast(context, 'Introduce un código válido.', danger: true);
+    final clean = InviteLinks.codeFromText(code.text);
+    if (clean == null || clean.length < 4) {
+      await showToast(context, 'Introduce un código o enlace válido.', danger: true);
       return;
     }
     setState(() => loading = true);
     try {
-      await AppData.joinGroup(code.text);
+      await AppData.joinGroup(clean);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      await showToast(context, e.toString(), danger: true);
+      await showToast(context, humanError(e), danger: true);
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -1278,13 +1719,116 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
         const SizedBox(height: 28),
         Text('Unirme a un grupo', style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 8),
-        Text('Introduce el código de invitación que te ha enviado tu grupo.', style: Theme.of(context).textTheme.bodyMedium),
+        Text('Pega un código o un enlace de invitación. Si vienes desde un enlace, lo rellenamos automáticamente.', style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 26),
-        FieldLabel('Código de invitación'),
-        TextField(controller: code, textCapitalization: TextCapitalization.characters, decoration: const InputDecoration(prefixIcon: Icon(Icons.qr_code_rounded), hintText: 'Ej. ABC123')),
+        FieldLabel('Código o enlace de invitación'),
+        TextField(
+          controller: code,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(prefixIcon: Icon(Icons.link_rounded), hintText: 'ABC123 o https://grupli.vercel.app/join/ABC123'),
+        ),
         const SizedBox(height: 18),
         PrimaryButton(label: 'Unirme', icon: Icons.login_rounded, loading: loading, onTap: join),
       ]),
+    );
+  }
+}
+
+class JoinInviteScreen extends StatefulWidget {
+  final String inviteCode;
+  const JoinInviteScreen({super.key, required this.inviteCode});
+
+  @override
+  State<JoinInviteScreen> createState() => _JoinInviteScreenState();
+}
+
+class _JoinInviteScreenState extends State<JoinInviteScreen> {
+  bool loading = true;
+  bool joined = false;
+  String? groupId;
+  String? groupName;
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _joinFromLink());
+  }
+
+  Future<void> _joinFromLink() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+
+    try {
+      final joinedGroupId = await AppData.joinGroup(widget.inviteCode);
+      final group = await AppData.group(joinedGroupId);
+      if (!mounted) return;
+      setState(() {
+        groupId = joinedGroupId;
+        groupName = AppData.text(group['name'], 'Grupo');
+        joined = true;
+        loading = false;
+      });
+      await Future.delayed(const Duration(milliseconds: 650));
+      if (!mounted || groupId == null) return;
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId!)));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        loading = false;
+        error = humanError(e);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DirectPage(
+      scroll: false,
+      child: Center(
+        child: AppCard(
+          padding: const EdgeInsets.all(22),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 78,
+              height: 78,
+              decoration: BoxDecoration(color: joined ? AppColors.greenSoft : AppColors.tealSoft, shape: BoxShape.circle),
+              child: Icon(joined ? Icons.check_rounded : Icons.group_add_rounded, color: joined ? AppColors.green : AppColors.teal, size: 40),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              loading ? 'Entrando al grupo...' : joined ? 'Ya estás dentro' : 'No se pudo abrir la invitación',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              loading
+                  ? 'Estamos usando el enlace privado ${widget.inviteCode}.'
+                  : joined
+                      ? 'Te llevamos a ${groupName ?? 'tu grupo'} automáticamente.'
+                      : (error ?? 'El enlace puede haber caducado o el código no es válido.'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 20),
+            if (loading)
+              const CircularProgressIndicator(color: AppColors.teal)
+            else if (joined && groupId != null)
+              PrimaryButton(label: 'Entrar al grupo', icon: Icons.arrow_forward_rounded, onTap: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId!))))
+            else ...[
+              PrimaryButton(label: 'Intentar otra vez', icon: Icons.refresh_rounded, onTap: _joinFromLink),
+              const SizedBox(height: 10),
+              SecondaryButton(label: 'Escribir código', icon: Icons.qr_code_rounded, onTap: () async {
+                final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => JoinGroupScreen(initialCode: widget.inviteCode)));
+                if (ok == true && mounted) Navigator.pop(context, true);
+              }),
+            ],
+          ]),
+        ),
+      ),
     );
   }
 }
@@ -1850,8 +2394,28 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   int minPeople = 2;
   bool loading = false;
   String template = 'Quedada';
+  bool repeatEnabled = false;
+  String repeatFrequency = 'weekly';
+  int repeatOccurrences = 8;
 
   bool get editing => widget.event != null;
+
+  String get frequencyLabel {
+    switch (repeatFrequency) {
+      case 'biweekly':
+        return 'cada 2 semanas';
+      case 'monthly':
+        return 'cada mes';
+      default:
+        return 'cada semana';
+    }
+  }
+
+  String get routinePreview {
+    if (!repeatEnabled) return 'Evento único';
+    final first = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    return '${_cap(frequencyLabel)} · $repeatOccurrences eventos · empieza ${longDateTime(first)}';
+  }
 
   @override
   void initState() {
@@ -1897,11 +2461,28 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       await showToast(context, 'Pon un título claro para el evento.', danger: true);
       return;
     }
+    if (!editing && repeatEnabled && repeatOccurrences < 2) {
+      await showToast(context, 'Una rutina necesita al menos 2 eventos.', danger: true);
+      return;
+    }
+
     final start = DateTime(date.year, date.month, date.day, time.hour, time.minute);
     setState(() => loading = true);
     try {
       if (editing) {
         await AppData.updateEvent(widget.event!['id'].toString(), cleanTitle, start, location.text, notes.text, minPeople);
+      } else if (repeatEnabled) {
+        final created = await AppData.createEventSeries(
+          widget.group['id'].toString(),
+          cleanTitle,
+          start,
+          location.text,
+          notes.text,
+          minPeople,
+          repeatFrequency,
+          repeatOccurrences,
+        );
+        if (mounted) await showToast(context, 'Rutina creada: $created eventos generados.');
       } else {
         await AppData.createEvent(widget.group['id'].toString(), cleanTitle, start, location.text, notes.text, minPeople);
       }
@@ -1926,6 +2507,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         location: location.text.trim(),
         minPeople: minPeople,
         template: template,
+        repeatLabel: repeatEnabled ? routinePreview : null,
       ),
       const SizedBox(height: 16),
       SectionHeader(title: 'Tipo de plan'),
@@ -1963,6 +2545,57 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         FieldLabel('Lugar'),
         TextField(controller: location, onChanged: (_) => setState(() {}), decoration: const InputDecoration(prefixIcon: Icon(Icons.place_outlined), hintText: 'Ej. Pista 3, club, casa...')),
       ])),
+      if (!editing) ...[
+        const SizedBox(height: 14),
+        AppCard(
+          color: repeatEnabled ? AppColors.tealSoft : AppColors.white,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(color: repeatEnabled ? AppColors.teal : AppColors.surface, borderRadius: BorderRadius.circular(15), border: Border.all(color: AppColors.line)),
+                child: Icon(Icons.repeat_rounded, color: repeatEnabled ? Colors.white : AppColors.teal, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Convertir en rutina', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 3),
+                Text('Ideal para partido todos los jueves, entreno semanal o quedadas fijas.', style: Theme.of(context).textTheme.bodyMedium),
+              ])),
+              Switch.adaptive(value: repeatEnabled, activeColor: AppColors.teal, onChanged: (v) => setState(() => repeatEnabled = v)),
+            ]),
+            if (repeatEnabled) ...[
+              const SizedBox(height: 14),
+              FieldLabel('Frecuencia'),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                RoutineChoice(label: 'Cada semana', selected: repeatFrequency == 'weekly', onTap: () => setState(() => repeatFrequency = 'weekly')),
+                RoutineChoice(label: 'Cada 2 semanas', selected: repeatFrequency == 'biweekly', onTap: () => setState(() => repeatFrequency = 'biweekly')),
+                RoutineChoice(label: 'Cada mes', selected: repeatFrequency == 'monthly', onTap: () => setState(() => repeatFrequency = 'monthly')),
+              ]),
+              const SizedBox(height: 14),
+              Row(children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Eventos a generar', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 3),
+                  Text(routinePreview, style: Theme.of(context).textTheme.bodyMedium),
+                ])),
+                const SizedBox(width: 12),
+                Container(
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.line)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton(onPressed: () => setState(() => repeatOccurrences = max(2, repeatOccurrences - 1)), icon: const Icon(Icons.remove_rounded)),
+                    Text(repeatOccurrences.toString(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.ink)),
+                    IconButton(onPressed: () => setState(() => repeatOccurrences = min(52, repeatOccurrences + 1)), icon: const Icon(Icons.add_rounded)),
+                  ]),
+                ),
+              ]),
+              const SizedBox(height: 12),
+              RoutineInfoBox(text: 'Se crearán $repeatOccurrences eventos independientes. Después podrás editar o cancelar cada fecha por separado.'),
+            ],
+          ]),
+        ),
+      ],
       const SizedBox(height: 14),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -1981,7 +2614,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       FieldLabel('Notas opcionales'),
       TextField(controller: notes, maxLines: 4, decoration: const InputDecoration(hintText: 'Material, normas, instrucciones, coste aproximado...')),
       const SizedBox(height: 22),
-      PrimaryButton(label: editing ? 'Guardar cambios' : 'Crear evento', icon: editing ? Icons.save_rounded : Icons.add_rounded, loading: loading, onTap: save),
+      PrimaryButton(
+        label: editing ? 'Guardar cambios' : (repeatEnabled ? 'Crear rutina' : 'Crear evento'),
+        icon: editing ? Icons.save_rounded : (repeatEnabled ? Icons.repeat_rounded : Icons.add_rounded),
+        loading: loading,
+        onTap: save,
+      ),
     ]));
   }
 }
@@ -2257,6 +2895,8 @@ class _CalendarTabState extends State<CalendarTab> {
                     month = DateTime(day.year, day.month);
                   }),
                 ),
+                const SizedBox(height: 10),
+                EventTypeLegend(events: events),
                 const SizedBox(height: 14),
                 AppCard(child: Column(children: [
                   Row(children: [
@@ -2376,6 +3016,7 @@ class _FinancesTabState extends State<FinancesTab> {
 
             final data = snapshot.data ?? _FinanceData.empty();
             final summary = data.summary;
+            final sortedBalances = summary.sortedBalances;
             final pendingExpenses = data.expenses.where((e) => AppData.text(e['status'], 'pending') != 'paid').toList();
             final settledExpenses = data.expenses.where((e) => AppData.text(e['status'], 'pending') == 'paid').toList();
             final pendingCount = pendingExpenses.length;
@@ -2392,14 +3033,16 @@ class _FinancesTabState extends State<FinancesTab> {
                   FinanceHeroCard(summary: summary, onCreate: openCreate),
                   const SizedBox(height: 12),
                   Row(children: [
-                    Expanded(child: FinanceMiniMetric(icon: Icons.receipt_long_rounded, label: 'Total', value: money(summary.totalExpenses), color: AppColors.teal)),
+                    Expanded(child: FinanceMiniMetric(icon: Icons.receipt_long_rounded, label: 'Histórico', value: money(summary.totalExpenses), color: AppColors.teal)),
                     const SizedBox(width: 10),
-                    Expanded(child: FinanceMiniMetric(icon: Icons.pending_actions_rounded, label: 'Abiertos', value: pendingCount.toString(), color: AppColors.amber)),
+                    Expanded(child: FinanceMiniMetric(icon: Icons.swap_horiz_rounded, label: 'A mover', value: money(summary.settlementAmount), color: AppColors.orange)),
                     const SizedBox(width: 10),
-                    Expanded(child: FinanceMiniMetric(icon: Icons.verified_rounded, label: 'Liquidados', value: settledCount.toString(), color: AppColors.green)),
+                    Expanded(child: FinanceMiniMetric(icon: Icons.auto_awesome_rounded, label: 'Compensado', value: money(summary.compensatedAmount), color: AppColors.green)),
                   ]),
+                  const SizedBox(height: 14),
+                  FinanceAutoBalanceCard(summary: summary, openCount: pendingCount, settledCount: settledCount),
                   const SizedBox(height: 20),
-                  SectionHeader(title: 'Plan para dejarlo a cero', action: 'Actualizar', onTap: reload),
+                  SectionHeader(title: 'Liquidación automática', action: 'Actualizar', onTap: reload),
                   const SizedBox(height: 8),
                   if (summary.settlements.isEmpty)
                     EmptySlim(icon: Icons.verified_rounded, title: 'Todo está cuadrado', body: 'No hace falta mover dinero entre miembros ahora mismo.')
@@ -2416,15 +3059,17 @@ class _FinancesTabState extends State<FinancesTab> {
                   const SizedBox(height: 20),
                   SectionHeader(title: 'Balances individuales'),
                   const SizedBox(height: 8),
-                  if (summary.balances.isEmpty)
-                    EmptySlim(icon: Icons.people_alt_rounded, title: 'Sin miembros para calcular balances')
+                  if (sortedBalances.isEmpty)
+                    EmptySlim(icon: Icons.people_alt_rounded, title: 'Todos los balances están a cero', body: 'Nadie debe ni tiene que recibir dinero ahora mismo.')
                   else
                     AppCard(
                       padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Column(children: summary.balances.entries.map((entry) {
-                        final name = summary.names[entry.key] ?? 'Miembro';
-                        return BalanceRow(name: name, value: entry.value);
-                      }).toList()),
+                      child: Column(children: [
+                        for (int i = 0; i < sortedBalances.length; i++) ...[
+                          BalanceRow(name: summary.names[sortedBalances[i].key] ?? 'Miembro', value: sortedBalances[i].value),
+                          if (i != sortedBalances.length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
+                        ],
+                      ]),
                     ),
                   const SizedBox(height: 20),
                   SectionHeader(title: 'Gastos abiertos', action: 'Añadir', onTap: openCreate),
@@ -2842,9 +3487,9 @@ class FinanceHeroCard extends StatelessWidget {
           ]),
           const SizedBox(height: 16),
           Row(children: [
-            Expanded(child: _HeroFinanceMetric(label: 'Tu saldo', value: money(summary.myNet))),
+            Expanded(child: _HeroFinanceMetric(label: 'Tu saldo neto', value: money(summary.myNet))),
             const SizedBox(width: 10),
-            Expanded(child: _HeroFinanceMetric(label: 'Pendiente', value: money(summary.pendingAmount))),
+            Expanded(child: _HeroFinanceMetric(label: 'Movimiento real', value: money(summary.settlementAmount))),
           ]),
           const SizedBox(height: 14),
           WhiteButton(label: 'Añadir gasto', onTap: onCreate),
@@ -2910,13 +3555,85 @@ class SettlementPaymentRow extends StatelessWidget {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('${debt.fromName} paga a ${debt.toName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
           const SizedBox(height: 2),
-          const Text('Pago recomendado para cuadrar el grupo', style: TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
+          const Text('Pago mínimo calculado tras compensar deudas cruzadas', style: TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
         ])),
         const SizedBox(width: 8),
         Text(money(debt.amount), style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 15)),
       ]),
     );
   }
+}
+
+
+class FinanceAutoBalanceCard extends StatelessWidget {
+  final FinanceSummary summary;
+  final int openCount;
+  final int settledCount;
+  const FinanceAutoBalanceCard({super.key, required this.summary, required this.openCount, required this.settledCount});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPending = summary.pendingAmount > 0.01;
+    final color = hasPending ? AppColors.teal : AppColors.green;
+    final title = hasPending ? 'Grupli ya ha compensado las deudas cruzadas' : 'Cuentas equilibradas';
+    final body = hasPending
+        ? 'Si alguien debía dinero y luego paga un gasto nuevo, Grupli resta automáticamente una cosa con la otra y solo muestra el balance neto real.'
+        : 'No hay nada que mover ahora mismo. Los gastos abiertos y pagos liquidados están en orden.';
+
+    return AppCard(
+      padding: const EdgeInsets.all(15),
+      color: AppColors.surface,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(color: color.withOpacity(.12), borderRadius: BorderRadius.circular(15)),
+            child: Icon(hasPending ? Icons.auto_awesome_rounded : Icons.verified_rounded, color: color, size: 23),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 5),
+            Text(body, style: Theme.of(context).textTheme.bodyMedium),
+          ])),
+        ]),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: _FinanceAutoMetric(label: 'Deuda bruta', value: money(summary.pendingAmount), color: AppColors.amber)),
+          const SizedBox(width: 8),
+          Expanded(child: _FinanceAutoMetric(label: 'A mover', value: money(summary.settlementAmount), color: AppColors.teal)),
+          const SizedBox(width: 8),
+          Expanded(child: _FinanceAutoMetric(label: 'Compensado', value: money(summary.compensatedAmount), color: AppColors.green)),
+        ]),
+        const SizedBox(height: 10),
+        Text(
+          hasPending
+              ? '$openCount ${openCount == 1 ? 'gasto abierto' : 'gastos abiertos'} · ${summary.settlements.length} ${summary.settlements.length == 1 ? 'pago recomendado' : 'pagos recomendados'} para dejarlo a cero.'
+              : '$settledCount ${settledCount == 1 ? 'gasto liquidado' : 'gastos liquidados'} · sin pagos pendientes.',
+          style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12),
+        ),
+      ]),
+    );
+  }
+}
+
+class _FinanceAutoMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _FinanceAutoMetric({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.line)),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 10.5, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 4),
+      Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w900)),
+    ]),
+  );
 }
 
 class FinanceSplitPreview extends StatelessWidget {
@@ -2936,7 +3653,7 @@ class FinanceSplitPreview extends StatelessWidget {
         ? 'Elige al menos un participante.'
         : customMode
             ? (ok ? 'Reparto manual equilibrado · total ${money(customTotal)}' : 'Faltan/sobran ${money(diff.abs())} para cuadrar el total')
-            : '$participants participantes · cada uno debe ${money(equalShare)}';
+            : '$participants participantes · cada uno debe ${money(equalShare)} · se compensará con saldos anteriores';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -2975,7 +3692,27 @@ class FinanceSummary {
   final double pendingAmount;
   final double myNet;
 
-  FinanceSummary({required this.names, required this.balances, required this.settlements, required this.totalExpenses, required this.pendingAmount, required this.myNet});
+  FinanceSummary({
+    required this.names,
+    required this.balances,
+    required this.settlements,
+    required this.totalExpenses,
+    required this.pendingAmount,
+    required this.myNet,
+  });
+
+  double get settlementAmount => double.parse(settlements.fold<double>(0, (sum, debt) => sum + debt.amount).toStringAsFixed(2));
+
+  double get compensatedAmount {
+    final value = pendingAmount - settlementAmount;
+    return double.parse(max(0, value).toStringAsFixed(2));
+  }
+
+  List<MapEntry<String, double>> get sortedBalances {
+    final list = balances.entries.where((entry) => entry.value.abs() > 0.01).toList();
+    list.sort((a, b) => b.value.abs().compareTo(a.value.abs()));
+    return list;
+  }
 
   factory FinanceSummary.from(List<Map<String, dynamic>> expenses, List<Map<String, dynamic>> members) {
     final names = <String, String>{};
@@ -3003,8 +3740,8 @@ class FinanceSummary {
         names.putIfAbsent(userId, () => financeMemberName(userId, members));
         balances.putIfAbsent(userId, () => 0);
         if (!alreadyPaid) {
-          balances[paidBy] = (balances[paidBy] ?? 0) + share;
-          balances[userId] = (balances[userId] ?? 0) - share;
+          balances[paidBy] = double.parse(((balances[paidBy] ?? 0) + share).toStringAsFixed(2));
+          balances[userId] = double.parse(((balances[userId] ?? 0) - share).toStringAsFixed(2));
           pending += share;
         }
       }
@@ -3012,7 +3749,14 @@ class FinanceSummary {
 
     final settlements = buildSettlements(balances, names);
     final myId = AppData.user?.id ?? '';
-    return FinanceSummary(names: names, balances: balances, settlements: settlements, totalExpenses: total, pendingAmount: pending, myNet: balances[myId] ?? 0);
+    return FinanceSummary(
+      names: names,
+      balances: balances,
+      settlements: settlements,
+      totalExpenses: double.parse(total.toStringAsFixed(2)),
+      pendingAmount: double.parse(pending.toStringAsFixed(2)),
+      myNet: double.parse((balances[myId] ?? 0).toStringAsFixed(2)),
+    );
   }
 }
 
@@ -3082,6 +3826,9 @@ String _financeMainTitle(FinanceSummary summary) {
 
 String _financeMainSubtitle(FinanceSummary summary) {
   if (summary.pendingAmount <= 0.01) return 'No hay deudas abiertas en este grupo.';
+  if (summary.compensatedAmount > 0.01) {
+    return 'De ${money(summary.pendingAmount)} en deuda bruta, solo hay que mover ${money(summary.settlementAmount)} gracias al balance neto.';
+  }
   return 'Con ${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} se puede dejar el grupo a cero.';
 }
 
@@ -3105,15 +3852,27 @@ class BalanceRow extends StatelessWidget {
   const BalanceRow({super.key, required this.name, required this.value});
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Row(children: [
-      CircleAvatar(radius: 15, backgroundColor: value >= 0 ? AppColors.tealSoft : const Color(0xFFFFECEC), child: Text(name.substring(0, 1).toUpperCase(), style: TextStyle(color: value >= 0 ? AppColors.teal : AppColors.red, fontWeight: FontWeight.w900))),
-      const SizedBox(width: 10),
-      Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w900))),
-      Text(money(value), style: TextStyle(color: value >= 0 ? AppColors.green : AppColors.red, fontWeight: FontWeight.w900)),
-    ]),
-  );
+  Widget build(BuildContext context) {
+    final color = value > 0.01 ? AppColors.green : value < -0.01 ? AppColors.red : AppColors.muted;
+    final label = value > 0.01 ? 'Le deben dinero' : value < -0.01 ? 'Debe dinero' : 'Cuadrado';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      child: Row(children: [
+        CircleAvatar(
+          radius: 17,
+          backgroundColor: value >= 0 ? AppColors.tealSoft : const Color(0xFFFFECEC),
+          child: Text(name.substring(0, 1).toUpperCase(), style: TextStyle(color: value >= 0 ? AppColors.teal : AppColors.red, fontWeight: FontWeight.w900)),
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 2),
+          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
+        ])),
+        Text(money(value), style: TextStyle(color: color, fontWeight: FontWeight.w900)),
+      ]),
+    );
+  }
 }
 
 class ChoicePill extends StatelessWidget {
@@ -4684,17 +5443,212 @@ class GroupSettingsScreen extends StatelessWidget {
   }
 }
 
-class NotificationsScreen extends StatelessWidget {
+class NotificationsScreen extends StatefulWidget {
   final VoidCallback onChanged;
   const NotificationsScreen({super.key, required this.onChanged});
-  @override Widget build(BuildContext context) {
-    return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Avisos', style: Theme.of(context).textTheme.headlineMedium),
-      const SizedBox(height: 8), Text('Notificaciones importantes de tus grupos.', style: Theme.of(context).textTheme.bodyMedium),
-      const SizedBox(height: 22),
-      EmptyBlock(icon: Icons.notifications_none_rounded, title: 'Sin avisos pendientes', body: 'Aquí verás cambios en eventos, gastos y torneos.'),
-    ]));
+
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  late Future<List<Map<String, dynamic>>> future;
+
+  @override
+  void initState() {
+    super.initState();
+    load();
   }
+
+  void load() => future = AppData.notifications();
+  void reload() => setState(load);
+
+  Future<void> markAll() async {
+    await AppData.markAllNotificationsRead();
+    reload();
+  }
+
+  Future<void> openNotification(Map<String, dynamic> notification) async {
+    final id = notification['id']?.toString();
+    if (id != null && id.isNotEmpty) await AppData.markNotificationRead(id);
+    final groupId = notification['group_id']?.toString();
+    reload();
+    if (!mounted) return;
+    if (groupId != null && groupId.isNotEmpty) {
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)));
+      widget.onChanged();
+      reload();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      bottom: false,
+      child: RefreshIndicator(
+        color: AppColors.teal,
+        onRefresh: () async => reload(),
+        child: FutureBuilder<List<Map<String, dynamic>>>(
+          future: future,
+          builder: (context, snapshot) {
+            final notifications = snapshot.data ?? [];
+            final unread = notifications.where((n) => n['read_at'] == null).length;
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
+              children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(child: PageHeader(title: 'Avisos', subtitle: unread == 0 ? 'Todo leído en tus grupos.' : '$unread aviso${unread == 1 ? '' : 's'} sin leer', leading: false)),
+                  if (unread > 0)
+                    TextButton(onPressed: markAll, child: const Text('Leer todo')),
+                ]),
+                const SizedBox(height: 12),
+                PushStatusCard(onEnable: () async {
+                  final token = await PushNotificationService.enableForCurrentDevice();
+                  if (!mounted) return;
+                  if (token == null) {
+                    await showToast(context, 'Falta configurar Firebase para activar push real en este entorno.', danger: true);
+                  } else {
+                    await showToast(context, 'Notificaciones push activadas en este dispositivo.');
+                  }
+                }),
+                const SizedBox(height: 16),
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const CenterLoader(label: 'Cargando avisos...')
+                else if (snapshot.hasError)
+                  ErrorBlock(message: 'No se pudieron cargar los avisos. Ejecuta el SQL de notificaciones si acabas de actualizar.', onRetry: reload)
+                else if (notifications.isEmpty)
+                  EmptyBlock(
+                    icon: Icons.notifications_none_rounded,
+                    title: 'Sin avisos todavía',
+                    body: 'Cuando alguien cree una quedada, añada un gasto, registre un resultado o entre al grupo, aparecerá aquí.',
+                  )
+                else
+                  AppCard(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Column(children: [
+                      for (int i = 0; i < notifications.length; i++) ...[
+                        NotificationListRow(notification: notifications[i], onTap: () => openNotification(notifications[i])),
+                        if (i != notifications.length - 1) const Divider(height: 1, indent: 64, color: AppColors.line),
+                      ],
+                    ]),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class PushStatusCard extends StatelessWidget {
+  final Future<void> Function() onEnable;
+  const PushStatusCard({super.key, required this.onEnable});
+
+  @override
+  Widget build(BuildContext context) {
+    final configured = AppConfig.firebaseConfigured;
+    return AppCard(
+      color: configured ? AppColors.tealSoft : AppColors.surface,
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(color: configured ? AppColors.white : AppColors.tealSoft, borderRadius: BorderRadius.circular(15)),
+          child: Icon(configured ? Icons.notifications_active_rounded : Icons.notifications_none_rounded, color: AppColors.teal),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(configured ? 'Push preparado' : 'Push pendiente de Firebase', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            configured
+                ? 'Activa este dispositivo para recibir avisos del grupo aunque la app no esté abierta.'
+                : 'Los avisos internos ya funcionan. Para push al móvil hay que añadir las claves Firebase en el build.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(onPressed: onEnable, icon: const Icon(Icons.power_settings_new_rounded), label: Text(configured ? 'Activar en este dispositivo' : 'Comprobar configuración')),
+          ),
+        ])),
+      ]),
+    );
+  }
+}
+
+class NotificationListRow extends StatelessWidget {
+  final Map<String, dynamic> notification;
+  final VoidCallback onTap;
+  const NotificationListRow({super.key, required this.notification, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final unread = notification['read_at'] == null;
+    final type = AppData.text(notification['type'], 'general');
+    final color = notificationColor(type);
+    final created = DateTime.tryParse(notification['created_at']?.toString() ?? '')?.toLocal();
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Stack(children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(color: color.withOpacity(.12), borderRadius: BorderRadius.circular(14)),
+              child: Icon(notificationIcon(type), color: color, size: 21),
+            ),
+            if (unread)
+              Positioned(right: 0, top: 0, child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle))),
+          ]),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text(AppData.text(notification['title'], 'Aviso'), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: unread ? FontWeight.w900 : FontWeight.w800, color: AppColors.ink))),
+              if (created != null) Text(notificationTime(created), style: const TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700)),
+            ]),
+            const SizedBox(height: 4),
+            Text(AppData.text(notification['body'], 'Hay una novedad en tu grupo.'), maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyMedium),
+          ])),
+          const SizedBox(width: 6),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        ]),
+      ),
+    );
+  }
+}
+
+IconData notificationIcon(String type) {
+  return switch (type) {
+    'event' => Icons.event_available_rounded,
+    'finance' => Icons.account_balance_wallet_rounded,
+    'tournament' => Icons.emoji_events_rounded,
+    'member' => Icons.groups_rounded,
+    _ => Icons.notifications_rounded,
+  };
+}
+
+Color notificationColor(String type) {
+  return switch (type) {
+    'event' => AppColors.teal,
+    'finance' => AppColors.green,
+    'tournament' => AppColors.orange,
+    'member' => AppColors.violet,
+    _ => AppColors.blue,
+  };
+}
+
+String notificationTime(DateTime date) {
+  final now = DateTime.now();
+  final diff = now.difference(date);
+  if (diff.inMinutes < 1) return 'ahora';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+  if (diff.inHours < 24) return '${diff.inHours}h';
+  if (diff.inDays < 7) return '${diff.inDays}d';
+  return DateFormat('dd/MM', 'es_ES').format(date);
 }
 
 
@@ -4818,15 +5772,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: const [
-          SheetTitle(icon: Icons.notifications_active_outlined, title: 'Notificaciones', body: 'Preparado para push notifications reales en la fase de publicación.'),
-          SizedBox(height: 12),
-          PreferencePreviewRow(icon: Icons.event_available_rounded, title: 'Eventos', body: 'Avisos de nuevas quedadas y cambios importantes'),
-          PreferencePreviewRow(icon: Icons.account_balance_wallet_rounded, title: 'Finanzas', body: 'Gastos nuevos, deudas pendientes y pagos marcados'),
-          PreferencePreviewRow(icon: Icons.emoji_events_rounded, title: 'Torneos', body: 'Partidos generados, resultados y clasificación'),
-        ]),
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
+            child: FutureBuilder<Map<String, dynamic>>(
+              future: AppData.notificationSettings(),
+              builder: (context, snapshot) {
+                final settings = snapshot.data ?? {};
+                bool enabled(String key) => settings[key] != false;
+                Future<void> toggle(String key, bool value) async {
+                  await AppData.updateNotificationSettings({key: value});
+                  setSheetState(() {});
+                }
+                return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  const SheetTitle(icon: Icons.notifications_active_outlined, title: 'Notificaciones', body: 'Elige qué avisos quieres recibir por grupo. Las notificaciones internas funcionan con Supabase; el push móvil se activa con Firebase.'),
+                  const SizedBox(height: 12),
+                  NotificationPreferenceSwitch(icon: Icons.event_available_rounded, title: 'Eventos', body: 'Nuevas quedadas, cambios y cancelaciones', value: enabled('notify_events'), onChanged: (v) => toggle('notify_events', v)),
+                  NotificationPreferenceSwitch(icon: Icons.account_balance_wallet_rounded, title: 'Finanzas', body: 'Gastos nuevos y pagos importantes', value: enabled('notify_expenses'), onChanged: (v) => toggle('notify_expenses', v)),
+                  NotificationPreferenceSwitch(icon: Icons.emoji_events_rounded, title: 'Torneos', body: 'Torneos, partidos y resultados', value: enabled('notify_tournaments'), onChanged: (v) => toggle('notify_tournaments', v)),
+                  NotificationPreferenceSwitch(icon: Icons.groups_rounded, title: 'Miembros', body: 'Entradas al grupo y cambios de rol', value: enabled('notify_members'), onChanged: (v) => toggle('notify_members', v)),
+                  const SizedBox(height: 12),
+                  PrimaryButton(label: 'Activar push en este dispositivo', icon: Icons.notifications_active_rounded, onTap: () async {
+                    final token = await PushNotificationService.enableForCurrentDevice();
+                    if (!mounted) return;
+                    if (token == null) {
+                      await showToast(context, 'Falta configurar Firebase para activar push real en este entorno.', danger: true);
+                    } else {
+                      await showToast(context, 'Push activado en este dispositivo.');
+                    }
+                  }),
+                ]);
+              },
+            ),
+          );
+        },
       ),
     );
   }
@@ -5170,6 +6151,34 @@ class PreferencePreviewRow extends StatelessWidget {
 }
 
 
+
+class NotificationPreferenceSwitch extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  const NotificationPreferenceSwitch({super.key, required this.icon, required this.title, required this.body, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 9),
+    child: AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(children: [
+        Container(width: 38, height: 38, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: AppColors.teal, size: 20)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+          const SizedBox(height: 2),
+          Text(body, style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+        ])),
+        Switch(value: value, activeColor: AppColors.teal, onChanged: onChanged),
+      ]),
+    ),
+  );
+}
+
 class GroupHeroCard extends StatelessWidget {
   final String name;
   const GroupHeroCard({super.key, required this.name});
@@ -5177,31 +6186,47 @@ class GroupHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 104,
+      height: 112,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
-        gradient: const LinearGradient(colors: [Color(0xFF006B69), Color(0xFF00998E)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        boxShadow: const [BoxShadow(color: Color(0x1A008F86), blurRadius: 20, offset: Offset(0, 10))],
+        borderRadius: BorderRadius.circular(30),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF005F5E), Color(0xFF008F86), Color(0xFF20B8A8)],
+          stops: [0, .58, 1],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: const [
+          BoxShadow(color: Color(0x26008F86), blurRadius: 26, offset: Offset(0, 14)),
+          BoxShadow(color: Color(0x14005F5E), blurRadius: 10, offset: Offset(0, 3)),
+        ],
       ),
-      child: Stack(children: [
-        Positioned.fill(child: Opacity(opacity: .10, child: PatternIcons())),
-        Positioned(left: 18, right: 16, bottom: 16, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-          Row(children: [
-            Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: -0.6))),
-            Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white.withOpacity(.18), shape: BoxShape.circle), child: const Icon(Icons.lock_rounded, color: Colors.white, size: 18)),
-          ]),
-          const SizedBox(height: 8),
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: Colors.white.withOpacity(.17), borderRadius: BorderRadius.circular(99)),
-              child: const Text('Grupo privado', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
-            ),
-            const SizedBox(width: 8),
-            const Expanded(child: Text('Resumen general', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w700))),
-          ]),
-        ])),
-      ]),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: Stack(children: [
+          Positioned.fill(child: Opacity(opacity: .10, child: PatternIcons())),
+          Positioned(right: -30, top: -34, child: Container(width: 120, height: 120, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(.10)))),
+          Positioned(right: 26, bottom: -28, child: Container(width: 78, height: 78, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(.09)))),
+          Positioned(left: 18, right: 16, bottom: 17, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white.withOpacity(.12))),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.lock_rounded, color: Colors.white, size: 14),
+                  SizedBox(width: 5),
+                  Text('Grupo privado', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5)),
+                ]),
+              ),
+              const Spacer(),
+              Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white.withOpacity(.16), shape: BoxShape.circle), child: const Icon(Icons.groups_rounded, color: Colors.white, size: 18)),
+            ]),
+            const SizedBox(height: 12),
+            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: -0.75)),
+            const SizedBox(height: 6),
+            const Text('Resumen claro, decisiones rápidas y actividad real', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xEFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w700)),
+          ])),
+        ]),
+      ),
     );
   }
 }
@@ -5214,10 +6239,24 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
-      Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
-      if (action != null) TextButton(onPressed: onTap, child: Text(action!)),
-    ]);
+    return Padding(
+      padding: const EdgeInsets.only(left: 2, right: 2),
+      child: Row(children: [
+        Container(width: 4, height: 20, decoration: BoxDecoration(color: AppColors.teal, borderRadius: BorderRadius.circular(99))),
+        const SizedBox(width: 8),
+        Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
+        if (action != null)
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(99),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+              decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(99), border: Border.all(color: const Color(0x19008F86))),
+              child: Text(action!, style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 12)),
+            ),
+          ),
+      ]),
+    );
   }
 }
 
@@ -5302,41 +6341,115 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
     final maybe = attendanceCount(event, 'maybe');
     final no = attendanceCount(event, 'no');
     final mine = myAttendanceStatus(event);
+    final color = eventKindColor(event);
+    final soft = eventKindSoftColor(event);
+    final progress = minPeople <= 0 ? 0.0 : min(1.0, yes / minPeople);
+    final missing = max(0, minPeople - yes);
 
-    return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(15)),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Text(shortWeekday(date).toUpperCase(), style: const TextStyle(color: AppColors.teal, fontSize: 11, fontWeight: FontWeight.w900)),
-            Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 21, fontWeight: FontWeight.w900)),
-          ]),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        gradient: LinearGradient(
+          colors: [soft, Colors.white],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(AppData.text(event['title'], 'Evento'), style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 5),
-          MetaLine(icon: Icons.schedule_rounded, text: DateFormat('HH:mm', 'es_ES').format(date)),
-          MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
-        ])),
-        IconButton(onPressed: () async {
-          await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: widget.group)));
-          widget.onChanged();
-        }, icon: const Icon(Icons.chevron_right_rounded)),
-      ]),
-      const SizedBox(height: 10),
-      Row(children: [
-        Expanded(child: AttendancePick(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
-        const SizedBox(width: 8),
-        Expanded(child: AttendancePick(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
-        const SizedBox(width: 8),
-        Expanded(child: AttendancePick(label: 'No voy', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
-      ]),
-      const SizedBox(height: 12),
-      StatusNotice(ok: yes >= minPeople, text: yes >= minPeople ? 'Mínimo alcanzado: $yes de $minPeople asistentes.' : 'Faltan ${max(0, minPeople - yes)} para alcanzar el mínimo.'),
-    ]));
+        border: Border.all(color: color.withOpacity(.18), width: 1.2),
+        boxShadow: [BoxShadow(color: color.withOpacity(.10), blurRadius: 28, offset: const Offset(0, 14))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () async {
+              await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: widget.group)));
+              widget.onChanged();
+            },
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 15),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(.78), borderRadius: BorderRadius.circular(99), border: Border.all(color: color.withOpacity(.18))),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(eventKindIcon(event), size: 16, color: color),
+                      const SizedBox(width: 6),
+                      Text(eventKindLabel(event), style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900)),
+                    ]),
+                  ),
+                  if (eventIsRoutine(event)) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(.72), borderRadius: BorderRadius.circular(99), border: Border.all(color: color.withOpacity(.14))),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.repeat_rounded, size: 15, color: color),
+                        const SizedBox(width: 5),
+                        Text(eventRoutineBadge(event), style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900)),
+                      ]),
+                    ),
+                  ],
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(color: yes >= minPeople ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(99)),
+                    child: Text(yes >= minPeople ? 'Plan viable' : 'Faltan $missing', style: TextStyle(color: yes >= minPeople ? AppColors.green : AppColors.orange, fontSize: 12, fontWeight: FontWeight.w900)),
+                  ),
+                ]),
+                const SizedBox(height: 15),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(
+                    width: 70,
+                    height: 74,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(.78),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: color.withOpacity(.16)),
+                    ),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Text(shortWeekday(date).toUpperCase(), style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: .2)),
+                      const SizedBox(height: 2),
+                      Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 28, fontWeight: FontWeight.w900, height: 1)),
+                      const SizedBox(height: 3),
+                      Text(DateFormat('MMM', 'es_ES').format(date).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w800)),
+                    ]),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Próxima quedada', style: TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 3),
+                    Text(AppData.text(event['title'], 'Evento'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 23, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -.45)),
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 8, runSpacing: 7, children: [
+                      EventMetaChip(icon: Icons.schedule_rounded, text: DateFormat('HH:mm', 'es_ES').format(date), color: color),
+                      EventMetaChip(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación'), color: color),
+                    ]),
+                  ])),
+                ]),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 9, backgroundColor: Colors.white.withOpacity(.72), color: color))),
+                  const SizedBox(width: 10),
+                  Text('$yes/$minPeople', style: TextStyle(color: color, fontWeight: FontWeight.w900)),
+                ]),
+                const SizedBox(height: 8),
+                Text(yes >= minPeople ? 'Mínimo alcanzado. El grupo ya puede contar con este plan.' : 'Faltan $missing para alcanzar el mínimo. Responder rápido ayuda a organizar mejor.', style: const TextStyle(color: AppColors.muted, fontSize: 12.3, fontWeight: FontWeight.w700, height: 1.3)),
+                const SizedBox(height: 13),
+                Row(children: [
+                  Expanded(child: AttendancePick(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
+                  const SizedBox(width: 8),
+                  Expanded(child: AttendancePick(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
+                  const SizedBox(width: 8),
+                  Expanded(child: AttendancePick(label: 'No voy', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
+                ]),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -5767,17 +6880,23 @@ class WeekStrip extends StatelessWidget {
     required this.onSelect,
   });
 
-  int countFor(DateTime day) {
-    return events.where((event) {
+  List<Map<String, dynamic>> eventsFor(DateTime day) {
+    final list = events.where((event) {
       final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
       return date != null && sameDay(date, day);
-    }).length;
+    }).toList();
+    list.sort((a, b) {
+      final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
+      final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now();
+      return da.compareTo(db);
+    });
+    return list;
   }
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 78,
+      height: 88,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: days.length,
@@ -5785,33 +6904,54 @@ class WeekStrip extends StatelessWidget {
         itemBuilder: (context, index) {
           final day = days[index];
           final active = sameDay(day, selected);
-          final count = countFor(day);
+          final dayEvents = eventsFor(day);
+          final hasEvents = dayEvents.isNotEmpty;
+          final mainColor = hasEvents ? eventKindColor(dayEvents.first) : AppColors.line;
+          final today = sameDay(day, DateTime.now());
           return InkWell(
             onTap: () => onSelect(day),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(20),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              width: 62,
+              duration: const Duration(milliseconds: 180),
+              width: 68,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
               decoration: BoxDecoration(
-                color: active ? AppColors.teal : AppColors.surface,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: active ? AppColors.teal : AppColors.line),
-                boxShadow: active ? const [BoxShadow(color: Color(0x16008F86), blurRadius: 14, offset: Offset(0, 7))] : null,
+                color: active ? AppColors.teal : hasEvents ? eventKindSoftColor(dayEvents.first) : AppColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: active ? AppColors.teal : today ? AppColors.teal.withOpacity(.45) : hasEvents ? mainColor.withOpacity(.38) : AppColors.line,
+                  width: active || today || hasEvents ? 1.4 : 1,
+                ),
+                boxShadow: active ? const [BoxShadow(color: Color(0x18008F86), blurRadius: 16, offset: Offset(0, 8))] : null,
               ),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 Text(shortWeekday(day).toUpperCase(), style: TextStyle(color: active ? Colors.white : AppColors.muted, fontWeight: FontWeight.w900, fontSize: 11)),
                 const SizedBox(height: 4),
-                Text(day.day.toString(), style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 20)),
-                const SizedBox(height: 4),
-                Container(
-                  width: count > 0 ? 18 : 5,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: active ? Colors.white : (count > 0 ? AppColors.teal : AppColors.line),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
+                Text(day.day.toString(), style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 21)),
+                const SizedBox(height: 6),
+                if (hasEvents)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      for (final event in dayEvents.take(3))
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                          width: active ? 7 : 8,
+                          height: active ? 7 : 8,
+                          decoration: BoxDecoration(
+                            color: active ? Colors.white : eventKindColor(event),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      if (dayEvents.length > 3)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 2),
+                          child: Text('+', style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 11)),
+                        ),
+                    ],
+                  )
+                else
+                  Container(width: today ? 18 : 6, height: 5, decoration: BoxDecoration(color: active ? Colors.white : AppColors.line, borderRadius: BorderRadius.circular(99))),
               ]),
             ),
           );
@@ -5819,6 +6959,147 @@ class WeekStrip extends StatelessWidget {
       ),
     );
   }
+}
+
+
+class EventTypeLegend extends StatelessWidget {
+  final List<Map<String, dynamic>> events;
+  const EventTypeLegend({super.key, required this.events});
+
+  @override
+  Widget build(BuildContext context) {
+    final kinds = <String, Map<String, dynamic>>{};
+    for (final event in events) {
+      kinds.putIfAbsent(eventKind(event), () => event);
+    }
+    final ordered = <String>['partido', 'entrenamiento', 'cena', 'reunion', 'torneo', 'quedada']
+        .where((kind) => kinds.containsKey(kind))
+        .toList();
+    if (ordered.isEmpty) {
+      ordered.addAll(['partido', 'entrenamiento', 'cena', 'torneo']);
+    }
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      color: AppColors.surface,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: const [
+          Icon(Icons.palette_outlined, color: AppColors.teal, size: 18),
+          SizedBox(width: 7),
+          Text('Colores del calendario', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12.5)),
+        ]),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 7,
+          runSpacing: 7,
+          children: ordered.map((kind) {
+            final sample = kinds[kind] ?? {'title': kind};
+            return EventKindPill(event: sample, compact: true);
+          }).toList(),
+        ),
+      ]),
+    );
+  }
+}
+
+
+class RoutineBadge extends StatelessWidget {
+  final String label;
+  final bool compact;
+  const RoutineBadge({super.key, required this.label, this.compact = true});
+
+  @override
+  Widget build(BuildContext context) {
+    final horizontal = compact ? 8.0 : 10.0;
+    final vertical = compact ? 5.0 : 6.0;
+    final iconSize = compact ? 14.0 : 16.0;
+    final fontSize = compact ? 11.5 : 12.5;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: horizontal, vertical: vertical),
+      decoration: BoxDecoration(
+        color: AppColors.violet.withOpacity(.10),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: AppColors.violet.withOpacity(.22)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.repeat_rounded, color: AppColors.violet, size: iconSize),
+        const SizedBox(width: 5),
+        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.violet, fontSize: fontSize, fontWeight: FontWeight.w900)),
+      ]),
+    );
+  }
+}
+
+class EventKindPill extends StatelessWidget {
+  final Map<String, dynamic> event;
+  final bool compact;
+  const EventKindPill({super.key, required this.event, this.compact = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = eventKindColor(event);
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10, vertical: compact ? 5 : 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(.10),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: color.withOpacity(.24)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(eventKindIcon(event), color: color, size: compact ? 14 : 16),
+        const SizedBox(width: 5),
+        Text(eventKindLabel(event), style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: compact ? 11 : 12)),
+      ]),
+    );
+  }
+}
+
+
+class RoutineChoice extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const RoutineChoice({super.key, required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(15),
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: selected ? AppColors.teal : Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: selected ? AppColors.teal : AppColors.line),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.repeat_rounded, color: selected ? Colors.white : AppColors.teal, size: 17),
+        const SizedBox(width: 7),
+        Text(label, style: TextStyle(color: selected ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900)),
+      ]),
+    ),
+  );
+}
+
+class RoutineInfoBox extends StatelessWidget {
+  final String text;
+  const RoutineInfoBox({super.key, required this.text});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(.72),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: AppColors.line),
+    ),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Icon(Icons.info_outline_rounded, color: AppColors.teal, size: 20),
+      const SizedBox(width: 9),
+      Expanded(child: Text(text, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.35))),
+    ]),
+  );
 }
 
 class EventTemplateChoice extends StatelessWidget {
@@ -5862,6 +7143,7 @@ class EventFormPreviewCard extends StatelessWidget {
   final String location;
   final int minPeople;
   final String template;
+  final String? repeatLabel;
 
   const EventFormPreviewCard({
     super.key,
@@ -5870,6 +7152,7 @@ class EventFormPreviewCard extends StatelessWidget {
     required this.location,
     required this.minPeople,
     required this.template,
+    this.repeatLabel,
   });
 
   IconData get icon {
@@ -5883,6 +7166,7 @@ class EventFormPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isRoutine = repeatLabel != null && repeatLabel!.trim().isNotEmpty;
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(26),
@@ -5896,7 +7180,7 @@ class EventFormPreviewCard extends StatelessWidget {
             width: 54,
             height: 54,
             decoration: BoxDecoration(color: Colors.white.withOpacity(.18), borderRadius: BorderRadius.circular(18)),
-            child: Icon(icon, color: Colors.white, size: 27),
+            child: Icon(isRoutine ? Icons.repeat_rounded : icon, color: Colors.white, size: 27),
           ),
           const SizedBox(width: 13),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -5906,11 +7190,23 @@ class EventFormPreviewCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(location.trim().isEmpty ? 'Lugar por definir' : location.trim(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700)),
             const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99)),
-              child: Text('Mínimo $minPeople asistentes', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
-            ),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99)),
+                child: Text('Mínimo $minPeople asistentes', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+              ),
+              if (isRoutine)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(.22), borderRadius: BorderRadius.circular(99)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.repeat_rounded, color: Colors.white, size: 14),
+                    const SizedBox(width: 5),
+                    Text(repeatLabel!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                  ]),
+                ),
+            ]),
           ])),
         ]),
       ),
@@ -6055,6 +7351,27 @@ class _AttendanceMiniStat extends StatelessWidget {
 
 
 
+class EventMetaChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color color;
+  const EventMetaChip({super.key, required this.icon, required this.text, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 190),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(.72), borderRadius: BorderRadius.circular(99), border: Border.all(color: color.withOpacity(.14))),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 15, color: color),
+        const SizedBox(width: 5),
+        Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 12, fontWeight: FontWeight.w800))),
+      ]),
+    );
+  }
+}
+
 // ---------- UI components ----------
 
 class FieldLabel extends StatelessWidget {
@@ -6073,19 +7390,27 @@ class PrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
     width: double.infinity,
-    height: 52,
-    child: FilledButton.icon(
-      style: FilledButton.styleFrom(
-        backgroundColor: AppColors.teal,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    height: 54,
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(colors: [AppColors.tealDark, AppColors.teal], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        boxShadow: const [BoxShadow(color: Color(0x22008F86), blurRadius: 18, offset: Offset(0, 8))],
       ),
-      onPressed: loading ? null : onTap,
-      icon: loading
-          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-          : Icon(icon ?? Icons.check_rounded, size: 20),
-      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
+      child: FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        ),
+        onPressed: loading ? null : onTap,
+        icon: loading
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : Icon(icon ?? Icons.check_rounded, size: 20),
+        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: -.1)),
+      ),
     ),
   );
 }
@@ -6102,9 +7427,10 @@ class SecondaryButton extends StatelessWidget {
     height: 52,
     child: OutlinedButton.icon(
       style: OutlinedButton.styleFrom(
+        backgroundColor: AppColors.white,
         foregroundColor: AppColors.teal,
-        side: const BorderSide(color: AppColors.teal),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        side: const BorderSide(color: Color(0x33008F86)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
       ),
       onPressed: onTap,
       icon: Icon(icon, size: 20),
@@ -6139,25 +7465,25 @@ class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(14),
+    this.padding = const EdgeInsets.all(15),
     this.onTap,
     this.color = AppColors.white,
   });
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(22);
+    final radius = BorderRadius.circular(24);
     final card = AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      curve: Curves.easeOut,
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
       padding: padding,
       decoration: BoxDecoration(
         color: color,
         borderRadius: radius,
-        border: Border.all(color: AppColors.line),
+        border: Border.all(color: AppColors.lineSoft),
         boxShadow: const [
-          BoxShadow(color: Color(0x06111B34), blurRadius: 18, offset: Offset(0, 8)),
-          BoxShadow(color: Color(0x03111B34), blurRadius: 4, offset: Offset(0, 1)),
+          BoxShadow(color: Color(0x08111B34), blurRadius: 22, offset: Offset(0, 10)),
+          BoxShadow(color: Color(0x06111B34), blurRadius: 8, offset: Offset(0, 2)),
         ],
       ),
       child: child,
@@ -6176,7 +7502,7 @@ class RoundBackButton extends StatelessWidget {
   @override Widget build(BuildContext context) => Container(
     width: 42,
     height: 42,
-    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.line)),
+    decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.line), boxShadow: const [BoxShadow(color: Color(0x08111B34), blurRadius: 12, offset: Offset(0, 4))]),
     child: IconButton(icon: const Icon(Icons.arrow_back_rounded, size: 20), onPressed: onTap ?? () => Navigator.of(context).maybePop()),
   );
 }
@@ -6188,10 +7514,10 @@ class CircleIconButton extends StatelessWidget {
     width: 42,
     height: 42,
     decoration: BoxDecoration(
-      color: filled ? AppColors.teal : AppColors.surface,
+      color: filled ? AppColors.teal : AppColors.white,
       shape: BoxShape.circle,
       border: filled ? null : Border.all(color: AppColors.line),
-      boxShadow: filled ? const [BoxShadow(color: Color(0x1A008F86), blurRadius: 14, offset: Offset(0, 6))] : null,
+      boxShadow: filled ? const [BoxShadow(color: Color(0x24008F86), blurRadius: 16, offset: Offset(0, 7))] : const [BoxShadow(color: Color(0x07111B34), blurRadius: 12, offset: Offset(0, 4))],
     ),
     child: IconButton(onPressed: onTap, icon: Icon(icon, size: 20, color: filled ? Colors.white : AppColors.ink)),
   );
@@ -6242,17 +7568,18 @@ class GroupHomeCard extends StatelessWidget {
     final members = AppData.intValue(group['members_count'], 1);
     final events = AppData.intValue(group['events_count'], 0);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 11),
       child: AppCard(
         onTap: onTap,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(13),
         child: Row(children: [
           Container(
-            width: 55,
-            height: 55,
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF00998E), Color(0xFF006B69)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-              borderRadius: BorderRadius.circular(18),
+              gradient: const LinearGradient(colors: [Color(0xFF00A99D), Color(0xFF006B69)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: const [BoxShadow(color: Color(0x22008F86), blurRadius: 14, offset: Offset(0, 7))],
             ),
             child: const Icon(Icons.lock_rounded, color: Colors.white, size: 23),
           ),
@@ -6260,16 +7587,16 @@ class GroupHomeCard extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
-            Text('Grupo privado · $members ${members == 1 ? 'miembro' : 'miembros'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 7),
+            Text('$members ${members == 1 ? 'miembro' : 'miembros'} · grupo privado', maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 8),
             Row(children: [
-              _MiniChip(text: events == 0 ? 'sin eventos' : '$events eventos', color: AppColors.teal),
+              _MiniChip(text: events == 0 ? 'sin eventos' : '$events eventos', color: events == 0 ? AppColors.muted : AppColors.teal),
               const SizedBox(width: 6),
-              const _MiniChip(text: 'cerrado', color: AppColors.violet),
+              const _MiniChip(text: 'por invitación', color: AppColors.violet),
             ]),
           ])),
           const SizedBox(width: 8),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+          Container(width: 32, height: 32, decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle), child: const Icon(Icons.chevron_right_rounded, color: AppColors.ink)),
         ]),
       ),
     );
@@ -6318,31 +7645,38 @@ class BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(10, 6, 10, 7),
-    decoration: const BoxDecoration(
+    margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+    padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
+    decoration: BoxDecoration(
       color: Colors.white,
-      border: Border(top: BorderSide(color: AppColors.line)),
-      boxShadow: [BoxShadow(color: Color(0x0D111B34), blurRadius: 16, offset: Offset(0, -6))],
+      borderRadius: BorderRadius.circular(26),
+      border: Border.all(color: AppColors.lineSoft),
+      boxShadow: const [BoxShadow(color: Color(0x11111B34), blurRadius: 24, offset: Offset(0, -4))],
     ),
     child: Row(children: List.generate(items.length, (i) {
       final active = i == index;
       final spec = items[i];
       return Expanded(
         child: InkWell(
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: BorderRadius.circular(24),
           onTap: () => onTap(i),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
+            padding: const EdgeInsets.symmetric(vertical: 1),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                height: 31,
-                padding: EdgeInsets.symmetric(horizontal: active ? 14 : 10),
-                decoration: BoxDecoration(color: active ? AppColors.tealSoft : Colors.transparent, borderRadius: BorderRadius.circular(99)),
+                duration: const Duration(milliseconds: 170),
+                curve: Curves.easeOutCubic,
+                height: 32,
+                width: active ? 48 : 36,
+                decoration: BoxDecoration(
+                  color: active ? AppColors.tealSoft : Colors.transparent,
+                  borderRadius: BorderRadius.circular(99),
+                  border: active ? Border.all(color: const Color(0x1F008F86)) : null,
+                ),
                 child: Icon(spec.icon, size: 21, color: active ? AppColors.teal : AppColors.muted),
               ),
               const SizedBox(height: 2),
-              Text(spec.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, fontWeight: active ? FontWeight.w900 : FontWeight.w700, color: active ? AppColors.ink : AppColors.muted)),
+              Text(spec.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.3, fontWeight: active ? FontWeight.w900 : FontWeight.w700, color: active ? AppColors.ink : AppColors.muted)),
             ]),
           ),
         ),
@@ -6354,16 +7688,37 @@ class BottomBar extends StatelessWidget {
 class PageHeader extends StatelessWidget {
   final String title; final String subtitle; final bool leading;
   const PageHeader({super.key, required this.title, this.subtitle = '', this.leading = false});
-  @override Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [if (leading) ...[RoundBackButton(onTap: () => Navigator.of(context).maybePop()), const SizedBox(width: 12)], Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.headlineMedium), if (subtitle.isNotEmpty) ...[const SizedBox(height: 4), Row(children: [const Icon(Icons.lock_rounded, size: 14, color: AppColors.teal), const SizedBox(width: 5), Expanded(child: Text(subtitle, style: Theme.of(context).textTheme.bodyMedium))])]]))]);
+  @override Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    if (leading) ...[RoundBackButton(onTap: () => Navigator.of(context).maybePop()), const SizedBox(width: 12)],
+    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(99)),
+        child: const Text('GRUPLI', style: TextStyle(color: AppColors.teal, fontSize: 10.5, letterSpacing: .8, fontWeight: FontWeight.w900)),
+      ),
+      const SizedBox(height: 8),
+      Text(title, style: Theme.of(context).textTheme.headlineMedium),
+      if (subtitle.isNotEmpty) ...[const SizedBox(height: 6), Text(subtitle, style: Theme.of(context).textTheme.bodyMedium)],
+    ]))
+  ]);
 }
 
 class CenterLoader extends StatelessWidget { final String label; const CenterLoader({super.key, required this.label}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 40), child: Column(children: [const CircularProgressIndicator(color: AppColors.teal), const SizedBox(height: 12), Text(label, style: Theme.of(context).textTheme.bodyMedium)])); }
 
-class ErrorBlock extends StatelessWidget { final String message; final VoidCallback onRetry; const ErrorBlock({super.key, required this.message, required this.onRetry}); @override Widget build(BuildContext context) => AppCard(child: Column(children: [const Icon(Icons.error_outline_rounded, color: AppColors.red, size: 34), const SizedBox(height: 10), const Text('Algo no ha cargado bien', style: TextStyle(fontWeight: FontWeight.w900)), const SizedBox(height: 7), Text(message, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium), const SizedBox(height: 14), SecondaryButton(label: 'Reintentar', icon: Icons.refresh_rounded, onTap: onRetry)])); }
+class ErrorBlock extends StatelessWidget { final String message; final VoidCallback onRetry; const ErrorBlock({super.key, required this.message, required this.onRetry}); @override Widget build(BuildContext context) => AppCard(child: Column(children: [Container(width: 58, height: 58, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.redSoft), child: const Icon(Icons.error_outline_rounded, color: AppColors.red, size: 30)), const SizedBox(height: 12), const Text('Algo no ha cargado bien', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)), const SizedBox(height: 7), Text(humanizeError(message), textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium), const SizedBox(height: 14), SecondaryButton(label: 'Reintentar', icon: Icons.refresh_rounded, onTap: onRetry)])); }
 
-class EmptyBlock extends StatelessWidget { final IconData icon; final String title; final String body; const EmptyBlock({super.key, required this.icon, required this.title, required this.body}); @override Widget build(BuildContext context) => AppCard(child: Column(children: [Container(width: 62, height: 62, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft), child: Icon(icon, color: AppColors.teal, size: 30)), const SizedBox(height: 12), Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 6), Text(body, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium)])); }
+class EmptyBlock extends StatelessWidget { final IconData icon; final String title; final String body; const EmptyBlock({super.key, required this.icon, required this.title, required this.body}); @override Widget build(BuildContext context) => AppCard(color: AppColors.surface, child: Column(children: [Container(width: 66, height: 66, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft), child: Icon(icon, color: AppColors.teal, size: 31)), const SizedBox(height: 13), Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 7), Text(body, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium)])); }
 
-class EmptySlim extends StatelessWidget { final IconData icon; final String title; final String body; const EmptySlim({super.key, required this.icon, required this.title, this.body = ''}); @override Widget build(BuildContext context) => AppCard(child: Row(children: [Icon(icon, color: AppColors.teal), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), if (body.trim().isNotEmpty) ...[const SizedBox(height: 4), Text(body, style: Theme.of(context).textTheme.bodyMedium)]]))])); }
+class EmptySlim extends StatelessWidget { final IconData icon; final String title; final String body; const EmptySlim({super.key, required this.icon, required this.title, this.body = ''}); @override Widget build(BuildContext context) => AppCard(color: AppColors.surface, padding: const EdgeInsets.all(14), child: Row(children: [Container(width: 38, height: 38, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft), child: Icon(icon, color: AppColors.teal, size: 20)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)), if (body.trim().isNotEmpty) ...[const SizedBox(height: 4), Text(body, style: Theme.of(context).textTheme.bodyMedium)]]))])); }
+
+String humanizeError(String raw) {
+  final text = raw.toLowerCase();
+  if (text.contains('permission') || text.contains('rls') || text.contains('not allowed') || text.contains('denied')) return 'No tienes permiso para hacer esa acción en este grupo.';
+  if (text.contains('network') || text.contains('socket') || text.contains('connection')) return 'Revisa tu conexión e inténtalo de nuevo.';
+  if (text.contains('jwt') || text.contains('session') || text.contains('auth')) return 'Tu sesión necesita actualizarse. Cierra sesión y vuelve a entrar.';
+  if (text.contains('duplicate') || text.contains('already')) return 'Parece que esto ya existe o ya se había guardado.';
+  return raw.length > 120 ? 'No se pudo completar la acción. Inténtalo de nuevo.' : raw;
+}
 
 class HomeLoading extends StatelessWidget { const HomeLoading({super.key}); @override Widget build(BuildContext context) => Column(children: [Row(children: const [Expanded(child: GhostBox(height: 90)), SizedBox(width: 10), Expanded(child: GhostBox(height: 90)), SizedBox(width: 10), Expanded(child: GhostBox(height: 90))]), const SizedBox(height: 24), const GhostBox(height: 100), const SizedBox(height: 10), const GhostBox(height: 100)]); }
 class GhostBox extends StatelessWidget { final double height; const GhostBox({super.key, required this.height}); @override Widget build(BuildContext context) => Container(height: height, decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(18), border: Border.all(color: AppColors.line))); }
@@ -6415,17 +7770,48 @@ class CalendarDaySummary extends StatelessWidget {
   final int maybe;
   final VoidCallback onCreate;
   const CalendarDaySummary({super.key, required this.day, required this.events, required this.confirmed, required this.maybe, required this.onCreate});
+
   @override
-  Widget build(BuildContext context) => AppCard(child: Row(children: [
-    DateBadge(date: day),
-    const SizedBox(width: 12),
-    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(longDay(day), style: Theme.of(context).textTheme.titleMedium),
-      const SizedBox(height: 5),
-      Text(events.isEmpty ? 'No hay eventos creados para este día.' : '${events.length} evento${events.length == 1 ? '' : 's'} · $confirmed confirmados · $maybe en duda', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
-    ])),
-    IconButton(onPressed: onCreate, icon: const Icon(Icons.add_circle_rounded, color: AppColors.teal, size: 30)),
-  ]));
+  Widget build(BuildContext context) {
+    final kinds = <String, Map<String, dynamic>>{};
+    for (final event in events) {
+      kinds.putIfAbsent(eventKind(event), () => event);
+    }
+    final mainColor = events.isEmpty ? AppColors.teal : eventKindColor(events.first);
+    return AppCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        DateBadge(date: day),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: Text(longDay(day), style: Theme.of(context).textTheme.titleMedium)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(color: mainColor.withOpacity(.10), borderRadius: BorderRadius.circular(99)),
+              child: Text(events.isEmpty ? 'Libre' : '${events.length} evento${events.length == 1 ? '' : 's'}', style: TextStyle(color: mainColor, fontWeight: FontWeight.w900, fontSize: 11.5)),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          Text(
+            events.isEmpty
+                ? 'No hay eventos creados para este día.'
+                : '$confirmed confirmados · $maybe en duda · ${events.length == 1 ? '1 plan en agenda' : '${events.length} planes en agenda'}',
+            style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700),
+          ),
+          if (events.isNotEmpty) ...[
+            const SizedBox(height: 9),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: kinds.values.map((event) => EventKindPill(event: event, compact: true)).toList(),
+            ),
+          ],
+        ])),
+        IconButton(onPressed: onCreate, icon: const Icon(Icons.add_circle_rounded, color: AppColors.teal, size: 30)),
+      ]),
+    );
+  }
 }
 
 class EventAgendaCard extends StatefulWidget {
@@ -6467,41 +7853,86 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
     final minPeople = AppData.intValue(event['min_people'], 2);
     final mine = myAttendanceStatus(event);
     final viable = yes >= minPeople;
+    final color = eventKindColor(event);
+    final progress = min(1.0, yes / max(1, minPeople));
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        InkWell(
-          onTap: open,
-          borderRadius: BorderRadius.circular(15),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            DateBadge(date: date),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(child: Text(AppData.text(event['title'], 'Evento'), style: Theme.of(context).textTheme.titleMedium)),
-                Icon(viable ? Icons.verified_rounded : Icons.info_rounded, color: viable ? AppColors.green : AppColors.amber, size: 20),
+      padding: const EdgeInsets.only(bottom: 11),
+      child: AppCard(
+        padding: EdgeInsets.zero,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Container(width: 6, color: color),
+            Expanded(child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                InkWell(
+                  onTap: open,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Container(
+                      width: 52,
+                      height: 58,
+                      decoration: BoxDecoration(color: eventKindSoftColor(event), borderRadius: BorderRadius.circular(17)),
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(eventKindIcon(event), color: color, size: 20),
+                        const SizedBox(height: 3),
+                        Text(DateFormat('HH:mm', 'es_ES').format(date), style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900)),
+                      ]),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Wrap(spacing: 6, runSpacing: 6, children: [
+                        EventKindPill(event: event, compact: true),
+                        if (eventIsRoutine(event)) RoutineBadge(label: eventRoutineBadge(event)),
+                      ]),
+                      const SizedBox(height: 7),
+                      Text(AppData.text(event['title'], 'Evento'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w900, height: 1.1)),
+                      const SizedBox(height: 6),
+                      MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
+                      const SizedBox(height: 7),
+                      Row(children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 7,
+                              backgroundColor: AppColors.line,
+                              valueColor: AlwaysStoppedAnimation<Color>(viable ? AppColors.green : color),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text('$yes/$minPeople', style: TextStyle(color: viable ? AppColors.green : color, fontWeight: FontWeight.w900, fontSize: 12)),
+                      ]),
+                      const SizedBox(height: 6),
+                      Text(
+                        viable ? 'Plan viable · mínimo alcanzado' : 'Faltan ${max(0, minPeople - yes)} para alcanzar el mínimo',
+                        style: TextStyle(color: viable ? AppColors.green : AppColors.amber, fontWeight: FontWeight.w900, fontSize: 12),
+                      ),
+                    ])),
+                    const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+                  ]),
+                ),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(child: CompactAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
+                  const SizedBox(width: 7),
+                  Expanded(child: CompactAttendanceButton(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
+                  const SizedBox(width: 7),
+                  Expanded(child: CompactAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
+                ]),
               ]),
-              const SizedBox(height: 5),
-              MetaLine(icon: Icons.schedule_rounded, text: DateFormat('HH:mm', 'es_ES').format(date)),
-              MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
-              const SizedBox(height: 7),
-              Text(viable ? 'Mínimo alcanzado: $yes/$minPeople' : 'Faltan ${max(0, minPeople - yes)} para llegar al mínimo', style: TextStyle(color: viable ? AppColors.green : AppColors.amber, fontWeight: FontWeight.w900, fontSize: 12)),
-            ])),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+            )),
           ]),
         ),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: CompactAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
-          const SizedBox(width: 7),
-          Expanded(child: CompactAttendanceButton(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
-          const SizedBox(width: 7),
-          Expanded(child: CompactAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
-        ]),
-      ])),
+      ),
     );
   }
 }
+
 
 class CompactAttendanceButton extends StatelessWidget {
   final String label;
@@ -6562,23 +7993,70 @@ class EventCard extends StatelessWidget {
     final maybe = attendanceCount(event, 'maybe');
     final minPeople = AppData.intValue(event['min_people'], 2);
     final viable = yes >= minPeople;
+    final color = eventKindColor(event);
+    final soft = eventKindSoftColor(event);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: AppCard(onTap: onTap, child: Row(children: [
-        DateBadge(date: d),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(AppData.text(event['title'], 'Evento'), style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 5),
-          MetaLine(icon: Icons.schedule_rounded, text: DateFormat('dd/MM · HH:mm', 'es_ES').format(d)),
-          MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
-        ])),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: viable ? const Color(0xFFEAF8F0) : const Color(0xFFFFF6DF), borderRadius: BorderRadius.circular(99)), child: Text(viable ? '$yes/$minPeople OK' : '$yes/$minPeople', style: TextStyle(color: viable ? AppColors.green : AppColors.amber, fontWeight: FontWeight.w900, fontSize: 12))),
-          const SizedBox(height: 6),
-          Text('$maybe en duda', style: const TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700)),
-        ]),
-      ])),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: color.withOpacity(.16)),
+          boxShadow: [BoxShadow(color: color.withOpacity(.045), blurRadius: 18, offset: const Offset(0, 8))],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Material(
+            color: AppColors.white,
+            child: InkWell(
+              onTap: onTap,
+              child: IntrinsicHeight(
+                child: Row(children: [
+                  Container(width: 6, color: color),
+                  Expanded(child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(children: [
+                      Container(
+                        width: 54,
+                        height: 58,
+                        decoration: BoxDecoration(color: soft, borderRadius: BorderRadius.circular(17)),
+                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Text(shortWeekday(d).toUpperCase(), style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w900)),
+                          Text(d.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 22, fontWeight: FontWeight.w900)),
+                        ]),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Icon(eventKindIcon(event), color: color, size: 16),
+                          const SizedBox(width: 5),
+                          Text(eventKindLabel(event), style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w900)),
+                          if (eventIsRoutine(event)) ...[
+                            const SizedBox(width: 8),
+                            Icon(Icons.repeat_rounded, color: color, size: 14),
+                            const SizedBox(width: 4),
+                            Flexible(child: Text(eventRoutineBadge(event), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w900))),
+                          ],
+                        ]),
+                        const SizedBox(height: 4),
+                        Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 5),
+                        MetaLine(icon: Icons.schedule_rounded, text: DateFormat('dd/MM · HH:mm', 'es_ES').format(d)),
+                        MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
+                      ])),
+                      const SizedBox(width: 8),
+                      Column(crossAxisAlignment: CrossAxisAlignment.end, mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: viable ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(99)), child: Text(viable ? '$yes/$minPeople OK' : '$yes/$minPeople', style: TextStyle(color: viable ? AppColors.green : AppColors.orange, fontWeight: FontWeight.w900, fontSize: 12))),
+                        const SizedBox(height: 6),
+                        Text('$maybe duda', style: const TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700)),
+                      ]),
+                    ]),
+                  )),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -6769,13 +8247,13 @@ class InviteAccessCard extends StatelessWidget {
         InviteCodeBox(code: code),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: SecondaryButton(label: 'Copiar', icon: Icons.copy_rounded, onTap: () => copyInviteCode(context, code))),
+          Expanded(child: SecondaryButton(label: 'Copiar link', icon: Icons.link_rounded, onTap: () => copyInviteLink(context, code))),
           const SizedBox(width: 10),
           Expanded(child: PrimaryButton(label: 'Compartir', icon: Icons.share_rounded, onTap: () => Share.share(inviteText(groupName, code)))),
         ]),
         if (!compact) ...[
           const SizedBox(height: 10),
-          Text('QR real y enlace profundo llegarán en la fase PWA/APK. Ahora el acceso estable es por código privado.', style: Theme.of(context).textTheme.bodyMedium),
+          InviteLinkBox(code: code),
         ],
       ]),
     );
@@ -6802,6 +8280,40 @@ class InviteCodeBox extends StatelessWidget {
         Expanded(child: Text(code, textAlign: TextAlign.center, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w900, letterSpacing: 3, color: AppColors.teal))),
         const SizedBox(width: 12),
         const Icon(Icons.ios_share_rounded, color: AppColors.teal),
+      ]),
+    );
+  }
+}
+
+
+class InviteLinkBox extends StatelessWidget {
+  final String code;
+  const InviteLinkBox({super.key, required this.code});
+
+  @override
+  Widget build(BuildContext context) {
+    final link = InviteLinks.joinUrl(code);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(children: [
+        const Icon(Icons.link_rounded, color: AppColors.teal, size: 20),
+        const SizedBox(width: 10),
+        Expanded(child: Text(link, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, fontSize: 12))),
+        const SizedBox(width: 8),
+        InkWell(
+          onTap: () => copyInviteLink(context, code),
+          borderRadius: BorderRadius.circular(12),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Text('Copiar', style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900)),
+          ),
+        ),
       ]),
     );
   }
@@ -6969,7 +8481,114 @@ class SmallPick extends StatelessWidget { final String label; final String value
 
 class StepperRow extends StatelessWidget { final int value; final VoidCallback onMinus; final VoidCallback onPlus; const StepperRow({super.key, required this.value, required this.onMinus, required this.onPlus}); @override Widget build(BuildContext context) => AppCard(child: Row(children: [const Icon(Icons.groups_rounded, color: AppColors.muted), const SizedBox(width: 12), Text(value.toString(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const Spacer(), IconButton(onPressed: onMinus, icon: const Icon(Icons.remove_rounded)), IconButton(onPressed: onPlus, icon: const Icon(Icons.add_rounded))])); }
 
-class MonthGrid extends StatelessWidget { final DateTime month; final DateTime selected; final List<Map<String, dynamic>> events; final ValueChanged<DateTime> onSelect; const MonthGrid({super.key, required this.month, required this.selected, required this.events, required this.onSelect}); @override Widget build(BuildContext context) { final first = DateTime(month.year, month.month, 1); final startOffset = (first.weekday + 6) % 7; final days = DateTime(month.year, month.month + 1, 0).day; final cells = <DateTime?>[]; for (int i = 0; i < startOffset; i++) cells.add(null); for (int d = 1; d <= days; d++) cells.add(DateTime(month.year, month.month, d)); while (cells.length % 7 != 0) cells.add(null); return Column(children: [Row(children: ['L','M','X','J','V','S','D'].map((d) => Expanded(child: Center(child: Text(d, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.muted, fontSize: 12))))).toList()), const SizedBox(height: 8), GridView.count(crossAxisCount: 7, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), childAspectRatio: 1.05, children: cells.map((day) { if (day == null) return const SizedBox(); final active = day.year == selected.year && day.month == selected.month && day.day == selected.day; final has = events.any((e) { final d = DateTime.tryParse(e['starts_at']?.toString() ?? '')?.toLocal(); return d != null && d.year == day.year && d.month == day.month && d.day == day.day; }); return InkWell(onTap: () => onSelect(day), borderRadius: BorderRadius.circular(20), child: Container(margin: const EdgeInsets.all(3), decoration: BoxDecoration(color: active ? AppColors.teal : Colors.transparent, shape: BoxShape.circle), child: Stack(alignment: Alignment.center, children: [Text(day.day.toString(), style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w800)), if (has) Positioned(bottom: 6, child: Container(width: 5, height: 5, decoration: BoxDecoration(color: active ? Colors.white : AppColors.teal, shape: BoxShape.circle))) ]))); }).toList())]); }}
+class MonthGrid extends StatelessWidget {
+  final DateTime month;
+  final DateTime selected;
+  final List<Map<String, dynamic>> events;
+  final ValueChanged<DateTime> onSelect;
+  const MonthGrid({super.key, required this.month, required this.selected, required this.events, required this.onSelect});
+
+  List<Map<String, dynamic>> eventsFor(DateTime day) {
+    final list = events.where((event) {
+      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
+      return date != null && sameDay(date, day);
+    }).toList();
+    list.sort((a, b) {
+      final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
+      final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now();
+      return da.compareTo(db);
+    });
+    return list;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final first = DateTime(month.year, month.month, 1);
+    final startOffset = (first.weekday + 6) % 7;
+    final days = DateTime(month.year, month.month + 1, 0).day;
+    final cells = <DateTime?>[];
+    for (int i = 0; i < startOffset; i++) { cells.add(null); }
+    for (int d = 1; d <= days; d++) { cells.add(DateTime(month.year, month.month, d)); }
+    while (cells.length % 7 != 0) { cells.add(null); }
+
+    return Column(children: [
+      Row(children: ['L','M','X','J','V','S','D'].map((d) => Expanded(child: Center(child: Text(d, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.muted, fontSize: 12))))).toList()),
+      const SizedBox(height: 8),
+      GridView.count(
+        crossAxisCount: 7,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        childAspectRatio: .92,
+        children: cells.map((day) {
+          if (day == null) return const SizedBox();
+          final active = sameDay(day, selected);
+          final today = sameDay(day, DateTime.now());
+          final dayEvents = eventsFor(day);
+          final hasEvents = dayEvents.isNotEmpty;
+          final mainColor = hasEvents ? eventKindColor(dayEvents.first) : AppColors.line;
+          return InkWell(
+            onTap: () => onSelect(day),
+            borderRadius: BorderRadius.circular(16),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              margin: const EdgeInsets.all(2.5),
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 3),
+              decoration: BoxDecoration(
+                color: active ? AppColors.teal : hasEvents ? eventKindSoftColor(dayEvents.first) : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: active ? AppColors.teal : today ? AppColors.teal.withOpacity(.55) : hasEvents ? mainColor.withOpacity(.32) : Colors.transparent,
+                  width: active || today || hasEvents ? 1.3 : 1,
+                ),
+                boxShadow: active ? const [BoxShadow(color: Color(0x16008F86), blurRadius: 10, offset: Offset(0, 5))] : null,
+              ),
+              child: Stack(children: [
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: Text(
+                    day.day.toString(),
+                    style: TextStyle(
+                      color: active ? Colors.white : AppColors.ink,
+                      fontWeight: active || hasEvents || today ? FontWeight.w900 : FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                if (hasEvents)
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (final event in dayEvents.take(3))
+                            Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 1),
+                              width: active ? 5.5 : 6.5,
+                              height: active ? 5.5 : 6.5,
+                              decoration: BoxDecoration(color: active ? Colors.white : eventKindColor(event), shape: BoxShape.circle),
+                            ),
+                        ],
+                      ),
+                      if (dayEvents.length > 1) ...[
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(color: active ? Colors.white.withOpacity(.18) : Colors.white.withOpacity(.75), borderRadius: BorderRadius.circular(99)),
+                          child: Text('${dayEvents.length}', style: TextStyle(color: active ? Colors.white : mainColor, fontSize: 9, fontWeight: FontWeight.w900)),
+                        ),
+                      ],
+                    ]),
+                  ),
+              ]),
+            ),
+          );
+        }).toList(),
+      ),
+    ]);
+  }
+}
+
 
 class PatternIcons extends StatelessWidget { @override Widget build(BuildContext context) => Wrap(spacing: 24, runSpacing: 20, children: List.generate(70, (i) => Icon([Icons.event_available_rounded, Icons.calendar_month_rounded, Icons.account_balance_wallet_rounded, Icons.emoji_events_rounded, Icons.lock_rounded, Icons.qr_code_rounded][i % 6], size: 17, color: Colors.white))); }
 
@@ -7021,11 +8640,19 @@ String humanError(Object? error) {
 }
 
 void copyInviteCode(BuildContext context, String code) {
-  Clipboard.setData(ClipboardData(text: code));
+  Clipboard.setData(ClipboardData(text: InviteLinks.normalizeCode(code)));
   showToast(context, 'Código copiado.');
 }
 
-String inviteText(String groupName, String code) => 'Únete a $groupName en Grupli con el código $code';
+void copyInviteLink(BuildContext context, String code) {
+  Clipboard.setData(ClipboardData(text: InviteLinks.joinUrl(code)));
+  showToast(context, 'Link de invitación copiado.');
+}
+
+String inviteText(String groupName, String code) {
+  final clean = InviteLinks.normalizeCode(code);
+  return 'Únete a $groupName en Grupli. Toca este enlace y entrarás directamente al grupo:\n\n${InviteLinks.joinUrl(clean)}\n\nCódigo: $clean';
+}
 
 void showCodeSheet(BuildContext context, String code, String groupName) {
   showModalBottomSheet(
@@ -7036,12 +8663,14 @@ void showCodeSheet(BuildContext context, String code, String groupName) {
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Text('Invitación privada', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 6),
-        Text('Comparte este código solo con quien quieras dentro del grupo.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+        Text('Comparte este link solo con quien quieras dentro del grupo.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 14),
         InviteCodeBox(code: code),
+        const SizedBox(height: 10),
+        InviteLinkBox(code: code),
         const SizedBox(height: 16),
         Row(children: [
-          Expanded(child: SecondaryButton(label: 'Copiar', icon: Icons.copy_rounded, onTap: () => copyInviteCode(context, code))),
+          Expanded(child: SecondaryButton(label: 'Copiar link', icon: Icons.link_rounded, onTap: () => copyInviteLink(context, code))),
           const SizedBox(width: 10),
           Expanded(child: PrimaryButton(label: 'Compartir', icon: Icons.share_rounded, onTap: () => Share.share(inviteText(groupName, code)))),
         ]),

@@ -71,3 +71,10 @@ join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
   and p.proname in ('set_group_member_role','remove_group_member','leave_group_safe')
 order by p.proname;
+
+
+-- v15.5 notification checks
+select 'notifications_rls' as check_name, relrowsecurity as rls_enabled from pg_class where relname = 'notifications';
+select 'user_devices_rls' as check_name, relrowsecurity as rls_enabled from pg_class where relname = 'user_devices';
+select 'notification_triggers' as check_name, tgname from pg_trigger where tgname like 'trg_notify_%' order by tgname;
+select 'unread_notifications' as check_name, count(*) from public.notifications where user_id = auth.uid() and read_at is null;

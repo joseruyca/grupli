@@ -106,3 +106,27 @@ SQL recomendado: `supabase/patch_v14_7_members_permissions.sql`.
 
 
 Última mejora incluida: `docs/V14_8_PROFILE_SETTINGS_FINAL.md`.
+
+
+Última mejora incluida: `docs/V14_9_INVITE_LINKS_AUTO_JOIN.md`.
+
+
+Última mejora incluida: `docs/V15_0_GROUP_HOME_VISUAL_PREMIUM.md`.
+
+
+Última mejora incluida: `docs/V15_1_RECURRING_EVENTS_ROUTINES.md`.
+
+
+Última mejora incluida: `docs/V15_2_CALENDAR_COLORS_AGENDA.md`.
+
+
+Última mejora incluida: `docs/V15_3_NET_BALANCE_AUTO_SETTLEMENT.md`.
+
+
+Última corrección incluida: `docs/V15_3_1_ROUTINE_BADGE_COMPILE_FIX.md`.
+
+
+Última mejora incluida: `docs/V15_4_GLOBAL_VISUAL_POLISH.md`.
+
+
+Última mejora incluida: `docs/V15_5_PUSH_NOTIFICATIONS.md`.
