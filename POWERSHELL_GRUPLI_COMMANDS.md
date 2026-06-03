@@ -50,3 +50,8 @@ Remove-Item $Temp -Recurse -Force
 
 cd $Dest
 ```
+
+
+## v12.9
+
+Calendario en español y perfil real con nombre/foto. Ejecutar `supabase/patch_v12_9_profile_avatar_storage.sql` para habilitar subida de avatares.

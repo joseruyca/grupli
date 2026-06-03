@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -26,6 +29,9 @@ Future<void> main() async {
       ),
     );
   };
+
+  Intl.defaultLocale = 'es_ES';
+  await initializeDateFormatting('es_ES');
 
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
@@ -224,6 +230,62 @@ class AppData {
 
   static Future<void> ensureProfile() async {
     await sb.rpc('ensure_current_profile');
+  }
+
+  static Future<Map<String, dynamic>> profile() async {
+    await ensureProfile();
+    final uid = user?.id;
+    if (uid == null) return <String, dynamic>{};
+    final res = await sb.from('profiles').select().eq('id', uid).single();
+    return asMap(res);
+  }
+
+  static Future<void> updateProfileName(String fullName) async {
+    final uid = user?.id;
+    if (uid == null) return;
+    await ensureProfile();
+    final clean = fullName.trim().isEmpty ? (user?.email?.split('@').first ?? 'Usuario') : fullName.trim();
+    await sb.from('profiles').update({
+      'full_name': clean,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', uid);
+  }
+
+  static Future<String> uploadAvatarBytes(Uint8List bytes, String filename) async {
+    final uid = user?.id;
+    if (uid == null) throw Exception('Inicia sesión para cambiar la foto.');
+    await ensureProfile();
+    final ext = filename.toLowerCase().endsWith('.png')
+        ? 'png'
+        : filename.toLowerCase().endsWith('.webp')
+            ? 'webp'
+            : 'jpg';
+    final path = '$uid/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await sb.storage.from('avatars').uploadBinary(
+      path,
+      bytes,
+      fileOptions: FileOptions(
+        upsert: true,
+        contentType: ext == 'png' ? 'image/png' : ext == 'webp' ? 'image/webp' : 'image/jpeg',
+      ),
+    );
+    final publicUrl = sb.storage.from('avatars').getPublicUrl(path);
+    final versionedUrl = '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+    await sb.from('profiles').update({
+      'avatar_url': versionedUrl,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', uid);
+    return versionedUrl;
+  }
+
+  static Future<void> removeAvatar() async {
+    final uid = user?.id;
+    if (uid == null) return;
+    await ensureProfile();
+    await sb.from('profiles').update({
+      'avatar_url': null,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', uid);
   }
 
   static Future<List<Map<String, dynamic>>> myGroups() async {
@@ -532,8 +594,18 @@ class AppData {
 }
 
 String dateLabel(DateTime date) {
-  return DateFormat('dd/MM · HH:mm').format(date.toLocal());
+  return DateFormat('dd/MM · HH:mm', 'es_ES').format(date.toLocal());
 }
+
+String _cap(String value) {
+  if (value.trim().isEmpty) return value;
+  return value.substring(0, 1).toUpperCase() + value.substring(1);
+}
+
+String monthTitle(DateTime date) => _cap(DateFormat('MMMM yyyy', 'es_ES').format(date));
+String longDay(DateTime date) => _cap(DateFormat('EEEE dd MMMM', 'es_ES').format(date));
+String longDateTime(DateTime date) => _cap(DateFormat('EEEE dd MMMM · HH:mm', 'es_ES').format(date));
+String shortWeekday(DateTime date) => _cap(DateFormat('EEE', 'es_ES').format(date).replaceAll('.', ''));
 
 String money(double value) {
   final sign = value < 0 ? '-' : '';
@@ -1601,7 +1673,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       TextField(controller: title, decoration: const InputDecoration(hintText: 'Ej. Partido semanal')),
       const SizedBox(height: 14),
       Row(children: [
-        Expanded(child: SmallPick(label: 'Fecha', value: DateFormat('dd/MM/yyyy').format(date), icon: Icons.calendar_month_rounded, onTap: () async {
+        Expanded(child: SmallPick(label: 'Fecha', value: DateFormat('dd/MM/yyyy', 'es_ES').format(date), icon: Icons.calendar_month_rounded, onTap: () async {
           final d = await showDatePicker(context: context, initialDate: date, firstDate: DateTime.now().subtract(const Duration(days: 1)), lastDate: DateTime.now().add(const Duration(days: 730)));
           if (d != null) setState(() => date = d);
         })),
@@ -1727,7 +1799,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(AppData.text(event['title'], 'Evento'), style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 5),
-                MetaLine(icon: Icons.schedule_rounded, text: DateFormat('EEEE dd MMMM · HH:mm').format(date)),
+                MetaLine(icon: Icons.schedule_rounded, text: longDateTime(date)),
                 MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
               ])),
             ]),
@@ -1856,7 +1928,7 @@ class _CalendarTabState extends State<CalendarTab> {
                   Row(children: [
                     IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month - 1)), icon: const Icon(Icons.chevron_left_rounded)),
                     Expanded(child: Column(children: [
-                      Text(DateFormat('MMMM yyyy').format(month), style: Theme.of(context).textTheme.titleMedium),
+                      Text(monthTitle(month), style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 2),
                       Text('${eventsInMonth(events, month)} eventos este mes', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
                     ])),
@@ -3503,28 +3575,282 @@ class NotificationsScreen extends StatelessWidget {
   }
 }
 
-class ProfileScreen extends StatelessWidget {
+
+class ProfileScreen extends StatefulWidget {
   final VoidCallback onChanged;
   const ProfileScreen({super.key, required this.onChanged});
-  @override Widget build(BuildContext context) {
-    final user = AppData.user;
-    final name = (user?.email ?? 'usuario@email.com').split('@').first;
-    return DirectPage(child: Column(children: [
-      const SizedBox(height: 10),
-      const CircleAvatar(radius: 44, backgroundColor: AppColors.tealSoft, child: Icon(Icons.person_rounded, color: AppColors.teal, size: 50)),
-      const SizedBox(height: 14),
-      Text(name, style: Theme.of(context).textTheme.titleLarge),
-      const SizedBox(height: 2), Text(user?.email ?? '', style: Theme.of(context).textTheme.bodyMedium),
-      const SizedBox(height: 22),
-      SettingsRow(icon: Icons.edit_rounded, title: 'Editar perfil', subtitle: 'Nombre y foto', onTap: () => showToast(context, 'Edición de perfil preparada para la siguiente fase.')),
-      SettingsRow(icon: Icons.admin_panel_settings_outlined, title: 'Administrar grupos', subtitle: 'Tus grupos y roles', onTap: () {}),
-      SettingsRow(icon: Icons.notifications_none_rounded, title: 'Notificaciones', subtitle: 'Eventos, gastos y torneos', onTap: () {}),
-      SettingsRow(icon: Icons.help_outline_rounded, title: 'Ayuda y soporte', subtitle: 'Centro de ayuda y contacto', onTap: () {}),
-      const SizedBox(height: 18),
-      DangerButton(label: 'Cerrar sesión', icon: Icons.logout_rounded, onTap: () => AppData.sb.auth.signOut()),
-    ]));
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  late Future<_ProfileData> future;
+  bool photoLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  void load() {
+    future = _ProfileData.load();
+  }
+
+  void reload() {
+    setState(load);
+    widget.onChanged();
+  }
+
+  Future<void> editName(String currentName) async {
+    final controller = TextEditingController(text: currentName);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Editar nombre'),
+        content: TextField(
+          controller: controller,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Nombre visible',
+            hintText: 'Ej. José García',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Guardar')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (newName == null) return;
+    try {
+      await AppData.updateProfileName(newName);
+      reload();
+      if (mounted) await showToast(context, 'Nombre actualizado.');
+    } catch (e) {
+      if (mounted) await showToast(context, e.toString(), danger: true);
+    }
+  }
+
+  Future<void> changePhoto() async {
+    if (photoLoading) return;
+    setState(() => photoLoading = true);
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 900,
+        imageQuality: 82,
+      );
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      await AppData.uploadAvatarBytes(bytes, picked.name);
+      reload();
+      if (mounted) await showToast(context, 'Foto actualizada.');
+    } catch (e) {
+      if (mounted) {
+        await showToast(
+          context,
+          'No se ha podido subir la foto. Ejecuta el SQL de avatares si aún no lo has hecho.',
+          danger: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => photoLoading = false);
+    }
+  }
+
+  Future<void> removePhoto() async {
+    try {
+      await AppData.removeAvatar();
+      reload();
+      if (mounted) await showToast(context, 'Foto eliminada.');
+    } catch (e) {
+      if (mounted) await showToast(context, e.toString(), danger: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DirectPage(
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 30),
+      child: FutureBuilder<_ProfileData>(
+        future: future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const CenterLoader(label: 'Cargando perfil...');
+          }
+          if (snapshot.hasError) {
+            return ErrorBlock(message: snapshot.error.toString(), onRetry: reload);
+          }
+
+          final data = snapshot.data ?? _ProfileData.empty();
+          final name = data.name;
+          final email = data.email;
+          final avatarUrl = data.avatarUrl;
+
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              Text('Perfil', style: Theme.of(context).textTheme.headlineMedium),
+              const Spacer(),
+              IconButton(
+                onPressed: reload,
+                icon: const Icon(Icons.refresh_rounded),
+                color: AppColors.muted,
+              ),
+            ]),
+            const SizedBox(height: 18),
+            AppCard(
+              padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
+              child: Column(children: [
+                Stack(alignment: Alignment.bottomRight, children: [
+                  ProfileAvatar(name: name, avatarUrl: avatarUrl, radius: 52),
+                  Material(
+                    color: AppColors.teal,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: changePhoto,
+                      child: SizedBox(
+                        width: 35,
+                        height: 35,
+                        child: photoLoading
+                            ? const Padding(
+                                padding: EdgeInsets.all(9),
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 18),
+                      ),
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 14),
+                Text(name, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 3),
+                Text(email, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 18),
+                Row(children: [
+                  Expanded(child: TinyStat(icon: Icons.lock_rounded, value: '${data.groups.length}', label: 'Grupos')),
+                  const SizedBox(width: 10),
+                  Expanded(child: TinyStat(icon: Icons.admin_panel_settings_rounded, value: '${data.adminGroups}', label: 'Admin')),
+                  const SizedBox(width: 10),
+                  Expanded(child: TinyStat(icon: Icons.event_available_rounded, value: '${data.totalEvents}', label: 'Eventos')),
+                ]),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            SettingsRow(icon: Icons.edit_rounded, title: 'Nombre visible', subtitle: name, onTap: () => editName(name)),
+            SettingsRow(icon: Icons.photo_camera_rounded, title: 'Cambiar foto', subtitle: 'Elige una imagen de tu dispositivo', onTap: changePhoto),
+            if (avatarUrl.isNotEmpty)
+              SettingsRow(icon: Icons.delete_outline_rounded, title: 'Quitar foto', subtitle: 'Volver al avatar con iniciales', danger: true, onTap: removePhoto),
+            SettingsRow(icon: Icons.groups_rounded, title: 'Mis grupos', subtitle: '${data.groups.length} grupo${data.groups.length == 1 ? '' : 's'} privado${data.groups.length == 1 ? '' : 's'}', onTap: () {}),
+            SettingsRow(icon: Icons.notifications_none_rounded, title: 'Notificaciones', subtitle: 'Eventos, gastos y torneos', onTap: () => showToast(context, 'Ajustes de notificaciones preparados para push.')),
+            SettingsRow(icon: Icons.help_outline_rounded, title: 'Ayuda y soporte', subtitle: 'Centro de ayuda y contacto', onTap: () => showToast(context, 'Soporte preparado para la siguiente fase.')),
+            const SizedBox(height: 18),
+            DangerButton(label: 'Cerrar sesión', icon: Icons.logout_rounded, onTap: () => AppData.sb.auth.signOut()),
+          ]);
+        },
+      ),
+    );
   }
 }
+
+class _ProfileData {
+  final Map<String, dynamic> profile;
+  final List<Map<String, dynamic>> groups;
+
+  const _ProfileData({required this.profile, required this.groups});
+
+  static _ProfileData empty() => const _ProfileData(profile: {}, groups: []);
+
+  static Future<_ProfileData> load() async {
+    final results = await Future.wait([
+      AppData.profile(),
+      AppData.myGroups(),
+    ]);
+    return _ProfileData(
+      profile: AppData.asMap(results[0]),
+      groups: AppData.asList(results[1]),
+    );
+  }
+
+  String get email => AppData.text(profile['email'], AppData.user?.email ?? '');
+  String get name {
+    final fromProfile = AppData.text(profile['full_name']);
+    if (fromProfile.isNotEmpty && fromProfile != 'Usuario') return fromProfile;
+    final e = email;
+    if (e.contains('@')) return e.split('@').first;
+    return 'Usuario';
+  }
+
+  String get avatarUrl => AppData.text(profile['avatar_url']);
+
+  int get adminGroups => groups.where((g) => ['owner', 'admin'].contains(AppData.text(g['role']))).length;
+  int get totalEvents => groups.fold<int>(0, (sum, g) => sum + AppData.intValue(g['events_count']));
+}
+
+
+
+class ProfileAvatar extends StatelessWidget {
+  final String name;
+  final String avatarUrl;
+  final double radius;
+  const ProfileAvatar({super.key, required this.name, required this.avatarUrl, this.radius = 24});
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = initialsFor(name);
+    if (avatarUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: AppColors.tealSoft,
+        backgroundImage: NetworkImage(avatarUrl),
+        onBackgroundImageError: (_, __) {},
+        child: const SizedBox.shrink(),
+      );
+    }
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: AppColors.tealSoft,
+      child: Text(
+        initials,
+        style: TextStyle(
+          color: AppColors.teal,
+          fontWeight: FontWeight.w900,
+          fontSize: radius * .58,
+        ),
+      ),
+    );
+  }
+}
+
+class TinyStat extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  const TinyStat({super.key, required this.icon, required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: AppColors.faint,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(children: [
+        Icon(icon, color: AppColors.teal, size: 18),
+        const SizedBox(height: 6),
+        Text(value, style: const TextStyle(color: AppColors.ink, fontSize: 18, fontWeight: FontWeight.w900)),
+        Text(label, style: const TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700)),
+      ]),
+    );
+  }
+}
+
 
 class GroupHeroCard extends StatelessWidget {
   final String name;
@@ -3661,7 +3987,7 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
           height: 56,
           decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(15)),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Text(DateFormat('EEE').format(date).replaceAll('.', '').toUpperCase(), style: const TextStyle(color: AppColors.teal, fontSize: 11, fontWeight: FontWeight.w900)),
+            Text(shortWeekday(date).toUpperCase(), style: const TextStyle(color: AppColors.teal, fontSize: 11, fontWeight: FontWeight.w900)),
             Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 21, fontWeight: FontWeight.w900)),
           ]),
         ),
@@ -3669,7 +3995,7 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(AppData.text(event['title'], 'Evento'), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 5),
-          MetaLine(icon: Icons.schedule_rounded, text: DateFormat('HH:mm').format(date)),
+          MetaLine(icon: Icons.schedule_rounded, text: DateFormat('HH:mm', 'es_ES').format(date)),
           MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
         ])),
         IconButton(onPressed: () async {
@@ -3877,7 +4203,7 @@ class DateBadge extends StatelessWidget {
     height: 66,
     decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(15)),
     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Text(DateFormat('EEE').format(date).replaceAll('.', '').toUpperCase(), style: const TextStyle(color: AppColors.teal, fontSize: 11, fontWeight: FontWeight.w900)),
+      Text(shortWeekday(date).toUpperCase(), style: const TextStyle(color: AppColors.teal, fontSize: 11, fontWeight: FontWeight.w900)),
       Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 24, fontWeight: FontWeight.w900)),
     ]),
   );
@@ -3895,7 +4221,7 @@ class CalendarDaySummary extends StatelessWidget {
     DateBadge(date: day),
     const SizedBox(width: 12),
     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(DateFormat('EEEE dd MMMM').format(day), style: Theme.of(context).textTheme.titleMedium),
+      Text(longDay(day), style: Theme.of(context).textTheme.titleMedium),
       const SizedBox(height: 5),
       Text(events.isEmpty ? 'No hay eventos creados para este día.' : '${events.length} evento${events.length == 1 ? '' : 's'} · $confirmed confirmados · $maybe en duda', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
     ])),
@@ -3957,7 +4283,7 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
                 Icon(viable ? Icons.verified_rounded : Icons.info_rounded, color: viable ? AppColors.green : AppColors.amber, size: 20),
               ]),
               const SizedBox(height: 5),
-              MetaLine(icon: Icons.schedule_rounded, text: DateFormat('HH:mm').format(date)),
+              MetaLine(icon: Icons.schedule_rounded, text: DateFormat('HH:mm', 'es_ES').format(date)),
               MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
               const SizedBox(height: 7),
               Text(viable ? 'Mínimo alcanzado: $yes/$minPeople' : 'Faltan ${max(0, minPeople - yes)} para llegar al mínimo', style: TextStyle(color: viable ? AppColors.green : AppColors.amber, fontWeight: FontWeight.w900, fontSize: 12)),
@@ -4045,7 +4371,7 @@ class EventCard extends StatelessWidget {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(AppData.text(event['title'], 'Evento'), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 5),
-          MetaLine(icon: Icons.schedule_rounded, text: DateFormat('dd/MM · HH:mm').format(d)),
+          MetaLine(icon: Icons.schedule_rounded, text: DateFormat('dd/MM · HH:mm', 'es_ES').format(d)),
           MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
         ])),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -4171,9 +4497,47 @@ class _MiniChip extends StatelessWidget {
   );
 }
 
-class MemberCard extends StatelessWidget { final Map<String, dynamic> member; const MemberCard({super.key, required this.member}); @override Widget build(BuildContext context) { final profile = AppData.asMap(member['profiles']); final role = AppData.text(member['role'], 'member'); return Padding(padding: const EdgeInsets.only(bottom: 8), child: AppCard(child: Row(children: [CircleAvatar(backgroundColor: AppColors.tealSoft, child: Text(memberName(member).substring(0, 1).toUpperCase(), style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900))), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(memberName(member), style: const TextStyle(fontWeight: FontWeight.w900)), Text(AppData.text(profile['email'], 'sin email'), style: const TextStyle(color: AppColors.muted, fontSize: 12))])), Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5), decoration: BoxDecoration(color: role == 'member' ? AppColors.faint : AppColors.tealSoft, borderRadius: BorderRadius.circular(99)), child: Text(role == 'owner' ? 'OWNER' : role == 'admin' ? 'ADMIN' : 'MIEMBRO', style: TextStyle(color: role == 'member' ? AppColors.muted : AppColors.teal, fontWeight: FontWeight.w900, fontSize: 11)))]))); }}
+class MemberCard extends StatelessWidget {
+  final Map<String, dynamic> member;
+  const MemberCard({super.key, required this.member});
 
-String memberName(Map<String, dynamic> member) { final profile = AppData.asMap(member['profiles']); return AppData.text(profile['full_name'], AppData.text(profile['email'], 'Miembro')); }
+  @override
+  Widget build(BuildContext context) {
+    final profile = AppData.asMap(member['profiles']);
+    final role = AppData.text(member['role'], 'member');
+    final name = memberName(member);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: AppCard(
+        child: Row(children: [
+          ProfileAvatar(name: name, avatarUrl: AppData.text(profile['avatar_url']), radius: 22),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(name, style: const TextStyle(fontWeight: FontWeight.w900)),
+            Text(AppData.text(profile['email'], 'sin email'), style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+          ])),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(color: role == 'member' ? AppColors.faint : AppColors.tealSoft, borderRadius: BorderRadius.circular(99)),
+            child: Text(
+              role == 'owner' ? 'OWNER' : role == 'admin' ? 'ADMIN' : 'MIEMBRO',
+              style: TextStyle(color: role == 'member' ? AppColors.muted : AppColors.teal, fontWeight: FontWeight.w900, fontSize: 11),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+String memberName(Map<String, dynamic> member) {
+  final profile = AppData.asMap(member['profiles']);
+  final fullName = AppData.text(profile['full_name']);
+  if (fullName.isNotEmpty && fullName != 'Usuario') return fullName;
+  final email = AppData.text(profile['email']);
+  if (email.contains('@')) return email.split('@').first;
+  return 'Miembro';
+}
 
 class SettingsRow extends StatelessWidget { final IconData icon; final String title; final String subtitle; final VoidCallback onTap; final bool danger; const SettingsRow({super.key, required this.icon, required this.title, required this.subtitle, required this.onTap, this.danger = false}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 9), child: AppCard(onTap: onTap, child: Row(children: [Icon(icon, color: danger ? AppColors.red : AppColors.ink), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(fontWeight: FontWeight.w900, color: danger ? AppColors.red : AppColors.ink)), Text(subtitle, style: const TextStyle(color: AppColors.muted, fontSize: 12))])), const Icon(Icons.chevron_right_rounded, color: AppColors.muted)]))); }
 

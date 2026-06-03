@@ -56,3 +56,8 @@ Corrige los errores de análisis de v12.6: casting de share a double, EmptySlim 
 ## v12.8
 
 Pulido compacto de Inicio de grupo: se eliminan acciones de invitación/código/miembros/ajustes de la home, se reduce el hero, se mejora densidad visual y se amplía `security_checks.sql`. No requiere SQL nuevo.
+
+
+## v12.9
+
+Calendario en español y perfil real con nombre/foto. Ejecutar `supabase/patch_v12_9_profile_avatar_storage.sql` para habilitar subida de avatares.

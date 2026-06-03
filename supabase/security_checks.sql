@@ -18,3 +18,12 @@ select schemaname, tablename, policyname, permissive, roles, cmd
 from pg_policies
 where schemaname = 'public'
 order by tablename, policyname;
+
+
+select 'avatars bucket exists' as check_name, exists(select 1 from storage.buckets where id = 'avatars') as ok
+union all select 'profiles avatar_url column exists', exists(select 1 from information_schema.columns where table_schema='public' and table_name='profiles' and column_name='avatar_url');
+
+select 'avatar storage policies' as section, policyname, cmd
+from pg_policies
+where schemaname = 'storage' and tablename = 'objects' and policyname like 'avatars_%'
+order by policyname;
