@@ -60,3 +60,14 @@ from pg_policies
 where schemaname = 'public'
   and tablename in ('groups','group_members','events','expenses','tournaments','matches')
 order by tablename, policyname;
+
+
+-- v14.7 role/member RPC check
+select
+  p.proname as function,
+  pg_get_function_identity_arguments(p.oid) as args
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname in ('set_group_member_role','remove_group_member','leave_group_safe')
+order by p.proname;

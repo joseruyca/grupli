@@ -99,3 +99,7 @@ Corrección incluida: `docs/V14_2_COMPILE_FIX.md`.
 
 
 Última mejora incluida: `docs/V14_6_TOURNAMENTS_GUIDED_FINAL.md`.
+
+
+Última mejora incluida: `docs/V14_7_MEMBERS_INVITES_PERMISSIONS.md`.
+SQL recomendado: `supabase/patch_v14_7_members_permissions.sql`.

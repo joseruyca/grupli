@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -338,17 +339,29 @@ class AppData {
     if (!['admin', 'member'].contains(role)) {
       throw Exception('Rol no válido.');
     }
-    await sb.from('group_members').update({'role': role}).eq('id', memberRowId);
+    try {
+      await sb.rpc('set_group_member_role', params: {'p_member_row_id': memberRowId, 'p_role': role});
+    } catch (_) {
+      await sb.from('group_members').update({'role': role}).eq('id', memberRowId);
+    }
   }
 
   static Future<void> removeMember(String memberRowId) async {
-    await sb.from('group_members').delete().eq('id', memberRowId);
+    try {
+      await sb.rpc('remove_group_member', params: {'p_member_row_id': memberRowId});
+    } catch (_) {
+      await sb.from('group_members').delete().eq('id', memberRowId);
+    }
   }
 
   static Future<void> leaveGroup(String groupId) async {
     final uid = user?.id;
     if (uid == null) return;
-    await sb.from('group_members').delete().eq('group_id', groupId).eq('user_id', uid);
+    try {
+      await sb.rpc('leave_group_safe', params: {'p_group_id': groupId});
+    } catch (_) {
+      await sb.from('group_members').delete().eq('group_id', groupId).eq('user_id', uid);
+    }
   }
 
   static Future<List<Map<String, dynamic>>> events(String groupId) async {
@@ -1695,17 +1708,42 @@ class GroupMoreTab extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
         children: [
           PageHeader(title: 'Más', subtitle: name, leading: false),
-          const SizedBox(height: 18),
-          SettingsRow(icon: Icons.person_add_alt_1_rounded, title: 'Invitar miembros', subtitle: 'Compartir el código del grupo', onTap: () => Share.share('Únete a $name en Grupli con el código $code')),
-          SettingsRow(icon: Icons.qr_code_rounded, title: 'Código de invitación', subtitle: code, onTap: () => showCodeSheet(context, code, name)),
-          SettingsRow(icon: Icons.groups_rounded, title: 'Miembros y admins', subtitle: 'Ver miembros, owner y administradores', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
-          SettingsRow(icon: Icons.lock_rounded, title: 'Privacidad del grupo', subtitle: 'Todos los grupos son privados por invitación', onTap: () => showToast(context, 'Los grupos de Grupli son privados por diseño.')),
-          SettingsRow(icon: Icons.settings_rounded, title: 'Ajustes del grupo', subtitle: 'Nombre, permisos y acciones de admin', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group)))),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
+          InviteAccessCard(groupName: name, code: code),
+          const SizedBox(height: 14),
+          SectionHeader(title: 'Gestión del grupo'),
+          const SizedBox(height: 8),
+          SettingsRow(
+            icon: Icons.groups_rounded,
+            title: 'Miembros y admins',
+            subtitle: 'Roles, permisos, owner y expulsiones seguras',
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group))),
+          ),
+          SettingsRow(
+            icon: Icons.verified_user_rounded,
+            title: 'Permisos',
+            subtitle: 'Qué puede hacer owner, admin y miembro',
+            onTap: () => showPermissionSheet(context),
+          ),
+          SettingsRow(
+            icon: Icons.settings_rounded,
+            title: 'Ajustes del grupo',
+            subtitle: 'Nombre, privacidad y acciones importantes',
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group))),
+          ),
+          SettingsRow(
+            icon: Icons.lock_rounded,
+            title: 'Privacidad',
+            subtitle: 'Grupo privado por invitación. Nadie entra sin código.',
+            onTap: () => showToast(context, 'Grupli funciona con grupos privados por invitación.'),
+          ),
+          const SizedBox(height: 16),
+          PermissionMatrixCard(compact: true),
+          const SizedBox(height: 16),
           EmptySlim(
             icon: Icons.info_outline_rounded,
-            title: 'Inicio es el resumen real del grupo',
-            body: 'Las quedadas se ven en Inicio y Calendario. Aquí solo quedan utilidades, miembros y ajustes.',
+            title: 'Más es el centro de control',
+            body: 'Aquí viven invitaciones, miembros, permisos y ajustes. La actividad diaria sigue en Inicio.',
           ),
         ],
       ),
@@ -4481,16 +4519,18 @@ class _MembersScreenState extends State<MembersScreen> {
 
   void reload() => setState(() => future = AppData.members(widget.group['id'].toString()));
 
-  bool _canManage(List<Map<String, dynamic>> members) {
+  Map<String, dynamic>? _me(List<Map<String, dynamic>> members) {
     final uid = AppData.user?.id;
-    Map<String, dynamic>? me;
     for (final member in members) {
-      if (member['user_id']?.toString() == uid) {
-        me = member;
-        break;
-      }
+      if (member['user_id']?.toString() == uid) return member;
     }
-    final role = AppData.text(me?['role']);
+    return null;
+  }
+
+  String _myRole(List<Map<String, dynamic>> members) => AppData.text(_me(members)?['role'], 'member');
+
+  bool _canManage(List<Map<String, dynamic>> members) {
+    final role = _myRole(members);
     return role == 'owner' || role == 'admin';
   }
 
@@ -4499,9 +4539,9 @@ class _MembersScreenState extends State<MembersScreen> {
     try {
       await AppData.updateMemberRole(member['id'].toString(), role);
       reload();
-      if (mounted) await showToast(context, role == 'admin' ? '$name ahora es admin.' : '$name ahora es miembro.');
+      if (mounted) await showToast(context, role == 'admin' ? '$name ahora es admin.' : '$name vuelve a ser miembro.');
     } catch (e) {
-      if (mounted) await showToast(context, e.toString(), danger: true);
+      if (mounted) await showToast(context, humanError(e), danger: true);
     }
   }
 
@@ -4524,7 +4564,34 @@ class _MembersScreenState extends State<MembersScreen> {
       reload();
       if (mounted) await showToast(context, '$name ya no está en el grupo.');
     } catch (e) {
-      if (mounted) await showToast(context, e.toString(), danger: true);
+      if (mounted) await showToast(context, humanError(e), danger: true);
+    }
+  }
+
+  Future<void> _leaveGroup(String groupName, bool isOwner) async {
+    if (isOwner) {
+      await showToast(context, 'El owner no puede salir sin transferir o eliminar el grupo.', danger: true);
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Salir del grupo'),
+        content: Text('Vas a salir de $groupName. Para volver necesitarás una invitación.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Salir')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await AppData.leaveGroup(widget.group['id'].toString());
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      await showToast(context, 'Has salido del grupo.');
+    } catch (e) {
+      if (mounted) await showToast(context, humanError(e), danger: true);
     }
   }
 
@@ -4536,28 +4603,19 @@ class _MembersScreenState extends State<MembersScreen> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         PageHeader(title: 'Miembros', subtitle: groupName, leading: true),
         const SizedBox(height: 14),
-        AppCard(
-          padding: const EdgeInsets.all(16),
-          child: Row(children: [
-            Container(width: 46, height: 46, decoration: const BoxDecoration(color: AppColors.tealSoft, shape: BoxShape.circle), child: const Icon(Icons.lock_rounded, color: AppColors.teal)),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Grupo privado por invitación', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 3),
-              Text('Comparte el código $code solo con quienes quieras dentro del grupo.', style: Theme.of(context).textTheme.bodyMedium),
-            ])),
-          ]),
-        ),
+        InviteAccessCard(groupName: groupName, code: code, compact: true),
         const SizedBox(height: 14),
         FutureBuilder<List<Map<String, dynamic>>>(
           future: future,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) return const CenterLoader(label: 'Cargando miembros...');
-            if (snapshot.hasError) return ErrorBlock(message: snapshot.error.toString(), onRetry: reload);
+            if (snapshot.hasError) return ErrorBlock(message: humanError(snapshot.error), onRetry: reload);
             final members = snapshot.data ?? [];
             final admins = members.where((m) => ['owner', 'admin'].contains(AppData.text(m['role']))).toList();
             final regular = members.where((m) => AppData.text(m['role']) == 'member').toList();
             final canManage = _canManage(members);
+            final myRole = _myRole(members);
+            final isOwner = myRole == 'owner';
             return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Expanded(child: StatCard(icon: Icons.groups_rounded, value: members.length.toString(), label: 'Total', color: AppColors.teal)),
@@ -4566,20 +4624,37 @@ class _MembersScreenState extends State<MembersScreen> {
                 const SizedBox(width: 10),
                 Expanded(child: StatCard(icon: Icons.person_outline_rounded, value: regular.length.toString(), label: 'Miembros', color: AppColors.orange)),
               ]),
+              const SizedBox(height: 16),
+              RoleInfoCard(role: myRole),
               const SizedBox(height: 18),
-              SectionHeader(title: 'Administradores'),
+              SectionHeader(title: 'Owner y administradores'),
               const SizedBox(height: 8),
               ...admins.map((m) => ManageMemberCard(member: m, canManage: canManage, onRole: _changeRole, onRemove: _remove)),
               const SizedBox(height: 16),
               SectionHeader(title: 'Miembros'),
               const SizedBox(height: 8),
               if (regular.isEmpty)
-                EmptySlim(icon: Icons.person_add_alt_1_rounded, title: 'Aún no hay miembros normales', body: 'Invita a tu grupo con el código o enlace cuando esté listo.')
+                EmptySlim(icon: Icons.person_add_alt_1_rounded, title: 'Aún no hay miembros normales', body: 'Invita a tu grupo con el código cuando esté listo.')
               else
                 ...regular.map((m) => ManageMemberCard(member: m, canManage: canManage, onRole: _changeRole, onRemove: _remove)),
               const SizedBox(height: 16),
-              if (!canManage)
-                EmptySlim(icon: Icons.shield_outlined, title: 'Permisos de miembro', body: 'Puedes ver el grupo y participar. Solo owner/admins pueden gestionar miembros.'),
+              PermissionMatrixCard(),
+              const SizedBox(height: 16),
+              DangerButton(
+                label: isOwner ? 'Owner protegido' : 'Salir del grupo',
+                icon: isOwner ? Icons.shield_rounded : Icons.logout_rounded,
+                onTap: () => _leaveGroup(groupName, isOwner),
+              ),
+              const SizedBox(height: 10),
+              EmptySlim(
+                icon: Icons.shield_outlined,
+                title: isOwner ? 'El owner no se puede expulsar' : canManage ? 'Puedes gestionar miembros' : 'Permisos de miembro',
+                body: isOwner
+                    ? 'Para evitar errores, el owner queda protegido. Más adelante añadiremos transferencia de propiedad.'
+                    : canManage
+                        ? 'Puedes hacer admins, quitar admins y expulsar miembros. El owner queda protegido.'
+                        : 'Puedes ver el grupo y participar. Solo owner/admins pueden gestionar miembros.',
+              ),
             ]);
           },
         ),
@@ -4592,13 +4667,19 @@ class GroupSettingsScreen extends StatelessWidget {
   final Map<String, dynamic> group;
   const GroupSettingsScreen({super.key, required this.group});
   @override Widget build(BuildContext context) {
+    final name = AppData.text(group['name'], 'Grupo');
+    final code = AppData.text(group['invite_code'], '------');
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: 'Ajustes del grupo', subtitle: AppData.text(group['name']), leading: true),
-      const SizedBox(height: 18),
-      SettingsRow(icon: Icons.groups_rounded, title: 'Miembros', subtitle: 'Gestiona el grupo', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
-      SettingsRow(icon: Icons.qr_code_rounded, title: 'Código de invitación', subtitle: AppData.text(group['invite_code'], '------'), onTap: () => showCodeSheet(context, AppData.text(group['invite_code'], '------'), AppData.text(group['name']))),
-      SettingsRow(icon: Icons.lock_rounded, title: 'Privacidad', subtitle: 'Grupo privado por invitación', onTap: () {}),
-      SettingsRow(icon: Icons.delete_outline_rounded, title: 'Eliminar grupo', subtitle: 'Solo owner', danger: true, onTap: () => showToast(context, 'Acción pendiente de confirmación segura.')),
+      PageHeader(title: 'Ajustes del grupo', subtitle: name, leading: true),
+      const SizedBox(height: 16),
+      InviteAccessCard(groupName: name, code: code, compact: true),
+      const SizedBox(height: 16),
+      SectionHeader(title: 'Administración'),
+      const SizedBox(height: 8),
+      SettingsRow(icon: Icons.groups_rounded, title: 'Miembros y roles', subtitle: 'Owner, admins, miembros y expulsiones seguras', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
+      SettingsRow(icon: Icons.verified_user_rounded, title: 'Permisos', subtitle: 'Consulta qué puede hacer cada rol', onTap: () => showPermissionSheet(context)),
+      SettingsRow(icon: Icons.lock_rounded, title: 'Privacidad', subtitle: 'Grupo privado por invitación', onTap: () => showToast(context, 'Los grupos son privados. El acceso se controla por invitación.')),
+      SettingsRow(icon: Icons.delete_outline_rounded, title: 'Eliminar grupo', subtitle: 'Pendiente de confirmación segura para owner', danger: true, onTap: () => showToast(context, 'Lo dejamos bloqueado hasta añadir una confirmación segura.')),
     ]));
   }
 }
@@ -6462,6 +6543,158 @@ String memberName(Map<String, dynamic> member) {
 }
 
 
+
+class InviteAccessCard extends StatelessWidget {
+  final String groupName;
+  final String code;
+  final bool compact;
+  const InviteAccessCard({super.key, required this.groupName, required this.code, this.compact = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.all(compact ? 14 : 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)),
+            child: const Icon(Icons.lock_person_rounded, color: AppColors.teal),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Acceso privado', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 3),
+            Text('Nadie entra al grupo sin recibir este código.', style: Theme.of(context).textTheme.bodyMedium),
+          ])),
+        ]),
+        const SizedBox(height: 14),
+        InviteCodeBox(code: code),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: SecondaryButton(label: 'Copiar', icon: Icons.copy_rounded, onTap: () => copyInviteCode(context, code))),
+          const SizedBox(width: 10),
+          Expanded(child: PrimaryButton(label: 'Compartir', icon: Icons.share_rounded, onTap: () => Share.share(inviteText(groupName, code)))),
+        ]),
+        if (!compact) ...[
+          const SizedBox(height: 10),
+          Text('QR real y enlace profundo llegarán en la fase PWA/APK. Ahora el acceso estable es por código privado.', style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ]),
+    );
+  }
+}
+
+class InviteCodeBox extends StatelessWidget {
+  final String code;
+  const InviteCodeBox({super.key, required this.code});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.tealSoft,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0x33008F86)),
+      ),
+      child: Row(children: [
+        const Icon(Icons.qr_code_2_rounded, color: AppColors.teal),
+        const SizedBox(width: 12),
+        Expanded(child: Text(code, textAlign: TextAlign.center, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w900, letterSpacing: 3, color: AppColors.teal))),
+        const SizedBox(width: 12),
+        const Icon(Icons.ios_share_rounded, color: AppColors.teal),
+      ]),
+    );
+  }
+}
+
+class RoleInfoCard extends StatelessWidget {
+  final String role;
+  const RoleInfoCard({super.key, required this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    final isOwner = role == 'owner';
+    final isAdmin = role == 'admin';
+    final color = isOwner ? AppColors.orange : isAdmin ? AppColors.teal : AppColors.violet;
+    final title = isOwner ? 'Eres owner del grupo' : isAdmin ? 'Eres admin' : 'Eres miembro';
+    final body = isOwner
+        ? 'Puedes nombrar admins, quitar admins y gestionar el grupo. Tu rol está protegido.'
+        : isAdmin
+            ? 'Puedes ayudar a gestionar miembros y mantener el grupo ordenado.'
+            : 'Puedes participar en quedadas, gastos y torneos. Los admins gestionan permisos.';
+    return AppCard(
+      color: AppColors.surface,
+      child: Row(children: [
+        Container(width: 42, height: 42, decoration: BoxDecoration(color: color.withOpacity(.12), borderRadius: BorderRadius.circular(15)), child: Icon(isOwner ? Icons.workspace_premium_rounded : isAdmin ? Icons.admin_panel_settings_rounded : Icons.person_rounded, color: color)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 3),
+          Text(body, style: Theme.of(context).textTheme.bodyMedium),
+        ])),
+      ]),
+    );
+  }
+}
+
+class PermissionMatrixCard extends StatelessWidget {
+  final bool compact;
+  const PermissionMatrixCard({super.key, this.compact = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.verified_user_rounded, color: AppColors.teal, size: 21)),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Permisos claros', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 2),
+            Text('Cada rol tiene límites para evitar errores humanos.', style: Theme.of(context).textTheme.bodyMedium),
+          ])),
+        ]),
+        const SizedBox(height: 12),
+        PermissionLine(role: 'Owner', body: 'Control total, admins, miembros y acciones críticas.', color: AppColors.orange),
+        PermissionLine(role: 'Admin', body: 'Gestiona miembros y ayuda a mantener el grupo.', color: AppColors.teal),
+        PermissionLine(role: 'Miembro', body: 'Participa en eventos, gastos y torneos del grupo.', color: AppColors.violet),
+        if (!compact) ...[
+          const SizedBox(height: 8),
+          Text('El owner queda protegido: no puede ser expulsado ni degradado desde la app.', style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ]),
+    );
+  }
+}
+
+class PermissionLine extends StatelessWidget {
+  final String role;
+  final String body;
+  final Color color;
+  const PermissionLine({super.key, required this.role, required this.body, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(99)),
+          child: Text(role, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11)),
+        ),
+        const SizedBox(width: 9),
+        Expanded(child: Text(body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12.5, height: 1.35))),
+      ]),
+    );
+  }
+}
+
 class ManageMemberCard extends StatelessWidget {
   final Map<String, dynamic> member;
   final bool canManage;
@@ -6544,4 +6777,54 @@ class MonthGrid extends StatelessWidget { final DateTime month; final DateTime s
 
 class PatternIcons extends StatelessWidget { @override Widget build(BuildContext context) => Wrap(spacing: 24, runSpacing: 20, children: List.generate(70, (i) => Icon([Icons.event_available_rounded, Icons.calendar_month_rounded, Icons.account_balance_wallet_rounded, Icons.emoji_events_rounded, Icons.lock_rounded, Icons.qr_code_rounded][i % 6], size: 17, color: Colors.white))); }
 
-void showCodeSheet(BuildContext context, String code, String groupName) { showModalBottomSheet(context: context, showDragHandle: true, builder: (context) => Padding(padding: const EdgeInsets.fromLTRB(22, 10, 22, 30), child: Column(mainAxisSize: MainAxisSize.min, children: [Text('Código de invitación', style: Theme.of(context).textTheme.titleLarge), const SizedBox(height: 12), Container(width: double.infinity, padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(18)), child: Center(child: Text(code, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, letterSpacing: 3, color: AppColors.teal)))), const SizedBox(height: 16), PrimaryButton(label: 'Compartir código', icon: Icons.share_rounded, onTap: () => Share.share('Únete a $groupName en Grupli con el código $code'))]))); }
+void showPermissionSheet(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => Padding(
+      padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
+      child: Column(mainAxisSize: MainAxisSize.min, children: const [
+        PermissionMatrixCard(),
+      ]),
+    ),
+  );
+}
+
+String humanError(Object? error) {
+  final raw = error?.toString() ?? '';
+  if (raw.contains('owner')) return 'El owner está protegido y no se puede modificar desde aquí.';
+  if (raw.contains('permission') || raw.contains('policy') || raw.contains('RLS')) return 'No tienes permisos para hacer esta acción.';
+  if (raw.contains('network')) return 'No se pudo conectar. Revisa tu conexión.';
+  if (raw.trim().isEmpty) return 'No se pudo completar la acción.';
+  return raw.replaceAll('Exception: ', '');
+}
+
+void copyInviteCode(BuildContext context, String code) {
+  Clipboard.setData(ClipboardData(text: code));
+  showToast(context, 'Código copiado.');
+}
+
+String inviteText(String groupName, String code) => 'Únete a $groupName en Grupli con el código $code';
+
+void showCodeSheet(BuildContext context, String code, String groupName) {
+  showModalBottomSheet(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => Padding(
+      padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('Invitación privada', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 6),
+        Text('Comparte este código solo con quien quieras dentro del grupo.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(height: 14),
+        InviteCodeBox(code: code),
+        const SizedBox(height: 16),
+        Row(children: [
+          Expanded(child: SecondaryButton(label: 'Copiar', icon: Icons.copy_rounded, onTap: () => copyInviteCode(context, code))),
+          const SizedBox(width: 10),
+          Expanded(child: PrimaryButton(label: 'Compartir', icon: Icons.share_rounded, onTap: () => Share.share(inviteText(groupName, code)))),
+        ]),
+      ]),
+    ),
+  );
+}
