@@ -2179,7 +2179,7 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
                 child: Row(children: [
                   const Icon(Icons.calculate_rounded, color: AppColors.teal),
                   const SizedBox(width: 10),
-                  Expanded(child: Text(selected.isEmpty ? 'Elige al menos un participante.' : '${selected.length} participantes · cada uno debe ${money(share)}', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
+                  Expanded(child: Text(selected.isEmpty ? 'Elige al menos un participante.' : '${selected.length} participantes · cada uno debe ${money(share.toDouble())}', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
                 ]),
               ),
             ])),
@@ -2264,7 +2264,7 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
               Text(financeMemberName(userId, widget.members), style: const TextStyle(fontWeight: FontWeight.w900)),
               Text(userId == paidBy ? 'Pagó el gasto' : paid ? 'Pago registrado' : 'Pendiente de pagar', style: TextStyle(color: paid ? AppColors.green : AppColors.muted, fontSize: 12)),
             ])),
-            Text(money(share), style: const TextStyle(fontWeight: FontWeight.w900)),
+            Text(money(share.toDouble()), style: const TextStyle(fontWeight: FontWeight.w900)),
             const SizedBox(width: 8),
             Icon(paid ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, color: paid ? AppColors.green : AppColors.muted),
           ]),
@@ -3808,7 +3808,7 @@ class ErrorBlock extends StatelessWidget { final String message; final VoidCallb
 
 class EmptyBlock extends StatelessWidget { final IconData icon; final String title; final String body; const EmptyBlock({super.key, required this.icon, required this.title, required this.body}); @override Widget build(BuildContext context) => AppCard(child: Column(children: [Container(width: 62, height: 62, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft), child: Icon(icon, color: AppColors.teal, size: 30)), const SizedBox(height: 12), Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 6), Text(body, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium)])); }
 
-class EmptySlim extends StatelessWidget { final IconData icon; final String title; final String body; const EmptySlim({super.key, required this.icon, required this.title, required this.body}); @override Widget build(BuildContext context) => AppCard(child: Row(children: [Icon(icon, color: AppColors.teal), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), Text(body, style: Theme.of(context).textTheme.bodyMedium)]))])); }
+class EmptySlim extends StatelessWidget { final IconData icon; final String title; final String body; const EmptySlim({super.key, required this.icon, required this.title, this.body = ''}); @override Widget build(BuildContext context) => AppCard(child: Row(children: [Icon(icon, color: AppColors.teal), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontWeight: FontWeight.w900)), if (body.trim().isNotEmpty) ...[const SizedBox(height: 4), Text(body, style: Theme.of(context).textTheme.bodyMedium)]]))])); }
 
 class HomeLoading extends StatelessWidget { const HomeLoading({super.key}); @override Widget build(BuildContext context) => Column(children: [Row(children: const [Expanded(child: GhostBox(height: 90)), SizedBox(width: 10), Expanded(child: GhostBox(height: 90)), SizedBox(width: 10), Expanded(child: GhostBox(height: 90))]), const SizedBox(height: 24), const GhostBox(height: 100), const SizedBox(height: 10), const GhostBox(height: 100)]); }
 class GhostBox extends StatelessWidget { final double height; const GhostBox({super.key, required this.height}); @override Widget build(BuildContext context) => Container(height: height, decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(18), border: Border.all(color: AppColors.line))); }

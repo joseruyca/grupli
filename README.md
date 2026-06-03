@@ -46,3 +46,8 @@ Mejora el flujo de eventos/quedadas: Inicio muestra próximos eventos con asiste
 - Back dentro de pestañas vuelve a Inicio del grupo.
 - Pestañas de grupo sin flecha superior.
 - Torneos mejorados: importar miembros, regenerar partidos, eliminatorias limpias.
+
+
+## v12.7 compile fix
+
+Corrige los errores de análisis de v12.6: casting de share a double, EmptySlim con body opcional y limpieza de regla inválida en analysis_options.
