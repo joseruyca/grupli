@@ -1,19 +1,25 @@
-# Instalar Grupli v12.4
+\
+# Grupli v12.6 — instalación local
 
 ```powershell
 $Dest = "$env:USERPROFILE\Desktop\grupliv2"
 
-$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v12.4-finances-tricount-real*.zip" |
+$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v12.6-navigation-tournaments-fix*.zip" |
   Sort-Object LastWriteTime -Descending |
   Select-Object -First 1
 
-if (-not $Zip) { throw "No encuentro el ZIP en Descargas." }
+if (-not $Zip) {
+  throw "No encuentro el ZIP en Descargas."
+}
 
 $Temp = "$env:TEMP\grupli_flutter_extract"
 $EnvBackup = "$env:TEMP\grupli_env_backup.txt"
 $GitBackup = "$env:TEMP\grupli_git_backup"
 
-if (Test-Path "$Dest\.env") { Copy-Item "$Dest\.env" $EnvBackup -Force }
+if (Test-Path "$Dest\.env") {
+  Copy-Item "$Dest\.env" $EnvBackup -Force
+}
+
 if (Test-Path "$Dest\.git") {
   Remove-Item $GitBackup -Recurse -Force -ErrorAction SilentlyContinue
   Copy-Item "$Dest\.git" $GitBackup -Recurse -Force
@@ -22,17 +28,25 @@ if (Test-Path "$Dest\.git") {
 Remove-Item $Temp -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $Temp | Out-Null
 New-Item -ItemType Directory -Path $Dest -Force | Out-Null
+
 Expand-Archive -Path $Zip.FullName -DestinationPath $Temp -Force
 
-Get-ChildItem $Dest -Force | Where-Object { $_.Name -ne ".env" -and $_.Name -ne ".git" } | Remove-Item -Recurse -Force
+Get-ChildItem $Dest -Force | Where-Object {
+  $_.Name -ne ".env" -and $_.Name -ne ".git"
+} | Remove-Item -Recurse -Force
+
 Get-ChildItem $Temp -Force | Copy-Item -Destination $Dest -Recurse -Force
 
-if (Test-Path $EnvBackup) { Copy-Item $EnvBackup "$Dest\.env" -Force }
+if (Test-Path $EnvBackup) {
+  Copy-Item $EnvBackup "$Dest\.env" -Force
+}
+
 if (Test-Path $GitBackup) {
   Remove-Item "$Dest\.git" -Recurse -Force -ErrorAction SilentlyContinue
   Copy-Item $GitBackup "$Dest\.git" -Recurse -Force
 }
 
 Remove-Item $Temp -Recurse -Force
+
 cd $Dest
 ```

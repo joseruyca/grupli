@@ -422,6 +422,16 @@ class AppData {
     return row['id'].toString();
   }
 
+  static Future<int> addTournamentTeams(String tournamentId, List<String> names) async {
+    final clean = names.map((n) => n.trim()).where((n) => n.length >= 2).toSet().toList();
+    if (clean.isEmpty) return 0;
+    await sb.from('tournament_teams').insert(clean.map((name) => {
+      'tournament_id': tournamentId,
+      'name': name,
+    }).toList());
+    return clean.length;
+  }
+
   static Future<void> deleteTournamentTeam(String teamId) async {
     await sb.from('tournament_teams').delete().eq('id', teamId);
   }
@@ -440,8 +450,8 @@ class AppData {
     final rows = <Map<String, dynamic>>[];
     if (format == 'eliminatoria') {
       if (teams.length < 2) throw Exception('Añade al menos 2 participantes.');
-      if (teams.length % 2 != 0) {
-        throw Exception('Para una eliminatoria simple usa 2, 4, 8 o 16 participantes. Añade o quita uno para cerrar el cuadro.');
+      if (!isPowerOfTwo(teams.length)) {
+        throw Exception('Para una eliminatoria limpia usa 2, 4, 8 o 16 participantes. Así no hay rondas incompletas ni ganadores sueltos.');
       }
       for (var i = 0; i < teams.length; i += 2) {
         rows.add({
@@ -561,6 +571,8 @@ String eventStatusForUser(Map<String, dynamic> event, String userId) {
 }
 
 bool sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+
+bool isPowerOfTwo(int value) => value > 0 && (value & (value - 1)) == 0;
 
 int eventsInMonth(List<Map<String, dynamic>> events, DateTime month) {
   return events.where((e) {
@@ -1190,10 +1202,19 @@ class _GroupShellState extends State<GroupShell> {
           TournamentsTab(group: group, refreshSeed: refreshKey),
           GroupMoreTab(group: group, refresh: refresh),
         ];
-        return Scaffold(
-          backgroundColor: AppColors.white,
-          body: pages[tab],
-          bottomNavigationBar: GroupBottomNav(groupName: name, index: tab, onTap: (i) => setState(() => tab = i)),
+        return WillPopScope(
+          onWillPop: () async {
+            if (tab != 0) {
+              setState(() => tab = 0);
+              return false;
+            }
+            return true;
+          },
+          child: Scaffold(
+            backgroundColor: AppColors.white,
+            body: pages[tab],
+            bottomNavigationBar: GroupBottomNav(groupName: name, index: tab, onTap: (i) => setState(() => tab = i)),
+          ),
         );
       },
     );
@@ -1399,7 +1420,7 @@ class GroupMoreTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
         children: [
-          PageHeader(title: 'Más', subtitle: name, leading: true),
+          PageHeader(title: 'Más', subtitle: name, leading: false),
           const SizedBox(height: 18),
           SettingsRow(icon: Icons.person_add_alt_1_rounded, title: 'Invitar miembros', subtitle: 'Compartir el código del grupo', onTap: () => Share.share('Únete a $name en Grupli con el código $code')),
           SettingsRow(icon: Icons.qr_code_rounded, title: 'Código de invitación', subtitle: code, onTap: () => showCodeSheet(context, code, name)),
@@ -1844,7 +1865,7 @@ class _CalendarTabState extends State<CalendarTab> {
               color: AppColors.teal,
               onRefresh: () async => reload(),
               child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 112), children: [
-                PageHeader(title: 'Calendario', subtitle: AppData.text(widget.group['name']), leading: true),
+                PageHeader(title: 'Calendario', subtitle: AppData.text(widget.group['name']), leading: false),
                 const SizedBox(height: 14),
                 AppCard(child: Column(children: [
                   Row(children: [
@@ -1948,7 +1969,7 @@ class _FinancesTabState extends State<FinancesTab> {
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
               children: [
-                PageHeader(title: 'Finanzas', subtitle: AppData.text(widget.group['name']), leading: true),
+                PageHeader(title: 'Finanzas', subtitle: AppData.text(widget.group['name']), leading: false),
                 const SizedBox(height: 14),
                 AppCard(
                   padding: const EdgeInsets.all(16),
@@ -2498,7 +2519,7 @@ class _TournamentsTabState extends State<TournamentsTab> {
                   PageHeader(
                     title: 'Torneos / Ligas',
                     subtitle: 'Competiciones de ${AppData.text(widget.group['name'], 'tu grupo')}',
-                    leading: true,
+                    leading: false,
                   ),
                   const SizedBox(height: 16),
                   AppCard(
@@ -2712,7 +2733,11 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Ej. Ana y Javi / Equipo azul'),
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            hintText: 'Ej. Ana y Javi / Equipo azul',
+            helperText: 'Puede ser jugador, pareja o equipo.',
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
@@ -2730,12 +2755,68 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     }
   }
 
+  Future<void> addGroupMembers(List<Map<String, dynamic>> currentTeams) async {
+    try {
+      final members = await AppData.members(widget.group['id'].toString());
+      final existing = currentTeams
+          .map((team) => AppData.text(team['name']).trim().toLowerCase())
+          .where((name) => name.isNotEmpty)
+          .toSet();
+      final names = members
+          .map(memberDisplayName)
+          .where((name) => name.trim().length >= 2)
+          .where((name) => !existing.contains(name.trim().toLowerCase()))
+          .toList();
+
+      if (names.isEmpty) {
+        await showToast(context, 'No hay miembros nuevos para añadir.');
+        return;
+      }
+
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Añadir miembros del grupo'),
+          content: Text('Se añadirán ${names.length} miembros como participantes. Después podrás renombrarlos si quieres usar parejas o equipos.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Añadir')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+
+      final added = await AppData.addTournamentTeams(widget.tournamentId, names);
+      reload();
+      if (mounted) await showToast(context, '$added participantes añadidos.');
+    } catch (e) {
+      await showToast(context, e.toString(), danger: true);
+    }
+  }
+
   Future<void> generate(Map<String, dynamic> tournament) async {
     final teams = tournamentTeams(tournament);
+    final existingMatches = tournamentMatches(tournament);
+
+    if (existingMatches.isNotEmpty) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Regenerar partidos'),
+          content: const Text('Se borrarán los partidos y resultados actuales para crear un calendario nuevo con los participantes actuales.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Regenerar')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+
     try {
       await AppData.generateMatches(widget.tournamentId, AppData.text(tournament['format'], 'liga'), teams);
       reload();
-      if (mounted) await showToast(context, 'Partidos generados.');
+      if (mounted) await showToast(context, existingMatches.isEmpty ? 'Partidos generados.' : 'Partidos regenerados.');
     } catch (e) {
       await showToast(context, e.toString(), danger: true);
     }
@@ -2820,11 +2901,13 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                     PopupMenuButton<String>(
                       icon: const Icon(Icons.more_horiz_rounded, color: Colors.white),
                       onSelected: (value) {
+                        if (value == 'regenerate') generate(tournament);
                         if (value == 'finish') finish('finished');
                         if (value == 'reopen') finish('active');
                         if (value == 'delete') removeTournament();
                       },
                       itemBuilder: (_) => [
+                        if (teams.length >= 2) const PopupMenuItem(value: 'regenerate', child: Text('Regenerar partidos')),
                         if (status != 'finished') const PopupMenuItem(value: 'finish', child: Text('Marcar como finalizada')),
                         if (status == 'finished') const PopupMenuItem(value: 'reopen', child: Text('Reabrir competición')),
                         const PopupMenuItem(value: 'delete', child: Text('Eliminar competición')),
@@ -2853,6 +2936,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                   teams: teams,
                   matches: matches,
                   onAddTeam: addParticipant,
+                  onAddGroupMembers: () => addGroupMembers(teams),
                   onGenerate: () => generate(tournament),
                   onGenerateNext: () => generateNext(tournament),
                 ),
@@ -2874,6 +2958,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                     teams: teams,
                     matches: matches,
                     onAddTeam: addParticipant,
+                    onAddGroupMembers: () => addGroupMembers(teams),
                     onGenerate: () => generate(tournament),
                   )
                 else if (section == 1)
@@ -2889,6 +2974,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                     teams: teams,
                     matches: matches,
                     onAddTeam: addParticipant,
+                    onAddGroupMembers: () => addGroupMembers(teams),
                     onDeleted: reload,
                   ),
               ]),
@@ -2905,6 +2991,7 @@ class _TournamentNextStepCard extends StatelessWidget {
   final List<Map<String, dynamic>> teams;
   final List<Map<String, dynamic>> matches;
   final VoidCallback onAddTeam;
+  final VoidCallback onAddGroupMembers;
   final VoidCallback onGenerate;
   final VoidCallback onGenerateNext;
 
@@ -2913,6 +3000,7 @@ class _TournamentNextStepCard extends StatelessWidget {
     required this.teams,
     required this.matches,
     required this.onAddTeam,
+    required this.onAddGroupMembers,
     required this.onGenerate,
     required this.onGenerateNext,
   });
@@ -2976,7 +3064,12 @@ class _TournamentNextStepCard extends StatelessWidget {
             Text('$played resultados registrados', style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 12)),
           ],
         ])),
-        if (onTap != null && action.isNotEmpty)
+        if (teams.length < 2)
+          Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+            TextButton(onPressed: onAddTeam, child: const Text('Añadir', style: TextStyle(fontWeight: FontWeight.w900))),
+            TextButton(onPressed: onAddGroupMembers, child: const Text('Usar miembros', style: TextStyle(fontWeight: FontWeight.w900))),
+          ])
+        else if (onTap != null && action.isNotEmpty)
           TextButton(onPressed: onTap, child: Text(action, style: const TextStyle(fontWeight: FontWeight.w900))),
       ]),
     );
@@ -3018,6 +3111,7 @@ class _TournamentSummarySection extends StatelessWidget {
   final List<Map<String, dynamic>> teams;
   final List<Map<String, dynamic>> matches;
   final VoidCallback onAddTeam;
+  final VoidCallback onAddGroupMembers;
   final VoidCallback onGenerate;
 
   const _TournamentSummarySection({
@@ -3026,6 +3120,7 @@ class _TournamentSummarySection extends StatelessWidget {
     required this.teams,
     required this.matches,
     required this.onAddTeam,
+    required this.onAddGroupMembers,
     required this.onGenerate,
   });
 
@@ -3059,9 +3154,11 @@ class _TournamentSummarySection extends StatelessWidget {
       else
         ...top.asMap().entries.map((entry) => StandingRow(position: entry.key + 1, standing: entry.value)),
       const SizedBox(height: 14),
-      if (teams.length < 2)
-        PrimaryButton(label: 'Añadir participantes', icon: Icons.group_add_rounded, onTap: onAddTeam)
-      else if (matches.isEmpty)
+      if (teams.length < 2) ...[
+        PrimaryButton(label: 'Añadir participante', icon: Icons.group_add_rounded, onTap: onAddTeam),
+        const SizedBox(height: 10),
+        SecondaryButton(label: 'Añadir miembros del grupo', icon: Icons.groups_rounded, onTap: onAddGroupMembers),
+      ] else if (matches.isEmpty)
         PrimaryButton(label: 'Generar partidos', icon: Icons.auto_awesome_motion_rounded, onTap: onGenerate),
     ]);
   }
@@ -3117,8 +3214,9 @@ class _TournamentTeamsSection extends StatelessWidget {
   final List<Map<String, dynamic>> teams;
   final List<Map<String, dynamic>> matches;
   final VoidCallback onAddTeam;
+  final VoidCallback onAddGroupMembers;
   final VoidCallback onDeleted;
-  const _TournamentTeamsSection({required this.teams, required this.matches, required this.onAddTeam, required this.onDeleted});
+  const _TournamentTeamsSection({required this.teams, required this.matches, required this.onAddTeam, required this.onAddGroupMembers, required this.onDeleted});
 
   Future<void> deleteTeam(BuildContext context, Map<String, dynamic> team) async {
     if (matches.isNotEmpty) {
@@ -3149,8 +3247,8 @@ class _TournamentTeamsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Text('Participantes', style: Theme.of(context).textTheme.titleLarge),
-        const Spacer(),
+        Expanded(child: Text('Participantes', style: Theme.of(context).textTheme.titleLarge)),
+        TextButton.icon(onPressed: onAddGroupMembers, icon: const Icon(Icons.groups_rounded), label: const Text('Miembros')),
         TextButton.icon(onPressed: onAddTeam, icon: const Icon(Icons.add_rounded), label: const Text('Añadir')),
       ]),
       const SizedBox(height: 8),
@@ -3664,10 +3762,27 @@ class RootBottomNav extends StatelessWidget {
 class GroupBottomNav extends StatelessWidget {
   final String groupName; final int index; final ValueChanged<int> onTap;
   const GroupBottomNav({super.key, required this.groupName, required this.index, required this.onTap});
-  @override Widget build(BuildContext context) => Container(color: Colors.white, child: Column(mainAxisSize: MainAxisSize.min, children: [
-    Container(width: double.infinity, padding: const EdgeInsets.only(top: 9), child: Center(child: Text('Estás dentro de $groupName 🔒', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.ink)))),
-    BottomBar(items: const [NavSpec(Icons.home_rounded, 'Inicio'), NavSpec(Icons.calendar_month_rounded, 'Calendario'), NavSpec(Icons.account_balance_wallet_rounded, 'Finanzas'), NavSpec(Icons.emoji_events_rounded, 'Torneos'), NavSpec(Icons.more_horiz_rounded, 'Más')], index: index, onTap: onTap),
-  ]));
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.line)),
+      ),
+      child: BottomBar(
+        items: const [
+          NavSpec(Icons.home_rounded, 'Inicio'),
+          NavSpec(Icons.calendar_month_rounded, 'Calendario'),
+          NavSpec(Icons.account_balance_wallet_rounded, 'Finanzas'),
+          NavSpec(Icons.emoji_events_rounded, 'Torneos'),
+          NavSpec(Icons.more_horiz_rounded, 'Más'),
+        ],
+        index: index,
+        onTap: onTap,
+      ),
+    );
+  }
 }
 
 class NavSpec { final IconData icon; final String label; const NavSpec(this.icon, this.label); }

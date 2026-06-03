@@ -38,3 +38,11 @@ Mejora completa de Finanzas: balances por miembro, quién debe a quién, formula
 ## v12.5 Calendario + eventos unidos
 
 Mejora el flujo de eventos/quedadas: Inicio muestra próximos eventos con asistencia directa; Calendario permite crear eventos desde el día seleccionado, responder asistencia, abrir detalle, editar y cancelar. No añade SQL nuevo.
+
+
+## v12.6
+
+- Quitada frase inferior dentro del grupo.
+- Back dentro de pestañas vuelve a Inicio del grupo.
+- Pestañas de grupo sin flecha superior.
+- Torneos mejorados: importar miembros, regenerar partidos, eliminatorias limpias.
