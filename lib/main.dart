@@ -1354,9 +1354,9 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
     for (final expense in expenses) {
       if (AppData.text(expense['status'], 'pending') == 'paid') continue;
       final paidBy = expense['paid_by']?.toString();
-      final participants = asList(expense['expense_participants']);
+      final participants = AppData.asList(expense['expense_participants']);
       for (final row in participants) {
-        final item = asMap(row);
+        final item = AppData.asMap(row);
         final rowUserId = item['user_id']?.toString();
         final share = AppData.doubleValue(item['share_amount']);
         final paid = item['paid'] == true;
@@ -1376,12 +1376,12 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
 
   int _pendingMatches(Map<String, dynamic>? tournament) {
     if (tournament == null) return 0;
-    return asList(tournament['matches']).where((m) => AppData.text(asMap(m)['status'], 'pending') != 'played').length;
+    return AppData.asList(tournament['matches']).where((m) => AppData.text(AppData.asMap(m)['status'], 'pending') != 'played').length;
   }
 
   int _teamCount(Map<String, dynamic>? tournament) {
     if (tournament == null) return 0;
-    return asList(tournament['tournament_teams']).length;
+    return AppData.asList(tournament['tournament_teams']).length;
   }
 
   @override
@@ -1565,7 +1565,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                               children: [
                                 QuickActionButton(icon: Icons.add_task_rounded, label: 'Quedada', onTap: openCreateEvent),
                                 QuickActionButton(icon: Icons.wallet_rounded, label: 'Gasto', onTap: () async {
-                                  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => CreateExpenseScreen(group: group)));
+                                  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => CreateExpenseScreen(groupId: group['id'].toString())));
                                   reload();
                                 }),
                                 QuickActionButton(icon: Icons.emoji_events_rounded, label: 'Torneo', onTap: () => widget.onNavigateTab?.call(3)),
