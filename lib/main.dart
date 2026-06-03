@@ -409,25 +409,43 @@ class AppData {
   }
 
   static Future<String> createExpense(String groupId, String concept, double amount, String paidBy, List<String> participantIds, String note) async {
-    final current = user?.id;
     final participantSet = <String>{...participantIds, paidBy};
     final participants = participantSet.where((id) => id.trim().isNotEmpty).toList();
+    final share = participants.isEmpty ? amount : amount / participants.length;
+    return createExpenseWithShares(
+      groupId,
+      concept,
+      amount,
+      paidBy,
+      {for (final id in participants) id: double.parse(share.toStringAsFixed(2))},
+      note,
+    );
+  }
+
+  static Future<String> createExpenseWithShares(String groupId, String concept, double amount, String paidBy, Map<String, double> shares, String note) async {
+    final current = user?.id;
+    final cleanShares = <String, double>{};
+    shares.forEach((id, value) {
+      if (id.trim().isEmpty) return;
+      final cleanValue = double.parse(max(0, value).toStringAsFixed(2));
+      if (cleanValue > 0 || id == paidBy) cleanShares[id] = cleanValue;
+    });
+    cleanShares.putIfAbsent(paidBy, () => 0);
     final expense = await sb.from('expenses').insert({
       'group_id': groupId,
       'concept': concept.trim(),
-      'amount': amount,
+      'amount': double.parse(amount.toStringAsFixed(2)),
       'paid_by': paidBy,
       'created_by': current,
       'note': note.trim().isEmpty ? null : note.trim(),
       'status': 'pending',
     }).select('id').single();
     final expenseId = expense['id'].toString();
-    final share = participants.isEmpty ? amount : amount / participants.length;
-    final rows = participants.map((id) => {
+    final rows = cleanShares.entries.map((entry) => {
       'expense_id': expenseId,
-      'user_id': id,
-      'share_amount': double.parse(share.toStringAsFixed(2)),
-      'paid': id == paidBy,
+      'user_id': entry.key,
+      'share_amount': double.parse(entry.value.toStringAsFixed(2)),
+      'paid': entry.key == paidBy,
     }).toList();
     if (rows.isNotEmpty) await sb.from('expense_participants').insert(rows);
     return expenseId;
@@ -435,6 +453,12 @@ class AppData {
 
   static Future<void> setExpenseParticipantPaid(String expenseId, String userId, bool paid) async {
     await sb.from('expense_participants').update({'paid': paid}).eq('expense_id', expenseId).eq('user_id', userId);
+    final rows = asList(await sb.from('expense_participants').select('paid').eq('expense_id', expenseId));
+    final allPaid = rows.isNotEmpty && rows.every((row) => row['paid'] == true);
+    await sb.from('expenses').update({
+      'status': allPaid ? 'paid' : 'pending',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', expenseId);
   }
 
   static Future<void> markExpenseSettled(String expenseId) async {
@@ -2289,9 +2313,13 @@ class _FinancesTabState extends State<FinancesTab> {
   void load() => future = _FinanceData.load(widget.group['id'].toString());
   void reload() => setState(load);
 
+  Future<void> openCreate() async {
+    final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateExpenseScreen(groupId: widget.group['id'].toString())));
+    if (ok == true) reload();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final groupId = widget.group['id'].toString();
     return SafeArea(
       bottom: false,
       child: Stack(children: [
@@ -2307,79 +2335,88 @@ class _FinancesTabState extends State<FinancesTab> {
                 children: [ErrorBlock(message: snapshot.error.toString(), onRetry: reload)],
               );
             }
+
             final data = snapshot.data ?? _FinanceData.empty();
             final summary = data.summary;
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
-              children: [
-                PageHeader(title: 'Finanzas', subtitle: AppData.text(widget.group['name']), leading: false),
-                const SizedBox(height: 14),
-                AppCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: const BoxDecoration(color: AppColors.tealSoft, shape: BoxShape.circle),
-                        child: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.teal),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(_financeMainTitle(summary), style: Theme.of(context).textTheme.titleLarge),
-                        const SizedBox(height: 3),
-                        Text(_financeMainSubtitle(summary), style: Theme.of(context).textTheme.bodyMedium),
-                      ])),
-                    ]),
-                    const SizedBox(height: 16),
-                    Row(children: [
-                      Expanded(child: MoneyStat(label: 'Tu saldo', value: summary.myNet, positiveMeansGood: true)),
-                      const SizedBox(width: 10),
-                      Expanded(child: MoneyStat(label: 'Pendiente', value: -summary.pendingAmount, positiveMeansGood: false)),
-                    ]),
+            final pendingExpenses = data.expenses.where((e) => AppData.text(e['status'], 'pending') != 'paid').toList();
+            final settledExpenses = data.expenses.where((e) => AppData.text(e['status'], 'pending') == 'paid').toList();
+            final pendingCount = pendingExpenses.length;
+            final settledCount = settledExpenses.length;
+
+            return RefreshIndicator(
+              color: AppColors.teal,
+              onRefresh: () async => reload(),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
+                children: [
+                  PageHeader(title: 'Finanzas', subtitle: 'Cuentas claras para ${AppData.text(widget.group['name'], 'el grupo')}', leading: false),
+                  const SizedBox(height: 14),
+                  FinanceHeroCard(summary: summary, onCreate: openCreate),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: FinanceMiniMetric(icon: Icons.receipt_long_rounded, label: 'Total', value: money(summary.totalExpenses), color: AppColors.teal)),
+                    const SizedBox(width: 10),
+                    Expanded(child: FinanceMiniMetric(icon: Icons.pending_actions_rounded, label: 'Abiertos', value: pendingCount.toString(), color: AppColors.amber)),
+                    const SizedBox(width: 10),
+                    Expanded(child: FinanceMiniMetric(icon: Icons.verified_rounded, label: 'Liquidados', value: settledCount.toString(), color: AppColors.green)),
                   ]),
-                ),
-                const SizedBox(height: 12),
-                Row(children: [
-                  Expanded(child: StatCard(icon: Icons.receipt_long_rounded, value: money(summary.totalExpenses), label: 'Gasto total', color: AppColors.teal)),
-                  const SizedBox(width: 10),
-                  Expanded(child: StatCard(icon: Icons.people_alt_rounded, value: data.members.length.toString(), label: 'Participantes', color: AppColors.violet)),
-                ]),
-                const SizedBox(height: 22),
-                SectionHeader(title: 'Quién debe a quién', action: 'Actualizar', onTap: reload),
-                const SizedBox(height: 8),
-                if (summary.settlements.isEmpty)
-                  EmptySlim(icon: Icons.verified_rounded, title: 'Todo está cuadrado', body: 'No hay pagos pendientes entre los miembros del grupo.')
-                else
-                  AppCard(child: Column(children: [
-                    ...summary.settlements.take(4).map((d) => SettlementRow(debt: d)),
-                    if (summary.settlements.length > 4) Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text('+ ${summary.settlements.length - 4} pagos más para dejarlo a cero', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 20),
+                  SectionHeader(title: 'Plan para dejarlo a cero', action: 'Actualizar', onTap: reload),
+                  const SizedBox(height: 8),
+                  if (summary.settlements.isEmpty)
+                    EmptySlim(icon: Icons.verified_rounded, title: 'Todo está cuadrado', body: 'No hace falta mover dinero entre miembros ahora mismo.')
+                  else
+                    AppCard(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Column(children: [
+                        for (int i = 0; i < summary.settlements.length; i++) ...[
+                          SettlementPaymentRow(debt: summary.settlements[i]),
+                          if (i != summary.settlements.length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
+                        ],
+                      ]),
                     ),
-                  ])),
-                const SizedBox(height: 22),
-                SectionHeader(title: 'Balances individuales'),
-                const SizedBox(height: 8),
-                AppCard(child: Column(children: summary.balances.entries.map((entry) {
-                  final name = summary.names[entry.key] ?? 'Miembro';
-                  return BalanceRow(name: name, value: entry.value);
-                }).toList())),
-                const SizedBox(height: 22),
-                SectionHeader(title: 'Gastos recientes'),
-                const SizedBox(height: 8),
-                if (data.expenses.isEmpty)
-                  EmptyBlock(icon: Icons.account_balance_wallet_rounded, title: 'Sin gastos', body: 'Añade pistas, cenas, gasolina, reservas o compras comunes. Grupli calculará quién debe a quién.')
-                else
-                  ...data.expenses.map((e) => ExpenseCard(
-                    expense: e,
-                    members: data.members,
-                    onTap: () async {
-                      final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ExpenseDetailScreen(expense: e, members: data.members)));
-                      if (ok == true) reload();
-                    },
-                  )),
-              ],
+                  const SizedBox(height: 20),
+                  SectionHeader(title: 'Balances individuales'),
+                  const SizedBox(height: 8),
+                  if (summary.balances.isEmpty)
+                    EmptySlim(icon: Icons.people_alt_rounded, title: 'Sin miembros para calcular balances')
+                  else
+                    AppCard(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Column(children: summary.balances.entries.map((entry) {
+                        final name = summary.names[entry.key] ?? 'Miembro';
+                        return BalanceRow(name: name, value: entry.value);
+                      }).toList()),
+                    ),
+                  const SizedBox(height: 20),
+                  SectionHeader(title: 'Gastos abiertos', action: 'Añadir', onTap: openCreate),
+                  const SizedBox(height: 8),
+                  if (pendingExpenses.isEmpty)
+                    EmptyBlock(icon: Icons.account_balance_wallet_rounded, title: 'No hay gastos pendientes', body: 'Cuando alguien pague una pista, cena o reserva, Grupli calculará automáticamente quién debe a quién.')
+                  else
+                    ...pendingExpenses.map((e) => ExpenseCard(
+                      expense: e,
+                      members: data.members,
+                      onTap: () async {
+                        final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ExpenseDetailScreen(expense: e, members: data.members)));
+                        if (ok == true) reload();
+                      },
+                    )),
+                  if (settledExpenses.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    SectionHeader(title: 'Historial liquidado', action: '${settledExpenses.length} gastos'),
+                    const SizedBox(height: 8),
+                    ...settledExpenses.take(5).map((e) => ExpenseCard(
+                      expense: e,
+                      members: data.members,
+                      onTap: () async {
+                        final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ExpenseDetailScreen(expense: e, members: data.members)));
+                        if (ok == true) reload();
+                      },
+                    )),
+                  ],
+                ],
+              ),
             );
           },
         ),
@@ -2389,10 +2426,7 @@ class _FinancesTabState extends State<FinancesTab> {
           child: FloatingActionButton.extended(
             backgroundColor: AppColors.teal,
             foregroundColor: Colors.white,
-            onPressed: () async {
-              final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateExpenseScreen(groupId: groupId)));
-              if (ok == true) reload();
-            },
+            onPressed: openCreate,
             icon: const Icon(Icons.add_rounded),
             label: const Text('Gasto', style: TextStyle(fontWeight: FontWeight.w900)),
           ),
@@ -2418,12 +2452,16 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
   String? paidBy;
   String splitMode = 'all';
   final selected = <String>{};
+  final customShares = <String, TextEditingController>{};
   late Future<List<Map<String, dynamic>>> membersFuture;
 
   @override
   void initState() {
     super.initState();
     membersFuture = AppData.members(widget.groupId);
+    amount.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -2431,25 +2469,79 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
     concept.dispose();
     amount.dispose();
     note.dispose();
+    for (final controller in customShares.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
+
+  double get amountValue => double.tryParse(amount.text.replaceAll(',', '.')) ?? 0;
 
   void initMembers(List<Map<String, dynamic>> members) {
     if (initialized || members.isEmpty) return;
     paidBy = members.any((m) => m['user_id']?.toString() == AppData.user?.id) ? AppData.user?.id : members.first['user_id'].toString();
     selected.addAll(members.map((m) => m['user_id'].toString()));
+    for (final member in members) {
+      final id = member['user_id'].toString();
+      customShares[id] = TextEditingController();
+    }
     initialized = true;
   }
 
-  Future<void> save() async {
-    final value = double.tryParse(amount.text.replaceAll(',', '.')) ?? 0;
+  void setMode(String mode, List<Map<String, dynamic>> members) {
+    setState(() {
+      splitMode = mode;
+      if (mode == 'all') {
+        selected
+          ..clear()
+          ..addAll(members.map((m) => m['user_id'].toString()));
+      }
+      if (paidBy != null) selected.add(paidBy!);
+      if (mode == 'custom') syncCustomShares(members);
+    });
+  }
+
+  void syncCustomShares(List<Map<String, dynamic>> members) {
+    final ids = selected.toList();
+    final equal = ids.isEmpty ? 0.0 : amountValue / ids.length;
+    for (final member in members) {
+      final id = member['user_id'].toString();
+      final controller = customShares.putIfAbsent(id, () => TextEditingController());
+      if (selected.contains(id) && controller.text.trim().isEmpty) {
+        controller.text = equal > 0 ? equal.toStringAsFixed(2).replaceAll('.', ',') : '';
+      }
+      if (!selected.contains(id)) controller.text = '';
+    }
+  }
+
+  double customShareFor(String id) => double.tryParse((customShares[id]?.text ?? '').replaceAll(',', '.')) ?? 0;
+
+  double customTotal() => selected.fold<double>(0, (sum, id) => sum + customShareFor(id));
+
+  Map<String, double> sharesFor(List<Map<String, dynamic>> members) {
+    if (splitMode == 'custom') {
+      return {for (final id in selected) id: double.parse(customShareFor(id).toStringAsFixed(2))};
+    }
+    final share = selected.isEmpty ? 0.0 : amountValue / selected.length;
+    return {for (final id in selected) id: double.parse(share.toStringAsFixed(2))};
+  }
+
+  Future<void> save(List<Map<String, dynamic>> members) async {
+    final value = amountValue;
     if (concept.text.trim().isEmpty || value <= 0 || paidBy == null || selected.isEmpty) {
       await showToast(context, 'Completa concepto, importe, pagador y participantes.', danger: true);
       return;
     }
+    if (splitMode == 'custom') {
+      final total = customTotal();
+      if ((total - value).abs() > .05) {
+        await showToast(context, 'Los importes personalizados deben sumar ${money(value)}.', danger: true);
+        return;
+      }
+    }
     setState(() => loading = true);
     try {
-      await AppData.createExpense(widget.groupId, concept.text, value, paidBy!, selected.toList(), note.text);
+      await AppData.createExpenseWithShares(widget.groupId, concept.text, value, paidBy!, sharesFor(members), note.text);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       await showToast(context, e.toString(), danger: true);
@@ -2461,9 +2553,18 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
   @override
   Widget build(BuildContext context) {
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: 'Nuevo gasto', subtitle: 'Divide claro, sin cálculos raros', leading: true),
+      PageHeader(title: 'Nuevo gasto', subtitle: 'Como Tricount: claro, rápido y sin cuentas manuales', leading: true),
       const SizedBox(height: 18),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(width: 46, height: 46, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.receipt_long_rounded, color: AppColors.teal)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('¿Qué se ha pagado?', style: Theme.of(context).textTheme.titleMedium),
+            Text('Elige quién pagó y cómo se reparte.', style: Theme.of(context).textTheme.bodyMedium),
+          ])),
+        ]),
+        const SizedBox(height: 16),
         FieldLabel('Concepto'),
         TextField(controller: concept, decoration: const InputDecoration(hintText: 'Ej. Pista de pádel, cena, gasolina...')),
         const SizedBox(height: 12),
@@ -2476,10 +2577,13 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
         builder: (context, snapshot) {
           final members = snapshot.data ?? [];
           initMembers(members);
-          final value = double.tryParse(amount.text.replaceAll(',', '.')) ?? 0;
-          final share = selected.isEmpty ? 0 : value / selected.length;
+          final value = amountValue;
+          final equalShare = selected.isEmpty ? 0.0 : value / selected.length;
+          final custom = customTotal();
+          final diff = value - custom;
           if (snapshot.connectionState == ConnectionState.waiting) return const CenterLoader(label: 'Cargando miembros...');
           if (snapshot.hasError) return ErrorBlock(message: snapshot.error.toString(), onRetry: () => setState(() => membersFuture = AppData.members(widget.groupId)));
+          if (members.isEmpty) return EmptyBlock(icon: Icons.groups_rounded, title: 'No hay miembros', body: 'Añade miembros al grupo para poder repartir gastos.');
           return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               FieldLabel('Pagado por'),
@@ -2489,16 +2593,19 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
                 onChanged: (v) => setState(() {
                   paidBy = v;
                   if (v != null) selected.add(v);
+                  if (splitMode == 'custom') syncCustomShares(members);
                 }),
               ),
             ])),
             const SizedBox(height: 14),
             AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              FieldLabel('Dividir entre'),
+              FieldLabel('Reparto'),
               Row(children: [
-                Expanded(child: ChoicePill(label: 'Todos', active: splitMode == 'all', onTap: () => setState(() { splitMode = 'all'; selected..clear()..addAll(members.map((m) => m['user_id'].toString())); }))),
+                Expanded(child: ChoicePill(label: 'Todos', active: splitMode == 'all', onTap: () => setMode('all', members))),
                 const SizedBox(width: 8),
-                Expanded(child: ChoicePill(label: 'Algunos', active: splitMode == 'some', onTap: () => setState(() => splitMode = 'some'))),
+                Expanded(child: ChoicePill(label: 'Algunos', active: splitMode == 'some', onTap: () => setMode('some', members))),
+                const SizedBox(width: 8),
+                Expanded(child: ChoicePill(label: 'Manual', active: splitMode == 'custom', onTap: () => setMode('custom', members))),
               ]),
               const SizedBox(height: 12),
               Wrap(spacing: 9, runSpacing: 9, children: members.map((m) {
@@ -2508,22 +2615,50 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
                   label: Text(memberName(m)),
                   selected: active,
                   onSelected: (v) => setState(() {
-                    splitMode = 'some';
-                    if (v) selected.add(id); else selected.remove(id);
+                    if (splitMode == 'all') splitMode = 'some';
+                    if (v) {
+                      selected.add(id);
+                    } else {
+                      selected.remove(id);
+                    }
                     if (paidBy != null) selected.add(paidBy!);
+                    if (splitMode == 'custom') syncCustomShares(members);
                   }),
                 );
               }).toList()),
+              if (splitMode == 'custom') ...[
+                const SizedBox(height: 14),
+                FieldLabel('Importe por persona'),
+                ...members.where((m) => selected.contains(m['user_id'].toString())).map((m) {
+                  final id = m['user_id'].toString();
+                  final controller = customShares.putIfAbsent(id, () => TextEditingController());
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(children: [
+                      Expanded(child: Text(memberName(m), style: const TextStyle(fontWeight: FontWeight.w900))),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 108,
+                        child: TextField(
+                          controller: controller,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          textAlign: TextAlign.right,
+                          decoration: const InputDecoration(hintText: '0,00'),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                    ]),
+                  );
+                }),
+              ],
               const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(15)),
-                child: Row(children: [
-                  const Icon(Icons.calculate_rounded, color: AppColors.teal),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(selected.isEmpty ? 'Elige al menos un participante.' : '${selected.length} participantes · cada uno debe ${money(share.toDouble())}', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
-                ]),
+              FinanceSplitPreview(
+                participants: selected.length,
+                amount: value,
+                equalShare: equalShare,
+                customMode: splitMode == 'custom',
+                customTotal: custom,
+                diff: diff,
               ),
             ])),
           ]);
@@ -2535,7 +2670,13 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
         TextField(controller: note, maxLines: 3, decoration: const InputDecoration(hintText: 'Ej. Reserva incluida, se pagó con tarjeta...')),
       ])),
       const SizedBox(height: 24),
-      PrimaryButton(label: 'Guardar gasto', loading: loading, onTap: save),
+      FutureBuilder<List<Map<String, dynamic>>>(
+        future: membersFuture,
+        builder: (context, snapshot) {
+          final members = snapshot.data ?? [];
+          return PrimaryButton(label: 'Guardar gasto', loading: loading, onTap: () => save(members));
+        },
+      ),
     ]));
   }
 }
@@ -2609,7 +2750,13 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
             ])),
             Text(money(share.toDouble()), style: const TextStyle(fontWeight: FontWeight.w900)),
             const SizedBox(width: 8),
-            Icon(paid ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, color: paid ? AppColors.green : AppColors.muted),
+            userId == paidBy
+                ? const Icon(Icons.payments_rounded, color: AppColors.teal)
+                : IconButton(
+                    tooltip: paid ? 'Marcar pendiente' : 'Marcar pagado',
+                    onPressed: loading ? null : () => run(() => AppData.setExpenseParticipantPaid(expenseId, userId, !paid)),
+                    icon: Icon(paid ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, color: paid ? AppColors.green : AppColors.muted),
+                  ),
           ]),
         );
       }).toList())),
@@ -2621,6 +2768,147 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
       const SizedBox(height: 10),
       DangerButton(label: 'Eliminar gasto', icon: Icons.delete_outline_rounded, onTap: () => run(() => AppData.deleteExpense(expenseId))),
     ]));
+  }
+}
+
+class FinanceHeroCard extends StatelessWidget {
+  final FinanceSummary summary;
+  final VoidCallback onCreate;
+  const FinanceHeroCard({super.key, required this.summary, required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = summary.pendingAmount <= .01 ? AppColors.green : summary.myNet < -0.01 ? AppColors.red : AppColors.teal;
+    final icon = summary.pendingAmount <= .01
+        ? Icons.verified_rounded
+        : summary.myNet < -0.01
+            ? Icons.outbound_rounded
+            : Icons.savings_rounded;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        gradient: LinearGradient(colors: [color, Color.lerp(color, AppColors.ink, .18)!], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        boxShadow: [BoxShadow(color: color.withOpacity(.18), blurRadius: 22, offset: const Offset(0, 12))],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(width: 48, height: 48, decoration: BoxDecoration(color: Colors.white.withOpacity(.18), borderRadius: BorderRadius.circular(17)), child: Icon(icon, color: Colors.white, size: 26)),
+            const SizedBox(width: 13),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_financeMainTitle(summary), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -0.5)),
+              const SizedBox(height: 7),
+              Text(_financeMainSubtitle(summary), style: const TextStyle(color: Color(0xEFFFFFFF), fontSize: 13, fontWeight: FontWeight.w700, height: 1.35)),
+            ])),
+          ]),
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(child: _HeroFinanceMetric(label: 'Tu saldo', value: money(summary.myNet))),
+            const SizedBox(width: 10),
+            Expanded(child: _HeroFinanceMetric(label: 'Pendiente', value: money(summary.pendingAmount))),
+          ]),
+          const SizedBox(height: 14),
+          WhiteButton(label: 'Añadir gasto', onTap: onCreate),
+        ]),
+      ),
+    );
+  }
+}
+
+class _HeroFinanceMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  const _HeroFinanceMetric({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(.14), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(.14))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 11, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+      ]),
+    );
+  }
+}
+
+class FinanceMiniMetric extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  const FinanceMiniMetric({super.key, required this.icon, required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      color: AppColors.surface,
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 30, height: 30, decoration: BoxDecoration(color: color.withOpacity(.12), shape: BoxShape.circle), child: Icon(icon, size: 17, color: color)),
+        const SizedBox(height: 7),
+        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink, fontSize: 14)),
+        const SizedBox(height: 2),
+        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.muted, fontSize: 10.5)),
+      ]),
+    );
+  }
+}
+
+class SettlementPaymentRow extends StatelessWidget {
+  final SettlementDebt debt;
+  const SettlementPaymentRow({super.key, required this.debt});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      child: Row(children: [
+        Container(width: 36, height: 36, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.swap_horiz_rounded, color: AppColors.teal, size: 20)),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${debt.fromName} paga a ${debt.toName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+          const SizedBox(height: 2),
+          const Text('Pago recomendado para cuadrar el grupo', style: TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
+        ])),
+        const SizedBox(width: 8),
+        Text(money(debt.amount), style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 15)),
+      ]),
+    );
+  }
+}
+
+class FinanceSplitPreview extends StatelessWidget {
+  final int participants;
+  final double amount;
+  final double equalShare;
+  final bool customMode;
+  final double customTotal;
+  final double diff;
+  const FinanceSplitPreview({super.key, required this.participants, required this.amount, required this.equalShare, required this.customMode, required this.customTotal, required this.diff});
+
+  @override
+  Widget build(BuildContext context) {
+    final ok = !customMode || diff.abs() <= .05;
+    final color = ok ? AppColors.teal : AppColors.red;
+    final text = participants == 0
+        ? 'Elige al menos un participante.'
+        : customMode
+            ? (ok ? 'Reparto manual equilibrado · total ${money(customTotal)}' : 'Faltan/sobran ${money(diff.abs())} para cuadrar el total')
+            : '$participants participantes · cada uno debe ${money(equalShare)}';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(15), border: Border.all(color: color.withOpacity(.18))),
+      child: Row(children: [
+        Icon(ok ? Icons.calculate_rounded : Icons.warning_amber_rounded, color: color),
+        const SizedBox(width: 10),
+        Expanded(child: Text(text, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
+      ]),
+    );
   }
 }
 

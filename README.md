@@ -90,3 +90,9 @@ Corrección incluida: `docs/V14_2_COMPILE_FIX.md`.
 
 
 Última mejora incluida: `docs/V14_4_CALENDAR_EVENTS_POLISH.md`.
+
+
+Última mejora incluida: `docs/V14_5_FINANCES_TRICOUNT_FINAL.md`.
+
+
+Última corrección incluida: `docs/V14_5_1_FINANCES_COMPILE_FIX.md`.
