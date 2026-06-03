@@ -84,3 +84,9 @@ Pulido visual global: tarjetas más suaves, navegación inferior mejorada, Home 
 Última mejora incluida: `docs/V14_1_SMART_GROUP_HOME.md`.
 
 Corrección incluida: `docs/V14_2_COMPILE_FIX.md`.
+
+
+Última mejora incluida: `docs/V14_3_GROUP_HOME_PREMIUM_DASHBOARD.md`.
+
+
+Última mejora incluida: `docs/V14_4_CALENDAR_EVENTS_POLISH.md`.

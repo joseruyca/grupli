@@ -1575,6 +1575,17 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                           ],
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      SectionHeader(title: 'Actividad real', action: 'Actualizar', onTap: reload),
+                      const SizedBox(height: 8),
+                      DashboardActivityCard(
+                        events: events,
+                        expenses: data?.expenses ?? const <Map<String, dynamic>>[],
+                        tournaments: data?.tournaments ?? const <Map<String, dynamic>>[],
+                        onOpenCalendar: () => widget.onNavigateTab?.call(1),
+                        onOpenFinances: () => widget.onNavigateTab?.call(2),
+                        onOpenTournaments: () => widget.onNavigateTab?.call(3),
+                      ),
                       if (upcoming.length > 1) ...[
                         const SizedBox(height: 16),
                         SectionHeader(title: 'Más adelante', action: 'Ver todo', onTap: () => widget.onNavigateTab?.call(1)),
@@ -1757,6 +1768,7 @@ class _EventsTabState extends State<EventsTab> {
 }
 
 
+
 class CreateEventScreen extends StatefulWidget {
   final Map<String, dynamic> group;
   final DateTime? initialDate;
@@ -1775,6 +1787,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   TimeOfDay time = const TimeOfDay(hour: 20, minute: 0);
   int minPeople = 2;
   bool loading = false;
+  String template = 'Quedada';
 
   bool get editing => widget.event != null;
 
@@ -1789,6 +1802,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     location.text = AppData.text(event?['location']);
     notes.text = AppData.text(event?['notes']);
     minPeople = AppData.intValue(event?['min_people'], 2);
+    if (title.text.toLowerCase().contains('partido')) template = 'Partido';
+    if (title.text.toLowerCase().contains('entrenamiento')) template = 'Entrenamiento';
+    if (title.text.toLowerCase().contains('cena')) template = 'Cena';
+    if (title.text.toLowerCase().contains('reunión') || title.text.toLowerCase().contains('reunion')) template = 'Reunión';
   }
 
   @override
@@ -1800,7 +1817,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   }
 
   void applyTemplate(String value) {
-    if (title.text.trim().isEmpty) title.text = value;
+    setState(() {
+      template = value;
+      if (title.text.trim().isEmpty || ['Quedada', 'Partido', 'Entrenamiento', 'Cena del grupo', 'Reunión'].contains(title.text.trim())) {
+        title.text = value == 'Cena' ? 'Cena del grupo' : value;
+      }
+      if (value == 'Partido' && minPeople < 4) minPeople = 4;
+      if (value == 'Entrenamiento' && minPeople < 2) minPeople = 2;
+      if (value == 'Cena' && minPeople < 2) minPeople = 2;
+      if (value == 'Reunión' && minPeople < 2) minPeople = 2;
+    });
   }
 
   Future<void> save() async {
@@ -1828,54 +1854,66 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   @override
   Widget build(BuildContext context) {
     final groupName = AppData.text(widget.group['name'], 'Grupo');
+    final previewDate = DateTime(date.year, date.month, date.day, time.hour, time.minute);
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       PageHeader(title: editing ? 'Editar evento' : 'Nuevo evento', subtitle: groupName, leading: true),
-      const SizedBox(height: 16),
-      AppCard(
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(width: 46, height: 46, decoration: const BoxDecoration(color: AppColors.tealSoft, shape: BoxShape.circle), child: const Icon(Icons.event_available_rounded, color: AppColors.teal)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Crea una quedada fácil de responder', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 5),
-            const Text('El grupo verá el evento en Inicio y Calendario, y podrá marcar Voy, Duda o No voy.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600, height: 1.35)),
-          ])),
-        ]),
+      const SizedBox(height: 14),
+      EventFormPreviewCard(
+        title: title.text.trim().isEmpty ? (editing ? 'Evento del grupo' : 'Nueva quedada') : title.text.trim(),
+        date: previewDate,
+        location: location.text.trim(),
+        minPeople: minPeople,
+        template: template,
       ),
       const SizedBox(height: 16),
-      FieldLabel('Plantillas rápidas'),
+      SectionHeader(title: 'Tipo de plan'),
+      const SizedBox(height: 8),
       Wrap(spacing: 8, runSpacing: 8, children: [
-        QuickTemplateChip(label: 'Partido', onTap: () => applyTemplate('Partido')),
-        QuickTemplateChip(label: 'Entrenamiento', onTap: () => applyTemplate('Entrenamiento')),
-        QuickTemplateChip(label: 'Cena del grupo', onTap: () => applyTemplate('Cena del grupo')),
-        QuickTemplateChip(label: 'Reunión', onTap: () => applyTemplate('Reunión')),
+        EventTemplateChoice(label: 'Quedada', icon: Icons.groups_rounded, selected: template == 'Quedada', onTap: () => applyTemplate('Quedada')),
+        EventTemplateChoice(label: 'Partido', icon: Icons.sports_soccer_rounded, selected: template == 'Partido', onTap: () => applyTemplate('Partido')),
+        EventTemplateChoice(label: 'Entrenamiento', icon: Icons.fitness_center_rounded, selected: template == 'Entrenamiento', onTap: () => applyTemplate('Entrenamiento')),
+        EventTemplateChoice(label: 'Cena', icon: Icons.restaurant_rounded, selected: template == 'Cena', onTap: () => applyTemplate('Cena')),
+        EventTemplateChoice(label: 'Reunión', icon: Icons.forum_rounded, selected: template == 'Reunión', onTap: () => applyTemplate('Reunión')),
       ]),
       const SizedBox(height: 16),
-      FieldLabel('Título'),
-      TextField(controller: title, decoration: const InputDecoration(hintText: 'Ej. Partido semanal')),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        FieldLabel('Título'),
+        TextField(controller: title, onChanged: (_) => setState(() {}), decoration: const InputDecoration(hintText: 'Ej. Partido semanal')),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: SmallPick(label: 'Fecha', value: DateFormat('dd/MM/yyyy', 'es_ES').format(date), icon: Icons.calendar_month_rounded, onTap: () async {
+            final d = await showDatePicker(
+              context: context,
+              locale: const Locale('es'),
+              initialDate: date,
+              firstDate: DateTime.now().subtract(const Duration(days: 1)),
+              lastDate: DateTime.now().add(const Duration(days: 730)),
+            );
+            if (d != null) setState(() => date = d);
+          })),
+          const SizedBox(width: 10),
+          Expanded(child: SmallPick(label: 'Hora', value: time.format(context), icon: Icons.schedule_rounded, onTap: () async {
+            final t = await showTimePicker(context: context, initialTime: time);
+            if (t != null) setState(() => time = t);
+          })),
+        ]),
+        const SizedBox(height: 14),
+        FieldLabel('Lugar'),
+        TextField(controller: location, onChanged: (_) => setState(() {}), decoration: const InputDecoration(prefixIcon: Icon(Icons.place_outlined), hintText: 'Ej. Pista 3, club, casa...')),
+      ])),
       const SizedBox(height: 14),
-      Row(children: [
-        Expanded(child: SmallPick(label: 'Fecha', value: DateFormat('dd/MM/yyyy', 'es_ES').format(date), icon: Icons.calendar_month_rounded, onTap: () async {
-          final d = await showDatePicker(context: context, initialDate: date, firstDate: DateTime.now().subtract(const Duration(days: 1)), lastDate: DateTime.now().add(const Duration(days: 730)));
-          if (d != null) setState(() => date = d);
-        })),
-        const SizedBox(width: 10),
-        Expanded(child: SmallPick(label: 'Hora', value: time.format(context), icon: Icons.schedule_rounded, onTap: () async {
-          final t = await showTimePicker(context: context, initialTime: time);
-          if (t != null) setState(() => time = t);
-        })),
-      ]),
-      const SizedBox(height: 14),
-      FieldLabel('Lugar'),
-      TextField(controller: location, decoration: const InputDecoration(prefixIcon: Icon(Icons.place_outlined), hintText: 'Ej. Pista 3, club, casa...')),
-      const SizedBox(height: 14),
-      FieldLabel('Mínimo para confirmar el plan'),
-      AppCard(padding: const EdgeInsets.all(12), child: Row(children: [
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('$minPeople asistentes', style: Theme.of(context).textTheme.titleMedium),
-          const Text('Cuando se alcance este número, el evento se marcará como viable.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w600)),
-        ])),
-        SizedBox(width: 150, child: StepperRow(value: minPeople, onMinus: () => setState(() => minPeople = max(1, minPeople - 1)), onPlus: () => setState(() => minPeople++))),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.verified_rounded, color: AppColors.teal, size: 20)),
+          const SizedBox(width: 11),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Mínimo para que el plan salga adelante', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 3),
+            Text('Grupli avisará cuando haya suficientes personas confirmadas.', style: Theme.of(context).textTheme.bodyMedium),
+          ])),
+        ]),
+        const SizedBox(height: 12),
+        StepperRow(value: minPeople, onMinus: () => setState(() => minPeople = max(1, minPeople - 1)), onPlus: () => setState(() => minPeople++)),
       ])),
       const SizedBox(height: 14),
       FieldLabel('Notas opcionales'),
@@ -1972,26 +2010,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         final pending = max(0, data.members.length - yes - maybe - no);
 
         return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          PageHeader(title: AppData.text(event['title'], 'Evento'), subtitle: dateLabel(date), leading: true),
+          PageHeader(title: AppData.text(event['title'], 'Evento'), subtitle: AppData.text(widget.group['name'], 'Grupo'), leading: true),
           const SizedBox(height: 12),
-          AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              DateBadge(date: date),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(AppData.text(event['title'], 'Evento'), style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 5),
-                MetaLine(icon: Icons.schedule_rounded, text: longDateTime(date)),
-                MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
-              ])),
-            ]),
-            if (AppData.text(event['notes']).isNotEmpty) ...[
-              const SizedBox(height: 14),
-              Container(width: double.infinity, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(14)), child: Text(AppData.text(event['notes']), style: const TextStyle(color: AppColors.ink, height: 1.35))),
-            ],
-          ])),
+          PremiumEventDetailHero(event: event, date: date, yes: yes, minPeople: minPeople),
           const SizedBox(height: 16),
-          Text('Tu respuesta', style: Theme.of(context).textTheme.titleLarge),
+          SectionHeader(title: 'Tu respuesta'),
           const SizedBox(height: 10),
           Row(children: [
             Expanded(child: AttendancePick(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus(event['id'].toString(), 'yes'))),
@@ -2002,15 +2025,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           ]),
           if (saving) const Padding(padding: EdgeInsets.only(top: 10), child: LinearProgressIndicator()),
           const SizedBox(height: 12),
-          StatusNotice(ok: yes >= minPeople, text: yes >= minPeople ? 'Evento viable: $yes de $minPeople asistentes confirmados.' : 'Faltan ${max(0, minPeople - yes)} confirmaciones para llegar al mínimo de $minPeople.'),
-          const SizedBox(height: 16),
-          Row(children: [
-            Expanded(child: StatCard(icon: Icons.check_circle_rounded, value: yes.toString(), label: 'Van', color: AppColors.green)),
-            const SizedBox(width: 9),
-            Expanded(child: StatCard(icon: Icons.help_rounded, value: maybe.toString(), label: 'Duda', color: AppColors.amber)),
-            const SizedBox(width: 9),
-            Expanded(child: StatCard(icon: Icons.hourglass_empty_rounded, value: pending.toString(), label: 'Sin responder', color: AppColors.muted)),
-          ]),
+          AttendanceOverviewCard(yes: yes, maybe: maybe, no: no, pending: pending, minPeople: minPeople),
           const SizedBox(height: 18),
           SectionHeader(title: 'Asistencia del grupo', action: 'Actualizar', onTap: reload),
           const SizedBox(height: 10),
@@ -2038,6 +2053,8 @@ class _EventDetailData {
     return _EventDetailData(event: results[0] as Map<String, dynamic>, members: List<Map<String, dynamic>>.from(results[1] as List));
   }
 }
+
+
 
 
 class CalendarTab extends StatefulWidget {
@@ -2068,8 +2085,49 @@ class _CalendarTabState extends State<CalendarTab> {
   void reload() => setState(load);
 
   Future<void> createFor(DateTime day) async {
-    final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: widget.group, initialDate: day)));
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => CreateEventScreen(group: widget.group, initialDate: day)),
+    );
     if (ok == true) reload();
+  }
+
+  Future<void> openEvent(Map<String, dynamic> event) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: widget.group)));
+    reload();
+  }
+
+  int _eventCountForDay(List<Map<String, dynamic>> events, DateTime day) {
+    return events.where((event) {
+      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
+      return date != null && sameDay(date, day);
+    }).length;
+  }
+
+  List<Map<String, dynamic>> _eventsForDay(List<Map<String, dynamic>> events, DateTime day) {
+    final list = events.where((event) {
+      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
+      return date != null && sameDay(date, day);
+    }).toList();
+    list.sort((a, b) {
+      final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
+      final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now();
+      return da.compareTo(db);
+    });
+    return list;
+  }
+
+  List<Map<String, dynamic>> _upcoming(List<Map<String, dynamic>> events) {
+    final now = DateTime.now().subtract(const Duration(hours: 2));
+    final list = events.where((event) {
+      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
+      return date != null && date.isAfter(now);
+    }).toList();
+    list.sort((a, b) {
+      final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
+      final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now();
+      return da.compareTo(db);
+    });
+    return list;
   }
 
   @override
@@ -2084,27 +2142,59 @@ class _CalendarTabState extends State<CalendarTab> {
               return const CenterLoader(label: 'Cargando calendario...');
             }
             if (snapshot.hasError) {
-              return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 100), children: [ErrorBlock(message: snapshot.error.toString(), onRetry: reload)]);
+              return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 112), children: [
+                ErrorBlock(message: snapshot.error.toString(), onRetry: reload),
+              ]);
             }
-            final events = (snapshot.data ?? []).where((e) => AppData.text(e['status'], 'active') != 'cancelled').toList();
-            final selectedEvents = events.where((e) {
-              final d = DateTime.tryParse(e['starts_at']?.toString() ?? '')?.toLocal();
-              return d != null && sameDay(d, selected);
-            }).toList()
-              ..sort((a, b) => (DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now()).compareTo(DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now()));
-            final upcoming = events.where((e) {
-              final d = DateTime.tryParse(e['starts_at']?.toString() ?? '')?.toLocal();
-              return d != null && d.isAfter(DateTime.now().subtract(const Duration(hours: 2)));
-            }).toList()
-              ..sort((a, b) => (DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now()).compareTo(DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now()));
+
+            final events = (snapshot.data ?? [])
+                .where((e) => AppData.text(e['status'], 'active') != 'cancelled')
+                .toList();
+            final selectedEvents = _eventsForDay(events, selected);
+            final upcoming = _upcoming(events);
+            final todayEvents = _eventsForDay(events, DateTime.now());
+            final thisWeek = upcoming.where((event) {
+              final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
+              if (date == null) return false;
+              return date.isBefore(DateTime.now().add(const Duration(days: 7)));
+            }).length;
+            final pendingResponse = upcoming.where((event) {
+              final mine = myAttendanceStatus(event);
+              return mine == null || mine == 'maybe';
+            }).length;
             final selectedYes = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
             final selectedMaybe = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
+
+            final weekDays = List<DateTime>.generate(7, (i) {
+              final start = DateTime.now();
+              return DateTime(start.year, start.month, start.day).add(Duration(days: i));
+            });
 
             return RefreshIndicator(
               color: AppColors.teal,
               onRefresh: () async => reload(),
               child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 112), children: [
                 PageHeader(title: 'Calendario', subtitle: AppData.text(widget.group['name']), leading: false),
+                const SizedBox(height: 12),
+                CalendarSmartHeader(
+                  todayEvents: todayEvents.length,
+                  weekEvents: thisWeek,
+                  pendingResponses: pendingResponse,
+                  onToday: () => setState(() {
+                    selected = DateTime.now();
+                    month = DateTime(DateTime.now().year, DateTime.now().month);
+                  }),
+                ),
+                const SizedBox(height: 12),
+                WeekStrip(
+                  days: weekDays,
+                  selected: selected,
+                  events: events,
+                  onSelect: (day) => setState(() {
+                    selected = day;
+                    month = DateTime(day.year, day.month);
+                  }),
+                ),
                 const SizedBox(height: 14),
                 AppCard(child: Column(children: [
                   Row(children: [
@@ -2117,10 +2207,24 @@ class _CalendarTabState extends State<CalendarTab> {
                     IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month + 1)), icon: const Icon(Icons.chevron_right_rounded)),
                   ]),
                   const SizedBox(height: 8),
-                  MonthGrid(month: month, selected: selected, events: events, onSelect: (d) => setState(() { selected = d; month = DateTime(d.year, d.month); })),
+                  MonthGrid(
+                    month: month,
+                    selected: selected,
+                    events: events,
+                    onSelect: (d) => setState(() {
+                      selected = d;
+                      month = DateTime(d.year, d.month);
+                    }),
+                  ),
                 ])),
                 const SizedBox(height: 14),
-                CalendarDaySummary(day: selected, events: selectedEvents, confirmed: selectedYes, maybe: selectedMaybe, onCreate: () => createFor(selected)),
+                CalendarDaySummary(
+                  day: selected,
+                  events: selectedEvents,
+                  confirmed: selectedYes,
+                  maybe: selectedMaybe,
+                  onCreate: () => createFor(selected),
+                ),
                 const SizedBox(height: 18),
                 SectionHeader(title: 'Agenda del día', action: 'Crear', onTap: () => createFor(selected)),
                 const SizedBox(height: 10),
@@ -2129,15 +2233,15 @@ class _CalendarTabState extends State<CalendarTab> {
                 else
                   ...selectedEvents.map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
                 const SizedBox(height: 18),
-                SectionHeader(title: 'Próximos eventos', action: 'Hoy', onTap: () => setState(() { selected = DateTime.now(); month = DateTime(DateTime.now().year, DateTime.now().month); })),
+                SectionHeader(title: 'Próximas decisiones', action: 'Ver hoy', onTap: () => setState(() {
+                  selected = DateTime.now();
+                  month = DateTime(DateTime.now().year, DateTime.now().month);
+                })),
                 const SizedBox(height: 10),
                 if (upcoming.isEmpty)
                   EmptySlim(icon: Icons.event_available_rounded, title: 'Agenda vacía', body: 'Crea el primer evento desde el botón +.')
                 else
-                  ...upcoming.take(5).map((e) => EventCard(event: e, onTap: () async {
-                    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: e, group: widget.group)));
-                    reload();
-                  })),
+                  ...upcoming.take(5).map((e) => EventCard(event: e, onTap: () => openEvent(e))),
               ]),
             );
           },
@@ -4460,6 +4564,559 @@ class QuickActionButton extends StatelessWidget {
     );
   }
 }
+
+
+
+class DashboardActivityCard extends StatelessWidget {
+  final List<Map<String, dynamic>> events;
+  final List<Map<String, dynamic>> expenses;
+  final List<Map<String, dynamic>> tournaments;
+  final VoidCallback? onOpenCalendar;
+  final VoidCallback? onOpenFinances;
+  final VoidCallback? onOpenTournaments;
+
+  const DashboardActivityCard({
+    super.key,
+    required this.events,
+    required this.expenses,
+    required this.tournaments,
+    this.onOpenCalendar,
+    this.onOpenFinances,
+    this.onOpenTournaments,
+  });
+
+  List<_DashboardActivityItem> _items() {
+    final items = <_DashboardActivityItem>[];
+
+    for (final event in events.take(6)) {
+      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
+      if (date == null) continue;
+      final title = AppData.text(event['title'], 'Quedada');
+      final yes = attendanceCount(event, 'yes');
+      final minPeople = AppData.intValue(event['min_people'], 1);
+      items.add(_DashboardActivityItem(
+        date: date,
+        icon: Icons.event_available_rounded,
+        color: AppColors.teal,
+        title: title,
+        body: '${longDateTime(date)} · $yes/$minPeople confirmados',
+        onTapKind: 'calendar',
+      ));
+    }
+
+    for (final expense in expenses.take(6)) {
+      final created = DateTime.tryParse(expense['created_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+      final concept = AppData.text(expense['concept'], 'Gasto');
+      final amount = AppData.doubleValue(expense['amount']);
+      final status = AppData.text(expense['status'], 'pending') == 'paid' ? 'liquidado' : 'pendiente';
+      items.add(_DashboardActivityItem(
+        date: created,
+        icon: Icons.account_balance_wallet_rounded,
+        color: AppData.text(expense['status'], 'pending') == 'paid' ? AppColors.green : AppColors.amber,
+        title: concept,
+        body: '${money(amount)} · $status',
+        onTapKind: 'finances',
+      ));
+    }
+
+    for (final tournament in tournaments.take(6)) {
+      final created = DateTime.tryParse(tournament['created_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+      final name = AppData.text(tournament['name'], 'Competición');
+      final teams = AppData.asList(tournament['tournament_teams']).length;
+      final matches = AppData.asList(tournament['matches']).length;
+      final finished = AppData.text(tournament['status'], 'active') == 'finished';
+      items.add(_DashboardActivityItem(
+        date: created,
+        icon: Icons.emoji_events_rounded,
+        color: finished ? AppColors.violet : AppColors.orange,
+        title: name,
+        body: '$teams participantes · $matches partidos · ${finished ? 'finalizado' : 'en curso'}',
+        onTapKind: 'tournaments',
+      ));
+    }
+
+    items.sort((a, b) => b.date.compareTo(a.date));
+    return items.take(5).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _items();
+
+    if (items.isEmpty) {
+      return EmptySlim(
+        icon: Icons.bolt_rounded,
+        title: 'Todavía no hay actividad real',
+        body: 'Cuando el grupo cree quedadas, gastos o torneos, aparecerán aquí sin usar ejemplos falsos.',
+      );
+    }
+
+    return AppCard(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        children: [
+          for (int i = 0; i < items.length; i++) ...[
+            _DashboardActivityRow(
+              item: items[i],
+              onTap: () {
+                if (items[i].onTapKind == 'calendar') onOpenCalendar?.call();
+                if (items[i].onTapKind == 'finances') onOpenFinances?.call();
+                if (items[i].onTapKind == 'tournaments') onOpenTournaments?.call();
+              },
+            ),
+            if (i != items.length - 1)
+              const Divider(height: 1, indent: 58, color: AppColors.line),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardActivityItem {
+  final DateTime date;
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String body;
+  final String onTapKind;
+
+  const _DashboardActivityItem({
+    required this.date,
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.body,
+    required this.onTapKind,
+  });
+}
+
+class _DashboardActivityRow extends StatelessWidget {
+  final _DashboardActivityItem item;
+  final VoidCallback onTap;
+
+  const _DashboardActivityRow({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(color: item.color.withOpacity(.12), borderRadius: BorderRadius.circular(12)),
+              child: Icon(item.icon, color: item.color, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+                const SizedBox(height: 2),
+                Text(item.body, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
+              ]),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.muted, size: 22),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+
+
+class CalendarSmartHeader extends StatelessWidget {
+  final int todayEvents;
+  final int weekEvents;
+  final int pendingResponses;
+  final VoidCallback onToday;
+
+  const CalendarSmartHeader({
+    super.key,
+    required this.todayEvents,
+    required this.weekEvents,
+    required this.pendingResponses,
+    required this.onToday,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPending = pendingResponses > 0;
+    return AppCard(
+      color: AppColors.surface,
+      padding: const EdgeInsets.all(14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: hasPending ? AppColors.amber.withOpacity(.12) : AppColors.tealSoft,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              hasPending ? Icons.notification_important_rounded : Icons.calendar_month_rounded,
+              color: hasPending ? AppColors.amber : AppColors.teal,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              hasPending ? 'Tienes respuestas pendientes' : 'Agenda del grupo',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              hasPending
+                  ? '$pendingResponses ${pendingResponses == 1 ? 'evento necesita' : 'eventos necesitan'} tu respuesta para organizar mejor el grupo.'
+                  : 'Mira qué hay hoy, qué viene esta semana y crea eventos desde cualquier día.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ])),
+          TextButton(onPressed: onToday, child: const Text('Hoy')),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: _CalendarMiniStat(label: 'Hoy', value: '$todayEvents', color: AppColors.teal)),
+          const SizedBox(width: 8),
+          Expanded(child: _CalendarMiniStat(label: '7 días', value: '$weekEvents', color: AppColors.violet)),
+          const SizedBox(width: 8),
+          Expanded(child: _CalendarMiniStat(label: 'Pendientes', value: '$pendingResponses', color: AppColors.amber)),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _CalendarMiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _CalendarMiniStat({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: AppColors.line),
+    ),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11)),
+      const SizedBox(height: 4),
+      Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 19)),
+    ]),
+  );
+}
+
+class WeekStrip extends StatelessWidget {
+  final List<DateTime> days;
+  final DateTime selected;
+  final List<Map<String, dynamic>> events;
+  final ValueChanged<DateTime> onSelect;
+
+  const WeekStrip({
+    super.key,
+    required this.days,
+    required this.selected,
+    required this.events,
+    required this.onSelect,
+  });
+
+  int countFor(DateTime day) {
+    return events.where((event) {
+      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
+      return date != null && sameDay(date, day);
+    }).length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 78,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: days.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final day = days[index];
+          final active = sameDay(day, selected);
+          final count = countFor(day);
+          return InkWell(
+            onTap: () => onSelect(day),
+            borderRadius: BorderRadius.circular(18),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: 62,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+              decoration: BoxDecoration(
+                color: active ? AppColors.teal : AppColors.surface,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: active ? AppColors.teal : AppColors.line),
+                boxShadow: active ? const [BoxShadow(color: Color(0x16008F86), blurRadius: 14, offset: Offset(0, 7))] : null,
+              ),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Text(shortWeekday(day).toUpperCase(), style: TextStyle(color: active ? Colors.white : AppColors.muted, fontWeight: FontWeight.w900, fontSize: 11)),
+                const SizedBox(height: 4),
+                Text(day.day.toString(), style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 20)),
+                const SizedBox(height: 4),
+                Container(
+                  width: count > 0 ? 18 : 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: active ? Colors.white : (count > 0 ? AppColors.teal : AppColors.line),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ]),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class EventTemplateChoice extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const EventTemplateChoice({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(16),
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: selected ? AppColors.teal : AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: selected ? AppColors.teal : AppColors.line),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, color: selected ? Colors.white : AppColors.teal, size: 18),
+        const SizedBox(width: 7),
+        Text(label, style: TextStyle(color: selected ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900)),
+      ]),
+    ),
+  );
+}
+
+class EventFormPreviewCard extends StatelessWidget {
+  final String title;
+  final DateTime date;
+  final String location;
+  final int minPeople;
+  final String template;
+
+  const EventFormPreviewCard({
+    super.key,
+    required this.title,
+    required this.date,
+    required this.location,
+    required this.minPeople,
+    required this.template,
+  });
+
+  IconData get icon {
+    final lower = template.toLowerCase();
+    if (lower.contains('partido')) return Icons.sports_soccer_rounded;
+    if (lower.contains('entrenamiento')) return Icons.fitness_center_rounded;
+    if (lower.contains('cena')) return Icons.restaurant_rounded;
+    if (lower.contains('reun')) return Icons.forum_rounded;
+    return Icons.event_available_rounded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        gradient: const LinearGradient(colors: [Color(0xFF006B69), Color(0xFF00998E)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        boxShadow: const [BoxShadow(color: Color(0x16008F86), blurRadius: 18, offset: Offset(0, 9))],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(color: Colors.white.withOpacity(.18), borderRadius: BorderRadius.circular(18)),
+            child: Icon(icon, color: Colors.white, size: 27),
+          ),
+          const SizedBox(width: 13),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900, height: 1.05)),
+            const SizedBox(height: 8),
+            Text(longDateTime(date), style: const TextStyle(color: Color(0xEFFFFFFF), fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(location.trim().isEmpty ? 'Lugar por definir' : location.trim(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99)),
+              child: Text('Mínimo $minPeople asistentes', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+            ),
+          ])),
+        ]),
+      ),
+    );
+  }
+}
+
+class PremiumEventDetailHero extends StatelessWidget {
+  final Map<String, dynamic> event;
+  final DateTime date;
+  final int yes;
+  final int minPeople;
+
+  const PremiumEventDetailHero({
+    super.key,
+    required this.event,
+    required this.date,
+    required this.yes,
+    required this.minPeople,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ok = yes >= minPeople;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          colors: ok ? const [Color(0xFF0D8F72), Color(0xFF15B38C)] : const [Color(0xFF006B69), Color(0xFF00998E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: const [BoxShadow(color: Color(0x16008F86), blurRadius: 20, offset: Offset(0, 10))],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(17),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              width: 58,
+              height: 62,
+              decoration: BoxDecoration(color: Colors.white.withOpacity(.18), borderRadius: BorderRadius.circular(18)),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Text(shortWeekday(date).toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+                Text(date.day.toString(), style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900)),
+              ]),
+            ),
+            const SizedBox(width: 13),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(AppData.text(event['title'], 'Evento'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -0.4)),
+              const SizedBox(height: 8),
+              Text(longDateTime(date), style: const TextStyle(color: Color(0xEFFFFFFF), fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700)),
+            ])),
+          ]),
+          if (AppData.text(event['notes']).isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.white.withOpacity(.13), borderRadius: BorderRadius.circular(16)),
+              child: Text(AppData.text(event['notes']), style: const TextStyle(color: Colors.white, height: 1.35, fontWeight: FontWeight.w700)),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99)),
+            child: Text(ok ? 'Mínimo alcanzado · $yes/$minPeople' : 'Faltan ${max(0, minPeople - yes)} · $yes/$minPeople confirmados', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class AttendanceOverviewCard extends StatelessWidget {
+  final int yes;
+  final int maybe;
+  final int no;
+  final int pending;
+  final int minPeople;
+
+  const AttendanceOverviewCard({
+    super.key,
+    required this.yes,
+    required this.maybe,
+    required this.no,
+    required this.pending,
+    required this.minPeople,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ok = yes >= minPeople;
+    final total = max(1, yes + maybe + no + pending);
+    final progress = (yes / max(1, minPeople)).clamp(0.0, 1.0).toDouble();
+    return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Icon(ok ? Icons.check_circle_rounded : Icons.info_rounded, color: ok ? AppColors.green : AppColors.amber),
+        const SizedBox(width: 9),
+        Expanded(child: Text(ok ? 'El evento ya es viable' : 'Todavía falta gente', style: Theme.of(context).textTheme.titleMedium)),
+        Text('$yes/$minPeople', style: TextStyle(color: ok ? AppColors.green : AppColors.amber, fontWeight: FontWeight.w900)),
+      ]),
+      const SizedBox(height: 10),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(99),
+        child: LinearProgressIndicator(
+          value: progress,
+          minHeight: 9,
+          backgroundColor: AppColors.faint,
+          color: ok ? AppColors.green : AppColors.amber,
+        ),
+      ),
+      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(child: _AttendanceMiniStat(label: 'Van', value: yes, color: AppColors.green)),
+        Expanded(child: _AttendanceMiniStat(label: 'Duda', value: maybe, color: AppColors.amber)),
+        Expanded(child: _AttendanceMiniStat(label: 'No', value: no, color: AppColors.red)),
+        Expanded(child: _AttendanceMiniStat(label: 'Pend.', value: pending, color: AppColors.muted)),
+      ]),
+      const SizedBox(height: 8),
+      Text('Total de miembros considerados: $total', style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+    ]));
+  }
+}
+
+class _AttendanceMiniStat extends StatelessWidget {
+  final String label;
+  final int value;
+  final Color color;
+  const _AttendanceMiniStat({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+    Text(value.toString(), style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 18)),
+    const SizedBox(height: 2),
+    Text(label, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11)),
+  ]);
+}
+
 
 
 // ---------- UI components ----------
