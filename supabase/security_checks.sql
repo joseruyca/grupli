@@ -78,3 +78,17 @@ select 'notifications_rls' as check_name, relrowsecurity as rls_enabled from pg_
 select 'user_devices_rls' as check_name, relrowsecurity as rls_enabled from pg_class where relname = 'user_devices';
 select 'notification_triggers' as check_name, tgname from pg_trigger where tgname like 'trg_notify_%' order by tgname;
 select 'unread_notifications' as check_name, count(*) from public.notifications where user_id = auth.uid() and read_at is null;
+
+-- v15.6 security/delete-account checks
+select 'delete_my_account exists' as check_name, to_regprocedure('public.delete_my_account(text)') is not null as ok;
+select 'protect_owner_role exists' as check_name, to_regprocedure('public.protect_owner_role()') is not null as ok;
+select 'delete_my_account executable by authenticated' as check_name, has_function_privilege('authenticated', 'public.delete_my_account(text)', 'EXECUTE') as ok;
+select 'all public core tables RLS enabled' as check_name, not exists (
+  select 1
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public'
+    and c.relname in ('profiles','user_settings','groups','group_members','events','event_attendance','expenses','expense_participants','tournaments','tournament_teams','matches','notifications','user_devices')
+    and c.relkind = 'r'
+    and c.relrowsecurity = false
+) as ok;

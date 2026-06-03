@@ -49,6 +49,7 @@ DROP FUNCTION IF EXISTS public.notify_expense_insert() CASCADE;
 DROP FUNCTION IF EXISTS public.notify_tournament_insert() CASCADE;
 DROP FUNCTION IF EXISTS public.notify_match_played() CASCADE;
 DROP FUNCTION IF EXISTS public.notify_member_join() CASCADE;
+DROP FUNCTION IF EXISTS public.delete_my_account(text) CASCADE;
 
 DROP TABLE IF EXISTS public.notifications CASCADE;
 DROP TABLE IF EXISTS public.user_devices CASCADE;
@@ -98,6 +99,7 @@ CREATE TABLE public.groups (
   type text NOT NULL DEFAULT 'otro' CHECK (type IN ('deporte','cartas','otro')),
   privacy text NOT NULL DEFAULT 'privado' CHECK (privacy = 'privado'),
   invite_code text NOT NULL UNIQUE DEFAULT public.random_invite_code(),
+  cover_url text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -362,6 +364,7 @@ RETURNS TABLE (
   type text,
   privacy text,
   invite_code text,
+  cover_url text,
   role text,
   members_count int,
   events_count int,
@@ -378,6 +381,7 @@ AS $$
     g.type,
     g.privacy,
     g.invite_code,
+    g.cover_url,
     gm.role,
     (SELECT count(*)::int FROM public.group_members x WHERE x.group_id = g.id) AS members_count,
     (SELECT count(*)::int FROM public.events e WHERE e.group_id = g.id AND e.status = 'active' AND e.starts_at >= now() - interval '2 hours') AS events_count,
@@ -532,6 +536,53 @@ to authenticated
 using (
   bucket_id = 'avatars'
   and (storage.foldername(name))[1] = auth.uid()::text
+);
+
+
+-- Grupli v15.7 group cover images storage
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('group-covers', 'group-covers', true, 5242880, array['image/jpeg','image/png','image/webp']::text[])
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists group_covers_public_read on storage.objects;
+drop policy if exists group_covers_insert_admin on storage.objects;
+drop policy if exists group_covers_update_admin on storage.objects;
+drop policy if exists group_covers_delete_admin on storage.objects;
+
+create policy group_covers_public_read
+on storage.objects for select
+to public
+using (bucket_id = 'group-covers');
+
+create policy group_covers_insert_admin
+on storage.objects for insert
+to authenticated
+with check (
+  bucket_id = 'group-covers'
+  and public.is_group_admin(((storage.foldername(name))[1])::uuid)
+);
+
+create policy group_covers_update_admin
+on storage.objects for update
+to authenticated
+using (
+  bucket_id = 'group-covers'
+  and public.is_group_admin(((storage.foldername(name))[1])::uuid)
+)
+with check (
+  bucket_id = 'group-covers'
+  and public.is_group_admin(((storage.foldername(name))[1])::uuid)
+);
+
+create policy group_covers_delete_admin
+on storage.objects for delete
+to authenticated
+using (
+  bucket_id = 'group-covers'
+  and public.is_group_admin(((storage.foldername(name))[1])::uuid)
 );
 
 commit;
@@ -924,4 +975,90 @@ AFTER INSERT ON public.group_members
 FOR EACH ROW EXECUTE FUNCTION public.notify_member_join();
 
 -- end v15.5 notification schema patch
+
+
+
+-- Grupli v15.6 — Revisión SQL/RLS + errores humanos + borrar cuenta
+-- NO resetea datos. Ejecutar en Supabase SQL Editor.
+
+begin;
+
+-- Permite que una operación controlada pueda borrar grupos owned sin que
+-- el trigger de protección del owner bloquee los cascades internos.
+create or replace function public.protect_owner_role()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if current_setting('grupli.allow_owner_delete', true) = 'on' then
+    return coalesce(new, old);
+  end if;
+
+  if tg_op = 'UPDATE' and new.role = 'owner' and old.role <> 'owner' then
+    raise exception 'owner_protected';
+  end if;
+
+  if old.role = 'owner' and (tg_op = 'DELETE' or new.role <> 'owner') then
+    raise exception 'owner_protected';
+  end if;
+
+  return coalesce(new, old);
+end;
+$$;
+
+-- RPC segura para eliminar la cuenta desde la app.
+-- Requiere confirmación explícita: ELIMINAR.
+create or replace function public.delete_my_account(confirm_text text)
+returns void
+language plpgsql
+security definer
+set search_path = public, auth, storage
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'not_authenticated';
+  end if;
+
+  if upper(trim(coalesce(confirm_text, ''))) <> 'ELIMINAR' then
+    raise exception 'confirmation_required';
+  end if;
+
+  perform set_config('grupli.allow_owner_delete', 'on', true);
+
+  -- Datos personales / dispositivos / avisos.
+  delete from public.notifications where user_id = v_uid or actor_id = v_uid;
+  delete from public.user_devices where user_id = v_uid;
+  delete from public.user_settings where user_id = v_uid;
+
+  -- Participaciones personales.
+  delete from public.event_attendance where user_id = v_uid;
+
+  -- Los gastos pagados o creados por el usuario se eliminan para no dejar
+  -- datos personales ni bloquear la eliminación por FK paid_by.
+  delete from public.expenses where paid_by = v_uid or created_by = v_uid;
+
+  -- Grupos owned: se borran completamente con eventos, gastos, torneos y miembros.
+  delete from public.groups where owner_id = v_uid;
+
+  -- Salida del resto de grupos donde era miembro/admin.
+  delete from public.group_members where user_id = v_uid;
+
+  -- Avatar en Storage. Se borra por ruta propia del usuario.
+  delete from storage.objects
+   where bucket_id = 'avatars'
+     and name like (v_uid::text || '/%');
+
+  -- Borrado de Auth. Esto cascada el perfil por FK profiles.id -> auth.users.id.
+  delete from auth.users where id = v_uid;
+end;
+$$;
+
+revoke all on function public.delete_my_account(text) from public;
+grant execute on function public.delete_my_account(text) to authenticated;
+
+commit;
 

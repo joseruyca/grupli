@@ -73,29 +73,29 @@ class AppConfig {
 }
 
 class AppColors {
-  static const bgShell = Color(0xFFF2F6F8);
+  static const bgShell = Color(0xFFF4F7FB);
   static const white = Color(0xFFFFFFFF);
-  static const ink = Color(0xFF111827);
-  static const muted = Color(0xFF667085);
-  static const faint = Color(0xFFF6F8FB);
-  static const surface = Color(0xFFFAFBFC);
-  static const line = Color(0xFFE6EBF2);
-  static const lineSoft = Color(0xFFF0F3F7);
-  static const teal = Color(0xFF008F86);
-  static const tealDark = Color(0xFF005F5E);
-  static const tealSoft = Color(0xFFE5F7F5);
-  static const blue = Color(0xFF3767FF);
-  static const blueSoft = Color(0xFFEEF3FF);
-  static const violet = Color(0xFF6E56E8);
-  static const violetSoft = Color(0xFFF0EEFF);
-  static const orange = Color(0xFFF28B20);
-  static const orangeSoft = Color(0xFFFFF2E1);
-  static const green = Color(0xFF0C9D61);
-  static const greenSoft = Color(0xFFE9F8F0);
-  static const red = Color(0xFFE24A4A);
-  static const redSoft = Color(0xFFFFEEEE);
-  static const amber = Color(0xFFE6A600);
-  static const amberSoft = Color(0xFFFFF7D6);
+  static const ink = Color(0xFF102033);
+  static const muted = Color(0xFF66758A);
+  static const faint = Color(0xFFF7FAFD);
+  static const surface = Color(0xFFFBFDFF);
+  static const line = Color(0xFFE4EBF4);
+  static const lineSoft = Color(0xFFF0F5FA);
+  static const teal = Color(0xFF0B6B8F);
+  static const tealDark = Color(0xFF073A57);
+  static const tealSoft = Color(0xFFEAF6FB);
+  static const blue = Color(0xFF2563EB);
+  static const blueSoft = Color(0xFFEFF6FF);
+  static const violet = Color(0xFF6657D8);
+  static const violetSoft = Color(0xFFF1F0FF);
+  static const orange = Color(0xFFE98A2C);
+  static const orangeSoft = Color(0xFFFFF4E8);
+  static const green = Color(0xFF17966B);
+  static const greenSoft = Color(0xFFEAF8F2);
+  static const red = Color(0xFFE05252);
+  static const redSoft = Color(0xFFFFF0F0);
+  static const amber = Color(0xFFD9A21B);
+  static const amberSoft = Color(0xFFFFF7DD);
 }
 
 class GrupliApp extends StatelessWidget {
@@ -333,6 +333,17 @@ class AppData {
     }).eq('id', uid);
   }
 
+  static Future<void> deleteMyAccount(String confirmation) async {
+    final clean = confirmation.trim().toUpperCase();
+    if (clean != 'ELIMINAR') {
+      throw Exception('confirmation_required');
+    }
+    await sb.rpc('delete_my_account', params: {'confirm_text': clean});
+    try {
+      await sb.auth.signOut();
+    } catch (_) {}
+  }
+
   static Future<List<Map<String, dynamic>>> myGroups() async {
     try {
       final res = await sb.rpc('get_my_groups');
@@ -340,7 +351,7 @@ class AppData {
     } catch (_) {
       final uid = user?.id;
       if (uid == null) return [];
-      final res = await sb.from('group_members').select('role, groups(id,name,type,privacy,invite_code,created_at)').eq('user_id', uid);
+      final res = await sb.from('group_members').select('role, groups(id,name,type,privacy,invite_code,cover_url,created_at)').eq('user_id', uid);
       return asList(res).map((row) {
         final g = asMap(row['groups']);
         return {
@@ -367,6 +378,39 @@ class AppData {
   static Future<Map<String, dynamic>> group(String groupId) async {
     final res = await sb.from('groups').select().eq('id', groupId).single();
     return asMap(res);
+  }
+
+  static Future<String> uploadGroupCoverBytes(String groupId, Uint8List bytes, String filename) async {
+    final uid = user?.id;
+    if (uid == null) throw Exception('Inicia sesión para cambiar la foto del grupo.');
+    final ext = filename.toLowerCase().endsWith('.png')
+        ? 'png'
+        : filename.toLowerCase().endsWith('.webp')
+            ? 'webp'
+            : 'jpg';
+    final path = '$groupId/${uid}_cover_${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await sb.storage.from('group-covers').uploadBinary(
+      path,
+      bytes,
+      fileOptions: FileOptions(
+        upsert: true,
+        contentType: ext == 'png' ? 'image/png' : ext == 'webp' ? 'image/webp' : 'image/jpeg',
+      ),
+    );
+    final publicUrl = sb.storage.from('group-covers').getPublicUrl(path);
+    final versionedUrl = '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+    await sb.from('groups').update({
+      'cover_url': versionedUrl,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', groupId);
+    return versionedUrl;
+  }
+
+  static Future<void> removeGroupCover(String groupId) async {
+    await sb.from('groups').update({
+      'cover_url': null,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', groupId);
   }
 
   static Future<List<Map<String, dynamic>>> members(String groupId) async {
@@ -1184,10 +1228,11 @@ class TeamStanding {
 
 Future<void> showToast(BuildContext context, String message, {bool danger = false}) async {
   if (!context.mounted) return;
+  final cleanMessage = danger ? humanizeError(message) : message;
   ScaffoldMessenger.of(context).clearSnackBars();
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
-      content: Text(message),
+      content: Text(cleanMessage),
       backgroundColor: danger ? AppColors.red : AppColors.teal,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -1993,13 +2038,6 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
               final myBalance = _myOpenBalance(data?.expenses ?? const <Map<String, dynamic>>[]);
               final activeTournament = _firstActiveTournament(data?.tournaments ?? const <Map<String, dynamic>>[]);
               final tournamentsActive = data?.activeTournaments ?? 0;
-              final upcomingThisWeek = upcoming.where((event) {
-                final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
-                if (date == null) return false;
-                final now = DateTime.now();
-                return !date.isBefore(now.subtract(const Duration(hours: 2))) && date.isBefore(now.add(const Duration(days: 7)));
-              }).length;
-
               Future<void> openCreateEvent() async {
                 final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: group)));
                 if (ok == true) reload();
@@ -2025,7 +2063,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                       ),
                     ]),
                     const SizedBox(height: 12),
-                    GroupHeroCard(name: name),
+                    GroupHeroCard(name: name, coverUrl: AppData.text(group['cover_url'])),
                     const SizedBox(height: 12),
                     if (snapshot.connectionState == ConnectionState.waiting)
                       const CenterLoader(label: 'Cargando resumen...')
@@ -2045,16 +2083,16 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                                 : AppColors.teal,
                         title: myDecisionPending.isNotEmpty
                             ? (myDecisionPending.length == 1
-                                ? 'Tienes 1 decisión pendiente'
-                                : 'Tienes ${myDecisionPending.length} decisiones pendientes')
+                                ? '1 respuesta pendiente'
+                                : '${myDecisionPending.length} respuestas pendientes')
                             : nextEvent != null
-                                ? 'Tu grupo ya tiene plan'
-                                : 'Empieza a mover el grupo',
+                                ? 'Próximo plan listo'
+                                : 'Empieza el grupo',
                         body: myDecisionPending.isNotEmpty
-                            ? 'Responde a ${AppData.text(myDecisionPending.first['title'], 'la próxima quedada')} para dejar claro quién va y si se alcanza el mínimo.'
+                            ? 'Responde a ${AppData.text(myDecisionPending.first['title'], 'la próxima quedada')}.'
                             : nextEvent != null
-                                ? 'La siguiente cita es ${AppData.text(nextEvent['title'], 'Evento')} y puedes revisarla o confirmar desde aquí sin salir del Inicio.'
-                                : 'Crea la primera quedada del grupo para empezar a organizar asistencia, calendario y actividad real.',
+                                ? 'Revisa o confirma la próxima cita.'
+                                : 'Crea la primera quedada del grupo.',
                         actionLabel: myDecisionPending.isNotEmpty
                             ? 'Responder ahora'
                             : nextEvent != null
@@ -2129,33 +2167,6 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                           ),
                         ),
                       ]),
-                      const SizedBox(height: 16),
-                      AppCard(
-                        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(children: [
-                              Expanded(child: Text('Acciones rápidas', style: Theme.of(context).textTheme.titleMedium)),
-                              Text('${upcomingThisWeek} esta semana', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
-                            ]),
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: [
-                                QuickActionButton(icon: Icons.add_task_rounded, label: 'Quedada', onTap: openCreateEvent),
-                                QuickActionButton(icon: Icons.wallet_rounded, label: 'Gasto', onTap: () async {
-                                  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => CreateExpenseScreen(groupId: group['id'].toString())));
-                                  reload();
-                                }),
-                                QuickActionButton(icon: Icons.emoji_events_rounded, label: 'Torneo', onTap: () => widget.onNavigateTab?.call(3)),
-                                QuickActionButton(icon: Icons.groups_rounded, label: 'Miembros', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
                       const SizedBox(height: 16),
                       SectionHeader(title: 'Actividad real', action: 'Actualizar', onTap: reload),
                       const SizedBox(height: 8),
@@ -2273,7 +2284,7 @@ class GroupMoreTab extends StatelessWidget {
             icon: Icons.settings_rounded,
             title: 'Ajustes del grupo',
             subtitle: 'Nombre, privacidad y acciones importantes',
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group))),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group, onChanged: refresh))),
           ),
           SettingsRow(
             icon: Icons.lock_rounded,
@@ -3577,8 +3588,8 @@ class FinanceAutoBalanceCard extends StatelessWidget {
     final color = hasPending ? AppColors.teal : AppColors.green;
     final title = hasPending ? 'Grupli ya ha compensado las deudas cruzadas' : 'Cuentas equilibradas';
     final body = hasPending
-        ? 'Si alguien debía dinero y luego paga un gasto nuevo, Grupli resta automáticamente una cosa con la otra y solo muestra el balance neto real.'
-        : 'No hay nada que mover ahora mismo. Los gastos abiertos y pagos liquidados están en orden.';
+        ? 'Compensa deudas cruzadas y muestra solo lo que hay que mover.'
+        : 'No hay pagos pendientes.';
 
     return AppCard(
       padding: const EdgeInsets.all(15),
@@ -3827,7 +3838,7 @@ String _financeMainTitle(FinanceSummary summary) {
 String _financeMainSubtitle(FinanceSummary summary) {
   if (summary.pendingAmount <= 0.01) return 'No hay deudas abiertas en este grupo.';
   if (summary.compensatedAmount > 0.01) {
-    return 'De ${money(summary.pendingAmount)} en deuda bruta, solo hay que mover ${money(summary.settlementAmount)} gracias al balance neto.';
+    return 'Deuda bruta ${money(summary.pendingAmount)} · mover ${money(summary.settlementAmount)}.';
   }
   return 'Con ${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} se puede dejar el grupo a cero.';
 }
@@ -3981,28 +3992,6 @@ class _TournamentsTabState extends State<TournamentsTab> {
                               await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TournamentDetailScreen(tournamentId: next['id'].toString(), group: widget.group)));
                               reload();
                             },
-                    ),
-                    const SizedBox(height: 16),
-                    SectionHeader(title: 'Crear rápido', action: 'Nuevo', onTap: () => openCreate()),
-                    const SizedBox(height: 8),
-                    Row(children: [
-                      Expanded(child: TournamentQuickFormatCard(icon: Icons.table_chart_rounded, title: 'Liga', body: 'Todos contra todos', color: AppColors.teal, onTap: () => openCreate(initialFormat: 'liga'))),
-                      const SizedBox(width: 10),
-                      Expanded(child: TournamentQuickFormatCard(icon: Icons.account_tree_rounded, title: 'Copa', body: 'Eliminatoria', color: AppColors.orange, onTap: () => openCreate(initialFormat: 'eliminatoria'))),
-                      const SizedBox(width: 10),
-                      Expanded(child: TournamentQuickFormatCard(icon: Icons.sync_alt_rounded, title: 'Americano', body: 'Rotación', color: AppColors.violet, onTap: () => openCreate(initialFormat: 'americano'))),
-                    ]),
-                    const SizedBox(height: 18),
-                    SectionHeader(title: 'Flujo recomendado'),
-                    const SizedBox(height: 8),
-                    TournamentFlowStrip(
-                      currentStep: tournaments.isEmpty
-                          ? 0
-                          : next == null
-                              ? 3
-                              : tournamentMatches(next).isEmpty
-                                  ? 1
-                                  : 2,
                     ),
                     const SizedBox(height: 18),
                     Row(children: [
@@ -4819,7 +4808,7 @@ class TournamentHubHero extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(27),
-        gradient: const LinearGradient(colors: [Color(0xFF007F78), Color(0xFF00A493)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        gradient: const LinearGradient(colors: [Color(0xFF073A57), Color(0xFF0B6B8F)], begin: Alignment.topLeft, end: Alignment.bottomRight),
         boxShadow: const [BoxShadow(color: Color(0x16008F86), blurRadius: 24, offset: Offset(0, 10))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -4832,11 +4821,11 @@ class TournamentHubHero extends StatelessWidget {
           ),
           const SizedBox(width: 13),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Centro de competición', style: TextStyle(color: Colors.white, fontSize: 23, height: 1.05, fontWeight: FontWeight.w900, letterSpacing: -0.4)),
+            const Text('Competición', style: TextStyle(color: Colors.white, fontSize: 23, height: 1.05, fontWeight: FontWeight.w900, letterSpacing: -0.4)),
             const SizedBox(height: 6),
             Text(
               next == null
-                  ? 'Crea una liga, copa o americano sin hojas de cálculo.'
+                  ? 'Ligas y torneos claros.'
                   : 'Siguiente: ${AppData.text(next['name'], 'competición')}',
               style: const TextStyle(color: Color(0xEFFFFFFF), fontWeight: FontWeight.w700, height: 1.25),
             ),
@@ -5008,9 +4997,7 @@ class TournamentGuidedEmpty extends StatelessWidget {
       const SizedBox(height: 14),
       Text('Monta el primer torneo sin Excel', style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
       const SizedBox(height: 6),
-      Text('Grupli te guía: formato, participantes, partidos, resultados y clasificación.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
-      const SizedBox(height: 16),
-      TournamentFlowStrip(currentStep: 0),
+      Text('Crea una liga, copa o americano en pocos pasos.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
       const SizedBox(height: 16),
       PrimaryButton(label: 'Crear competición guiada', icon: Icons.add_rounded, onTap: onCreate),
     ]),
@@ -5422,24 +5409,126 @@ class _MembersScreenState extends State<MembersScreen> {
   }
 }
 
-class GroupSettingsScreen extends StatelessWidget {
+class GroupSettingsScreen extends StatefulWidget {
   final Map<String, dynamic> group;
-  const GroupSettingsScreen({super.key, required this.group});
+  final VoidCallback? onChanged;
+  const GroupSettingsScreen({super.key, required this.group, this.onChanged});
+
+  @override
+  State<GroupSettingsScreen> createState() => _GroupSettingsScreenState();
+}
+
+class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
+  late Map<String, dynamic> group;
+  bool savingCover = false;
+
+  @override
+  void initState() {
+    super.initState();
+    group = Map<String, dynamic>.from(widget.group);
+  }
+
+  Future<void> changeCover() async {
+    setState(() => savingCover = true);
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1600);
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      final url = await AppData.uploadGroupCoverBytes(group['id'].toString(), bytes, picked.name);
+      if (!mounted) return;
+      setState(() => group['cover_url'] = url);
+      widget.onChanged?.call();
+      await showToast(context, 'Foto del grupo actualizada.');
+    } catch (e) {
+      if (!mounted) return;
+      await showToast(context, humanError(e), danger: true);
+    } finally {
+      if (mounted) setState(() => savingCover = false);
+    }
+  }
+
+  Future<void> removeCover() async {
+    setState(() => savingCover = true);
+    try {
+      await AppData.removeGroupCover(group['id'].toString());
+      if (!mounted) return;
+      setState(() => group['cover_url'] = null);
+      widget.onChanged?.call();
+      await showToast(context, 'Foto del grupo eliminada.');
+    } catch (e) {
+      if (!mounted) return;
+      await showToast(context, humanError(e), danger: true);
+    } finally {
+      if (mounted) setState(() => savingCover = false);
+    }
+  }
+
   @override Widget build(BuildContext context) {
     final name = AppData.text(group['name'], 'Grupo');
     final code = AppData.text(group['invite_code'], '------');
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       PageHeader(title: 'Ajustes del grupo', subtitle: name, leading: true),
       const SizedBox(height: 16),
+      GroupCoverSettingsCard(
+        group: group,
+        saving: savingCover,
+        onChange: changeCover,
+        onRemove: removeCover,
+      ),
+      const SizedBox(height: 16),
       InviteAccessCard(groupName: name, code: code, compact: true),
       const SizedBox(height: 16),
       SectionHeader(title: 'Administración'),
       const SizedBox(height: 8),
-      SettingsRow(icon: Icons.groups_rounded, title: 'Miembros y roles', subtitle: 'Owner, admins, miembros y expulsiones seguras', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
-      SettingsRow(icon: Icons.verified_user_rounded, title: 'Permisos', subtitle: 'Consulta qué puede hacer cada rol', onTap: () => showPermissionSheet(context)),
-      SettingsRow(icon: Icons.lock_rounded, title: 'Privacidad', subtitle: 'Grupo privado por invitación', onTap: () => showToast(context, 'Los grupos son privados. El acceso se controla por invitación.')),
-      SettingsRow(icon: Icons.delete_outline_rounded, title: 'Eliminar grupo', subtitle: 'Pendiente de confirmación segura para owner', danger: true, onTap: () => showToast(context, 'Lo dejamos bloqueado hasta añadir una confirmación segura.')),
+      SettingsRow(icon: Icons.groups_rounded, title: 'Miembros y roles', subtitle: 'Owner, admins y miembros', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
+      SettingsRow(icon: Icons.verified_user_rounded, title: 'Permisos', subtitle: 'Qué puede hacer cada rol', onTap: () => showPermissionSheet(context)),
+      SettingsRow(icon: Icons.lock_rounded, title: 'Privacidad', subtitle: 'Grupo privado por invitación', onTap: () => showToast(context, 'Grupo privado por invitación.')),
+      SettingsRow(icon: Icons.delete_outline_rounded, title: 'Eliminar grupo', subtitle: 'Solo owner con confirmación segura', danger: true, onTap: () => showToast(context, 'Lo dejamos bloqueado hasta añadir una confirmación segura.')),
     ]));
+  }
+}
+
+class GroupCoverSettingsCard extends StatelessWidget {
+  final Map<String, dynamic> group;
+  final bool saving;
+  final VoidCallback onChange;
+  final VoidCallback onRemove;
+  const GroupCoverSettingsCard({super.key, required this.group, required this.saving, required this.onChange, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final cover = AppData.text(group['cover_url']);
+    return AppCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Container(
+            height: 128,
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(colors: [Color(0xFF073A57), Color(0xFF0B6B8F)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            ),
+            child: cover.isNotEmpty
+                ? Image.network(cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.image_rounded, color: Colors.white, size: 34)))
+                : const Center(child: Icon(Icons.image_rounded, color: Colors.white, size: 34)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text('Foto del grupo', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text('Dale identidad al grupo en Inicio y Mis grupos.', style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: SecondaryButton(label: saving ? 'Guardando...' : 'Cambiar foto', icon: Icons.photo_camera_rounded, onTap: saving ? () {} : onChange)),
+          if (cover.isNotEmpty) ...[
+            const SizedBox(width: 10),
+            Expanded(child: DangerButton(label: 'Quitar', icon: Icons.delete_outline_rounded, onTap: saving ? () {} : onRemove)),
+          ],
+        ]),
+      ]),
+    );
   }
 }
 
@@ -5768,6 +5857,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await AppData.sb.auth.signOut();
   }
 
+  Future<void> deleteAccountFlow() async {
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar cuenta'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Esta acción elimina tu cuenta de Grupli, tu perfil, tu foto, tus dispositivos, tus avisos y tu acceso a los grupos.'),
+            const SizedBox(height: 10),
+            const Text('Si eres owner de algún grupo, esos grupos también se eliminarán con sus eventos, gastos y torneos.'),
+            const SizedBox(height: 14),
+            const Text('Escribe ELIMINAR para confirmar.', style: TextStyle(fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: controller,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(hintText: 'ELIMINAR'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+            onPressed: () => Navigator.pop(context, controller.text.trim().toUpperCase() == 'ELIMINAR'),
+            child: const Text('Eliminar cuenta'),
+          ),
+        ],
+      ),
+    );
+    final typed = controller.text;
+    controller.dispose();
+    if (confirmed != true) {
+      if (typed.trim().isNotEmpty && mounted) {
+        await showToast(context, 'Para eliminar la cuenta debes escribir ELIMINAR exactamente.', danger: true);
+      }
+      return;
+    }
+
+    try {
+      await AppData.deleteMyAccount('ELIMINAR');
+      if (mounted) await showToast(context, 'Cuenta eliminada.');
+    } catch (e) {
+      if (mounted) await showToast(context, humanError(e), danger: true);
+    }
+  }
+
   void showNotificationsSheet() {
     showModalBottomSheet(
       context: context,
@@ -5824,6 +5963,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           PreferencePreviewRow(icon: Icons.verified_user_rounded, title: 'Cuenta protegida', body: 'Acceso mediante Supabase Auth y sesión privada'),
           PreferencePreviewRow(icon: Icons.groups_rounded, title: 'Grupos privados', body: 'El contenido del grupo queda limitado a sus miembros'),
           PreferencePreviewRow(icon: Icons.admin_panel_settings_rounded, title: 'Roles claros', body: 'Owner, admins y miembros tienen permisos separados'),
+          PreferencePreviewRow(icon: Icons.delete_outline_rounded, title: 'Eliminación de cuenta', body: 'Puedes iniciar el borrado de cuenta desde Perfil con confirmación explícita'),
         ]),
       ),
     );
@@ -5838,7 +5978,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: const [
           SheetTitle(icon: Icons.auto_awesome_rounded, title: 'Grupli', body: 'App para organizar grupos privados: quedadas, calendario, gastos, torneos, miembros y permisos.'),
           SizedBox(height: 12),
-          PreferencePreviewRow(icon: Icons.phone_android_rounded, title: 'Versión', body: 'v14.8 · Perfil y ajustes final'),
+          PreferencePreviewRow(icon: Icons.phone_android_rounded, title: 'Versión', body: 'v15.6 · Seguridad, errores humanos y borrado de cuenta'),
           PreferencePreviewRow(icon: Icons.web_rounded, title: 'Preparada para web/PWA', body: 'Lista para seguir hacia revisión final y stores'),
         ]),
       ),
@@ -5946,6 +6086,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SettingsRow(icon: Icons.lock_outline_rounded, title: 'Privacidad y seguridad', subtitle: 'Grupos cerrados, roles y acceso privado', onTap: showPrivacySheet),
             SettingsRow(icon: Icons.help_outline_rounded, title: 'Ayuda y soporte', subtitle: 'Guía rápida y contacto próximamente', onTap: () => showToast(context, 'Soporte preparado para la siguiente fase.')),
             SettingsRow(icon: Icons.info_outline_rounded, title: 'Acerca de Grupli', subtitle: 'Versión y estado del producto', onTap: showAboutSheet),
+            SettingsRow(icon: Icons.delete_forever_rounded, title: 'Eliminar cuenta', subtitle: 'Borra tu cuenta y datos personales de Grupli', danger: true, onTap: deleteAccountFlow),
             const SizedBox(height: 10),
             DangerButton(label: 'Cerrar sesión', icon: Icons.logout_rounded, onTap: confirmSignOut),
           ]);
@@ -6181,49 +6322,45 @@ class NotificationPreferenceSwitch extends StatelessWidget {
 
 class GroupHeroCard extends StatelessWidget {
   final String name;
-  const GroupHeroCard({super.key, required this.name});
+  final String coverUrl;
+  const GroupHeroCard({super.key, required this.name, this.coverUrl = ''});
 
   @override
   Widget build(BuildContext context) {
+    final hasCover = coverUrl.trim().isNotEmpty;
     return Container(
-      height: 112,
+      height: 118,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(28),
         gradient: const LinearGradient(
-          colors: [Color(0xFF005F5E), Color(0xFF008F86), Color(0xFF20B8A8)],
-          stops: [0, .58, 1],
+          colors: [Color(0xFF073A57), Color(0xFF0B6B8F), Color(0xFF3A8EBD)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        boxShadow: const [
-          BoxShadow(color: Color(0x26008F86), blurRadius: 26, offset: Offset(0, 14)),
-          BoxShadow(color: Color(0x14005F5E), blurRadius: 10, offset: Offset(0, 3)),
-        ],
+        boxShadow: const [BoxShadow(color: Color(0x1A073A57), blurRadius: 24, offset: Offset(0, 12))],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(28),
         child: Stack(children: [
-          Positioned.fill(child: Opacity(opacity: .10, child: PatternIcons())),
-          Positioned(right: -30, top: -34, child: Container(width: 120, height: 120, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(.10)))),
-          Positioned(right: 26, bottom: -28, child: Container(width: 78, height: 78, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(.09)))),
-          Positioned(left: 18, right: 16, bottom: 17, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Row(children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white.withOpacity(.12))),
-                child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.lock_rounded, color: Colors.white, size: 14),
-                  SizedBox(width: 5),
-                  Text('Grupo privado', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5)),
-                ]),
-              ),
-              const Spacer(),
-              Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white.withOpacity(.16), shape: BoxShape.circle), child: const Icon(Icons.groups_rounded, color: Colors.white, size: 18)),
-            ]),
-            const SizedBox(height: 12),
-            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: -0.75)),
-            const SizedBox(height: 6),
-            const Text('Resumen claro, decisiones rápidas y actividad real', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xEFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w700)),
+          if (hasCover)
+            Positioned.fill(child: Image.network(coverUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink())),
+          Positioned.fill(child: Container(color: hasCover ? const Color(0xAA073A57) : Colors.transparent)),
+          if (!hasCover) Positioned.fill(child: Opacity(opacity: .08, child: PatternIcons())),
+          Positioned(left: 16, right: 16, top: 14, child: Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white.withOpacity(.16))),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.lock_rounded, color: Colors.white, size: 13),
+                SizedBox(width: 5),
+                Text('Privado', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5)),
+              ]),
+            ),
+          ])),
+          Positioned(left: 18, right: 18, bottom: 18, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: -0.75)),
+            const SizedBox(height: 7),
+            const Text('Resumen del grupo', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xEFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w700)),
           ])),
         ]),
       ),
@@ -6420,7 +6557,7 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('Próxima quedada', style: TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w900)),
                     const SizedBox(height: 3),
-                    Text(AppData.text(event['title'], 'Evento'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 23, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -.45)),
+                    Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 23, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -.45)),
                     const SizedBox(height: 8),
                     Wrap(spacing: 8, runSpacing: 7, children: [
                       EventMetaChip(icon: Icons.schedule_rounded, text: DateFormat('HH:mm', 'es_ES').format(date), color: color),
@@ -6435,7 +6572,7 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
                   Text('$yes/$minPeople', style: TextStyle(color: color, fontWeight: FontWeight.w900)),
                 ]),
                 const SizedBox(height: 8),
-                Text(yes >= minPeople ? 'Mínimo alcanzado. El grupo ya puede contar con este plan.' : 'Faltan $missing para alcanzar el mínimo. Responder rápido ayuda a organizar mejor.', style: const TextStyle(color: AppColors.muted, fontSize: 12.3, fontWeight: FontWeight.w700, height: 1.3)),
+                Text(yes >= minPeople ? 'Plan viable.' : 'Faltan $missing para el mínimo.', style: const TextStyle(color: AppColors.muted, fontSize: 12.3, fontWeight: FontWeight.w700, height: 1.3)),
                 const SizedBox(height: 13),
                 Row(children: [
                   Expanded(child: AttendancePick(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
@@ -6557,9 +6694,9 @@ class DashboardSummaryCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(title, style: const TextStyle(fontSize: 18, height: 1.15, fontWeight: FontWeight.w900, color: AppColors.ink)),
           const SizedBox(height: 6),
-          Text(body, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, height: 1.35, color: AppColors.muted, fontWeight: FontWeight.w700)),
+          Text(body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, height: 1.3, color: AppColors.muted, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
-          Text(footer, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, height: 1.35, color: AppColors.ink, fontWeight: FontWeight.w700)),
+          Text(footer, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, height: 1.3, color: AppColors.ink, fontWeight: FontWeight.w700)),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -7256,7 +7393,7 @@ class PremiumEventDetailHero extends StatelessWidget {
             ),
             const SizedBox(width: 13),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(AppData.text(event['title'], 'Evento'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -0.4)),
+              Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -0.4)),
               const SizedBox(height: 8),
               Text(longDateTime(date), style: const TextStyle(color: Color(0xEFFFFFFF), fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
@@ -7482,8 +7619,8 @@ class AppCard extends StatelessWidget {
         borderRadius: radius,
         border: Border.all(color: AppColors.lineSoft),
         boxShadow: const [
-          BoxShadow(color: Color(0x08111B34), blurRadius: 22, offset: Offset(0, 10)),
-          BoxShadow(color: Color(0x06111B34), blurRadius: 8, offset: Offset(0, 2)),
+          BoxShadow(color: Color(0x07102033), blurRadius: 20, offset: Offset(0, 8)),
+          BoxShadow(color: Color(0x03102033), blurRadius: 4, offset: Offset(0, 1)),
         ],
       ),
       child: child,
@@ -7567,32 +7704,36 @@ class GroupHomeCard extends StatelessWidget {
     final name = AppData.text(group['name'], 'Grupo');
     final members = AppData.intValue(group['members_count'], 1);
     final events = AppData.intValue(group['events_count'], 0);
+    final cover = AppData.text(group['cover_url']);
     return Padding(
       padding: const EdgeInsets.only(bottom: 11),
       child: AppCard(
         onTap: onTap,
-        padding: const EdgeInsets.all(13),
+        padding: const EdgeInsets.all(12),
         child: Row(children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF00A99D), Color(0xFF006B69)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: const [BoxShadow(color: Color(0x22008F86), blurRadius: 14, offset: Offset(0, 7))],
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              width: 60,
+              height: 60,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: [Color(0xFF0B6B8F), Color(0xFF073A57)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+              ),
+              child: cover.isNotEmpty
+                  ? Image.network(cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.lock_rounded, color: Colors.white, size: 23))
+                  : const Icon(Icons.lock_rounded, color: Colors.white, size: 23),
             ),
-            child: const Icon(Icons.lock_rounded, color: Colors.white, size: 23),
           ),
           const SizedBox(width: 13),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
-            Text('$members ${members == 1 ? 'miembro' : 'miembros'} · grupo privado', maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyMedium),
+            Text('$members ${members == 1 ? 'miembro' : 'miembros'} · privado', maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 8),
             Row(children: [
               _MiniChip(text: events == 0 ? 'sin eventos' : '$events eventos', color: events == 0 ? AppColors.muted : AppColors.teal),
               const SizedBox(width: 6),
-              const _MiniChip(text: 'por invitación', color: AppColors.violet),
+              const _MiniChip(text: 'invitación', color: AppColors.violet),
             ]),
           ])),
           const SizedBox(width: 8),
@@ -7712,12 +7853,21 @@ class EmptyBlock extends StatelessWidget { final IconData icon; final String tit
 class EmptySlim extends StatelessWidget { final IconData icon; final String title; final String body; const EmptySlim({super.key, required this.icon, required this.title, this.body = ''}); @override Widget build(BuildContext context) => AppCard(color: AppColors.surface, padding: const EdgeInsets.all(14), child: Row(children: [Container(width: 38, height: 38, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft), child: Icon(icon, color: AppColors.teal, size: 20)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)), if (body.trim().isNotEmpty) ...[const SizedBox(height: 4), Text(body, style: Theme.of(context).textTheme.bodyMedium)]]))])); }
 
 String humanizeError(String raw) {
-  final text = raw.toLowerCase();
-  if (text.contains('permission') || text.contains('rls') || text.contains('not allowed') || text.contains('denied')) return 'No tienes permiso para hacer esa acción en este grupo.';
-  if (text.contains('network') || text.contains('socket') || text.contains('connection')) return 'Revisa tu conexión e inténtalo de nuevo.';
-  if (text.contains('jwt') || text.contains('session') || text.contains('auth')) return 'Tu sesión necesita actualizarse. Cierra sesión y vuelve a entrar.';
-  if (text.contains('duplicate') || text.contains('already')) return 'Parece que esto ya existe o ya se había guardado.';
-  return raw.length > 120 ? 'No se pudo completar la acción. Inténtalo de nuevo.' : raw;
+  final original = raw.replaceAll('Exception: ', '').trim();
+  final text = original.toLowerCase();
+  if (text.isEmpty) return 'No se pudo completar la acción. Inténtalo de nuevo.';
+  if (text.contains('confirmation_required')) return 'Para eliminar la cuenta debes escribir ELIMINAR exactamente.';
+  if (text.contains('not_authenticated') || text.contains('usuario no autenticado') || text.contains('jwt') || text.contains('session') || text.contains('auth')) return 'Tu sesión necesita actualizarse. Cierra sesión y vuelve a entrar.';
+  if (text.contains('owner_protected') || text.contains('owner') || text.contains('creador del grupo')) return 'El creador del grupo está protegido. Transfiere o elimina el grupo antes de hacer esa acción.';
+  if (text.contains('member_not_found') || text.contains('not_member')) return 'Ese miembro ya no está disponible en el grupo.';
+  if (text.contains('invalid_role')) return 'Ese rol no es válido.';
+  if (text.contains('permission') || text.contains('policy') || text.contains('rls') || text.contains('not allowed') || text.contains('denied') || text.contains('violates row-level')) return 'No tienes permiso para hacer esa acción.';
+  if (text.contains('network') || text.contains('socket') || text.contains('connection') || text.contains('failed host lookup')) return 'No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.';
+  if (text.contains('duplicate') || text.contains('already') || text.contains('unique constraint')) return 'Parece que esto ya existe o ya se había guardado.';
+  if (text.contains('foreign key') || text.contains('violates') || text.contains('constraint')) return 'No se pudo guardar porque hay datos relacionados. Revisa la acción e inténtalo de nuevo.';
+  if (text.contains('postgrestexception') || text.contains('pgrst') || text.contains('supabase') || text.contains('postgres')) return 'No se pudo completar la acción en la base de datos. Inténtalo otra vez.';
+  if (original.length > 120) return 'No se pudo completar la acción. Inténtalo de nuevo.';
+  return original;
 }
 
 class HomeLoading extends StatelessWidget { const HomeLoading({super.key}); @override Widget build(BuildContext context) => Column(children: [Row(children: const [Expanded(child: GhostBox(height: 90)), SizedBox(width: 10), Expanded(child: GhostBox(height: 90)), SizedBox(width: 10), Expanded(child: GhostBox(height: 90))]), const SizedBox(height: 24), const GhostBox(height: 100), const SizedBox(height: 10), const GhostBox(height: 100)]); }
@@ -7888,7 +8038,7 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
                         if (eventIsRoutine(event)) RoutineBadge(label: eventRoutineBadge(event)),
                       ]),
                       const SizedBox(height: 7),
-                      Text(AppData.text(event['title'], 'Evento'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w900, height: 1.1)),
+                      Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w900, height: 1.1)),
                       const SizedBox(height: 6),
                       MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
                       const SizedBox(height: 7),
@@ -8631,13 +8781,9 @@ Future<bool?> confirmAction(
 }
 
 String humanError(Object? error) {
-  final raw = error?.toString() ?? '';
-  if (raw.contains('owner')) return 'El owner está protegido y no se puede modificar desde aquí.';
-  if (raw.contains('permission') || raw.contains('policy') || raw.contains('RLS')) return 'No tienes permisos para hacer esta acción.';
-  if (raw.contains('network')) return 'No se pudo conectar. Revisa tu conexión.';
-  if (raw.trim().isEmpty) return 'No se pudo completar la acción.';
-  return raw.replaceAll('Exception: ', '');
+  return humanizeError(error?.toString() ?? '');
 }
+
 
 void copyInviteCode(BuildContext context, String code) {
   Clipboard.setData(ClipboardData(text: InviteLinks.normalizeCode(code)));

@@ -130,3 +130,11 @@ SQL recomendado: `supabase/patch_v14_7_members_permissions.sql`.
 
 
 Última mejora incluida: `docs/V15_5_PUSH_NOTIFICATIONS.md`.
+
+
+Última mejora incluida: `docs/V15_6_SECURITY_DELETE_ACCOUNT.md`.
+SQL obligatorio: `supabase/patch_v15_6_security_delete_account.sql`.
+
+
+Última mejora incluida: `docs/V15_7_BLUE_VISUAL_GROUP_COVER.md`.
+SQL nuevo: `supabase/patch_v15_7_visual_group_cover.sql`.
