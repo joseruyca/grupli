@@ -66,3 +66,11 @@ Calendario en español y perfil real con nombre/foto. Ejecutar `supabase/patch_v
 ## v12.10 create group RPC fix
 
 Corrige el error PGRST203 al crear grupo eliminando funciones `create_group_atomic` antiguas/sobrecargadas en Supabase. Ejecutar `supabase/patch_v12_10_create_group_rpc_overload_fix.sql`.
+
+
+## v13 — Premium UI + estabilidad global
+
+Fase de estabilización antes de seguir creciendo: pulido visual global, Miembros y roles más claros, revisión de navegación, seguridad RLS y checks SQL ampliados.
+
+SQL opcional si ya tienes datos: `supabase/patch_v13_roles_rls_hardening.sql`.
+Reset limpio: `supabase/all_in_one.sql`.

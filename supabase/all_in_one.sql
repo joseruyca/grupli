@@ -37,6 +37,7 @@ DROP FUNCTION IF EXISTS public.random_invite_code() CASCADE;
 DROP FUNCTION IF EXISTS public.ensure_current_profile() CASCADE;
 DROP FUNCTION IF EXISTS public.is_group_member(uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.is_group_admin(uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.is_group_owner(uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.create_group_atomic(text) CASCADE;
 DROP FUNCTION IF EXISTS public.join_group_with_code(text) CASCADE;
 DROP FUNCTION IF EXISTS public.get_my_groups() CASCADE;
@@ -270,6 +271,18 @@ AS $$
   );
 $$;
 
+CREATE OR REPLACE FUNCTION public.is_group_owner(target_group_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.group_members gm
+    WHERE gm.group_id = target_group_id AND gm.user_id = auth.uid() AND gm.role = 'owner'
+  );
+$$;
+
 CREATE OR REPLACE FUNCTION public.create_group_atomic(p_name text)
 RETURNS uuid
 LANGUAGE plpgsql
@@ -372,9 +385,14 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+  IF TG_OP = 'UPDATE' AND NEW.role = 'owner' AND OLD.role <> 'owner' THEN
+    RAISE EXCEPTION 'Solo puede existir el owner original del grupo';
+  END IF;
+
   IF OLD.role = 'owner' AND (TG_OP = 'DELETE' OR NEW.role <> 'owner') THEN
     RAISE EXCEPTION 'No se puede expulsar ni degradar al creador del grupo';
   END IF;
+
   RETURN COALESCE(NEW, OLD);
 END;
 $$;

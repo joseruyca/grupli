@@ -83,7 +83,7 @@ class GrupliApp extends StatelessWidget {
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.white,
         fontFamily: 'Roboto',
-        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, background: AppColors.white),
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, surface: AppColors.white),
         textTheme: const TextTheme(
           headlineLarge: TextStyle(fontSize: 31, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.05),
           headlineMedium: TextStyle(fontSize: 25, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.08),
@@ -327,6 +327,23 @@ class AppData {
   static Future<List<Map<String, dynamic>>> members(String groupId) async {
     final res = await sb.from('group_members').select('id, role, user_id, profiles(id,email,full_name,avatar_url)').eq('group_id', groupId).order('created_at');
     return asList(res);
+  }
+
+  static Future<void> updateMemberRole(String memberRowId, String role) async {
+    if (!['admin', 'member'].contains(role)) {
+      throw Exception('Rol no válido.');
+    }
+    await sb.from('group_members').update({'role': role}).eq('id', memberRowId);
+  }
+
+  static Future<void> removeMember(String memberRowId) async {
+    await sb.from('group_members').delete().eq('id', memberRowId);
+  }
+
+  static Future<void> leaveGroup(String groupId) async {
+    final uid = user?.id;
+    if (uid == null) return;
+    await sb.from('group_members').delete().eq('group_id', groupId).eq('user_id', uid);
   }
 
   static Future<List<Map<String, dynamic>>> events(String groupId) async {
@@ -1349,7 +1366,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                 color: AppColors.teal,
                 onRefresh: () async => reload(),
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 112),
+                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 112),
                   children: [
                     Row(children: [
                       RoundBackButton(onTap: () => Navigator.of(context).pop()),
@@ -1358,7 +1375,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                     ]),
                     const SizedBox(height: 12),
                     GroupHeroCard(name: name),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     if (snapshot.connectionState == ConnectionState.waiting)
                       const CenterLoader(label: 'Cargando resumen...')
                     else if (snapshot.hasError)
@@ -1394,7 +1411,9 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                           reload();
                         })),
                       ],
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
+                      SectionHeader(title: 'Estado del grupo'),
+                      const SizedBox(height: 8),
                       CompactInsightStrip(
                         events: events.length,
                         expenses: expensesTotal,
@@ -3517,33 +3536,129 @@ class StandingRow extends StatelessWidget {
 }
 
 
+
 class MembersScreen extends StatefulWidget {
   final Map<String, dynamic> group;
   const MembersScreen({super.key, required this.group});
-  @override State<MembersScreen> createState() => _MembersScreenState();
+  @override
+  State<MembersScreen> createState() => _MembersScreenState();
 }
 
 class _MembersScreenState extends State<MembersScreen> {
   late Future<List<Map<String, dynamic>>> future;
-  @override void initState() { super.initState(); future = AppData.members(widget.group['id'].toString()); }
+
+  @override
+  void initState() {
+    super.initState();
+    future = AppData.members(widget.group['id'].toString());
+  }
+
   void reload() => setState(() => future = AppData.members(widget.group['id'].toString()));
+
+  bool _canManage(List<Map<String, dynamic>> members) {
+    final uid = AppData.user?.id;
+    Map<String, dynamic>? me;
+    for (final member in members) {
+      if (member['user_id']?.toString() == uid) {
+        me = member;
+        break;
+      }
+    }
+    final role = AppData.text(me?['role']);
+    return role == 'owner' || role == 'admin';
+  }
+
+  Future<void> _changeRole(Map<String, dynamic> member, String role) async {
+    final name = memberName(member);
+    try {
+      await AppData.updateMemberRole(member['id'].toString(), role);
+      reload();
+      if (mounted) await showToast(context, role == 'admin' ? '$name ahora es admin.' : '$name ahora es miembro.');
+    } catch (e) {
+      if (mounted) await showToast(context, e.toString(), danger: true);
+    }
+  }
+
+  Future<void> _remove(Map<String, dynamic> member) async {
+    final name = memberName(member);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Expulsar a $name'),
+        content: const Text('Esta persona perderá acceso al grupo. Podrá volver si recibe una nueva invitación.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Expulsar')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await AppData.removeMember(member['id'].toString());
+      reload();
+      if (mounted) await showToast(context, '$name ya no está en el grupo.');
+    } catch (e) {
+      if (mounted) await showToast(context, e.toString(), danger: true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: 'Miembros', subtitle: AppData.text(widget.group['name']), leading: true),
-      const SizedBox(height: 18),
-      FutureBuilder<List<Map<String, dynamic>>>(future: future, builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const CenterLoader(label: 'Cargando miembros...');
-        if (snapshot.hasError) return ErrorBlock(message: snapshot.error.toString(), onRetry: reload);
-        final members = snapshot.data ?? [];
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [Expanded(child: StatCard(icon: Icons.groups_rounded, value: members.length.toString(), label: 'Total', color: AppColors.teal)), const SizedBox(width: 10), Expanded(child: StatCard(icon: Icons.admin_panel_settings_rounded, value: members.where((m) => ['owner','admin'].contains(m['role'])).length.toString(), label: 'Admins', color: AppColors.violet))]),
-          const SizedBox(height: 16),
-          ...members.map((m) => MemberCard(member: m)),
-        ]);
-      })
-    ]));
+    final groupName = AppData.text(widget.group['name'], 'Grupo');
+    final code = AppData.text(widget.group['invite_code'], '------');
+    return DirectPage(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        PageHeader(title: 'Miembros', subtitle: groupName, leading: true),
+        const SizedBox(height: 14),
+        AppCard(
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            Container(width: 46, height: 46, decoration: const BoxDecoration(color: AppColors.tealSoft, shape: BoxShape.circle), child: const Icon(Icons.lock_rounded, color: AppColors.teal)),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Grupo privado por invitación', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 3),
+              Text('Comparte el código $code solo con quienes quieras dentro del grupo.', style: Theme.of(context).textTheme.bodyMedium),
+            ])),
+          ]),
+        ),
+        const SizedBox(height: 14),
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) return const CenterLoader(label: 'Cargando miembros...');
+            if (snapshot.hasError) return ErrorBlock(message: snapshot.error.toString(), onRetry: reload);
+            final members = snapshot.data ?? [];
+            final admins = members.where((m) => ['owner', 'admin'].contains(AppData.text(m['role']))).toList();
+            final regular = members.where((m) => AppData.text(m['role']) == 'member').toList();
+            final canManage = _canManage(members);
+            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(child: StatCard(icon: Icons.groups_rounded, value: members.length.toString(), label: 'Total', color: AppColors.teal)),
+                const SizedBox(width: 10),
+                Expanded(child: StatCard(icon: Icons.admin_panel_settings_rounded, value: admins.length.toString(), label: 'Admins', color: AppColors.violet)),
+                const SizedBox(width: 10),
+                Expanded(child: StatCard(icon: Icons.person_outline_rounded, value: regular.length.toString(), label: 'Miembros', color: AppColors.orange)),
+              ]),
+              const SizedBox(height: 18),
+              SectionHeader(title: 'Administradores'),
+              const SizedBox(height: 8),
+              ...admins.map((m) => ManageMemberCard(member: m, canManage: canManage, onRole: _changeRole, onRemove: _remove)),
+              const SizedBox(height: 16),
+              SectionHeader(title: 'Miembros'),
+              const SizedBox(height: 8),
+              if (regular.isEmpty)
+                EmptySlim(icon: Icons.person_add_alt_1_rounded, title: 'Aún no hay miembros normales', body: 'Invita a tu grupo con el código o enlace cuando esté listo.')
+              else
+                ...regular.map((m) => ManageMemberCard(member: m, canManage: canManage, onRole: _changeRole, onRemove: _remove)),
+              const SizedBox(height: 16),
+              if (!canManage)
+                EmptySlim(icon: Icons.shield_outlined, title: 'Permisos de miembro', body: 'Puedes ver el grupo y participar. Solo owner/admins pueden gestionar miembros.'),
+            ]);
+          },
+        ),
+      ]),
+    );
   }
 }
 
@@ -3552,7 +3667,7 @@ class GroupSettingsScreen extends StatelessWidget {
   const GroupSettingsScreen({super.key, required this.group});
   @override Widget build(BuildContext context) {
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: 'Más', subtitle: AppData.text(group['name']), leading: true),
+      PageHeader(title: 'Ajustes del grupo', subtitle: AppData.text(group['name']), leading: true),
       const SizedBox(height: 18),
       SettingsRow(icon: Icons.groups_rounded, title: 'Miembros', subtitle: 'Gestiona el grupo', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
       SettingsRow(icon: Icons.qr_code_rounded, title: 'Código de invitación', subtitle: AppData.text(group['invite_code'], '------'), onTap: () => showCodeSheet(context, AppData.text(group['invite_code'], '------'), AppData.text(group['name']))),
@@ -4032,13 +4147,48 @@ class PrimaryButton extends StatelessWidget {
   final VoidCallback onTap;
   final bool loading;
   const PrimaryButton({super.key, required this.label, required this.onTap, this.icon, this.loading = false});
-  @override Widget build(BuildContext context) => SizedBox(width: double.infinity, height: 54, child: FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), onPressed: loading ? null : onTap, icon: loading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(icon ?? Icons.check_rounded), label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900))));
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    height: 52,
+    child: FilledButton.icon(
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.teal,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      onPressed: loading ? null : onTap,
+      icon: loading
+          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+          : Icon(icon ?? Icons.check_rounded, size: 20),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
+    ),
+  );
 }
 
 class SecondaryButton extends StatelessWidget {
-  final String label; final IconData icon; final VoidCallback onTap;
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
   const SecondaryButton({super.key, required this.label, required this.icon, required this.onTap});
-  @override Widget build(BuildContext context) => SizedBox(width: double.infinity, height: 54, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(foregroundColor: AppColors.teal, side: const BorderSide(color: AppColors.teal), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), onPressed: onTap, icon: Icon(icon), label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900))));
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    height: 52,
+    child: OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.teal,
+        side: const BorderSide(color: AppColors.teal),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      onPressed: onTap,
+      icon: Icon(icon, size: 20),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
+    ),
+  );
 }
 
 class DangerButton extends StatelessWidget {
@@ -4060,11 +4210,38 @@ class SocialButton extends StatelessWidget {
 }
 
 class AppCard extends StatelessWidget {
-  final Widget child; final EdgeInsets padding; final VoidCallback? onTap;
-  const AppCard({super.key, required this.child, this.padding = const EdgeInsets.all(14), this.onTap});
-  @override Widget build(BuildContext context) {
-    final card = Container(padding: padding, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: AppColors.line), boxShadow: [BoxShadow(color: Colors.black.withOpacity(.022), blurRadius: 12, offset: const Offset(0, 6))]), child: child);
-    return onTap == null ? card : InkWell(borderRadius: BorderRadius.circular(18), onTap: onTap, child: card);
+  final Widget child;
+  final EdgeInsets padding;
+  final VoidCallback? onTap;
+  final Color color;
+  const AppCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(14),
+    this.onTap,
+    this.color = AppColors.white,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(20);
+    final card = AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOut,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: radius,
+        border: Border.all(color: AppColors.line),
+        boxShadow: const [BoxShadow(color: Color(0x0A111B34), blurRadius: 18, offset: Offset(0, 8))],
+      ),
+      child: child,
+    );
+    if (onTap == null) return card;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(borderRadius: radius, onTap: onTap, child: card),
+    );
   }
 }
 
@@ -4083,9 +4260,23 @@ class CircleIconButton extends StatelessWidget {
 class OrDivider extends StatelessWidget { const OrDivider({super.key}); @override Widget build(BuildContext context) => Row(children: const [Expanded(child: Divider()), Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('o', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700))), Expanded(child: Divider())]); }
 
 class StatCard extends StatelessWidget {
-  final IconData icon; final String value; final String label; final Color color;
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
   const StatCard({super.key, required this.icon, required this.value, required this.label, required this.color});
-  @override Widget build(BuildContext context) => AppCard(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11), child: Column(children: [Icon(icon, color: color, size: 21), const SizedBox(height: 5), Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.ink)), const SizedBox(height: 1), Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.2, color: AppColors.muted, fontWeight: FontWeight.w700))]));
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+    child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, color: color, size: 20),
+      const SizedBox(height: 5),
+      Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.ink)),
+      const SizedBox(height: 1),
+      Text(label, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w700)),
+    ]),
+  );
 }
 
 class MoneyStat extends StatelessWidget {
@@ -4144,12 +4335,39 @@ class GroupBottomNav extends StatelessWidget {
 class NavSpec { final IconData icon; final String label; const NavSpec(this.icon, this.label); }
 
 class BottomBar extends StatelessWidget {
-  final List<NavSpec> items; final int index; final ValueChanged<int> onTap;
+  final List<NavSpec> items;
+  final int index;
+  final ValueChanged<int> onTap;
   const BottomBar({super.key, required this.items, required this.index, required this.onTap});
-  @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.fromLTRB(12, 6, 12, 8), decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.line))), child: Row(children: List.generate(items.length, (i) {
-    final active = i == index; final spec = items[i];
-    return Expanded(child: InkWell(borderRadius: BorderRadius.circular(28), onTap: () => onTap(i), child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(height: 32, padding: const EdgeInsets.symmetric(horizontal: 13), decoration: BoxDecoration(color: active ? AppColors.tealSoft : Colors.transparent, borderRadius: BorderRadius.circular(99)), child: Icon(spec.icon, size: 22, color: active ? AppColors.teal : AppColors.muted)), const SizedBox(height: 2), Text(spec.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: active ? FontWeight.w900 : FontWeight.w700, color: active ? AppColors.ink : AppColors.muted))]))));
-  })));
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(10, 5, 10, 7),
+    decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.line))),
+    child: Row(children: List.generate(items.length, (i) {
+      final active = i == index;
+      final spec = items[i];
+      return Expanded(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(28),
+          onTap: () => onTap(i),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                height: 30,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(color: active ? AppColors.tealSoft : Colors.transparent, borderRadius: BorderRadius.circular(99)),
+                child: Icon(spec.icon, size: 21, color: active ? AppColors.teal : AppColors.muted),
+              ),
+              const SizedBox(height: 1),
+              Text(spec.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: active ? FontWeight.w900 : FontWeight.w700, color: active ? AppColors.ink : AppColors.muted)),
+            ]),
+          ),
+        ),
+      );
+    })),
+  );
 }
 
 class PageHeader extends StatelessWidget {
@@ -4537,6 +4755,73 @@ String memberName(Map<String, dynamic> member) {
   final email = AppData.text(profile['email']);
   if (email.contains('@')) return email.split('@').first;
   return 'Miembro';
+}
+
+
+class ManageMemberCard extends StatelessWidget {
+  final Map<String, dynamic> member;
+  final bool canManage;
+  final Future<void> Function(Map<String, dynamic> member, String role) onRole;
+  final Future<void> Function(Map<String, dynamic> member) onRemove;
+  const ManageMemberCard({super.key, required this.member, required this.canManage, required this.onRole, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = AppData.asMap(member['profiles']);
+    final role = AppData.text(member['role'], 'member');
+    final name = memberName(member);
+    final isMe = member['user_id']?.toString() == AppData.user?.id;
+    final canEditThis = canManage && role != 'owner' && !isMe;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: AppCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        child: Row(children: [
+          ProfileAvatar(name: name, avatarUrl: AppData.text(profile['avatar_url']), radius: 22),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text(isMe ? '$name (Tú)' : name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900))),
+              RoleBadge(role: role),
+            ]),
+            const SizedBox(height: 3),
+            Text(AppData.text(profile['email'], 'sin email'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+          ])),
+          if (canEditThis)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_horiz_rounded, color: AppColors.muted),
+              onSelected: (value) {
+                if (value == 'admin') onRole(member, 'admin');
+                if (value == 'member') onRole(member, 'member');
+                if (value == 'remove') onRemove(member);
+              },
+              itemBuilder: (context) => [
+                if (role != 'admin') const PopupMenuItem(value: 'admin', child: Text('Hacer admin')),
+                if (role == 'admin') const PopupMenuItem(value: 'member', child: Text('Quitar admin')),
+                const PopupMenuDivider(),
+                const PopupMenuItem(value: 'remove', child: Text('Expulsar del grupo')),
+              ],
+            ),
+        ]),
+      ),
+    );
+  }
+}
+
+class RoleBadge extends StatelessWidget {
+  final String role;
+  const RoleBadge({super.key, required this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = role == 'owner' ? AppColors.orange : role == 'admin' ? AppColors.teal : AppColors.muted;
+    final text = role == 'owner' ? 'OWNER' : role == 'admin' ? 'ADMIN' : 'MIEMBRO';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(99)),
+      child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 10.5)),
+    );
+  }
 }
 
 class SettingsRow extends StatelessWidget { final IconData icon; final String title; final String subtitle; final VoidCallback onTap; final bool danger; const SettingsRow({super.key, required this.icon, required this.title, required this.subtitle, required this.onTap, this.danger = false}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 9), child: AppCard(onTap: onTap, child: Row(children: [Icon(icon, color: danger ? AppColors.red : AppColors.ink), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(fontWeight: FontWeight.w900, color: danger ? AppColors.red : AppColors.ink)), Text(subtitle, style: const TextStyle(color: AppColors.muted, fontSize: 12))])), const Icon(Icons.chevron_right_rounded, color: AppColors.muted)]))); }

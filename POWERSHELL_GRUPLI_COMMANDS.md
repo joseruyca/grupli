@@ -4,7 +4,7 @@
 ```powershell
 $Dest = "$env:USERPROFILE\Desktop\grupliv2"
 
-$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v12.6-navigation-tournaments-fix*.zip" |
+$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v13-premium-ui-stability-review*.zip" |
   Sort-Object LastWriteTime -Descending |
   Select-Object -First 1
 
