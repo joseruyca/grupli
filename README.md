@@ -141,3 +141,6 @@ SQL nuevo: `supabase/patch_v15_7_visual_group_cover.sql`.
 
 
 Última corrección incluida: `docs/V15_7_1_VERCEL_BUILD_FIX.md`.
+
+
+Última mejora incluida: `docs/V15_8_COMPACT_VISUAL_POLISH.md`.

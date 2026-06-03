@@ -2070,53 +2070,16 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                     else if (snapshot.hasError)
                       ErrorBlock(message: snapshot.error.toString(), onRetry: reload)
                     else ...[
-                      SmartPromptCard(
-                        icon: myDecisionPending.isNotEmpty
-                            ? Icons.notification_important_rounded
-                            : nextEvent != null
-                                ? Icons.event_available_rounded
-                                : Icons.waving_hand_rounded,
-                        color: myDecisionPending.isNotEmpty
-                            ? AppColors.amber
-                            : nextEvent != null
-                                ? AppColors.teal
-                                : AppColors.teal,
-                        title: myDecisionPending.isNotEmpty
-                            ? (myDecisionPending.length == 1
-                                ? '1 respuesta pendiente'
-                                : '${myDecisionPending.length} respuestas pendientes')
-                            : nextEvent != null
-                                ? 'Próximo plan listo'
-                                : 'Empieza el grupo',
-                        body: myDecisionPending.isNotEmpty
-                            ? 'Responde a ${AppData.text(myDecisionPending.first['title'], 'la próxima quedada')}.'
-                            : nextEvent != null
-                                ? 'Revisa o confirma la próxima cita.'
-                                : 'Crea la primera quedada del grupo.',
-                        actionLabel: myDecisionPending.isNotEmpty
-                            ? 'Responder ahora'
-                            : nextEvent != null
-                                ? 'Ver detalle'
-                                : 'Crear quedada',
-                        onTap: () async {
-                          if (myDecisionPending.isNotEmpty) {
-                            await openEventDetail(myDecisionPending.first);
-                          } else if (nextEvent != null) {
-                            await openEventDetail(nextEvent);
-                          } else {
-                            await openCreateEvent();
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 14),
-                      Row(children: [
-                        Expanded(child: StatCard(icon: Icons.event_rounded, value: upcoming.length.toString(), label: 'Próximos', color: AppColors.teal)),
-                        const SizedBox(width: 10),
-                        Expanded(child: StatCard(icon: Icons.hourglass_top_rounded, value: myDecisionPending.length.toString(), label: 'Pendientes', color: AppColors.amber)),
-                        const SizedBox(width: 10),
-                        Expanded(child: StatCard(icon: Icons.emoji_events_rounded, value: tournamentsActive.toString(), label: 'Activos', color: AppColors.orange)),
-                      ]),
-                      const SizedBox(height: 16),
+                      if (myDecisionPending.isNotEmpty)
+                        SmartPromptCard(
+                          icon: Icons.notifications_active_rounded,
+                          color: AppColors.amber,
+                          title: myDecisionPending.length == 1 ? '1 respuesta pendiente' : '${myDecisionPending.length} respuestas pendientes',
+                          body: 'Toca para responder rápido.',
+                          actionLabel: 'Responder',
+                          onTap: () async => openEventDetail(myDecisionPending.first),
+                        ),
+                      if (myDecisionPending.isNotEmpty) const SizedBox(height: 12),
                       SectionHeader(
                         title: 'Próxima quedada',
                         action: nextEvent == null ? 'Crear' : 'Calendario',
@@ -2124,50 +2087,24 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                       ),
                       const SizedBox(height: 8),
                       if (nextEvent == null)
-                        EmptyBlock(
+                        EmptySlim(
                           icon: Icons.event_available_rounded,
-                          title: 'Todavía no hay quedadas',
-                          body: 'Crea el primer plan del grupo y todos podrán responder Voy, Duda o No voy.',
+                          title: 'Sin quedadas',
+                          body: 'Crea un plan para empezar.',
                         )
                       else
                         DashboardEventCard(event: nextEvent, group: group, onChanged: reload),
-                      const SizedBox(height: 16),
-                      Row(children: [
-                        Expanded(
-                          child: DashboardSummaryCard(
-                            icon: Icons.account_balance_wallet_rounded,
-                            color: myBalance >= 0 ? AppColors.teal : AppColors.red,
-                            eyebrow: 'Resumen económico',
-                            title: openExpenses.isEmpty ? 'Todo está al día' : (myBalance > 0 ? 'Te deben ${money(myBalance)}' : myBalance < 0 ? 'Debes ${money(myBalance.abs())}' : 'Balance en cero'),
-                            body: openExpenses.isEmpty
-                                ? 'No hay deudas abiertas ni gastos pendientes en este momento.'
-                                : '${openExpenses.length} ${openExpenses.length == 1 ? 'gasto abierto' : 'gastos abiertos'} · total del grupo ${money(openExpensesAmount)}',
-                            footer: expensesTotal > 0 ? 'Histórico acumulado: ${money(expensesTotal)}' : 'Empieza registrando el primer gasto compartido.',
-                            actionLabel: 'Abrir finanzas',
-                            onTap: () => widget.onNavigateTab?.call(2),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: DashboardSummaryCard(
-                            icon: Icons.emoji_events_rounded,
-                            color: activeTournament == null ? AppColors.violet : AppColors.orange,
-                            eyebrow: 'Torneo activo',
-                            title: activeTournament == null
-                                ? 'Aún no hay competición'
-                                : AppData.text(activeTournament['name'], 'Competición'),
-                            body: activeTournament == null
-                                ? 'Crea una liga o torneo cuando el grupo quiera competir.'
-                                : '${_teamCount(activeTournament)} participantes · ${_pendingMatches(activeTournament)} partidos pendientes',
-                            footer: activeTournament == null
-                                ? 'Formato guiado para liga, copa o americano.'
-                                : '${_cap(AppData.text(activeTournament['format'], 'liga'))} · ${AppData.text(activeTournament['status'], 'active') == 'finished' ? 'Finalizado' : 'En curso'}',
-                            actionLabel: activeTournament == null ? 'Crear torneo' : 'Abrir torneo',
-                            onTap: () => widget.onNavigateTab?.call(3),
-                          ),
-                        ),
-                      ]),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
+                      DashboardMiniSummaryRow(
+                        events: upcoming.length,
+                        pending: myDecisionPending.length,
+                        balance: myBalance,
+                        tournaments: tournamentsActive,
+                        onCalendar: () => widget.onNavigateTab?.call(1),
+                        onFinances: () => widget.onNavigateTab?.call(2),
+                        onTournaments: () => widget.onNavigateTab?.call(3),
+                      ),
+                      const SizedBox(height: 14),
                       SectionHeader(title: 'Actividad real', action: 'Actualizar', onTap: reload),
                       const SizedBox(height: 8),
                       DashboardActivityCard(
@@ -2887,7 +2824,7 @@ class _CalendarTabState extends State<CalendarTab> {
               child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 112), children: [
                 PageHeader(title: 'Calendario', subtitle: AppData.text(widget.group['name']), leading: false),
                 const SizedBox(height: 12),
-                CalendarSmartHeader(
+                CalendarCompactHeader(
                   todayEvents: todayEvents.length,
                   weekEvents: thisWeek,
                   pendingResponses: pendingResponse,
@@ -2896,7 +2833,7 @@ class _CalendarTabState extends State<CalendarTab> {
                     month = DateTime(DateTime.now().year, DateTime.now().month);
                   }),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 WeekStrip(
                   days: weekDays,
                   selected: selected,
@@ -2942,7 +2879,7 @@ class _CalendarTabState extends State<CalendarTab> {
                 SectionHeader(title: 'Agenda del día', action: 'Crear', onTap: () => createFor(selected)),
                 const SizedBox(height: 10),
                 if (selectedEvents.isEmpty)
-                  EmptyBlock(icon: Icons.calendar_month_rounded, title: 'No hay nada este día', body: 'Crea una quedada, partido, cena o reunión para organizar al grupo.')
+                  EmptySlim(icon: Icons.calendar_month_rounded, title: 'No hay planes este día', body: 'Crea uno desde + Evento.')
                 else
                   ...selectedEvents.map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
                 const SizedBox(height: 18),
@@ -3472,40 +3409,25 @@ class FinanceHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = summary.pendingAmount <= .01 ? AppColors.green : summary.myNet < -0.01 ? AppColors.red : AppColors.teal;
-    final icon = summary.pendingAmount <= .01
-        ? Icons.verified_rounded
-        : summary.myNet < -0.01
-            ? Icons.outbound_rounded
-            : Icons.savings_rounded;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
-        gradient: LinearGradient(colors: [color, Color.lerp(color, AppColors.ink, .18)!], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        boxShadow: [BoxShadow(color: color.withOpacity(.18), blurRadius: 22, offset: const Offset(0, 12))],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(width: 48, height: 48, decoration: BoxDecoration(color: Colors.white.withOpacity(.18), borderRadius: BorderRadius.circular(17)), child: Icon(icon, color: Colors.white, size: 26)),
-            const SizedBox(width: 13),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(_financeMainTitle(summary), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -0.5)),
-              const SizedBox(height: 7),
-              Text(_financeMainSubtitle(summary), style: const TextStyle(color: Color(0xEFFFFFFF), fontSize: 13, fontWeight: FontWeight.w700, height: 1.35)),
-            ])),
-          ]),
-          const SizedBox(height: 16),
-          Row(children: [
-            Expanded(child: _HeroFinanceMetric(label: 'Tu saldo neto', value: money(summary.myNet))),
-            const SizedBox(width: 10),
-            Expanded(child: _HeroFinanceMetric(label: 'Movimiento real', value: money(summary.settlementAmount))),
-          ]),
-          const SizedBox(height: 14),
-          WhiteButton(label: 'Añadir gasto', onTap: onCreate),
-        ]),
-      ),
+    final color = summary.pendingAmount <= .01 ? AppColors.teal : summary.myNet < -0.01 ? AppColors.red : AppColors.teal;
+    return AppCard(
+      color: AppColors.tealDark,
+      padding: const EdgeInsets.all(15),
+      child: Row(children: [
+        Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.white.withOpacity(.13), borderRadius: BorderRadius.circular(15)), child: Icon(summary.pendingAmount <= .01 ? Icons.verified_rounded : Icons.swap_horiz_rounded, color: Colors.white, size: 23)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(_financeMainTitle(summary), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, height: 1.1)),
+          const SizedBox(height: 4),
+          Text(summary.pendingAmount <= .01 ? 'Sin pagos pendientes.' : 'A mover ${money(summary.settlementAmount)} · compensado ${money(summary.compensatedAmount)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12, fontWeight: FontWeight.w700)),
+        ])),
+        const SizedBox(width: 10),
+        InkWell(
+          onTap: onCreate,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: const Text('+ Gasto', style: TextStyle(color: AppColors.tealDark, fontWeight: FontWeight.w900))),
+        ),
+      ]),
     );
   }
 }
@@ -6463,7 +6385,7 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
       await AppData.setAttendance(widget.event['id'].toString(), status);
       widget.onChanged();
     } catch (e) {
-      await showToast(context, e.toString(), danger: true);
+      await showToast(context, humanError(e), danger: true);
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -6479,23 +6401,22 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
     final no = attendanceCount(event, 'no');
     final mine = myAttendanceStatus(event);
     final color = eventKindColor(event);
-    final soft = eventKindSoftColor(event);
     final progress = minPeople <= 0 ? 0.0 : min(1.0, yes / minPeople);
     final missing = max(0, minPeople - yes);
 
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(24),
         gradient: LinearGradient(
-          colors: [soft, Colors.white],
+          colors: [Colors.white.withOpacity(.92), eventKindSoftColor(event).withOpacity(.95)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: color.withOpacity(.18), width: 1.2),
-        boxShadow: [BoxShadow(color: color.withOpacity(.10), blurRadius: 28, offset: const Offset(0, 14))],
+        border: Border.all(color: color.withOpacity(.16)),
+        boxShadow: [BoxShadow(color: AppColors.ink.withOpacity(.06), blurRadius: 24, offset: const Offset(0, 12))],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(24),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -6504,82 +6425,56 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
               widget.onChanged();
             },
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 15),
+              padding: const EdgeInsets.fromLTRB(13, 13, 13, 12),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(.78), borderRadius: BorderRadius.circular(99), border: Border.all(color: color.withOpacity(.18))),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(eventKindIcon(event), size: 16, color: color),
-                      const SizedBox(width: 6),
-                      Text(eventKindLabel(event), style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900)),
-                    ]),
-                  ),
-                  if (eventIsRoutine(event)) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(.72), borderRadius: BorderRadius.circular(99), border: Border.all(color: color.withOpacity(.14))),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(Icons.repeat_rounded, size: 15, color: color),
-                        const SizedBox(width: 5),
-                        Text(eventRoutineBadge(event), style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900)),
-                      ]),
-                    ),
-                  ],
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                    decoration: BoxDecoration(color: yes >= minPeople ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(99)),
-                    child: Text(yes >= minPeople ? 'Plan viable' : 'Faltan $missing', style: TextStyle(color: yes >= minPeople ? AppColors.green : AppColors.orange, fontSize: 12, fontWeight: FontWeight.w900)),
-                  ),
-                ]),
-                const SizedBox(height: 15),
-                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Container(
-                    width: 70,
-                    height: 74,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.78),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: color.withOpacity(.16)),
-                    ),
+                    width: 54,
+                    height: 58,
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(.78), borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withOpacity(.14))),
                     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Text(shortWeekday(date).toUpperCase(), style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: .2)),
-                      const SizedBox(height: 2),
-                      Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 28, fontWeight: FontWeight.w900, height: 1)),
-                      const SizedBox(height: 3),
-                      Text(DateFormat('MMM', 'es_ES').format(date).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w800)),
+                      Text(shortWeekday(date).toUpperCase(), style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w900)),
+                      Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 23, fontWeight: FontWeight.w900, height: 1.05)),
+                      Text(DateFormat('MMM', 'es_ES').format(date).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800)),
                     ]),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('Próxima quedada', style: TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 3),
-                    Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 23, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -.45)),
-                    const SizedBox(height: 8),
-                    Wrap(spacing: 8, runSpacing: 7, children: [
+                    Row(children: [
+                      EventKindPill(event: event, compact: true),
+                      if (eventIsRoutine(event)) ...[
+                        const SizedBox(width: 6),
+                        RoutineBadge(label: eventRoutineBadge(event)),
+                      ],
+                    ]),
+                    const SizedBox(height: 7),
+                    Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 21, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -.35)),
+                    const SizedBox(height: 7),
+                    Wrap(spacing: 6, runSpacing: 6, children: [
                       EventMetaChip(icon: Icons.schedule_rounded, text: DateFormat('HH:mm', 'es_ES').format(date), color: color),
                       EventMetaChip(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación'), color: color),
                     ]),
                   ])),
                 ]),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 Row(children: [
-                  Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 9, backgroundColor: Colors.white.withOpacity(.72), color: color))),
-                  const SizedBox(width: 10),
-                  Text('$yes/$minPeople', style: TextStyle(color: color, fontWeight: FontWeight.w900)),
+                  Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 7, backgroundColor: Colors.white.withOpacity(.70), color: color))),
+                  const SizedBox(width: 9),
+                  Text('$yes/$minPeople', style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12.5)),
+                  const SizedBox(width: 7),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(color: missing == 0 ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(99)),
+                    child: Text(missing == 0 ? 'Listo' : 'Faltan $missing', style: TextStyle(color: missing == 0 ? AppColors.green : AppColors.orange, fontSize: 11.5, fontWeight: FontWeight.w900)),
+                  ),
                 ]),
-                const SizedBox(height: 8),
-                Text(yes >= minPeople ? 'Plan viable.' : 'Faltan $missing para el mínimo.', style: const TextStyle(color: AppColors.muted, fontSize: 12.3, fontWeight: FontWeight.w700, height: 1.3)),
-                const SizedBox(height: 13),
+                const SizedBox(height: 10),
                 Row(children: [
-                  Expanded(child: AttendancePick(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
-                  const SizedBox(width: 8),
-                  Expanded(child: AttendancePick(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
-                  const SizedBox(width: 8),
-                  Expanded(child: AttendancePick(label: 'No voy', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
+                  Expanded(child: GlassAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
+                  const SizedBox(width: 7),
+                  Expanded(child: GlassAttendanceButton(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
+                  const SizedBox(width: 7),
+                  Expanded(child: GlassAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
                 ]),
               ]),
             ),
@@ -6588,6 +6483,80 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
       ),
     );
   }
+}
+
+class DashboardMiniSummaryRow extends StatelessWidget {
+  final int events;
+  final int pending;
+  final double balance;
+  final int tournaments;
+  final VoidCallback? onCalendar;
+  final VoidCallback? onFinances;
+  final VoidCallback? onTournaments;
+  const DashboardMiniSummaryRow({super.key, required this.events, required this.pending, required this.balance, required this.tournaments, this.onCalendar, this.onFinances, this.onTournaments});
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+    Expanded(child: MiniSummaryTile(icon: Icons.calendar_month_rounded, label: 'Agenda', value: events.toString(), color: AppColors.teal, onTap: onCalendar)),
+    const SizedBox(width: 8),
+    Expanded(child: MiniSummaryTile(icon: Icons.account_balance_wallet_rounded, label: 'Balance', value: money(balance), color: balance < -0.01 ? AppColors.red : AppColors.teal, onTap: onFinances)),
+    const SizedBox(width: 8),
+    Expanded(child: MiniSummaryTile(icon: Icons.emoji_events_rounded, label: 'Torneos', value: tournaments.toString(), color: AppColors.orange, onTap: onTournaments)),
+  ]);
+}
+
+class MiniSummaryTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final VoidCallback? onTap;
+  const MiniSummaryTile({super.key, required this.icon, required this.label, required this.value, required this.color, this.onTap});
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    onTap: onTap,
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(icon, color: color, size: 19),
+      const SizedBox(height: 7),
+      Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 15, fontWeight: FontWeight.w900)),
+      const SizedBox(height: 2),
+      Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 11.5, fontWeight: FontWeight.w800)),
+    ]),
+  );
+}
+
+class GlassAttendanceButton extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+  const GlassAttendanceButton({super.key, required this.label, required this.count, required this.selected, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(14),
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      height: 42,
+      decoration: BoxDecoration(
+        color: selected ? color.withOpacity(.13) : Colors.white.withOpacity(.72),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: selected ? color : Colors.white.withOpacity(.82), width: 1.1),
+        boxShadow: selected ? [BoxShadow(color: color.withOpacity(.12), blurRadius: 12, offset: const Offset(0, 5))] : null,
+      ),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: color, size: 16),
+        const SizedBox(width: 5),
+        Text(label, style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w900)),
+        const SizedBox(width: 4),
+        Text(count.toString(), style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w900)),
+      ]),
+    ),
+  );
 }
 
 class SmartPromptCard extends StatelessWidget {
@@ -6917,6 +6886,43 @@ class _DashboardActivityRow extends StatelessWidget {
 
 
 
+
+class CalendarCompactHeader extends StatelessWidget {
+  final int todayEvents;
+  final int weekEvents;
+  final int pendingResponses;
+  final VoidCallback onToday;
+  const CalendarCompactHeader({super.key, required this.todayEvents, required this.weekEvents, required this.pendingResponses, required this.onToday});
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+    child: Row(children: [
+      Expanded(child: _CalendarMiniStat(label: 'Hoy', value: todayEvents.toString(), color: AppColors.teal)),
+      Container(width: 1, height: 28, color: AppColors.line),
+      Expanded(child: _CalendarMiniStat(label: '7 días', value: weekEvents.toString(), color: AppColors.blue)),
+      Container(width: 1, height: 28, color: AppColors.line),
+      Expanded(child: _CalendarMiniStat(label: 'Pendientes', value: pendingResponses.toString(), color: AppColors.amber)),
+      const SizedBox(width: 6),
+      TextButton(onPressed: onToday, child: const Text('Hoy')),
+    ]),
+  );
+}
+
+class _CalendarMiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _CalendarMiniStat({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(label, style: const TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w800)),
+    const SizedBox(height: 3),
+    Text(value, style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w900)),
+  ]);
+}
+
 class CalendarSmartHeader extends StatelessWidget {
   final int todayEvents;
   final int weekEvents;
@@ -6979,28 +6985,6 @@ class CalendarSmartHeader extends StatelessWidget {
       ]),
     );
   }
-}
-
-class _CalendarMiniStat extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  const _CalendarMiniStat({required this.label, required this.value, required this.color});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.line),
-    ),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11)),
-      const SizedBox(height: 4),
-      Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 19)),
-    ]),
-  );
 }
 
 class WeekStrip extends StatelessWidget {
@@ -8015,15 +7999,15 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
           child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Container(width: 6, color: color),
             Expanded(child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(12),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 InkWell(
                   onTap: open,
                   borderRadius: BorderRadius.circular(16),
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Container(
-                      width: 52,
-                      height: 58,
+                      width: 46,
+                      height: 50,
                       decoration: BoxDecoration(color: eventKindSoftColor(event), borderRadius: BorderRadius.circular(17)),
                       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                         Icon(eventKindIcon(event), color: color, size: 20),
@@ -8066,7 +8050,7 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
                     const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
                   ]),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 9),
                 Row(children: [
                   Expanded(child: CompactAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
                   const SizedBox(width: 7),
@@ -8094,14 +8078,16 @@ class CompactAttendanceButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
-    borderRadius: BorderRadius.circular(14),
+    borderRadius: BorderRadius.circular(12),
     child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      decoration: BoxDecoration(color: selected ? color.withOpacity(.11) : AppColors.faint, borderRadius: BorderRadius.circular(14), border: Border.all(color: selected ? color : AppColors.line)),
+      height: 38,
+      decoration: BoxDecoration(color: selected ? color.withOpacity(.12) : Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: selected ? color : AppColors.lineSoft)),
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, size: 16, color: color),
-        const SizedBox(width: 5),
-        Text('$label · $count', style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900)),
+        Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, size: 15, color: color),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900)),
+        const SizedBox(width: 4),
+        Text(count.toString(), style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w900)),
       ]),
     ),
   );
@@ -8668,7 +8654,7 @@ class MonthGrid extends StatelessWidget {
         crossAxisCount: 7,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        childAspectRatio: .92,
+        childAspectRatio: 1.04,
         children: cells.map((day) {
           if (day == null) return const SizedBox();
           final active = sameDay(day, selected);
