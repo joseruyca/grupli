@@ -79,3 +79,6 @@ Reset limpio: `supabase/all_in_one.sql`.
 ## v14 Premium product polish
 
 Pulido visual global: tarjetas más suaves, navegación inferior mejorada, Home más clara, hero de grupo más compacto y checks SQL actualizados. No requiere SQL obligatorio.
+
+
+Última mejora incluida: `docs/V14_1_SMART_GROUP_HOME.md`.

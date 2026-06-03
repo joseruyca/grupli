@@ -1290,7 +1290,7 @@ class _GroupShellState extends State<GroupShell> {
         final group = snapshot.data ?? {};
         final name = AppData.text(group['name'], 'Grupo');
         final pages = [
-          GroupDashboardTab(group: group, refreshSeed: refreshKey),
+          GroupDashboardTab(group: group, refreshSeed: refreshKey, onNavigateTab: (i) => setState(() => tab = i)),
           CalendarTab(group: group, refreshSeed: refreshKey),
           FinancesTab(group: group, refreshSeed: refreshKey),
           TournamentsTab(group: group, refreshSeed: refreshKey),
@@ -1318,7 +1318,8 @@ class _GroupShellState extends State<GroupShell> {
 class GroupDashboardTab extends StatefulWidget {
   final Map<String, dynamic> group;
   final int refreshSeed;
-  const GroupDashboardTab({super.key, required this.group, required this.refreshSeed});
+  final ValueChanged<int>? onNavigateTab;
+  const GroupDashboardTab({super.key, required this.group, required this.refreshSeed, this.onNavigateTab});
 
   @override
   State<GroupDashboardTab> createState() => _GroupDashboardTabState();
@@ -1346,6 +1347,43 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
 
   void reload() => setState(load);
 
+  double _myOpenBalance(List<Map<String, dynamic>> expenses) {
+    final uid = AppData.user?.id;
+    if (uid == null) return 0;
+    double total = 0;
+    for (final expense in expenses) {
+      if (AppData.text(expense['status'], 'pending') == 'paid') continue;
+      final paidBy = expense['paid_by']?.toString();
+      final participants = asList(expense['expense_participants']);
+      for (final row in participants) {
+        final item = asMap(row);
+        final rowUserId = item['user_id']?.toString();
+        final share = AppData.doubleValue(item['share_amount']);
+        final paid = item['paid'] == true;
+        if (paidBy == uid && rowUserId != uid && !paid) total += share;
+        if (rowUserId == uid && paidBy != uid && !paid) total -= share;
+      }
+    }
+    return double.parse(total.toStringAsFixed(2));
+  }
+
+  Map<String, dynamic>? _firstActiveTournament(List<Map<String, dynamic>> tournaments) {
+    for (final tournament in tournaments) {
+      if (AppData.text(tournament['status'], 'active') != 'finished') return tournament;
+    }
+    return null;
+  }
+
+  int _pendingMatches(Map<String, dynamic>? tournament) {
+    if (tournament == null) return 0;
+    return asList(tournament['matches']).where((m) => AppData.text(asMap(m)['status'], 'pending') != 'played').length;
+  }
+
+  int _teamCount(Map<String, dynamic>? tournament) {
+    if (tournament == null) return 0;
+    return asList(tournament['tournament_teams']).length;
+  }
+
   @override
   Widget build(BuildContext context) {
     final group = widget.group;
@@ -1362,10 +1400,34 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
               final events = data?.events ?? <Map<String, dynamic>>[];
               final upcoming = data?.upcomingEvents ?? <Map<String, dynamic>>[];
               final nextEvent = upcoming.isNotEmpty ? upcoming.first : null;
-              final confirmed = upcoming.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
-              final pendingDecisions = upcoming.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
+              final myDecisionPending = upcoming.where((event) {
+                final mine = myAttendanceStatus(event);
+                return mine == null || mine == 'maybe';
+              }).toList();
+              final openExpenses = (data?.expenses ?? <Map<String, dynamic>>[])
+                  .where((expense) => AppData.text(expense['status'], 'pending') != 'paid')
+                  .toList();
+              final openExpensesAmount = openExpenses.fold<double>(0, (sum, expense) => sum + AppData.doubleValue(expense['amount']));
               final expensesTotal = data?.expensesTotal ?? 0;
+              final myBalance = _myOpenBalance(data?.expenses ?? const <Map<String, dynamic>>[]);
+              final activeTournament = _firstActiveTournament(data?.tournaments ?? const <Map<String, dynamic>>[]);
               final tournamentsActive = data?.activeTournaments ?? 0;
+              final upcomingThisWeek = upcoming.where((event) {
+                final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
+                if (date == null) return false;
+                final now = DateTime.now();
+                return !date.isBefore(now.subtract(const Duration(hours: 2))) && date.isBefore(now.add(const Duration(days: 7)));
+              }).length;
+
+              Future<void> openCreateEvent() async {
+                final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: group)));
+                if (ok == true) reload();
+              }
+
+              Future<void> openEventDetail(Map<String, dynamic> event) async {
+                await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: group)));
+                reload();
+              }
 
               return RefreshIndicator(
                 color: AppColors.teal,
@@ -1376,28 +1438,71 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                     Row(children: [
                       RoundBackButton(onTap: () => Navigator.of(context).pop()),
                       const Spacer(),
-                      CircleIconButton(icon: Icons.more_horiz_rounded, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group)))),
+                      CircleIconButton(
+                        icon: Icons.more_horiz_rounded,
+                        onTap: () => widget.onNavigateTab?.call(4),
+                      ),
                     ]),
                     const SizedBox(height: 12),
                     GroupHeroCard(name: name),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     if (snapshot.connectionState == ConnectionState.waiting)
                       const CenterLoader(label: 'Cargando resumen...')
                     else if (snapshot.hasError)
                       ErrorBlock(message: snapshot.error.toString(), onRetry: reload)
                     else ...[
-                      Row(children: [
-                        Expanded(child: StatCard(icon: Icons.event_available_rounded, value: upcoming.length.toString(), label: 'Próximos', color: AppColors.teal)),
-                        const SizedBox(width: 10),
-                        Expanded(child: StatCard(icon: Icons.check_circle_rounded, value: confirmed.toString(), label: 'Confirmados', color: AppColors.green)),
-                        const SizedBox(width: 10),
-                        Expanded(child: StatCard(icon: Icons.emoji_events_rounded, value: tournamentsActive.toString(), label: 'Torneos', color: AppColors.orange)),
-                      ]),
+                      SmartPromptCard(
+                        icon: myDecisionPending.isNotEmpty
+                            ? Icons.notification_important_rounded
+                            : nextEvent != null
+                                ? Icons.event_available_rounded
+                                : Icons.waving_hand_rounded,
+                        color: myDecisionPending.isNotEmpty
+                            ? AppColors.amber
+                            : nextEvent != null
+                                ? AppColors.teal
+                                : AppColors.teal,
+                        title: myDecisionPending.isNotEmpty
+                            ? (myDecisionPending.length == 1
+                                ? 'Tienes 1 decisión pendiente'
+                                : 'Tienes ${myDecisionPending.length} decisiones pendientes')
+                            : nextEvent != null
+                                ? 'Tu grupo ya tiene plan'
+                                : 'Empieza a mover el grupo',
+                        body: myDecisionPending.isNotEmpty
+                            ? 'Responde a ${AppData.text(myDecisionPending.first['title'], 'la próxima quedada')} para dejar claro quién va y si se alcanza el mínimo.'
+                            : nextEvent != null
+                                ? 'La siguiente cita es ${AppData.text(nextEvent['title'], 'Evento')} y puedes revisarla o confirmar desde aquí sin salir del Inicio.'
+                                : 'Crea la primera quedada del grupo para empezar a organizar asistencia, calendario y actividad real.',
+                        actionLabel: myDecisionPending.isNotEmpty
+                            ? 'Responder ahora'
+                            : nextEvent != null
+                                ? 'Ver detalle'
+                                : 'Crear quedada',
+                        onTap: () async {
+                          if (myDecisionPending.isNotEmpty) {
+                            await openEventDetail(myDecisionPending.first);
+                          } else if (nextEvent != null) {
+                            await openEventDetail(nextEvent);
+                          } else {
+                            await openCreateEvent();
+                          }
+                        },
+                      ),
                       const SizedBox(height: 14),
-                      SectionHeader(title: 'Próxima quedada', action: 'Crear', onTap: () async {
-                        final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: group)));
-                        if (ok == true) reload();
-                      }),
+                      Row(children: [
+                        Expanded(child: StatCard(icon: Icons.event_rounded, value: upcoming.length.toString(), label: 'Próximos', color: AppColors.teal)),
+                        const SizedBox(width: 10),
+                        Expanded(child: StatCard(icon: Icons.hourglass_top_rounded, value: myDecisionPending.length.toString(), label: 'Pendientes', color: AppColors.amber)),
+                        const SizedBox(width: 10),
+                        Expanded(child: StatCard(icon: Icons.emoji_events_rounded, value: tournamentsActive.toString(), label: 'Activos', color: AppColors.orange)),
+                      ]),
+                      const SizedBox(height: 16),
+                      SectionHeader(
+                        title: 'Próxima quedada',
+                        action: nextEvent == null ? 'Crear' : 'Calendario',
+                        onTap: nextEvent == null ? openCreateEvent : () => widget.onNavigateTab?.call(1),
+                      ),
                       const SizedBox(height: 8),
                       if (nextEvent == null)
                         EmptyBlock(
@@ -1407,24 +1512,77 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                         )
                       else
                         DashboardEventCard(event: nextEvent, group: group, onChanged: reload),
+                      const SizedBox(height: 16),
+                      Row(children: [
+                        Expanded(
+                          child: DashboardSummaryCard(
+                            icon: Icons.account_balance_wallet_rounded,
+                            color: myBalance >= 0 ? AppColors.teal : AppColors.red,
+                            eyebrow: 'Resumen económico',
+                            title: openExpenses.isEmpty ? 'Todo está al día' : (myBalance > 0 ? 'Te deben ${money(myBalance)}' : myBalance < 0 ? 'Debes ${money(myBalance.abs())}' : 'Balance en cero'),
+                            body: openExpenses.isEmpty
+                                ? 'No hay deudas abiertas ni gastos pendientes en este momento.'
+                                : '${openExpenses.length} ${openExpenses.length == 1 ? 'gasto abierto' : 'gastos abiertos'} · total del grupo ${money(openExpensesAmount)}',
+                            footer: expensesTotal > 0 ? 'Histórico acumulado: ${money(expensesTotal)}' : 'Empieza registrando el primer gasto compartido.',
+                            actionLabel: 'Abrir finanzas',
+                            onTap: () => widget.onNavigateTab?.call(2),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DashboardSummaryCard(
+                            icon: Icons.emoji_events_rounded,
+                            color: activeTournament == null ? AppColors.violet : AppColors.orange,
+                            eyebrow: 'Torneo activo',
+                            title: activeTournament == null
+                                ? 'Aún no hay competición'
+                                : AppData.text(activeTournament['name'], 'Competición'),
+                            body: activeTournament == null
+                                ? 'Crea una liga o torneo cuando el grupo quiera competir.'
+                                : '${_teamCount(activeTournament)} participantes · ${_pendingMatches(activeTournament)} partidos pendientes',
+                            footer: activeTournament == null
+                                ? 'Formato guiado para liga, copa o americano.'
+                                : '${_cap(AppData.text(activeTournament['format'], 'liga'))} · ${AppData.text(activeTournament['status'], 'active') == 'finished' ? 'Finalizado' : 'En curso'}',
+                            actionLabel: activeTournament == null ? 'Crear torneo' : 'Abrir torneo',
+                            onTap: () => widget.onNavigateTab?.call(3),
+                          ),
+                        ),
+                      ]),
+                      const SizedBox(height: 16),
+                      AppCard(
+                        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(children: [
+                              Expanded(child: Text('Acciones rápidas', style: Theme.of(context).textTheme.titleMedium)),
+                              Text('${upcomingThisWeek} esta semana', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+                            ]),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                QuickActionButton(icon: Icons.add_task_rounded, label: 'Quedada', onTap: openCreateEvent),
+                                QuickActionButton(icon: Icons.wallet_rounded, label: 'Gasto', onTap: () async {
+                                  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => CreateExpenseScreen(group: group)));
+                                  reload();
+                                }),
+                                QuickActionButton(icon: Icons.emoji_events_rounded, label: 'Torneo', onTap: () => widget.onNavigateTab?.call(3)),
+                                QuickActionButton(icon: Icons.groups_rounded, label: 'Miembros', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                       if (upcoming.length > 1) ...[
-                        const SizedBox(height: 14),
-                        SectionHeader(title: 'Más adelante'),
+                        const SizedBox(height: 16),
+                        SectionHeader(title: 'Más adelante', action: 'Ver todo', onTap: () => widget.onNavigateTab?.call(1)),
                         const SizedBox(height: 8),
                         ...upcoming.skip(1).take(3).map((e) => EventCard(event: e, onTap: () async {
-                          await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: e, group: group)));
-                          reload();
+                          await openEventDetail(e);
                         })),
                       ],
-                      const SizedBox(height: 16),
-                      SectionHeader(title: 'Estado del grupo'),
-                      const SizedBox(height: 8),
-                      CompactInsightStrip(
-                        events: events.length,
-                        expenses: expensesTotal,
-                        pending: pendingDecisions,
-                        tournaments: tournamentsActive,
-                      ),
                     ],
                   ],
                 ),
@@ -4139,6 +4297,167 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
       const SizedBox(height: 12),
       StatusNotice(ok: yes >= minPeople, text: yes >= minPeople ? 'Mínimo alcanzado: $yes de $minPeople asistentes.' : 'Faltan ${max(0, minPeople - yes)} para alcanzar el mínimo.'),
     ]));
+  }
+}
+
+class SmartPromptCard extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String body;
+  final String actionLabel;
+  final VoidCallback onTap;
+  const SmartPromptCard({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.body,
+    required this.actionLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      color: AppColors.surface,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(color: color.withOpacity(.12), borderRadius: BorderRadius.circular(16)),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(body, style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 10),
+                InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(actionLabel, style: TextStyle(color: color, fontWeight: FontWeight.w900)),
+                        const SizedBox(width: 4),
+                        Icon(Icons.arrow_forward_rounded, size: 18, color: color),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class DashboardSummaryCard extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String eyebrow;
+  final String title;
+  final String body;
+  final String footer;
+  final String actionLabel;
+  final VoidCallback onTap;
+  const DashboardSummaryCard({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.eyebrow,
+    required this.title,
+    required this.body,
+    required this.footer,
+    required this.actionLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(color: color.withOpacity(.12), borderRadius: BorderRadius.circular(14)),
+            child: Icon(icon, color: color, size: 21),
+          ),
+          const SizedBox(height: 12),
+          Text(eyebrow, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.muted)),
+          const SizedBox(height: 6),
+          Text(title, style: const TextStyle(fontSize: 18, height: 1.15, fontWeight: FontWeight.w900, color: AppColors.ink)),
+          const SizedBox(height: 6),
+          Text(body, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, height: 1.35, color: AppColors.muted, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Text(footer, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, height: 1.35, color: AppColors.ink, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Text(actionLabel, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12.5)),
+              const SizedBox(width: 4),
+              Icon(Icons.arrow_forward_rounded, size: 18, color: color),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const QuickActionButton({super.key, required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: (MediaQuery.of(context).size.width - 36 - 14 - 30) / 2,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, color: AppColors.teal, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
