@@ -3124,11 +3124,23 @@ class _TournamentsTabState extends State<TournamentsTab> {
   void load() => future = AppData.tournaments(widget.group['id'].toString());
   void reload() => setState(load);
 
-  Future<void> openCreate() async {
+  Future<void> openCreate({String? initialFormat}) async {
     final created = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => CreateTournamentScreen(group: widget.group)),
+      MaterialPageRoute(builder: (_) => CreateTournamentScreen(group: widget.group, initialFormat: initialFormat)),
     );
     if (created == true) reload();
+  }
+
+  Map<String, dynamic>? nextTournament(List<Map<String, dynamic>> tournaments) {
+    for (final tournament in tournaments) {
+      final matches = tournamentMatches(tournament);
+      final pending = matches.where((m) => AppData.text(m['status']) != 'played').length;
+      if (AppData.text(tournament['status'], 'active') != 'finished' && pending > 0) return tournament;
+    }
+    for (final tournament in tournaments) {
+      if (AppData.text(tournament['status'], 'active') != 'finished') return tournament;
+    }
+    return null;
   }
 
   @override
@@ -3143,91 +3155,94 @@ class _TournamentsTabState extends State<TournamentsTab> {
               final tournaments = snapshot.data ?? [];
               final active = tournaments.where((t) => AppData.text(t['status']) != 'finished').length;
               final finished = tournaments.where((t) => AppData.text(t['status']) == 'finished').length;
+              final totalMatches = tournaments.fold<int>(0, (sum, t) => sum + tournamentMatches(t).length);
+              final playedMatches = tournaments.fold<int>(0, (sum, t) => sum + tournamentMatches(t).where((m) => AppData.text(m['status']) == 'played').length);
+              final next = nextTournament(tournaments);
 
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-                children: [
-                  PageHeader(
-                    title: 'Torneos / Ligas',
-                    subtitle: 'Competiciones de ${AppData.text(widget.group['name'], 'tu grupo')}',
-                    leading: false,
-                  ),
-                  const SizedBox(height: 16),
-                  AppCard(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        Container(
-                          width: 54,
-                          height: 54,
-                          decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(17)),
-                          child: const Icon(Icons.emoji_events_rounded, color: AppColors.teal, size: 31),
-                        ),
-                        const SizedBox(width: 13),
-                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('Crea una competición sin líos', style: Theme.of(context).textTheme.titleMedium),
-                          const SizedBox(height: 3),
-                          Text('Elige formato, añade participantes, genera partidos y registra resultados con clasificación automática.', style: Theme.of(context).textTheme.bodyMedium),
-                        ])),
-                      ]),
-                      const SizedBox(height: 14),
-                      Row(children: [
-                        Expanded(child: StatCard(icon: Icons.play_circle_outline_rounded, value: active.toString(), label: 'Activos', color: AppColors.teal)),
-                        const SizedBox(width: 10),
-                        Expanded(child: StatCard(icon: Icons.flag_circle_rounded, value: finished.toString(), label: 'Finalizados', color: AppColors.violet)),
-                      ]),
+              return RefreshIndicator(
+                color: AppColors.teal,
+                onRefresh: () async => reload(),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                  children: [
+                    PageHeader(
+                      title: 'Torneos / Ligas',
+                      subtitle: 'Competición guiada para ${AppData.text(widget.group['name'], 'tu grupo')}',
+                      leading: false,
+                    ),
+                    const SizedBox(height: 16),
+                    TournamentHubHero(
+                      active: active,
+                      finished: finished,
+                      playedMatches: playedMatches,
+                      totalMatches: totalMatches,
+                      nextTournament: next,
+                      onCreate: () => openCreate(),
+                      onOpenNext: next == null
+                          ? null
+                          : () async {
+                              await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TournamentDetailScreen(tournamentId: next['id'].toString(), group: widget.group)));
+                              reload();
+                            },
+                    ),
+                    const SizedBox(height: 16),
+                    SectionHeader(title: 'Crear rápido', action: 'Nuevo', onTap: () => openCreate()),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Expanded(child: TournamentQuickFormatCard(icon: Icons.table_chart_rounded, title: 'Liga', body: 'Todos contra todos', color: AppColors.teal, onTap: () => openCreate(initialFormat: 'liga'))),
+                      const SizedBox(width: 10),
+                      Expanded(child: TournamentQuickFormatCard(icon: Icons.account_tree_rounded, title: 'Copa', body: 'Eliminatoria', color: AppColors.orange, onTap: () => openCreate(initialFormat: 'eliminatoria'))),
+                      const SizedBox(width: 10),
+                      Expanded(child: TournamentQuickFormatCard(icon: Icons.sync_alt_rounded, title: 'Americano', body: 'Rotación', color: AppColors.violet, onTap: () => openCreate(initialFormat: 'americano'))),
                     ]),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(children: [
-                    Text('Tus competiciones', style: Theme.of(context).textTheme.titleLarge),
-                    const Spacer(),
-                    TextButton.icon(onPressed: openCreate, icon: const Icon(Icons.add_rounded), label: const Text('Crear')),
-                  ]),
-                  const SizedBox(height: 8),
-                  if (snapshot.connectionState == ConnectionState.waiting)
-                    const CenterLoader(label: 'Cargando torneos...')
-                  else if (snapshot.hasError)
-                    ErrorBlock(message: snapshot.error.toString(), onRetry: reload)
-                  else if (tournaments.isEmpty)
-                    AppCard(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(children: [
-                        Container(
-                          width: 70,
-                          height: 70,
-                          decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(22)),
-                          child: const Icon(Icons.emoji_events_rounded, color: AppColors.teal, size: 36),
-                        ),
-                        const SizedBox(height: 14),
-                        Text('Aún no hay ligas ni torneos', style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
-                        const SizedBox(height: 6),
-                        Text('Empieza con una liga todos contra todos, una copa eliminatoria o un formato americano para pádel/tenis.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
-                        const SizedBox(height: 16),
-                        PrimaryButton(label: 'Crear competición', icon: Icons.add_rounded, onTap: openCreate),
-                      ]),
-                    )
-                  else
-                    ...tournaments.map((t) => TournamentCard(
-                      tournament: t,
-                      onTap: () async {
-                        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TournamentDetailScreen(tournamentId: t['id'].toString(), group: widget.group)));
-                        reload();
-                      },
-                    )),
-                ],
+                    const SizedBox(height: 18),
+                    SectionHeader(title: 'Flujo recomendado'),
+                    const SizedBox(height: 8),
+                    TournamentFlowStrip(
+                      currentStep: tournaments.isEmpty
+                          ? 0
+                          : next == null
+                              ? 3
+                              : tournamentMatches(next).isEmpty
+                                  ? 1
+                                  : 2,
+                    ),
+                    const SizedBox(height: 18),
+                    Row(children: [
+                      Text('Tus competiciones', style: Theme.of(context).textTheme.titleLarge),
+                      const Spacer(),
+                      TextButton.icon(onPressed: () => openCreate(), icon: const Icon(Icons.add_rounded), label: const Text('Crear')),
+                    ]),
+                    const SizedBox(height: 8),
+                    if (snapshot.connectionState == ConnectionState.waiting)
+                      const CenterLoader(label: 'Cargando torneos...')
+                    else if (snapshot.hasError)
+                      ErrorBlock(message: snapshot.error.toString(), onRetry: reload)
+                    else if (tournaments.isEmpty)
+                      TournamentGuidedEmpty(onCreate: () => openCreate())
+                    else
+                      ...tournaments.map((t) => TournamentCard(
+                        tournament: t,
+                        onTap: () async {
+                          await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TournamentDetailScreen(tournamentId: t['id'].toString(), group: widget.group)));
+                          reload();
+                        },
+                      )),
+                  ],
+                ),
               );
             },
           ),
           Positioned(
             right: 20,
             bottom: 20,
-            child: FloatingActionButton(
+            child: FloatingActionButton.extended(
               heroTag: 'create_tournament',
               backgroundColor: AppColors.teal,
               foregroundColor: Colors.white,
-              onPressed: openCreate,
-              child: const Icon(Icons.add_rounded),
+              onPressed: () => openCreate(),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Torneo'),
             ),
           ),
         ],
@@ -3238,7 +3253,8 @@ class _TournamentsTabState extends State<TournamentsTab> {
 
 class CreateTournamentScreen extends StatefulWidget {
   final Map<String, dynamic> group;
-  const CreateTournamentScreen({super.key, required this.group});
+  final String? initialFormat;
+  const CreateTournamentScreen({super.key, required this.group, this.initialFormat});
 
   @override
   State<CreateTournamentScreen> createState() => _CreateTournamentScreenState();
@@ -3248,7 +3264,14 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   final name = TextEditingController();
   String format = 'liga';
   String teamType = 'pareja';
+  int step = 0;
   bool loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    format = widget.initialFormat ?? 'liga';
+  }
 
   @override
   void dispose() {
@@ -3256,8 +3279,27 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
     super.dispose();
   }
 
+  String get defaultName {
+    switch (format) {
+      case 'eliminatoria':
+        return 'Copa ${AppData.text(widget.group['name'], 'del grupo')}';
+      case 'americano':
+        return 'Americano ${AppData.text(widget.group['name'], 'del grupo')}';
+      default:
+        return 'Liga ${AppData.text(widget.group['name'], 'del grupo')}';
+    }
+  }
+
+  void nextStep() {
+    if (step == 0 && name.text.trim().length < 2) {
+      name.text = defaultName;
+    }
+    setState(() => step = min(3, step + 1));
+  }
+
   Future<void> create() async {
-    if (name.text.trim().length < 2) {
+    final cleanName = name.text.trim().isEmpty ? defaultName : name.text.trim();
+    if (cleanName.length < 2) {
       await showToast(context, 'Pon un nombre para la competición.', danger: true);
       return;
     }
@@ -3266,7 +3308,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
     try {
       final id = await AppData.createTournament(
         widget.group['id'].toString(),
-        name.text,
+        cleanName,
         format: format,
         teamType: teamType,
       );
@@ -3282,53 +3324,99 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final previewName = name.text.trim().isEmpty ? defaultName : name.text.trim();
+
     return DirectPage(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        PageHeader(title: 'Nueva competición', subtitle: AppData.text(widget.group['name']), leading: true),
-        const SizedBox(height: 20),
-        FieldLabel('Nombre'),
-        TextField(controller: name, textInputAction: TextInputAction.next, decoration: const InputDecoration(hintText: 'Ej. Liga de pádel de los jueves')),
-        const SizedBox(height: 22),
-        Text('Formato', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        TournamentFormatOption(
-          selected: format == 'liga',
-          icon: Icons.table_chart_rounded,
-          title: 'Liga todos contra todos',
-          body: 'Ideal para grupos estables. Todos juegan contra todos y se calcula la clasificación.',
-          onTap: () => setState(() => format = 'liga'),
-        ),
-        TournamentFormatOption(
-          selected: format == 'eliminatoria',
-          icon: Icons.account_tree_rounded,
-          title: 'Eliminatoria / Copa',
-          body: 'Rondas directas. Perfecta para torneos rápidos con semifinal y final.',
-          onTap: () => setState(() => format = 'eliminatoria'),
-        ),
-        TournamentFormatOption(
-          selected: format == 'americano',
-          icon: Icons.sync_alt_rounded,
-          title: 'Americano / Ranking',
-          body: 'Pensado para rotaciones de pádel, tenis o juegos donde importa sumar resultados.',
-          onTap: () => setState(() => format = 'americano'),
-        ),
+        PageHeader(title: 'Nueva competición', subtitle: 'Asistente guiado', leading: true),
+        const SizedBox(height: 14),
+        TournamentCreateStepper(step: step),
         const SizedBox(height: 18),
-        Text('Participantes', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
+        if (step == 0) ...[
+          FieldLabel('Nombre'),
+          TextField(
+            controller: name,
+            textInputAction: TextInputAction.done,
+            textCapitalization: TextCapitalization.words,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(hintText: defaultName),
+          ),
+          const SizedBox(height: 14),
+          SmartPromptCard(
+            icon: Icons.auto_awesome_rounded,
+            color: AppColors.teal,
+            title: 'Empieza simple',
+            body: 'Solo necesitas nombre, formato y tipo de participantes. Después añadirás jugadores y la app te dirá el siguiente paso.',
+            actionLabel: 'Continuar',
+            onTap: nextStep,
+          ),
+        ] else if (step == 1) ...[
+          Text('¿Qué quieres organizar?', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          TournamentFormatOption(
+            selected: format == 'liga',
+            icon: Icons.table_chart_rounded,
+            title: 'Liga todos contra todos',
+            body: 'Para grupos estables. Todos juegan contra todos y Grupli calcula clasificación.',
+            onTap: () => setState(() => format = 'liga'),
+          ),
+          TournamentFormatOption(
+            selected: format == 'eliminatoria',
+            icon: Icons.account_tree_rounded,
+            title: 'Eliminatoria / Copa',
+            body: 'Rondas directas: cuartos, semifinal y final. Ideal para torneos rápidos.',
+            onTap: () => setState(() => format = 'eliminatoria'),
+          ),
+          TournamentFormatOption(
+            selected: format == 'americano',
+            icon: Icons.sync_alt_rounded,
+            title: 'Americano / Ranking',
+            body: 'Pensado para pádel, tenis o juegos con rotación y ranking por resultados.',
+            onTap: () => setState(() => format = 'americano'),
+          ),
+        ] else if (step == 2) ...[
+          Text('¿Quién participa?', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: PickPill(label: 'Personas', selected: teamType == 'individual', onTap: () => setState(() => teamType = 'individual'))),
+            const SizedBox(width: 8),
+            Expanded(child: PickPill(label: 'Parejas', selected: teamType == 'pareja', onTap: () => setState(() => teamType = 'pareja'))),
+            const SizedBox(width: 8),
+            Expanded(child: PickPill(label: 'Equipos', selected: teamType == 'equipo', onTap: () => setState(() => teamType = 'equipo'))),
+          ]),
+          const SizedBox(height: 16),
+          TournamentPreviewCard(
+            name: previewName,
+            format: format,
+            teamType: teamType,
+          ),
+        ] else ...[
+          Text('Resumen antes de crear', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          TournamentPreviewCard(
+            name: previewName,
+            format: format,
+            teamType: teamType,
+            detailed: true,
+          ),
+          const SizedBox(height: 14),
+          TournamentFlowStrip(currentStep: 0),
+        ],
+        const SizedBox(height: 24),
         Row(children: [
-          Expanded(child: PickPill(label: 'Individual', selected: teamType == 'individual', onTap: () => setState(() => teamType = 'individual'))),
-          const SizedBox(width: 8),
-          Expanded(child: PickPill(label: 'Parejas', selected: teamType == 'pareja', onTap: () => setState(() => teamType = 'pareja'))),
-          const SizedBox(width: 8),
-          Expanded(child: PickPill(label: 'Equipos', selected: teamType == 'equipo', onTap: () => setState(() => teamType = 'equipo'))),
+          if (step > 0) ...[
+            Expanded(child: SecondaryButton(label: 'Atrás', icon: Icons.arrow_back_rounded, onTap: () => setState(() => step--))),
+            const SizedBox(width: 10),
+          ],
+          Expanded(
+            child: PrimaryButton(
+              label: step == 3 ? 'Crear competición' : 'Continuar',
+              icon: step == 3 ? Icons.emoji_events_rounded : Icons.arrow_forward_rounded,
+              loading: loading,
+              onTap: step == 3 ? create : nextStep,
+            ),
+          ),
         ]),
-        const SizedBox(height: 16),
-        StatusNotice(
-          ok: true,
-          text: 'Después añadirás participantes y la app generará el calendario de partidos automáticamente.',
-        ),
-        const SizedBox(height: 22),
-        PrimaryButton(label: 'Crear competición', icon: Icons.emoji_events_rounded, loading: loading, onTap: create),
       ]),
     );
   }
@@ -3902,6 +3990,289 @@ class _TournamentTeamsSection extends StatelessWidget {
         }),
     ]);
   }
+}
+
+
+class TournamentHubHero extends StatelessWidget {
+  final int active;
+  final int finished;
+  final int playedMatches;
+  final int totalMatches;
+  final Map<String, dynamic>? nextTournament;
+  final VoidCallback onCreate;
+  final VoidCallback? onOpenNext;
+
+  const TournamentHubHero({
+    super.key,
+    required this.active,
+    required this.finished,
+    required this.playedMatches,
+    required this.totalMatches,
+    required this.nextTournament,
+    required this.onCreate,
+    this.onOpenNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final next = nextTournament;
+    final progress = totalMatches == 0 ? 0.0 : playedMatches / max(1, totalMatches);
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(27),
+        gradient: const LinearGradient(colors: [Color(0xFF007F78), Color(0xFF00A493)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        boxShadow: const [BoxShadow(color: Color(0x16008F86), blurRadius: 24, offset: Offset(0, 10))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(color: Colors.white.withOpacity(.18), borderRadius: BorderRadius.circular(18)),
+            child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 32),
+          ),
+          const SizedBox(width: 13),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Centro de competición', style: TextStyle(color: Colors.white, fontSize: 23, height: 1.05, fontWeight: FontWeight.w900, letterSpacing: -0.4)),
+            const SizedBox(height: 6),
+            Text(
+              next == null
+                  ? 'Crea una liga, copa o americano sin hojas de cálculo.'
+                  : 'Siguiente: ${AppData.text(next['name'], 'competición')}',
+              style: const TextStyle(color: Color(0xEFFFFFFF), fontWeight: FontWeight.w700, height: 1.25),
+            ),
+          ])),
+        ]),
+        const SizedBox(height: 16),
+        Row(children: [
+          Expanded(child: _HeroMiniStat(label: 'Activos', value: active.toString())),
+          const SizedBox(width: 8),
+          Expanded(child: _HeroMiniStat(label: 'Jugados', value: '$playedMatches/$totalMatches')),
+          const SizedBox(width: 8),
+          Expanded(child: _HeroMiniStat(label: 'Finalizados', value: finished.toString())),
+        ]),
+        const SizedBox(height: 14),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(99),
+          child: LinearProgressIndicator(
+            minHeight: 7,
+            value: progress.clamp(0.0, 1.0).toDouble(),
+            backgroundColor: Colors.white.withOpacity(.20),
+            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: WhiteButton(label: next == null ? 'Crear competición' : 'Abrir siguiente', onTap: next == null ? onCreate : (onOpenNext ?? onCreate))),
+          const SizedBox(width: 10),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(color: Colors.white.withOpacity(.18), borderRadius: BorderRadius.circular(15)),
+            child: IconButton(onPressed: onCreate, icon: const Icon(Icons.add_rounded, color: Colors.white)),
+          ),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _HeroMiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+  const _HeroMiniStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+    decoration: BoxDecoration(color: Colors.white.withOpacity(.15), borderRadius: BorderRadius.circular(15)),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+      const SizedBox(height: 2),
+      Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDDFFFFFF), fontWeight: FontWeight.w700, fontSize: 11)),
+    ]),
+  );
+}
+
+class TournamentQuickFormatCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+  final Color color;
+  final VoidCallback onTap;
+
+  const TournamentQuickFormatCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    onTap: onTap,
+    padding: const EdgeInsets.all(12),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(width: 36, height: 36, decoration: BoxDecoration(color: color.withOpacity(.12), borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: color, size: 20)),
+      const SizedBox(height: 10),
+      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+      const SizedBox(height: 3),
+      Text(body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 11.5, height: 1.25, fontWeight: FontWeight.w700)),
+    ]),
+  );
+}
+
+class TournamentFlowStrip extends StatelessWidget {
+  final int currentStep;
+  const TournamentFlowStrip({super.key, required this.currentStep});
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = [
+      _FlowStep(Icons.add_circle_outline_rounded, 'Crear', 'Elige formato'),
+      _FlowStep(Icons.groups_rounded, 'Participantes', 'Añade nombres'),
+      _FlowStep(Icons.auto_awesome_motion_rounded, 'Partidos', 'Genera calendario'),
+      _FlowStep(Icons.leaderboard_rounded, 'Resultados', 'Tabla automática'),
+    ];
+
+    return AppCard(
+      padding: const EdgeInsets.all(12),
+      child: Column(children: [
+        for (var i = 0; i < steps.length; i++) ...[
+          TournamentMiniStep(
+            step: steps[i],
+            active: i == currentStep,
+            done: i < currentStep,
+          ),
+          if (i != steps.length - 1) const SizedBox(height: 8),
+        ],
+      ]),
+    );
+  }
+}
+
+class _FlowStep {
+  final IconData icon;
+  final String title;
+  final String body;
+  const _FlowStep(this.icon, this.title, this.body);
+}
+
+class TournamentMiniStep extends StatelessWidget {
+  final _FlowStep step;
+  final bool active;
+  final bool done;
+  const TournamentMiniStep({super.key, required this.step, required this.active, required this.done});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = done ? AppColors.green : active ? AppColors.teal : AppColors.muted;
+    return Row(children: [
+      Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(color: color.withOpacity(.12), borderRadius: BorderRadius.circular(12)),
+        child: Icon(done ? Icons.check_rounded : step.icon, size: 18, color: color),
+      ),
+      const SizedBox(width: 10),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(step.title, style: TextStyle(fontWeight: FontWeight.w900, color: active || done ? AppColors.ink : AppColors.muted)),
+        const SizedBox(height: 1),
+        Text(step.body, style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+      ])),
+      if (active)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(99)),
+          child: const Text('Ahora', style: TextStyle(color: AppColors.teal, fontSize: 11, fontWeight: FontWeight.w900)),
+        ),
+    ]);
+  }
+}
+
+class TournamentGuidedEmpty extends StatelessWidget {
+  final VoidCallback onCreate;
+  const TournamentGuidedEmpty({super.key, required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    padding: const EdgeInsets.all(18),
+    child: Column(children: [
+      Container(
+        width: 74,
+        height: 74,
+        decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(24)),
+        child: const Icon(Icons.emoji_events_rounded, color: AppColors.teal, size: 38),
+      ),
+      const SizedBox(height: 14),
+      Text('Monta el primer torneo sin Excel', style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
+      const SizedBox(height: 6),
+      Text('Grupli te guía: formato, participantes, partidos, resultados y clasificación.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+      const SizedBox(height: 16),
+      TournamentFlowStrip(currentStep: 0),
+      const SizedBox(height: 16),
+      PrimaryButton(label: 'Crear competición guiada', icon: Icons.add_rounded, onTap: onCreate),
+    ]),
+  );
+}
+
+class TournamentCreateStepper extends StatelessWidget {
+  final int step;
+  const TournamentCreateStepper({super.key, required this.step});
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = ['Nombre', 'Formato', 'Participantes', 'Revisar'];
+    return Row(children: List.generate(labels.length, (i) {
+      final active = i == step;
+      final done = i < step;
+      final color = done ? AppColors.green : active ? AppColors.teal : AppColors.line;
+      return Expanded(child: Column(children: [
+        Container(
+          height: 7,
+          margin: EdgeInsets.only(left: i == 0 ? 0 : 3, right: i == labels.length - 1 ? 0 : 3),
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(99)),
+        ),
+        const SizedBox(height: 6),
+        Text(labels[i], maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: active || done ? AppColors.ink : AppColors.muted)),
+      ]));
+    }));
+  }
+}
+
+class TournamentPreviewCard extends StatelessWidget {
+  final String name;
+  final String format;
+  final String teamType;
+  final bool detailed;
+  const TournamentPreviewCard({super.key, required this.name, required this.format, required this.teamType, this.detailed = false});
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    padding: const EdgeInsets.all(16),
+    color: AppColors.surface,
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.emoji_events_rounded, color: AppColors.teal)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text('${tournamentFormatLabel(format)} · ${teamTypeLabel(teamType)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+        ])),
+      ]),
+      if (detailed) ...[
+        const SizedBox(height: 14),
+        StatusNotice(ok: true, text: tournamentFormatSubtitle(format)),
+        const SizedBox(height: 10),
+        const Text('Después de crearla, añade participantes y pulsa “Generar partidos”. La tabla se actualizará al registrar resultados.', style: TextStyle(color: AppColors.muted, height: 1.35, fontWeight: FontWeight.w700)),
+      ],
+    ]),
+  );
 }
 
 class TournamentFormatOption extends StatelessWidget {

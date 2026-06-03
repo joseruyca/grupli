@@ -96,3 +96,6 @@ Corrección incluida: `docs/V14_2_COMPILE_FIX.md`.
 
 
 Última corrección incluida: `docs/V14_5_1_FINANCES_COMPILE_FIX.md`.
+
+
+Última mejora incluida: `docs/V14_6_TOURNAMENTS_GUIDED_FINAL.md`.
