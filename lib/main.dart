@@ -1257,8 +1257,6 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
     final group = widget.group;
     final groupId = group['id'].toString();
     final name = AppData.text(group['name'], 'Grupo');
-    final code = AppData.text(group['invite_code'], '------');
-
     return SafeArea(
       bottom: false,
       child: Stack(
@@ -1287,18 +1285,8 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                       CircleIconButton(icon: Icons.more_horiz_rounded, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group)))),
                     ]),
                     const SizedBox(height: 12),
-                    GroupHeroCard(name: name, code: code, onInvite: () => Share.share('Únete a $name en Grupli con el código $code'), onCode: () => showCodeSheet(context, code, name)),
-                    const SizedBox(height: 14),
-                    Row(children: [
-                      Expanded(child: MiniAction(icon: Icons.person_add_alt_1_rounded, label: 'Invitar', onTap: () => Share.share('Únete a $name en Grupli con el código $code'))),
-                      const SizedBox(width: 8),
-                      Expanded(child: MiniAction(icon: Icons.qr_code_rounded, label: 'Código', onTap: () => showCodeSheet(context, code, name))),
-                      const SizedBox(width: 8),
-                      Expanded(child: MiniAction(icon: Icons.groups_rounded, label: 'Miembros', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group))))),
-                      const SizedBox(width: 8),
-                      Expanded(child: MiniAction(icon: Icons.settings_rounded, label: 'Ajustes', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group))))),
-                    ]),
-                    const SizedBox(height: 18),
+                    GroupHeroCard(name: name),
+                    const SizedBox(height: 12),
                     if (snapshot.connectionState == ConnectionState.waiting)
                       const CenterLoader(label: 'Cargando resumen...')
                     else if (snapshot.hasError)
@@ -1311,39 +1299,36 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                         const SizedBox(width: 10),
                         Expanded(child: StatCard(icon: Icons.emoji_events_rounded, value: tournamentsActive.toString(), label: 'Torneos', color: AppColors.orange)),
                       ]),
-                      const SizedBox(height: 18),
-                      SectionHeader(title: 'Resumen del grupo', action: 'Actualizar', onTap: reload),
-                      const SizedBox(height: 10),
-                      if (nextEvent == null)
-                        EmptyBlock(
-                          icon: Icons.event_available_rounded,
-                          title: 'No hay ninguna quedada creada',
-                          body: 'Crea el primer evento para que el grupo pueda confirmar asistencia desde esta pantalla.',
-                        )
-                      else
-                        DashboardEventCard(event: nextEvent, group: group, onChanged: reload),
-                      const SizedBox(height: 18),
-                      SectionHeader(title: 'Próximos eventos', action: 'Crear evento', onTap: () async {
+                      const SizedBox(height: 14),
+                      SectionHeader(title: 'Próxima quedada', action: 'Crear', onTap: () async {
                         final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: group)));
                         if (ok == true) reload();
                       }),
-                      const SizedBox(height: 10),
-                      if (upcoming.isEmpty)
-                        EmptySlim(icon: Icons.calendar_month_rounded, title: 'Agenda vacía', body: 'El calendario del grupo aún no tiene eventos próximos.')
+                      const SizedBox(height: 8),
+                      if (nextEvent == null)
+                        EmptyBlock(
+                          icon: Icons.event_available_rounded,
+                          title: 'Todavía no hay quedadas',
+                          body: 'Crea el primer plan del grupo y todos podrán responder Voy, Duda o No voy.',
+                        )
                       else
-                        ...upcoming.take(4).map((e) => EventCard(event: e, onTap: () async {
+                        DashboardEventCard(event: nextEvent, group: group, onChanged: reload),
+                      if (upcoming.length > 1) ...[
+                        const SizedBox(height: 14),
+                        SectionHeader(title: 'Más adelante'),
+                        const SizedBox(height: 8),
+                        ...upcoming.skip(1).take(3).map((e) => EventCard(event: e, onTap: () async {
                           await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: e, group: group)));
                           reload();
                         })),
-                      const SizedBox(height: 18),
-                      Text('Estado rápido', style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 10),
-                      Grid2(children: [
-                        FeatureTile(icon: Icons.calendar_month_rounded, title: 'Calendario', body: '${events.length} eventos totales', color: AppColors.blue, onTap: () {}),
-                        FeatureTile(icon: Icons.account_balance_wallet_rounded, title: 'Finanzas', body: money(expensesTotal), color: AppColors.green, onTap: () {}),
-                        FeatureTile(icon: Icons.help_outline_rounded, title: 'Por decidir', body: '$pendingDecisions respuestas en duda', color: AppColors.amber, onTap: () {}),
-                        FeatureTile(icon: Icons.lock_rounded, title: 'Privado', body: 'Solo por invitación', color: AppColors.teal, onTap: () {}),
-                      ]),
+                      ],
+                      const SizedBox(height: 14),
+                      CompactInsightStrip(
+                        events: events.length,
+                        expenses: expensesTotal,
+                        pending: pendingDecisions,
+                        tournaments: tournamentsActive,
+                      ),
                     ],
                   ],
                 ),
@@ -2175,7 +2160,7 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)),
+                decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(15)),
                 child: Row(children: [
                   const Icon(Icons.calculate_rounded, color: AppColors.teal),
                   const SizedBox(width: 10),
@@ -3053,7 +3038,7 @@ class _TournamentNextStepCard extends StatelessWidget {
     return AppCard(
       padding: const EdgeInsets.all(16),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)), child: Icon(icon, color: AppColors.teal)),
+        Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(15)), child: Icon(icon, color: AppColors.teal)),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title, style: Theme.of(context).textTheme.titleMedium),
@@ -3086,7 +3071,7 @@ class _TournamentSegment extends StatelessWidget {
     final labels = ['Resumen', 'Tabla', 'Partidos', 'Participantes'];
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.line)),
+      decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(15), border: Border.all(color: AppColors.line)),
       child: Row(children: List.generate(labels.length, (i) {
         final selected = index == i;
         return Expanded(
@@ -3543,31 +3528,29 @@ class ProfileScreen extends StatelessWidget {
 
 class GroupHeroCard extends StatelessWidget {
   final String name;
-  final String code;
-  final VoidCallback onInvite;
-  final VoidCallback onCode;
-  const GroupHeroCard({super.key, required this.name, required this.code, required this.onInvite, required this.onCode});
+  const GroupHeroCard({super.key, required this.name});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 150,
+      height: 118,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        gradient: const LinearGradient(colors: [Color(0xFF044D68), Color(0xFF008F86)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(colors: [Color(0xFF006B69), Color(0xFF00998E)], begin: Alignment.topLeft, end: Alignment.bottomRight),
       ),
       child: Stack(children: [
-        Positioned.fill(child: Opacity(opacity: .13, child: PatternIcons())),
-        Positioned(left: 18, right: 18, bottom: 18, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900))), const Icon(Icons.lock_rounded, color: Colors.white, size: 17)]),
-          const SizedBox(height: 5),
-          const Text('Grupo privado · Resumen general', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 12),
+        Positioned.fill(child: Opacity(opacity: .10, child: PatternIcons())),
+        Positioned(left: 18, right: 18, bottom: 18, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
           Row(children: [
-            Expanded(child: GestureDetector(onTap: onCode, child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), decoration: BoxDecoration(color: Colors.white.withOpacity(.15), borderRadius: BorderRadius.circular(14)), child: Text('Código $code', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900))))),
-            const SizedBox(width: 10),
-            InkWell(onTap: onInvite, borderRadius: BorderRadius.circular(14), child: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.ios_share_rounded, color: AppColors.teal, size: 20))),
+            Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w900, height: 1.0))),
+            Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white.withOpacity(.16), shape: BoxShape.circle), child: const Icon(Icons.lock_rounded, color: Colors.white, size: 18)),
           ]),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99)),
+            child: const Text('Grupo privado', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+          ),
         ])),
       ]),
     );
@@ -3587,6 +3570,53 @@ class SectionHeader extends StatelessWidget {
       if (action != null) TextButton(onPressed: onTap, child: Text(action!)),
     ]);
   }
+}
+
+
+class CompactInsightStrip extends StatelessWidget {
+  final int events;
+  final double expenses;
+  final int pending;
+  final int tournaments;
+  const CompactInsightStrip({super.key, required this.events, required this.expenses, required this.pending, required this.tournaments});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(children: [
+        Expanded(child: CompactInsight(icon: Icons.calendar_month_rounded, label: 'Agenda', value: '$events')),
+        const _TinyDivider(),
+        Expanded(child: CompactInsight(icon: Icons.account_balance_wallet_rounded, label: 'Gastos', value: money(expenses))),
+        const _TinyDivider(),
+        Expanded(child: CompactInsight(icon: Icons.help_outline_rounded, label: 'Dudas', value: '$pending')),
+        const _TinyDivider(),
+        Expanded(child: CompactInsight(icon: Icons.emoji_events_rounded, label: 'Torneos', value: '$tournaments')),
+      ]),
+    );
+  }
+}
+
+class CompactInsight extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const CompactInsight({super.key, required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, children: [
+    Icon(icon, size: 18, color: AppColors.teal),
+    const SizedBox(height: 5),
+    Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.ink)),
+    const SizedBox(height: 1),
+    Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.muted)),
+  ]);
+}
+
+class _TinyDivider extends StatelessWidget {
+  const _TinyDivider();
+  @override
+  Widget build(BuildContext context) => Container(width: 1, height: 34, color: AppColors.line);
 }
 
 class DashboardEventCard extends StatefulWidget {
@@ -3627,12 +3657,12 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
     return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(
-          width: 62,
-          height: 62,
-          decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)),
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(15)),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Text(DateFormat('EEE').format(date).replaceAll('.', '').toUpperCase(), style: const TextStyle(color: AppColors.teal, fontSize: 11, fontWeight: FontWeight.w900)),
-            Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 23, fontWeight: FontWeight.w900)),
+            Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 21, fontWeight: FontWeight.w900)),
           ]),
         ),
         const SizedBox(width: 12),
@@ -3647,7 +3677,7 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
           widget.onChanged();
         }, icon: const Icon(Icons.chevron_right_rounded)),
       ]),
-      const SizedBox(height: 12),
+      const SizedBox(height: 10),
       Row(children: [
         Expanded(child: AttendancePick(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
         const SizedBox(width: 8),
@@ -3705,9 +3735,9 @@ class SocialButton extends StatelessWidget {
 
 class AppCard extends StatelessWidget {
   final Widget child; final EdgeInsets padding; final VoidCallback? onTap;
-  const AppCard({super.key, required this.child, this.padding = const EdgeInsets.all(15), this.onTap});
+  const AppCard({super.key, required this.child, this.padding = const EdgeInsets.all(14), this.onTap});
   @override Widget build(BuildContext context) {
-    final card = Container(padding: padding, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: AppColors.line), boxShadow: [BoxShadow(color: Colors.black.withOpacity(.03), blurRadius: 16, offset: const Offset(0, 8))]), child: child);
+    final card = Container(padding: padding, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: AppColors.line), boxShadow: [BoxShadow(color: Colors.black.withOpacity(.022), blurRadius: 12, offset: const Offset(0, 6))]), child: child);
     return onTap == null ? card : InkWell(borderRadius: BorderRadius.circular(18), onTap: onTap, child: card);
   }
 }
@@ -3729,7 +3759,7 @@ class OrDivider extends StatelessWidget { const OrDivider({super.key}); @overrid
 class StatCard extends StatelessWidget {
   final IconData icon; final String value; final String label; final Color color;
   const StatCard({super.key, required this.icon, required this.value, required this.label, required this.color});
-  @override Widget build(BuildContext context) => AppCard(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14), child: Column(children: [Icon(icon, color: color, size: 24), const SizedBox(height: 8), Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.ink)), const SizedBox(height: 2), Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700))]));
+  @override Widget build(BuildContext context) => AppCard(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11), child: Column(children: [Icon(icon, color: color, size: 21), const SizedBox(height: 5), Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.ink)), const SizedBox(height: 1), Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.2, color: AppColors.muted, fontWeight: FontWeight.w700))]));
 }
 
 class MoneyStat extends StatelessWidget {
@@ -3745,7 +3775,7 @@ class GroupHomeCard extends StatelessWidget {
   final Map<String, dynamic> group; final VoidCallback onTap;
   const GroupHomeCard({super.key, required this.group, required this.onTap});
   @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 10), child: AppCard(onTap: onTap, child: Row(children: [
-    Container(width: 58, height: 58, decoration: BoxDecoration(color: AppColors.teal.withOpacity(.75), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.sports_soccer_rounded, color: Colors.white)),
+    Container(width: 58, height: 58, decoration: BoxDecoration(color: AppColors.teal.withOpacity(.75), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.sports_soccer_rounded, color: Colors.white)),
     const SizedBox(width: 14),
     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(AppData.text(group['name'], 'Grupo'), style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 4), Text('${AppData.intValue(group['members_count'], 1)} miembros', style: Theme.of(context).textTheme.bodyMedium), const SizedBox(height: 6), const Icon(Icons.lock_rounded, color: AppColors.teal, size: 16)])),
     Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7), decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(99)), child: Text('${AppData.intValue(group['events_count'], 0)} eventos', style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 12))),
@@ -3815,7 +3845,7 @@ class GhostBox extends StatelessWidget { final double height; const GhostBox({su
 
 class ChoiceBigCard extends StatelessWidget { final IconData icon; final String title; final String body; final VoidCallback onTap; const ChoiceBigCard({super.key, required this.icon, required this.title, required this.body, required this.onTap}); @override Widget build(BuildContext context) => AppCard(onTap: onTap, child: Row(children: [Container(width: 48, height: 48, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft), child: Icon(icon, color: AppColors.teal)), const SizedBox(width: 14), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.titleMedium), Text(body, style: Theme.of(context).textTheme.bodyMedium)])), const Icon(Icons.chevron_right_rounded, color: AppColors.muted)])); }
 
-class MiniAction extends StatelessWidget { final IconData icon; final String label; final VoidCallback onTap; const MiniAction({super.key, required this.icon, required this.label, required this.onTap}); @override Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(16), child: Container(padding: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.line)), child: Column(children: [Icon(icon, color: AppColors.ink), const SizedBox(height: 5), Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900))]))); }
+class MiniAction extends StatelessWidget { final IconData icon; final String label; final VoidCallback onTap; const MiniAction({super.key, required this.icon, required this.label, required this.onTap}); @override Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(15), child: Container(padding: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: AppColors.line)), child: Column(children: [Icon(icon, color: AppColors.ink), const SizedBox(height: 5), Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900))]))); }
 
 class Grid2 extends StatelessWidget { final List<Widget> children; const Grid2({super.key, required this.children}); @override Widget build(BuildContext context) => GridView.count(crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.55, children: children); }
 
@@ -3845,7 +3875,7 @@ class DateBadge extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: 62,
     height: 66,
-    decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)),
+    decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(15)),
     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       Text(DateFormat('EEE').format(date).replaceAll('.', '').toUpperCase(), style: const TextStyle(color: AppColors.teal, fontSize: 11, fontWeight: FontWeight.w900)),
       Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 24, fontWeight: FontWeight.w900)),
@@ -3917,7 +3947,7 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
       child: AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         InkWell(
           onTap: open,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(15),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             DateBadge(date: date),
             const SizedBox(width: 12),
@@ -4149,7 +4179,7 @@ class SettingsRow extends StatelessWidget { final IconData icon; final String ti
 
 class MetaLine extends StatelessWidget { final IconData icon; final String text; const MetaLine({super.key, required this.icon, required this.text}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 3), child: Row(children: [Icon(icon, size: 15, color: AppColors.muted), const SizedBox(width: 5), Expanded(child: Text(text, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)))])); }
 
-class AttendancePick extends StatelessWidget { final String label; final int count; final bool selected; final Color color; final VoidCallback onTap; const AttendancePick({super.key, required this.label, required this.count, required this.selected, required this.color, required this.onTap}); @override Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(16), child: Container(padding: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: selected ? color.withOpacity(.10) : Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: selected ? color : AppColors.line)), child: Column(children: [Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: color), const SizedBox(height: 4), Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900)), Text(count.toString(), style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 18))]))); }
+class AttendancePick extends StatelessWidget { final String label; final int count; final bool selected; final Color color; final VoidCallback onTap; const AttendancePick({super.key, required this.label, required this.count, required this.selected, required this.color, required this.onTap}); @override Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(15), child: Container(padding: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: selected ? color.withOpacity(.10) : Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: selected ? color : AppColors.line)), child: Column(children: [Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: color), const SizedBox(height: 4), Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900)), Text(count.toString(), style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 18))]))); }
 
 class StatusNotice extends StatelessWidget { final bool ok; final String text; const StatusNotice({super.key, required this.ok, required this.text}); @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: ok ? const Color(0xFFEAF8F0) : const Color(0xFFFFF6DF), borderRadius: BorderRadius.circular(14), border: Border.all(color: ok ? const Color(0xFFBFEBD2) : const Color(0xFFFFE3A6))), child: Row(children: [Icon(ok ? Icons.check_circle_rounded : Icons.info_rounded, color: ok ? AppColors.green : AppColors.amber), const SizedBox(width: 10), Expanded(child: Text(text, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)))])); }
 

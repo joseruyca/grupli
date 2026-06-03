@@ -51,3 +51,8 @@ Mejora el flujo de eventos/quedadas: Inicio muestra próximos eventos con asiste
 ## v12.7 compile fix
 
 Corrige los errores de análisis de v12.6: casting de share a double, EmptySlim con body opcional y limpieza de regla inválida en analysis_options.
+
+
+## v12.8
+
+Pulido compacto de Inicio de grupo: se eliminan acciones de invitación/código/miembros/ajustes de la home, se reduce el hero, se mejora densidad visual y se amplía `security_checks.sql`. No requiere SQL nuevo.
