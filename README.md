@@ -61,3 +61,8 @@ Pulido compacto de Inicio de grupo: se eliminan acciones de invitación/código/
 ## v12.9
 
 Calendario en español y perfil real con nombre/foto. Ejecutar `supabase/patch_v12_9_profile_avatar_storage.sql` para habilitar subida de avatares.
+
+
+## v12.10 create group RPC fix
+
+Corrige el error PGRST203 al crear grupo eliminando funciones `create_group_atomic` antiguas/sobrecargadas en Supabase. Ejecutar `supabase/patch_v12_10_create_group_rpc_overload_fix.sql`.

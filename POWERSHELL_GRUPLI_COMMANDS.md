@@ -55,3 +55,11 @@ cd $Dest
 ## v12.9
 
 Calendario en español y perfil real con nombre/foto. Ejecutar `supabase/patch_v12_9_profile_avatar_storage.sql` para habilitar subida de avatares.
+
+
+## Copiar SQL v12.10 create group RPC fix
+
+```powershell
+cd "$env:USERPROFILE\Desktop\grupliv2"
+Get-Content ".\supabase\patch_v12_10_create_group_rpc_overload_fix.sql" | Set-Clipboard
+```

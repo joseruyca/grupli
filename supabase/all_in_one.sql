@@ -6,6 +6,30 @@ create extension if not exists "pgcrypto";
 
 begin;
 
+-- Drop any old overloaded RPC signatures that may exist from previous versions.
+do $$
+declare
+  f record;
+begin
+  for f in
+    select
+      n.nspname as schema_name,
+      p.proname as function_name,
+      pg_get_function_identity_arguments(p.oid) as args
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in ('create_group_atomic', 'join_group_with_code')
+  loop
+    execute format(
+      'drop function if exists %I.%I(%s) cascade',
+      f.schema_name,
+      f.function_name,
+      f.args
+    );
+  end loop;
+end $$;
+
 -- Drop policies/functions/tables safely
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
