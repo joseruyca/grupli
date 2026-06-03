@@ -1055,7 +1055,7 @@ class _AuthedShellState extends State<AuthedShell> {
     final pages = [
       HomeScreen(key: ValueKey('home-$refreshKey'), onChanged: refresh),
       NotificationsScreen(onChanged: refresh),
-      ProfileScreen(onChanged: refresh),
+      ProfileScreen(onChanged: refresh, onNavigateRoot: (i) => setState(() => tab = i)),
     ];
     return Scaffold(
       backgroundColor: AppColors.white,
@@ -4700,7 +4700,8 @@ class NotificationsScreen extends StatelessWidget {
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onChanged;
-  const ProfileScreen({super.key, required this.onChanged});
+  final ValueChanged<int>? onNavigateRoot;
+  const ProfileScreen({super.key, required this.onChanged, this.onNavigateRoot});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -4753,7 +4754,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       reload();
       if (mounted) await showToast(context, 'Nombre actualizado.');
     } catch (e) {
-      if (mounted) await showToast(context, e.toString(), danger: true);
+      if (mounted) await showToast(context, humanError(e), danger: true);
     }
   }
 
@@ -4785,19 +4786,88 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> removePhoto() async {
+    final ok = await confirmAction(
+      context,
+      title: '¿Quitar foto?',
+      body: 'Volverás al avatar con iniciales. Puedes subir otra foto cuando quieras.',
+      danger: true,
+    );
+    if (ok != true) return;
     try {
       await AppData.removeAvatar();
       reload();
       if (mounted) await showToast(context, 'Foto eliminada.');
     } catch (e) {
-      if (mounted) await showToast(context, e.toString(), danger: true);
+      if (mounted) await showToast(context, humanError(e), danger: true);
     }
+  }
+
+  Future<void> confirmSignOut() async {
+    final ok = await confirmAction(
+      context,
+      title: '¿Cerrar sesión?',
+      body: 'Podrás volver a entrar con tu correo cuando quieras.',
+      danger: true,
+      confirmLabel: 'Cerrar sesión',
+    );
+    if (ok != true) return;
+    await AppData.sb.auth.signOut();
+  }
+
+  void showNotificationsSheet() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: const [
+          SheetTitle(icon: Icons.notifications_active_outlined, title: 'Notificaciones', body: 'Preparado para push notifications reales en la fase de publicación.'),
+          SizedBox(height: 12),
+          PreferencePreviewRow(icon: Icons.event_available_rounded, title: 'Eventos', body: 'Avisos de nuevas quedadas y cambios importantes'),
+          PreferencePreviewRow(icon: Icons.account_balance_wallet_rounded, title: 'Finanzas', body: 'Gastos nuevos, deudas pendientes y pagos marcados'),
+          PreferencePreviewRow(icon: Icons.emoji_events_rounded, title: 'Torneos', body: 'Partidos generados, resultados y clasificación'),
+        ]),
+      ),
+    );
+  }
+
+  void showPrivacySheet() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: const [
+          SheetTitle(icon: Icons.lock_outline_rounded, title: 'Privacidad y seguridad', body: 'Grupli está pensada para grupos cerrados. Nadie entra sin invitación o código.'),
+          SizedBox(height: 12),
+          PreferencePreviewRow(icon: Icons.verified_user_rounded, title: 'Cuenta protegida', body: 'Acceso mediante Supabase Auth y sesión privada'),
+          PreferencePreviewRow(icon: Icons.groups_rounded, title: 'Grupos privados', body: 'El contenido del grupo queda limitado a sus miembros'),
+          PreferencePreviewRow(icon: Icons.admin_panel_settings_rounded, title: 'Roles claros', body: 'Owner, admins y miembros tienen permisos separados'),
+        ]),
+      ),
+    );
+  }
+
+  void showAboutSheet() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: const [
+          SheetTitle(icon: Icons.auto_awesome_rounded, title: 'Grupli', body: 'App para organizar grupos privados: quedadas, calendario, gastos, torneos, miembros y permisos.'),
+          SizedBox(height: 12),
+          PreferencePreviewRow(icon: Icons.phone_android_rounded, title: 'Versión', body: 'v14.8 · Perfil y ajustes final'),
+          PreferencePreviewRow(icon: Icons.web_rounded, title: 'Preparada para web/PWA', body: 'Lista para seguir hacia revisión final y stores'),
+        ]),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return DirectPage(
-      padding: const EdgeInsets.fromLTRB(22, 24, 22, 30),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
       child: FutureBuilder<_ProfileData>(
         future: future,
         builder: (context, snapshot) {
@@ -4805,30 +4875,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
             return const CenterLoader(label: 'Cargando perfil...');
           }
           if (snapshot.hasError) {
-            return ErrorBlock(message: snapshot.error.toString(), onRetry: reload);
+            return ErrorBlock(message: humanError(snapshot.error), onRetry: reload);
           }
 
           final data = snapshot.data ?? _ProfileData.empty();
           final name = data.name;
           final email = data.email;
           final avatarUrl = data.avatarUrl;
+          final ownedGroups = data.groups.where((g) => AppData.text(g['role']) == 'owner').length;
 
           return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
-              Text('Perfil', style: Theme.of(context).textTheme.headlineMedium),
-              const Spacer(),
-              IconButton(
-                onPressed: reload,
-                icon: const Icon(Icons.refresh_rounded),
-                color: AppColors.muted,
-              ),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Perfil', style: Theme.of(context).textTheme.headlineMedium),
+                const SizedBox(height: 4),
+                Text('Tu cuenta, foto, grupos y ajustes básicos.', style: Theme.of(context).textTheme.bodyMedium),
+              ])),
+              CircleIconButton(icon: Icons.refresh_rounded, onTap: reload),
             ]),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             AppCard(
-              padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
+              padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
               child: Column(children: [
                 Stack(alignment: Alignment.bottomRight, children: [
-                  ProfileAvatar(name: name, avatarUrl: avatarUrl, radius: 52),
+                  ProfileAvatar(name: name, avatarUrl: avatarUrl, radius: 54),
                   Material(
                     color: AppColors.teal,
                     shape: const CircleBorder(),
@@ -4836,8 +4906,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       customBorder: const CircleBorder(),
                       onTap: changePhoto,
                       child: SizedBox(
-                        width: 35,
-                        height: 35,
+                        width: 36,
+                        height: 36,
                         child: photoLoading
                             ? const Padding(
                                 padding: EdgeInsets.all(9),
@@ -4852,26 +4922,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(name, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 3),
                 Text(email, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 12),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: const [
+                    AccountStatusPill(icon: Icons.verified_user_rounded, label: 'Cuenta activa', color: AppColors.green),
+                    AccountStatusPill(icon: Icons.lock_rounded, label: 'Grupos privados', color: AppColors.teal),
+                  ],
+                ),
                 const SizedBox(height: 18),
                 Row(children: [
-                  Expanded(child: TinyStat(icon: Icons.lock_rounded, value: '${data.groups.length}', label: 'Grupos')),
+                  Expanded(child: TinyStat(icon: Icons.groups_rounded, value: '${data.groups.length}', label: 'Grupos')),
                   const SizedBox(width: 10),
                   Expanded(child: TinyStat(icon: Icons.admin_panel_settings_rounded, value: '${data.adminGroups}', label: 'Admin')),
                   const SizedBox(width: 10),
-                  Expanded(child: TinyStat(icon: Icons.event_available_rounded, value: '${data.totalEvents}', label: 'Eventos')),
+                  Expanded(child: TinyStat(icon: Icons.workspace_premium_rounded, value: '$ownedGroups', label: 'Owner')),
                 ]),
               ]),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
+            SectionHeader(title: 'Cuenta'),
+            const SizedBox(height: 8),
             SettingsRow(icon: Icons.edit_rounded, title: 'Nombre visible', subtitle: name, onTap: () => editName(name)),
-            SettingsRow(icon: Icons.photo_camera_rounded, title: 'Cambiar foto', subtitle: 'Elige una imagen de tu dispositivo', onTap: changePhoto),
+            SettingsRow(icon: Icons.photo_camera_rounded, title: 'Cambiar foto', subtitle: photoLoading ? 'Subiendo imagen...' : 'Elige una imagen de tu dispositivo', onTap: changePhoto),
             if (avatarUrl.isNotEmpty)
               SettingsRow(icon: Icons.delete_outline_rounded, title: 'Quitar foto', subtitle: 'Volver al avatar con iniciales', danger: true, onTap: removePhoto),
-            SettingsRow(icon: Icons.groups_rounded, title: 'Mis grupos', subtitle: '${data.groups.length} grupo${data.groups.length == 1 ? '' : 's'} privado${data.groups.length == 1 ? '' : 's'}', onTap: () {}),
-            SettingsRow(icon: Icons.notifications_none_rounded, title: 'Notificaciones', subtitle: 'Eventos, gastos y torneos', onTap: () => showToast(context, 'Ajustes de notificaciones preparados para push.')),
-            SettingsRow(icon: Icons.help_outline_rounded, title: 'Ayuda y soporte', subtitle: 'Centro de ayuda y contacto', onTap: () => showToast(context, 'Soporte preparado para la siguiente fase.')),
-            const SizedBox(height: 18),
-            DangerButton(label: 'Cerrar sesión', icon: Icons.logout_rounded, onTap: () => AppData.sb.auth.signOut()),
+            const SizedBox(height: 8),
+            SectionHeader(title: 'Tus grupos', action: 'Ver inicio', onTap: () => widget.onNavigateRoot?.call(0)),
+            const SizedBox(height: 8),
+            if (data.groups.isEmpty)
+              EmptySlim(icon: Icons.groups_rounded, title: 'Aún no tienes grupos', body: 'Crea o únete a un grupo desde Inicio.')
+            else
+              ...data.groups.take(3).map((group) => ProfileGroupMiniCard(group: group, onTap: () => widget.onNavigateRoot?.call(0))),
+            if (data.groups.length > 3)
+              SettingsRow(icon: Icons.more_horiz_rounded, title: 'Ver todos los grupos', subtitle: '${data.groups.length} grupos en total', onTap: () => widget.onNavigateRoot?.call(0)),
+            const SizedBox(height: 8),
+            SectionHeader(title: 'Ajustes'),
+            const SizedBox(height: 8),
+            SettingsRow(icon: Icons.notifications_none_rounded, title: 'Notificaciones', subtitle: 'Eventos, gastos y torneos', onTap: showNotificationsSheet),
+            SettingsRow(icon: Icons.lock_outline_rounded, title: 'Privacidad y seguridad', subtitle: 'Grupos cerrados, roles y acceso privado', onTap: showPrivacySheet),
+            SettingsRow(icon: Icons.help_outline_rounded, title: 'Ayuda y soporte', subtitle: 'Guía rápida y contacto próximamente', onTap: () => showToast(context, 'Soporte preparado para la siguiente fase.')),
+            SettingsRow(icon: Icons.info_outline_rounded, title: 'Acerca de Grupli', subtitle: 'Versión y estado del producto', onTap: showAboutSheet),
+            const SizedBox(height: 10),
+            DangerButton(label: 'Cerrar sesión', icon: Icons.logout_rounded, onTap: confirmSignOut),
           ]);
         },
       ),
@@ -4971,6 +5066,107 @@ class TinyStat extends StatelessWidget {
       ]),
     );
   }
+}
+
+class AccountStatusPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  const AccountStatusPill({super.key, required this.icon, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+    decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(99), border: Border.all(color: color.withOpacity(.18))),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 15, color: color),
+      const SizedBox(width: 6),
+      Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12)),
+    ]),
+  );
+}
+
+class ProfileGroupMiniCard extends StatelessWidget {
+  final Map<String, dynamic> group;
+  final VoidCallback onTap;
+  const ProfileGroupMiniCard({super.key, required this.group, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = AppData.text(group['name'], 'Grupo');
+    final role = AppData.text(group['role'], 'member');
+    final members = AppData.intValue(group['members_count'], 1);
+    final events = AppData.intValue(group['events_count'], 0);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+        child: Row(children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(15)),
+            child: const Icon(Icons.groups_rounded, color: AppColors.teal),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
+              RoleBadge(role: role),
+            ]),
+            const SizedBox(height: 4),
+            Text('$members miembros · $events eventos', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+          ])),
+        ]),
+      ),
+    );
+  }
+}
+
+class SheetTitle extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+  const SheetTitle({super.key, required this.icon, required this.title, required this.body});
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)),
+      child: Icon(icon, color: AppColors.teal),
+    ),
+    const SizedBox(height: 12),
+    Text(title, style: Theme.of(context).textTheme.titleLarge),
+    const SizedBox(height: 6),
+    Text(body, style: Theme.of(context).textTheme.bodyMedium),
+  ]);
+}
+
+class PreferencePreviewRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+  const PreferencePreviewRow({super.key, required this.icon, required this.title, required this.body});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 9),
+    child: AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      child: Row(children: [
+        Icon(icon, color: AppColors.teal),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+          const SizedBox(height: 2),
+          Text(body, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+        ])),
+      ]),
+    ),
+  );
 }
 
 
@@ -6786,6 +6982,31 @@ void showPermissionSheet(BuildContext context) {
       child: Column(mainAxisSize: MainAxisSize.min, children: const [
         PermissionMatrixCard(),
       ]),
+    ),
+  );
+}
+
+
+Future<bool?> confirmAction(
+  BuildContext context, {
+  required String title,
+  required String body,
+  bool danger = false,
+  String confirmLabel = 'Confirmar',
+}) {
+  return showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: Text(body),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: danger ? AppColors.red : AppColors.teal),
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(confirmLabel),
+        ),
+      ],
     ),
   );
 }
