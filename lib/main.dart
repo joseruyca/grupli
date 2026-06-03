@@ -56,18 +56,23 @@ class AppConfig {
 class AppColors {
   static const bgShell = Color(0xFFEEF3F8);
   static const white = Color(0xFFFFFFFF);
-  static const ink = Color(0xFF111B34);
-  static const muted = Color(0xFF67718A);
-  static const faint = Color(0xFFF6F8FB);
-  static const line = Color(0xFFE3E8EF);
+  static const ink = Color(0xFF10172F);
+  static const muted = Color(0xFF667085);
+  static const faint = Color(0xFFF7F9FC);
+  static const surface = Color(0xFFF9FBFD);
+  static const line = Color(0xFFE4E9F1);
   static const teal = Color(0xFF008F86);
   static const tealDark = Color(0xFF006B69);
-  static const tealSoft = Color(0xFFEAF9F7);
+  static const tealSoft = Color(0xFFE7F8F6);
   static const blue = Color(0xFF3767FF);
   static const violet = Color(0xFF6E56E8);
+  static const violetSoft = Color(0xFFF0EEFF);
   static const orange = Color(0xFFF28B20);
+  static const orangeSoft = Color(0xFFFFF2E1);
   static const green = Color(0xFF0C9D61);
+  static const greenSoft = Color(0xFFE9F8F0);
   static const red = Color(0xFFE24A4A);
+  static const redSoft = Color(0xFFFFEEEE);
   static const amber = Color(0xFFE6A600);
 }
 
@@ -85,22 +90,22 @@ class GrupliApp extends StatelessWidget {
         fontFamily: 'Roboto',
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, surface: AppColors.white),
         textTheme: const TextTheme(
-          headlineLarge: TextStyle(fontSize: 31, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.05),
-          headlineMedium: TextStyle(fontSize: 25, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.08),
-          titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.ink),
-          titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.ink),
+          headlineLarge: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.04, letterSpacing: -0.8),
+          headlineMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.08, letterSpacing: -0.45),
+          titleLarge: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: AppColors.ink, letterSpacing: -0.25),
+          titleMedium: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: AppColors.ink),
           bodyLarge: TextStyle(fontSize: 15, color: AppColors.ink, height: 1.35),
-          bodyMedium: TextStyle(fontSize: 13.5, color: AppColors.muted, height: 1.35),
+          bodyMedium: TextStyle(fontSize: 13.2, color: AppColors.muted, height: 1.35),
           labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: AppColors.white,
+          fillColor: AppColors.surface,
           hintStyle: const TextStyle(color: Color(0xFF9AA4B5)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: AppColors.line)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: AppColors.line)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: AppColors.teal, width: 1.4)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.line)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.line)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.teal, width: 1.4)),
         ),
       ),
       locale: const Locale('es'),
@@ -3974,24 +3979,29 @@ class GroupHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 118,
+      height: 104,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(26),
         gradient: const LinearGradient(colors: [Color(0xFF006B69), Color(0xFF00998E)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        boxShadow: const [BoxShadow(color: Color(0x1A008F86), blurRadius: 20, offset: Offset(0, 10))],
       ),
       child: Stack(children: [
         Positioned.fill(child: Opacity(opacity: .10, child: PatternIcons())),
-        Positioned(left: 18, right: 18, bottom: 18, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Positioned(left: 18, right: 16, bottom: 16, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
           Row(children: [
-            Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w900, height: 1.0))),
-            Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white.withOpacity(.16), shape: BoxShape.circle), child: const Icon(Icons.lock_rounded, color: Colors.white, size: 18)),
+            Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: -0.6))),
+            Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white.withOpacity(.18), shape: BoxShape.circle), child: const Icon(Icons.lock_rounded, color: Colors.white, size: 18)),
           ]),
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99)),
-            child: const Text('Grupo privado', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
-          ),
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: Colors.white.withOpacity(.17), borderRadius: BorderRadius.circular(99)),
+              child: const Text('Grupo privado', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+            ),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Resumen general', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w700))),
+          ]),
         ])),
       ]),
     );
@@ -4224,7 +4234,7 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(20);
+    final radius = BorderRadius.circular(22);
     final card = AnimatedContainer(
       duration: const Duration(milliseconds: 160),
       curve: Curves.easeOut,
@@ -4233,7 +4243,10 @@ class AppCard extends StatelessWidget {
         color: color,
         borderRadius: radius,
         border: Border.all(color: AppColors.line),
-        boxShadow: const [BoxShadow(color: Color(0x0A111B34), blurRadius: 18, offset: Offset(0, 8))],
+        boxShadow: const [
+          BoxShadow(color: Color(0x06111B34), blurRadius: 18, offset: Offset(0, 8)),
+          BoxShadow(color: Color(0x03111B34), blurRadius: 4, offset: Offset(0, 1)),
+        ],
       ),
       child: child,
     );
@@ -4248,13 +4261,28 @@ class AppCard extends StatelessWidget {
 class RoundBackButton extends StatelessWidget {
   final VoidCallback? onTap;
   const RoundBackButton({super.key, this.onTap});
-  @override Widget build(BuildContext context) => Container(width: 44, height: 44, decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(15)), child: IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: onTap ?? () => Navigator.of(context).maybePop()));
+  @override Widget build(BuildContext context) => Container(
+    width: 42,
+    height: 42,
+    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.line)),
+    child: IconButton(icon: const Icon(Icons.arrow_back_rounded, size: 20), onPressed: onTap ?? () => Navigator.of(context).maybePop()),
+  );
 }
 
 class CircleIconButton extends StatelessWidget {
   final IconData icon; final VoidCallback onTap; final bool filled;
   const CircleIconButton({super.key, required this.icon, required this.onTap, this.filled = false});
-  @override Widget build(BuildContext context) => Container(width: 44, height: 44, decoration: BoxDecoration(color: filled ? AppColors.teal : AppColors.faint, shape: BoxShape.circle), child: IconButton(onPressed: onTap, icon: Icon(icon, color: filled ? Colors.white : AppColors.ink)));
+  @override Widget build(BuildContext context) => Container(
+    width: 42,
+    height: 42,
+    decoration: BoxDecoration(
+      color: filled ? AppColors.teal : AppColors.surface,
+      shape: BoxShape.circle,
+      border: filled ? null : Border.all(color: AppColors.line),
+      boxShadow: filled ? const [BoxShadow(color: Color(0x1A008F86), blurRadius: 14, offset: Offset(0, 6))] : null,
+    ),
+    child: IconButton(onPressed: onTap, icon: Icon(icon, size: 20, color: filled ? Colors.white : AppColors.ink)),
+  );
 }
 
 class OrDivider extends StatelessWidget { const OrDivider({super.key}); @override Widget build(BuildContext context) => Row(children: const [Expanded(child: Divider()), Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('o', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700))), Expanded(child: Divider())]); }
@@ -4268,13 +4296,19 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AppCard(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+    color: AppColors.surface,
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, color: color, size: 20),
-      const SizedBox(height: 5),
+      Container(
+        width: 27,
+        height: 27,
+        decoration: BoxDecoration(color: color.withOpacity(.10), shape: BoxShape.circle),
+        child: Icon(icon, color: color, size: 17),
+      ),
+      const SizedBox(height: 6),
       Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.ink)),
       const SizedBox(height: 1),
-      Text(label, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w700)),
+      Text(label, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, color: AppColors.muted, fontWeight: FontWeight.w700)),
     ]),
   );
 }
@@ -4291,13 +4325,43 @@ class MoneyStat extends StatelessWidget {
 class GroupHomeCard extends StatelessWidget {
   final Map<String, dynamic> group; final VoidCallback onTap;
   const GroupHomeCard({super.key, required this.group, required this.onTap});
-  @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 10), child: AppCard(onTap: onTap, child: Row(children: [
-    Container(width: 58, height: 58, decoration: BoxDecoration(color: AppColors.teal.withOpacity(.75), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.sports_soccer_rounded, color: Colors.white)),
-    const SizedBox(width: 14),
-    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(AppData.text(group['name'], 'Grupo'), style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 4), Text('${AppData.intValue(group['members_count'], 1)} miembros', style: Theme.of(context).textTheme.bodyMedium), const SizedBox(height: 6), const Icon(Icons.lock_rounded, color: AppColors.teal, size: 16)])),
-    Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7), decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(99)), child: Text('${AppData.intValue(group['events_count'], 0)} eventos', style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 12))),
-    const SizedBox(width: 8), const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
-  ])));
+  @override Widget build(BuildContext context) {
+    final name = AppData.text(group['name'], 'Grupo');
+    final members = AppData.intValue(group['members_count'], 1);
+    final events = AppData.intValue(group['events_count'], 0);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.all(12),
+        child: Row(children: [
+          Container(
+            width: 55,
+            height: 55,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [Color(0xFF00998E), Color(0xFF006B69)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(Icons.lock_rounded, color: Colors.white, size: 23),
+          ),
+          const SizedBox(width: 13),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text('Grupo privado · $members ${members == 1 ? 'miembro' : 'miembros'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 7),
+            Row(children: [
+              _MiniChip(text: events == 0 ? 'sin eventos' : '$events eventos', color: AppColors.teal),
+              const SizedBox(width: 6),
+              const _MiniChip(text: 'cerrado', color: AppColors.violet),
+            ]),
+          ])),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        ]),
+      ),
+    );
+  }
 }
 
 class RootBottomNav extends StatelessWidget {
@@ -4342,26 +4406,31 @@ class BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(10, 5, 10, 7),
-    decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.line))),
+    padding: const EdgeInsets.fromLTRB(10, 6, 10, 7),
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      border: Border(top: BorderSide(color: AppColors.line)),
+      boxShadow: [BoxShadow(color: Color(0x0D111B34), blurRadius: 16, offset: Offset(0, -6))],
+    ),
     child: Row(children: List.generate(items.length, (i) {
       final active = i == index;
       final spec = items[i];
       return Expanded(
         child: InkWell(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(26),
           onTap: () => onTap(i),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
+            padding: const EdgeInsets.symmetric(vertical: 2),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(
-                height: 30,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                height: 31,
+                padding: EdgeInsets.symmetric(horizontal: active ? 14 : 10),
                 decoration: BoxDecoration(color: active ? AppColors.tealSoft : Colors.transparent, borderRadius: BorderRadius.circular(99)),
                 child: Icon(spec.icon, size: 21, color: active ? AppColors.teal : AppColors.muted),
               ),
-              const SizedBox(height: 1),
-              Text(spec.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: active ? FontWeight.w900 : FontWeight.w700, color: active ? AppColors.ink : AppColors.muted)),
+              const SizedBox(height: 2),
+              Text(spec.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, fontWeight: active ? FontWeight.w900 : FontWeight.w700, color: active ? AppColors.ink : AppColors.muted)),
             ]),
           ),
         ),

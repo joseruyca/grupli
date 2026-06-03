@@ -1,4 +1,4 @@
--- Grupli v12 clean rebuild
+-- Grupli v14 clean rebuild
 -- Ejecutar en Supabase SQL Editor para resetear la base de datos de Grupli.
 -- Borra SOLO las tablas propias de Grupli y las recrea con RLS.
 

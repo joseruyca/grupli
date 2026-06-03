@@ -74,3 +74,8 @@ Fase de estabilización antes de seguir creciendo: pulido visual global, Miembro
 
 SQL opcional si ya tienes datos: `supabase/patch_v13_roles_rls_hardening.sql`.
 Reset limpio: `supabase/all_in_one.sql`.
+
+
+## v14 Premium product polish
+
+Pulido visual global: tarjetas más suaves, navegación inferior mejorada, Home más clara, hero de grupo más compacto y checks SQL actualizados. No requiere SQL obligatorio.

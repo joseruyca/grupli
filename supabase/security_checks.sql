@@ -1,4 +1,4 @@
--- Grupli v13 security checks: diagnostics only. It does not modify data.
+-- Grupli v14 security checks: diagnostics only. It does not modify data.
 
 select 'profiles RLS enabled' as check_name, rowsecurity as ok from pg_tables where schemaname='public' and tablename='profiles'
 union all select 'groups RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='groups'
@@ -43,3 +43,20 @@ select 'avatar storage policies' as section, policyname, cmd
 from pg_policies
 where schemaname = 'storage' and tablename = 'objects' and policyname like 'avatars_%'
 order by policyname;
+
+
+select 'avatar bucket exists' as check_name, exists (
+  select 1 from storage.buckets where id = 'avatars'
+) as ok;
+
+select 'public RPC overload count' as check_name, count(*) as value
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname in ('create_group_atomic', 'join_group_with_code');
+
+select 'admin policies summary' as check_name, tablename, policyname, cmd
+from pg_policies
+where schemaname = 'public'
+  and tablename in ('groups','group_members','events','expenses','tournaments','matches')
+order by tablename, policyname;
