@@ -161,3 +161,9 @@ SQL nuevo: `supabase/patch_v15_7_visual_group_cover.sql`.
 - Finanzas rehechas para mostrar primero qué debes, qué te deben y quién paga a quién.
 - Torneos/Ligas con sistema de puntuación configurable: general, fútbol, tenis/pádel, baloncesto, mus/cartas y personalizado.
 - SQL nuevo: `supabase/patch_v15_11_finance_tournament_ux.sql`.
+
+
+## v15.13
+
+- Finanzas rediseñadas con pestañas: Gastos, Saldos y Liquidar.
+- Fotos de perfil en finanzas, gastos, asistencia y miembros cuando `avatar_url` exista.

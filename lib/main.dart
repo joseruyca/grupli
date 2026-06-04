@@ -552,7 +552,7 @@ class AppData {
   }
 
   static Future<List<Map<String, dynamic>>> expenses(String groupId) async {
-    final res = await sb.from('expenses').select('*, profiles!expenses_paid_by_fkey(id,email,full_name), expense_participants(user_id,share_amount,paid)').eq('group_id', groupId).order('created_at', ascending: false);
+    final res = await sb.from('expenses').select('*, profiles!expenses_paid_by_fkey(id,email,full_name,avatar_url), expense_participants(user_id,share_amount,paid)').eq('group_id', groupId).order('created_at', ascending: false);
     return asList(res);
   }
 
@@ -1084,6 +1084,24 @@ String memberDisplayName(Map<String, dynamic> member) {
   final email = AppData.text(profile['email']);
   if (email.contains('@')) return email.split('@').first;
   return 'Miembro';
+}
+
+String memberAvatarUrl(Map<String, dynamic> member) {
+  final profile = AppData.asMap(member['profiles']);
+  return AppData.text(profile['avatar_url']);
+}
+
+Map<String, dynamic>? memberByUserId(List<Map<String, dynamic>> members, String userId) {
+  for (final member in members) {
+    if (member['user_id']?.toString() == userId) return member;
+  }
+  return null;
+}
+
+String financeMemberAvatarUrl(String userId, List<Map<String, dynamic>> members) {
+  final member = memberByUserId(members, userId);
+  if (member == null) return '';
+  return memberAvatarUrl(member);
 }
 
 String initialsFor(String name) {
@@ -3037,6 +3055,7 @@ class FinancesTab extends StatefulWidget {
 
 class _FinancesTabState extends State<FinancesTab> {
   late Future<_FinanceData> future;
+  int financeSection = 0;
 
   @override
   void initState() {
@@ -3083,7 +3102,6 @@ class _FinancesTabState extends State<FinancesTab> {
             final settledExpenses = data.expenses.where((e) => AppData.text(e['status'], 'pending') == 'paid').toList();
             final myId = AppData.user?.id ?? '';
             final mySettlements = summary.settlements.where((d) => d.fromId == myId || d.toId == myId).toList();
-            final groupSettlements = summary.settlements.where((d) => d.fromId != myId && d.toId != myId).toList();
 
             return RefreshIndicator(
               color: AppColors.teal,
@@ -3091,83 +3109,78 @@ class _FinancesTabState extends State<FinancesTab> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
                 children: [
-                  PageHeader(title: 'Finanzas', subtitle: 'Quién paga a quién, sin líos', leading: false),
+                  PageHeader(title: 'Finanzas', subtitle: AppData.text(widget.group['name'], 'Grupo'), leading: false),
                   const SizedBox(height: 14),
                   FinanceHeroCard(summary: summary, onCreate: openCreate),
                   const SizedBox(height: 12),
-                  FinanceMyStatusCard(summary: summary, settlements: mySettlements, onCreate: openCreate),
-                  const SizedBox(height: 12),
-                  FinanceAutoBalanceCard(summary: summary, openCount: pendingExpenses.length, settledCount: settledExpenses.length),
-                  if (mySettlements.isNotEmpty) ...[
-                    const SizedBox(height: 18),
-                    SectionHeader(title: 'Tus pagos recomendados', action: '${mySettlements.length}'),
+                  FinanceSegmentedTabs(index: financeSection, onChanged: (i) => setState(() => financeSection = i)),
+                  const SizedBox(height: 14),
+                  if (financeSection == 0) ...[
+                    SectionHeader(title: 'Gastos', action: 'Total ${money(summary.totalExpenses)}'),
                     const SizedBox(height: 8),
-                    AppCard(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Column(children: [
-                        for (int i = 0; i < mySettlements.length; i++) ...[
-                          SettlementPaymentRow(debt: mySettlements[i]),
-                          if (i != mySettlements.length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
-                        ],
-                      ]),
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                  SectionHeader(title: 'Liquidación del grupo', action: 'Actualizar', onTap: reload),
-                  const SizedBox(height: 8),
-                  if (summary.settlements.isEmpty)
-                    EmptySlim(icon: Icons.verified_rounded, title: 'Todo está cuadrado', body: 'Nadie tiene que pagar nada ahora mismo.')
-                  else
-                    AppCard(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Column(children: [
-                        for (int i = 0; i < summary.settlements.length; i++) ...[
-                          SettlementPaymentRow(debt: summary.settlements[i]),
-                          if (i != summary.settlements.length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
-                        ],
-                      ]),
-                    ),
-                  const SizedBox(height: 18),
-                  SectionHeader(title: 'Balance de cada persona'),
-                  const SizedBox(height: 8),
-                  if (sortedBalances.isEmpty)
-                    EmptySlim(icon: Icons.people_alt_rounded, title: 'Todos están a cero', body: 'No hay dinero pendiente entre miembros.')
-                  else
-                    AppCard(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Column(children: [
-                        for (int i = 0; i < sortedBalances.length; i++) ...[
-                          BalanceRow(name: summary.names[sortedBalances[i].key] ?? 'Miembro', value: sortedBalances[i].value),
-                          if (i != sortedBalances.length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
-                        ],
-                      ]),
-                    ),
-                  const SizedBox(height: 18),
-                  SectionHeader(title: 'Gastos recientes', action: 'Añadir', onTap: openCreate),
-                  const SizedBox(height: 8),
-                  if (pendingExpenses.isEmpty)
-                    EmptyBlock(icon: Icons.account_balance_wallet_rounded, title: 'No hay gastos pendientes', body: 'Cuando alguien pague una pista, cena o reserva, Grupli calculará automáticamente quién debe a quién.')
-                  else
-                    ...pendingExpenses.map((e) => ExpenseCard(
-                      expense: e,
-                      members: data.members,
-                      onTap: () async {
-                        final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ExpenseDetailScreen(expense: e, members: data.members)));
-                        if (ok == true) reload();
-                      },
-                    )),
-                  if (settledExpenses.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    SectionHeader(title: 'Historial liquidado', action: '${settledExpenses.length} gastos'),
+                    if (data.expenses.isEmpty)
+                      EmptyBlock(icon: Icons.receipt_long_rounded, title: 'Aún no hay gastos', body: 'Añade el primer gasto y Grupli calculará los saldos automáticamente.')
+                    else
+                      ...data.expenses.map((e) => ExpenseCard(
+                        expense: e,
+                        members: data.members,
+                        onTap: () async {
+                          final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ExpenseDetailScreen(expense: e, members: data.members)));
+                          if (ok == true) reload();
+                        },
+                      )),
                     const SizedBox(height: 8),
-                    ...settledExpenses.take(5).map((e) => ExpenseCard(
-                      expense: e,
-                      members: data.members,
-                      onTap: () async {
-                        final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ExpenseDetailScreen(expense: e, members: data.members)));
-                        if (ok == true) reload();
-                      },
-                    )),
+                    EmptySlim(icon: Icons.info_outline_rounded, title: '${data.expenses.length} gastos en total', body: 'Los gastos liquidados también aparecen aquí para que todo sea fácil de revisar.'),
+                  ] else if (financeSection == 1) ...[
+                    FinanceMyStatusCard(summary: summary, settlements: mySettlements, onCreate: openCreate),
+                    const SizedBox(height: 14),
+                    SectionHeader(title: 'Balance del grupo', action: 'Verde / Rojo'),
+                    const SizedBox(height: 8),
+                    if (sortedBalances.isEmpty)
+                      EmptySlim(icon: Icons.people_alt_rounded, title: 'Todos están a cero', body: 'No hay dinero pendiente entre miembros.')
+                    else
+                      AppCard(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Column(children: [
+                          for (int i = 0; i < sortedBalances.length; i++) ...[
+                            BalanceRow(
+                              name: summary.names[sortedBalances[i].key] ?? 'Miembro',
+                              avatarUrl: summary.avatars[sortedBalances[i].key] ?? '',
+                              value: sortedBalances[i].value,
+                            ),
+                            if (i != sortedBalances.length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
+                          ],
+                        ]),
+                      ),
+                    const SizedBox(height: 12),
+                    EmptySlim(icon: Icons.info_outline_rounded, title: 'Verde: te deben · Rojo: debes', body: 'La pestaña Liquidar muestra los pagos mínimos para dejarlo todo a cero.'),
+                  ] else ...[
+                    SectionHeader(title: 'Liquidar ahora', action: summary.settlements.isEmpty ? '' : '${summary.settlements.length} pagos'),
+                    const SizedBox(height: 8),
+                    if (summary.settlements.isEmpty)
+                      EmptyBlock(icon: Icons.verified_rounded, title: 'Todo queda a cero', body: 'No hace falta mover dinero ahora mismo.')
+                    else
+                      AppCard(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Column(children: [
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.fromLTRB(14, 13, 14, 10),
+                            decoration: const BoxDecoration(color: AppColors.greenSoft, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                            child: Row(children: const [
+                              Icon(Icons.check_circle_rounded, color: AppColors.green),
+                              SizedBox(width: 10),
+                              Expanded(child: Text('Con estos pagos, todo queda a cero', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+                            ]),
+                          ),
+                          for (int i = 0; i < summary.settlements.length; i++) ...[
+                            SettlementPaymentRow(debt: summary.settlements[i], large: true),
+                            if (i != summary.settlements.length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
+                          ],
+                        ]),
+                      ),
+                    const SizedBox(height: 12),
+                    FinanceAutoBalanceCard(summary: summary, openCount: pendingExpenses.length, settledCount: settledExpenses.length),
                   ],
                 ],
               ),
@@ -3353,7 +3366,14 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
               FieldLabel('Pagado por'),
               DropdownButtonFormField<String>(
                 value: paidBy,
-                items: members.map((m) => DropdownMenuItem(value: m['user_id'].toString(), child: Text(memberName(m)))).toList(),
+                items: members.map((m) => DropdownMenuItem(
+                  value: m['user_id'].toString(),
+                  child: Row(children: [
+                    ProfileAvatar(name: memberName(m), avatarUrl: memberAvatarUrl(m), radius: 14),
+                    const SizedBox(width: 8),
+                    Text(memberName(m)),
+                  ]),
+                )).toList(),
                 onChanged: (v) => setState(() {
                   paidBy = v;
                   if (v != null) selected.add(v);
@@ -3376,6 +3396,7 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
                 final id = m['user_id'].toString();
                 final active = selected.contains(id);
                 return FilterChip(
+                  avatar: ProfileAvatar(name: memberName(m), avatarUrl: memberAvatarUrl(m), radius: 12),
                   label: Text(memberName(m)),
                   selected: active,
                   onSelected: (v) => setState(() {
@@ -3399,7 +3420,11 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: Row(children: [
-                      Expanded(child: Text(memberName(m), style: const TextStyle(fontWeight: FontWeight.w900))),
+                      Expanded(child: Row(children: [
+                        ProfileAvatar(name: memberName(m), avatarUrl: memberAvatarUrl(m), radius: 15),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(memberName(m), overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900))),
+                      ])),
                       const SizedBox(width: 12),
                       SizedBox(
                         width: 108,
@@ -3483,7 +3508,7 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
       const SizedBox(height: 18),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const CircleAvatar(backgroundColor: AppColors.teal, child: Icon(Icons.receipt_long_rounded, color: Colors.white)),
+          ProfileAvatar(name: financeMemberName(paidBy, widget.members), avatarUrl: financeMemberAvatarUrl(paidBy, widget.members), radius: 22),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(money(total), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: AppColors.ink)),
@@ -3506,7 +3531,7 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Row(children: [
-            CircleAvatar(radius: 17, backgroundColor: AppColors.tealSoft, child: Text(financeMemberName(userId, widget.members).substring(0, 1).toUpperCase(), style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900))),
+            ProfileAvatar(name: financeMemberName(userId, widget.members), avatarUrl: financeMemberAvatarUrl(userId, widget.members), radius: 17),
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(financeMemberName(userId, widget.members), style: const TextStyle(fontWeight: FontWeight.w900)),
@@ -3532,6 +3557,46 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
       const SizedBox(height: 10),
       DangerButton(label: 'Eliminar gasto', icon: Icons.delete_outline_rounded, onTap: () => run(() => AppData.deleteExpense(expenseId))),
     ]));
+  }
+}
+
+
+class FinanceSegmentedTabs extends StatelessWidget {
+  final int index;
+  final ValueChanged<int> onChanged;
+  const FinanceSegmentedTabs({super.key, required this.index, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    const icons = [Icons.receipt_long_rounded, Icons.groups_rounded, Icons.swap_horiz_rounded];
+    const labels = ['Gastos', 'Saldos', 'Liquidar'];
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(18), border: Border.all(color: AppColors.line)),
+      child: Row(children: List.generate(labels.length, (i) {
+        final selected = index == i;
+        return Expanded(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(15),
+            onTap: () => onChanged(i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.symmetric(vertical: 11),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.tealDark : Colors.transparent,
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: selected ? const [BoxShadow(color: Color(0x1A073A57), blurRadius: 14, offset: Offset(0, 6))] : null,
+              ),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(icons[i], color: selected ? Colors.white : AppColors.muted, size: 17),
+                const SizedBox(width: 6),
+                Text(labels[i], style: TextStyle(color: selected ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12)),
+              ]),
+            ),
+          ),
+        );
+      })),
+    );
   }
 }
 
@@ -3664,7 +3729,8 @@ class FinanceMiniMetric extends StatelessWidget {
 
 class SettlementPaymentRow extends StatelessWidget {
   final SettlementDebt debt;
-  const SettlementPaymentRow({super.key, required this.debt});
+  final bool large;
+  const SettlementPaymentRow({super.key, required this.debt, this.large = false});
 
   @override
   Widget build(BuildContext context) {
@@ -3676,16 +3742,25 @@ class SettlementPaymentRow extends StatelessWidget {
             : '${debt.fromName} paga a ${debt.toName}';
     final subtitle = debt.fromId == myId || debt.toId == myId
         ? 'Movimiento directo para dejar tu balance a cero'
-        : 'Pago recomendado para compensar las deudas del grupo';
+        : 'Pago recomendado para compensar el grupo';
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: large ? 13 : 11),
       child: Row(children: [
-        Container(width: 38, height: 38, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.swap_horiz_rounded, color: AppColors.teal, size: 20)),
+        SizedBox(
+          width: 58,
+          height: 38,
+          child: Stack(children: [
+            Positioned(left: 0, top: 1, child: ProfileAvatar(name: debt.fromName, avatarUrl: debt.fromAvatarUrl, radius: 18)),
+            Positioned(right: 0, top: 1, child: ProfileAvatar(name: debt.toName, avatarUrl: debt.toAvatarUrl, radius: 18)),
+            Positioned(left: 23, top: 11, child: Container(width: 18, height: 18, decoration: BoxDecoration(color: AppColors.white, shape: BoxShape.circle, border: Border.all(color: AppColors.line)), child: const Icon(Icons.arrow_forward_rounded, size: 12, color: AppColors.teal))),
+          ]),
+        ),
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
           const SizedBox(height: 2),
-          Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
+          Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
         ])),
         const SizedBox(width: 8),
         Container(
@@ -3820,6 +3895,7 @@ class _FinanceData {
 
 class FinanceSummary {
   final Map<String, String> names;
+  final Map<String, String> avatars;
   final Map<String, double> balances;
   final List<SettlementDebt> settlements;
   final double totalExpenses;
@@ -3828,6 +3904,7 @@ class FinanceSummary {
 
   FinanceSummary({
     required this.names,
+    required this.avatars,
     required this.balances,
     required this.settlements,
     required this.totalExpenses,
@@ -3850,11 +3927,13 @@ class FinanceSummary {
 
   factory FinanceSummary.from(List<Map<String, dynamic>> expenses, List<Map<String, dynamic>> members) {
     final names = <String, String>{};
+    final avatars = <String, String>{};
     final balances = <String, double>{};
     for (final m in members) {
       final id = m['user_id']?.toString() ?? '';
       if (id.isEmpty) continue;
       names[id] = memberName(m);
+      avatars[id] = memberAvatarUrl(m);
       balances[id] = 0;
     }
 
@@ -3865,6 +3944,7 @@ class FinanceSummary {
       total += AppData.doubleValue(e['amount']);
       final paidBy = e['paid_by']?.toString() ?? '';
       names.putIfAbsent(paidBy, () => financeMemberName(paidBy, members));
+      avatars.putIfAbsent(paidBy, () => financeMemberAvatarUrl(paidBy, members));
       balances.putIfAbsent(paidBy, () => 0);
       for (final p in expenseParticipants(e)) {
         final userId = p['user_id']?.toString() ?? '';
@@ -3872,6 +3952,7 @@ class FinanceSummary {
         final share = AppData.doubleValue(p['share_amount']);
         final alreadyPaid = p['paid'] == true;
         names.putIfAbsent(userId, () => financeMemberName(userId, members));
+        avatars.putIfAbsent(userId, () => financeMemberAvatarUrl(userId, members));
         balances.putIfAbsent(userId, () => 0);
         if (!alreadyPaid) {
           balances[paidBy] = double.parse(((balances[paidBy] ?? 0) + share).toStringAsFixed(2));
@@ -3881,10 +3962,11 @@ class FinanceSummary {
       }
     }
 
-    final settlements = buildSettlements(balances, names);
+    final settlements = buildSettlements(balances, names, avatars);
     final myId = AppData.user?.id ?? '';
     return FinanceSummary(
       names: names,
+      avatars: avatars,
       balances: balances,
       settlements: settlements,
       totalExpenses: double.parse(total.toStringAsFixed(2)),
@@ -3899,11 +3981,21 @@ class SettlementDebt {
   final String toId;
   final String fromName;
   final String toName;
+  final String fromAvatarUrl;
+  final String toAvatarUrl;
   final double amount;
-  const SettlementDebt({required this.fromId, required this.toId, required this.fromName, required this.toName, required this.amount});
+  const SettlementDebt({
+    required this.fromId,
+    required this.toId,
+    required this.fromName,
+    required this.toName,
+    required this.fromAvatarUrl,
+    required this.toAvatarUrl,
+    required this.amount,
+  });
 }
 
-List<SettlementDebt> buildSettlements(Map<String, double> balances, Map<String, String> names) {
+List<SettlementDebt> buildSettlements(Map<String, double> balances, Map<String, String> names, Map<String, String> avatars) {
   final debtors = balances.entries.where((e) => e.value < -0.01).map((e) => MapEntry(e.key, -e.value)).toList();
   final creditors = balances.entries.where((e) => e.value > 0.01).map((e) => MapEntry(e.key, e.value)).toList();
   debtors.sort((a, b) => b.value.compareTo(a.value));
@@ -3919,6 +4011,8 @@ List<SettlementDebt> buildSettlements(Map<String, double> balances, Map<String, 
         toId: creditors[j].key,
         fromName: names[debtors[i].key] ?? 'Miembro',
         toName: names[creditors[j].key] ?? 'Miembro',
+        fromAvatarUrl: avatars[debtors[i].key] ?? '',
+        toAvatarUrl: avatars[creditors[j].key] ?? '',
         amount: double.parse(amount.toStringAsFixed(2)),
       ));
     }
@@ -3982,21 +4076,18 @@ class SettlementRow extends StatelessWidget {
 
 class BalanceRow extends StatelessWidget {
   final String name;
+  final String avatarUrl;
   final double value;
-  const BalanceRow({super.key, required this.name, required this.value});
+  const BalanceRow({super.key, required this.name, required this.value, this.avatarUrl = ''});
 
   @override
   Widget build(BuildContext context) {
     final color = value > 0.01 ? AppColors.green : value < -0.01 ? AppColors.red : AppColors.muted;
-    final label = value > 0.01 ? 'A favor' : value < -0.01 ? 'Debe' : 'Cuadrado';
+    final label = value > 0.01 ? 'Le deben' : value < -0.01 ? 'Debe' : 'En equilibrio';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       child: Row(children: [
-        CircleAvatar(
-          radius: 17,
-          backgroundColor: value >= 0 ? AppColors.tealSoft : const Color(0xFFFFECEC),
-          child: Text(name.substring(0, 1).toUpperCase(), style: TextStyle(color: value >= 0 ? AppColors.teal : AppColors.red, fontWeight: FontWeight.w900)),
-        ),
+        ProfileAvatar(name: name, avatarUrl: avatarUrl, radius: 18),
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900)),
@@ -8742,7 +8833,7 @@ class EventMemberRoster extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: AppCard(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11), child: Row(children: [
-          CircleAvatar(radius: 18, backgroundColor: color.withOpacity(.11), child: Text(initialsFor(name), style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12))),
+          ProfileAvatar(name: name, avatarUrl: memberAvatarUrl(m), radius: 18),
           const SizedBox(width: 11),
           Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w900))),
           Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(99)), child: Text(attendanceLabel(status), style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12))),
@@ -8866,9 +8957,17 @@ class ExpenseCard extends StatelessWidget {
       child: AppCard(
         onTap: onTap,
         child: Row(children: [
-          CircleAvatar(
-            backgroundColor: settled ? AppColors.tealSoft : AppColors.teal,
-            child: Icon(settled ? Icons.verified_rounded : Icons.receipt_long_rounded, color: settled ? AppColors.teal : Colors.white),
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              ProfileAvatar(name: financeMemberName(paidBy, members), avatarUrl: financeMemberAvatarUrl(paidBy, members), radius: 21),
+              Container(
+                width: 17,
+                height: 17,
+                decoration: BoxDecoration(color: settled ? AppColors.green : AppColors.orange, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
+                child: Icon(settled ? Icons.check_rounded : Icons.receipt_long_rounded, size: 10, color: Colors.white),
+              ),
+            ],
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
