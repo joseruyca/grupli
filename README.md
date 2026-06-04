@@ -144,3 +144,9 @@ SQL nuevo: `supabase/patch_v15_7_visual_group_cover.sql`.
 
 
 Última mejora incluida: `docs/V15_8_COMPACT_VISUAL_POLISH.md`.
+
+
+Última mejora incluida: `docs/V15_9_TOP_ALERTS_CLEAN_NAV_VISUAL.md`.
+
+
+Última corrección incluida: `docs/V15_9_1_COMPILE_FIX.md`.

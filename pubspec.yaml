@@ -1,7 +1,7 @@
 name: grupli
 description: Grupli - app premium para organizar grupos privados, eventos, calendario, finanzas y torneos.
 publish_to: "none"
-version: 0.15.8+1581
+version: 0.15.9+160
 
 environment:
   sdk: ">=3.4.0 <4.0.0"

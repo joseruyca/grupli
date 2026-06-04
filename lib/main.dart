@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -2057,6 +2058,13 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                     Row(children: [
                       RoundBackButton(onTap: () => Navigator.of(context).pop()),
                       const Spacer(),
+                      GroupAlertBell(
+                        group: group,
+                        pendingEvents: myDecisionPending,
+                        onEventOpen: openEventDetail,
+                        onChanged: reload,
+                      ),
+                      const SizedBox(width: 8),
                       CircleIconButton(
                         icon: Icons.more_horiz_rounded,
                         onTap: () => widget.onNavigateTab?.call(4),
@@ -2070,16 +2078,6 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                     else if (snapshot.hasError)
                       ErrorBlock(message: snapshot.error.toString(), onRetry: reload)
                     else ...[
-                      if (myDecisionPending.isNotEmpty)
-                        SmartPromptCard(
-                          icon: Icons.notifications_active_rounded,
-                          color: AppColors.amber,
-                          title: myDecisionPending.length == 1 ? '1 respuesta pendiente' : '${myDecisionPending.length} respuestas pendientes',
-                          body: 'Toca para responder rápido.',
-                          actionLabel: 'Responder',
-                          onTap: () async => openEventDetail(myDecisionPending.first),
-                        ),
-                      if (myDecisionPending.isNotEmpty) const SizedBox(height: 12),
                       SectionHeader(
                         title: 'Próxima quedada',
                         action: nextEvent == null ? 'Crear' : 'Calendario',
@@ -5454,6 +5452,233 @@ class GroupCoverSettingsCard extends StatelessWidget {
   }
 }
 
+
+class GroupAlertBell extends StatelessWidget {
+  final Map<String, dynamic> group;
+  final List<Map<String, dynamic>> pendingEvents;
+  final Future<void> Function(Map<String, dynamic> event) onEventOpen;
+  final VoidCallback onChanged;
+
+  const GroupAlertBell({
+    super.key,
+    required this.group,
+    required this.pendingEvents,
+    required this.onEventOpen,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: AppData.notifications(),
+      builder: (context, snapshot) {
+        final groupId = group['id']?.toString();
+        final notifications = (snapshot.data ?? const <Map<String, dynamic>>[])
+            .where((n) => groupId == null || n['group_id']?.toString() == groupId)
+            .take(12)
+            .toList();
+        final unread = notifications.where((n) => n['read_at'] == null).length;
+        final count = pendingEvents.length + unread;
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            CircleIconButton(
+              icon: count > 0 ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
+              onTap: () => showGroupAlertsSheet(
+                context,
+                group: group,
+                pendingEvents: pendingEvents,
+                notifications: notifications,
+                onEventOpen: onEventOpen,
+                onChanged: onChanged,
+              ),
+            ),
+            if (count > 0)
+              Positioned(
+                right: -2,
+                top: -4,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.red,
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(count > 9 ? '9+' : count.toString(), style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w900)),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+void showGroupAlertsSheet(
+  BuildContext context, {
+  required Map<String, dynamic> group,
+  required List<Map<String, dynamic>> pendingEvents,
+  required List<Map<String, dynamic>> notifications,
+  required Future<void> Function(Map<String, dynamic> event) onEventOpen,
+  required VoidCallback onChanged,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) => GroupAlertsSheet(
+      rootContext: context,
+      group: group,
+      pendingEvents: pendingEvents,
+      notifications: notifications,
+      onEventOpen: onEventOpen,
+      onChanged: onChanged,
+    ),
+  );
+}
+
+class GroupAlertsSheet extends StatelessWidget {
+  final BuildContext rootContext;
+  final Map<String, dynamic> group;
+  final List<Map<String, dynamic>> pendingEvents;
+  final List<Map<String, dynamic>> notifications;
+  final Future<void> Function(Map<String, dynamic> event) onEventOpen;
+  final VoidCallback onChanged;
+
+  const GroupAlertsSheet({
+    super.key,
+    required this.rootContext,
+    required this.group,
+    required this.pendingEvents,
+    required this.notifications,
+    required this.onEventOpen,
+    required this.onChanged,
+  });
+
+  Future<void> _openNotification(BuildContext context, Map<String, dynamic> notification) async {
+    final id = notification['id']?.toString();
+    if (id != null && id.isNotEmpty) await AppData.markNotificationRead(id);
+    if (context.mounted) Navigator.of(context).pop();
+    onChanged();
+    final groupId = notification['group_id']?.toString();
+    if (groupId != null && groupId.isNotEmpty && rootContext.mounted) {
+      await Navigator.of(rootContext).push(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)));
+      onChanged();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasContent = pendingEvents.isNotEmpty || notifications.isNotEmpty;
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .72),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: AppColors.lineSoft),
+          boxShadow: const [BoxShadow(color: Color(0x24102033), blurRadius: 34, offset: Offset(0, 16))],
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 10),
+          Container(width: 44, height: 5, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(99))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 10, 10),
+            child: Row(children: [
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Avisos del grupo', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 3),
+                Text(AppData.text(group['name'], 'Grupo'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+              ])),
+              IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close_rounded)),
+            ]),
+          ),
+          Flexible(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+              shrinkWrap: true,
+              children: [
+                if (!hasContent)
+                  EmptySlim(icon: Icons.notifications_none_rounded, title: 'Sin avisos pendientes', body: 'Cuando haya respuestas, gastos o cambios importantes aparecerán aquí.'),
+                if (pendingEvents.isNotEmpty) ...[
+                  const _SheetLabel('Respuestas pendientes'),
+                  ...pendingEvents.take(6).map((event) => PendingDecisionRow(
+                    event: event,
+                    onTap: () async {
+                      Navigator.of(context).pop();
+                      await onEventOpen(event);
+                    },
+                  )),
+                  const SizedBox(height: 8),
+                ],
+                if (notifications.isNotEmpty) ...[
+                  const _SheetLabel('Notificaciones'),
+                  AppCard(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Column(children: [
+                      for (int i = 0; i < notifications.length; i++) ...[
+                        NotificationListRow(notification: notifications[i], onTap: () => _openNotification(context, notifications[i])),
+                        if (i != notifications.length - 1) const Divider(height: 1, indent: 64, color: AppColors.line),
+                      ],
+                    ]),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _SheetLabel extends StatelessWidget {
+  final String text;
+  const _SheetLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(2, 12, 2, 8),
+    child: Text(text, style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: .2)),
+  );
+}
+
+class PendingDecisionRow extends StatelessWidget {
+  final Map<String, dynamic> event;
+  final VoidCallback onTap;
+  const PendingDecisionRow({super.key, required this.event, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+    final color = eventKindColor(event);
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      child: Row(children: [
+        Container(
+          width: 40,
+          height: 42,
+          decoration: BoxDecoration(color: eventKindSoftColor(event), borderRadius: BorderRadius.circular(14)),
+          child: Icon(notificationIcon('event'), color: color, size: 20),
+        ),
+        const SizedBox(width: 11),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+          const SizedBox(height: 3),
+          Text('${longDateTime(date)} · responde asistencia', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+        ])),
+        const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+      ]),
+    );
+  }
+}
+
 class NotificationsScreen extends StatefulWidget {
   final VoidCallback onChanged;
   const NotificationsScreen({super.key, required this.onChanged});
@@ -6242,6 +6467,63 @@ class NotificationPreferenceSwitch extends StatelessWidget {
   );
 }
 
+
+class SmartPromptCard extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String body;
+  final String actionLabel;
+  final VoidCallback onTap;
+  const SmartPromptCard({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.body,
+    required this.actionLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      color: AppColors.surface,
+      padding: const EdgeInsets.all(14),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: color.withOpacity(.12),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Icon(icon, color: color, size: 22),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(body, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 9),
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(actionLabel, style: TextStyle(color: color, fontWeight: FontWeight.w900)),
+                const SizedBox(width: 4),
+                Icon(Icons.arrow_forward_rounded, size: 18, color: color),
+              ]),
+            ),
+          ),
+        ])),
+      ]),
+    );
+  }
+}
+
 class GroupHeroCard extends StatelessWidget {
   final String name;
   final String coverUrl;
@@ -6408,75 +6690,90 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         gradient: LinearGradient(
-          colors: [Colors.white.withOpacity(.92), eventKindSoftColor(event).withOpacity(.95)],
+          colors: [
+            Colors.white.withOpacity(.78),
+            eventKindSoftColor(event).withOpacity(.82),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         border: Border.all(color: color.withOpacity(.16)),
-        boxShadow: [BoxShadow(color: AppColors.ink.withOpacity(.06), blurRadius: 24, offset: const Offset(0, 12))],
+        boxShadow: [BoxShadow(color: AppColors.ink.withOpacity(.055), blurRadius: 22, offset: const Offset(0, 10))],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () async {
-              await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: widget.group)));
-              widget.onChanged();
-            },
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(13, 13, 13, 12),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                  Container(
-                    width: 54,
-                    height: 58,
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(.78), borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withOpacity(.14))),
-                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Text(shortWeekday(date).toUpperCase(), style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w900)),
-                      Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 23, fontWeight: FontWeight.w900, height: 1.05)),
-                      Text(DateFormat('MMM', 'es_ES').format(date).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800)),
-                    ]),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      EventKindPill(event: event, compact: true),
-                      if (eventIsRoutine(event)) ...[
-                        const SizedBox(width: 6),
-                        RoutineBadge(label: eventRoutineBadge(event)),
-                      ],
-                    ]),
-                    const SizedBox(height: 7),
-                    Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 21, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -.35)),
-                    const SizedBox(height: 7),
-                    Wrap(spacing: 6, runSpacing: 6, children: [
-                      EventMetaChip(icon: Icons.schedule_rounded, text: DateFormat('HH:mm', 'es_ES').format(date), color: color),
-                      EventMetaChip(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación'), color: color),
-                    ]),
-                  ])),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () async {
+                await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: widget.group)));
+                widget.onChanged();
+              },
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 11),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                    Container(
+                      width: 50,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(.72),
+                        borderRadius: BorderRadius.circular(17),
+                        border: Border.all(color: color.withOpacity(.14)),
+                      ),
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Text(shortWeekday(date).toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900)),
+                        Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 22, fontWeight: FontWeight.w900, height: 1.02)),
+                        Text(DateFormat('MMM', 'es_ES').format(date).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 9.5, fontWeight: FontWeight.w800)),
+                      ]),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        EventKindPill(event: event, compact: true),
+                        if (eventIsRoutine(event)) ...[
+                          const SizedBox(width: 6),
+                          RoutineBadge(label: eventRoutineBadge(event)),
+                        ],
+                      ]),
+                      const SizedBox(height: 6),
+                      Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w900, height: 1.03, letterSpacing: -.35)),
+                      const SizedBox(height: 6),
+                      Row(children: [
+                        Icon(Icons.schedule_rounded, size: 14, color: color),
+                        const SizedBox(width: 4),
+                        Text(DateFormat('HH:mm', 'es_ES').format(date), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.ink)),
+                        const SizedBox(width: 10),
+                        Icon(Icons.place_outlined, size: 14, color: color),
+                        const SizedBox(width: 4),
+                        Expanded(child: Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink))),
+                      ]),
+                    ])),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(color: missing == 0 ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(999)),
+                      child: Text(missing == 0 ? 'Listo' : 'Faltan $missing', style: TextStyle(color: missing == 0 ? AppColors.green : AppColors.orange, fontSize: 11, fontWeight: FontWeight.w900)),
+                    ),
+                  ]),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 5, backgroundColor: Colors.white.withOpacity(.72), color: color))),
+                    const SizedBox(width: 8),
+                    Text('$yes/$minPeople', style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12)),
+                  ]),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(child: GlassAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
+                    const SizedBox(width: 7),
+                    Expanded(child: GlassAttendanceButton(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
+                    const SizedBox(width: 7),
+                    Expanded(child: GlassAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
+                  ]),
                 ]),
-                const SizedBox(height: 12),
-                Row(children: [
-                  Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 7, backgroundColor: Colors.white.withOpacity(.70), color: color))),
-                  const SizedBox(width: 9),
-                  Text('$yes/$minPeople', style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12.5)),
-                  const SizedBox(width: 7),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                    decoration: BoxDecoration(color: missing == 0 ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(99)),
-                    child: Text(missing == 0 ? 'Listo' : 'Faltan $missing', style: TextStyle(color: missing == 0 ? AppColors.green : AppColors.orange, fontSize: 11.5, fontWeight: FontWeight.w900)),
-                  ),
-                ]),
-                const SizedBox(height: 10),
-                Row(children: [
-                  Expanded(child: GlassAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
-                  const SizedBox(width: 7),
-                  Expanded(child: GlassAttendanceButton(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
-                  const SizedBox(width: 7),
-                  Expanded(child: GlassAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
-                ]),
-              ]),
+              ),
             ),
           ),
         ),
@@ -6538,186 +6835,25 @@ class GlassAttendanceButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
-    borderRadius: BorderRadius.circular(14),
+    borderRadius: BorderRadius.circular(13),
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 150),
-      height: 42,
+      height: 35,
       decoration: BoxDecoration(
-        color: selected ? color.withOpacity(.13) : Colors.white.withOpacity(.72),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: selected ? color : Colors.white.withOpacity(.82), width: 1.1),
-        boxShadow: selected ? [BoxShadow(color: color.withOpacity(.12), blurRadius: 12, offset: const Offset(0, 5))] : null,
+        color: selected ? color.withOpacity(.14) : Colors.white.withOpacity(.70),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: selected ? color.withOpacity(.80) : Colors.white.withOpacity(.85), width: 1),
+        boxShadow: selected ? [BoxShadow(color: color.withOpacity(.10), blurRadius: 10, offset: const Offset(0, 4))] : null,
       ),
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: color, size: 16),
-        const SizedBox(width: 5),
-        Text(label, style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w900)),
+        Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: color, size: 14),
         const SizedBox(width: 4),
-        Text(count.toString(), style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w900)),
+        Text(label, style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w900)),
+        const SizedBox(width: 3),
+        Text(count.toString(), style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w900)),
       ]),
     ),
   );
-}
-
-class SmartPromptCard extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String body;
-  final String actionLabel;
-  final VoidCallback onTap;
-  const SmartPromptCard({
-    super.key,
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.body,
-    required this.actionLabel,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      color: AppColors.surface,
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(color: color.withOpacity(.12), borderRadius: BorderRadius.circular(16)),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(body, style: Theme.of(context).textTheme.bodyMedium),
-                const SizedBox(height: 10),
-                InkWell(
-                  onTap: onTap,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(actionLabel, style: TextStyle(color: color, fontWeight: FontWeight.w900)),
-                        const SizedBox(width: 4),
-                        Icon(Icons.arrow_forward_rounded, size: 18, color: color),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class DashboardSummaryCard extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String eyebrow;
-  final String title;
-  final String body;
-  final String footer;
-  final String actionLabel;
-  final VoidCallback onTap;
-  const DashboardSummaryCard({
-    super.key,
-    required this.icon,
-    required this.color,
-    required this.eyebrow,
-    required this.title,
-    required this.body,
-    required this.footer,
-    required this.actionLabel,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(color: color.withOpacity(.12), borderRadius: BorderRadius.circular(14)),
-            child: Icon(icon, color: color, size: 21),
-          ),
-          const SizedBox(height: 12),
-          Text(eyebrow, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.muted)),
-          const SizedBox(height: 6),
-          Text(title, style: const TextStyle(fontSize: 18, height: 1.15, fontWeight: FontWeight.w900, color: AppColors.ink)),
-          const SizedBox(height: 6),
-          Text(body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, height: 1.3, color: AppColors.muted, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Text(footer, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, height: 1.3, color: AppColors.ink, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Text(actionLabel, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12.5)),
-              const SizedBox(width: 4),
-              Icon(Icons.arrow_forward_rounded, size: 18, color: color),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class QuickActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  const QuickActionButton({super.key, required this.icon, required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: (MediaQuery.of(context).size.width - 36 - 14 - 30) / 2,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(12)),
-                child: Icon(icon, color: AppColors.teal, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 
@@ -7751,7 +7887,6 @@ class GroupBottomNav extends StatelessWidget {
           NavSpec(Icons.calendar_month_rounded, 'Calendario'),
           NavSpec(Icons.account_balance_wallet_rounded, 'Finanzas'),
           NavSpec(Icons.emoji_events_rounded, 'Torneos'),
-          NavSpec(Icons.more_horiz_rounded, 'Más'),
         ],
         index: index,
         onTap: onTap,
