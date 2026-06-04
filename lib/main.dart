@@ -1992,26 +1992,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
       }
     }
     return double.parse(total.toStringAsFixed(2));
-  }
-
-  Map<String, dynamic>? _firstActiveTournament(List<Map<String, dynamic>> tournaments) {
-    for (final tournament in tournaments) {
-      if (AppData.text(tournament['status'], 'active') != 'finished') return tournament;
-    }
-    return null;
-  }
-
-  int _pendingMatches(Map<String, dynamic>? tournament) {
-    if (tournament == null) return 0;
-    return AppData.asList(tournament['matches']).where((m) => AppData.text(AppData.asMap(m)['status'], 'pending') != 'played').length;
-  }
-
-  int _teamCount(Map<String, dynamic>? tournament) {
-    if (tournament == null) return 0;
-    return AppData.asList(tournament['tournament_teams']).length;
-  }
-
-  @override
+  }  @override
   Widget build(BuildContext context) {
     final group = widget.group;
     final groupId = group['id'].toString();
@@ -2031,13 +2012,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                 final mine = myAttendanceStatus(event);
                 return mine == null || mine == 'maybe';
               }).toList();
-              final openExpenses = (data?.expenses ?? <Map<String, dynamic>>[])
-                  .where((expense) => AppData.text(expense['status'], 'pending') != 'paid')
-                  .toList();
-              final openExpensesAmount = openExpenses.fold<double>(0, (sum, expense) => sum + AppData.doubleValue(expense['amount']));
-              final expensesTotal = data?.expensesTotal ?? 0;
               final myBalance = _myOpenBalance(data?.expenses ?? const <Map<String, dynamic>>[]);
-              final activeTournament = _firstActiveTournament(data?.tournaments ?? const <Map<String, dynamic>>[]);
               final tournamentsActive = data?.activeTournaments ?? 0;
               Future<void> openCreateEvent() async {
                 final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: group)));
@@ -2079,7 +2054,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                       ErrorBlock(message: snapshot.error.toString(), onRetry: reload)
                     else ...[
                       SectionHeader(
-                        title: 'Próxima quedada',
+                        title: 'Próximo plan',
                         action: nextEvent == null ? 'Crear' : 'Calendario',
                         onTap: nextEvent == null ? openCreateEvent : () => widget.onNavigateTab?.call(1),
                       ),
@@ -2102,8 +2077,8 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                         onFinances: () => widget.onNavigateTab?.call(2),
                         onTournaments: () => widget.onNavigateTab?.call(3),
                       ),
-                      const SizedBox(height: 14),
-                      SectionHeader(title: 'Actividad real', action: 'Actualizar', onTap: reload),
+                      const SizedBox(height: 12),
+                      SectionHeader(title: 'Reciente', action: 'Ver calendario', onTap: () => widget.onNavigateTab?.call(1)),
                       const SizedBox(height: 8),
                       DashboardActivityCard(
                         events: events,
@@ -2113,14 +2088,6 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                         onOpenFinances: () => widget.onNavigateTab?.call(2),
                         onOpenTournaments: () => widget.onNavigateTab?.call(3),
                       ),
-                      if (upcoming.length > 1) ...[
-                        const SizedBox(height: 16),
-                        SectionHeader(title: 'Más adelante', action: 'Ver todo', onTap: () => widget.onNavigateTab?.call(1)),
-                        const SizedBox(height: 8),
-                        ...upcoming.skip(1).take(3).map((e) => EventCard(event: e, onTap: () async {
-                          await openEventDetail(e);
-                        })),
-                      ],
                     ],
                   ],
                 ),
@@ -2797,17 +2764,6 @@ class _CalendarTabState extends State<CalendarTab> {
                 .where((e) => AppData.text(e['status'], 'active') != 'cancelled')
                 .toList();
             final selectedEvents = _eventsForDay(events, selected);
-            final upcoming = _upcoming(events);
-            final todayEvents = _eventsForDay(events, DateTime.now());
-            final thisWeek = upcoming.where((event) {
-              final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
-              if (date == null) return false;
-              return date.isBefore(DateTime.now().add(const Duration(days: 7)));
-            }).length;
-            final pendingResponse = upcoming.where((event) {
-              final mine = myAttendanceStatus(event);
-              return mine == null || mine == 'maybe';
-            }).length;
             final selectedYes = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
             final selectedMaybe = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
 
@@ -2821,16 +2777,6 @@ class _CalendarTabState extends State<CalendarTab> {
               onRefresh: () async => reload(),
               child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 112), children: [
                 PageHeader(title: 'Calendario', subtitle: AppData.text(widget.group['name']), leading: false),
-                const SizedBox(height: 12),
-                CalendarCompactHeader(
-                  todayEvents: todayEvents.length,
-                  weekEvents: thisWeek,
-                  pendingResponses: pendingResponse,
-                  onToday: () => setState(() {
-                    selected = DateTime.now();
-                    month = DateTime(DateTime.now().year, DateTime.now().month);
-                  }),
-                ),
                 const SizedBox(height: 10),
                 WeekStrip(
                   days: weekDays,
@@ -2842,8 +2788,6 @@ class _CalendarTabState extends State<CalendarTab> {
                   }),
                 ),
                 const SizedBox(height: 10),
-                EventTypeLegend(events: events),
-                const SizedBox(height: 14),
                 AppCard(child: Column(children: [
                   Row(children: [
                     IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month - 1)), icon: const Icon(Icons.chevron_left_rounded)),
@@ -2874,22 +2818,12 @@ class _CalendarTabState extends State<CalendarTab> {
                   onCreate: () => createFor(selected),
                 ),
                 const SizedBox(height: 18),
-                SectionHeader(title: 'Agenda del día', action: 'Crear', onTap: () => createFor(selected)),
+                SectionHeader(title: 'Ese día', action: 'Crear', onTap: () => createFor(selected)),
                 const SizedBox(height: 10),
                 if (selectedEvents.isEmpty)
-                  EmptySlim(icon: Icons.calendar_month_rounded, title: 'No hay planes este día', body: 'Crea uno desde + Evento.')
+                  EmptySlim(icon: Icons.calendar_month_rounded, title: 'Día libre', body: 'Pulsa + Evento para crear un plan.')
                 else
                   ...selectedEvents.map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
-                const SizedBox(height: 18),
-                SectionHeader(title: 'Próximas decisiones', action: 'Ver hoy', onTap: () => setState(() {
-                  selected = DateTime.now();
-                  month = DateTime(DateTime.now().year, DateTime.now().month);
-                })),
-                const SizedBox(height: 10),
-                if (upcoming.isEmpty)
-                  EmptySlim(icon: Icons.event_available_rounded, title: 'Agenda vacía', body: 'Crea el primer evento desde el botón +.')
-                else
-                  ...upcoming.take(5).map((e) => EventCard(event: e, onTap: () => openEvent(e))),
               ]),
             );
           },
@@ -2983,12 +2917,12 @@ class _FinancesTabState extends State<FinancesTab> {
                     const SizedBox(width: 10),
                     Expanded(child: FinanceMiniMetric(icon: Icons.swap_horiz_rounded, label: 'A mover', value: money(summary.settlementAmount), color: AppColors.orange)),
                     const SizedBox(width: 10),
-                    Expanded(child: FinanceMiniMetric(icon: Icons.auto_awesome_rounded, label: 'Compensado', value: money(summary.compensatedAmount), color: AppColors.green)),
+                    Expanded(child: FinanceMiniMetric(icon: Icons.auto_awesome_rounded, label: 'Restado', value: money(summary.compensatedAmount), color: AppColors.green)),
                   ]),
                   const SizedBox(height: 14),
                   FinanceAutoBalanceCard(summary: summary, openCount: pendingCount, settledCount: settledCount),
                   const SizedBox(height: 20),
-                  SectionHeader(title: 'Liquidación automática', action: 'Actualizar', onTap: reload),
+                  SectionHeader(title: 'Pagos recomendados', action: 'Actualizar', onTap: reload),
                   const SizedBox(height: 8),
                   if (summary.settlements.isEmpty)
                     EmptySlim(icon: Icons.verified_rounded, title: 'Todo está cuadrado', body: 'No hace falta mover dinero entre miembros ahora mismo.')
@@ -3003,7 +2937,7 @@ class _FinancesTabState extends State<FinancesTab> {
                       ]),
                     ),
                   const SizedBox(height: 20),
-                  SectionHeader(title: 'Balances individuales'),
+                  SectionHeader(title: 'Personas'),
                   const SizedBox(height: 8),
                   if (sortedBalances.isEmpty)
                     EmptySlim(icon: Icons.people_alt_rounded, title: 'Todos los balances están a cero', body: 'Nadie debe ni tiene que recibir dinero ahora mismo.')
@@ -3407,23 +3341,32 @@ class FinanceHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = summary.pendingAmount <= .01 ? AppColors.teal : summary.myNet < -0.01 ? AppColors.red : AppColors.teal;
+    final clean = summary.pendingAmount <= .01;
     return AppCard(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       color: AppColors.tealDark,
-      padding: const EdgeInsets.all(15),
       child: Row(children: [
-        Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.white.withOpacity(.13), borderRadius: BorderRadius.circular(15)), child: Icon(summary.pendingAmount <= .01 ? Icons.verified_rounded : Icons.swap_horiz_rounded, color: Colors.white, size: 23)),
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(15)),
+          child: Icon(clean ? Icons.verified_rounded : Icons.account_balance_wallet_rounded, color: Colors.white, size: 24),
+        ),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_financeMainTitle(summary), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, height: 1.1)),
+          Text(_financeMainTitle(summary), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, letterSpacing: -.25)),
           const SizedBox(height: 4),
-          Text(summary.pendingAmount <= .01 ? 'Sin pagos pendientes.' : 'A mover ${money(summary.settlementAmount)} · compensado ${money(summary.compensatedAmount)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12, fontWeight: FontWeight.w700)),
+          Text(clean ? 'Nadie debe dinero.' : 'Movimiento real: ${money(summary.settlementAmount)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w700)),
         ])),
         const SizedBox(width: 10),
-        InkWell(
-          onTap: onCreate,
-          borderRadius: BorderRadius.circular(14),
-          child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: const Text('+ Gasto', style: TextStyle(color: AppColors.tealDark, fontWeight: FontWeight.w900))),
+        SizedBox(
+          height: 40,
+          child: TextButton.icon(
+            onPressed: onCreate,
+            style: TextButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.tealDark, padding: const EdgeInsets.symmetric(horizontal: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Gasto', style: TextStyle(fontWeight: FontWeight.w900)),
+          ),
         ),
       ]),
     );
@@ -3506,7 +3449,7 @@ class FinanceAutoBalanceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasPending = summary.pendingAmount > 0.01;
     final color = hasPending ? AppColors.teal : AppColors.green;
-    final title = hasPending ? 'Grupli ya ha compensado las deudas cruzadas' : 'Cuentas equilibradas';
+    final title = hasPending ? 'Cuentas compensadas' : 'Todo cuadrado';
     final body = hasPending
         ? 'Compensa deudas cruzadas y muestra solo lo que hay que mover.'
         : 'No hay pagos pendientes.';
@@ -3531,11 +3474,11 @@ class FinanceAutoBalanceCard extends StatelessWidget {
         ]),
         const SizedBox(height: 14),
         Row(children: [
-          Expanded(child: _FinanceAutoMetric(label: 'Deuda bruta', value: money(summary.pendingAmount), color: AppColors.amber)),
+          Expanded(child: _FinanceAutoMetric(label: 'Total', value: money(summary.pendingAmount), color: AppColors.amber)),
           const SizedBox(width: 8),
           Expanded(child: _FinanceAutoMetric(label: 'A mover', value: money(summary.settlementAmount), color: AppColors.teal)),
           const SizedBox(width: 8),
-          Expanded(child: _FinanceAutoMetric(label: 'Compensado', value: money(summary.compensatedAmount), color: AppColors.green)),
+          Expanded(child: _FinanceAutoMetric(label: 'Restado', value: money(summary.compensatedAmount), color: AppColors.green)),
         ]),
         const SizedBox(height: 10),
         Text(
@@ -3758,7 +3701,7 @@ String _financeMainTitle(FinanceSummary summary) {
 String _financeMainSubtitle(FinanceSummary summary) {
   if (summary.pendingAmount <= 0.01) return 'No hay deudas abiertas en este grupo.';
   if (summary.compensatedAmount > 0.01) {
-    return 'Deuda bruta ${money(summary.pendingAmount)} · mover ${money(summary.settlementAmount)}.';
+    return 'Total ${money(summary.pendingAmount)} · mover ${money(summary.settlementAmount)}.';
   }
   return 'Con ${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} se puede dejar el grupo a cero.';
 }
@@ -3914,11 +3857,7 @@ class _TournamentsTabState extends State<TournamentsTab> {
                             },
                     ),
                     const SizedBox(height: 18),
-                    Row(children: [
-                      Text('Tus competiciones', style: Theme.of(context).textTheme.titleLarge),
-                      const Spacer(),
-                      TextButton.icon(onPressed: () => openCreate(), icon: const Icon(Icons.add_rounded), label: const Text('Crear')),
-                    ]),
+                    Text('Tus competiciones', style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 8),
                     if (snapshot.connectionState == ConnectionState.waiting)
                       const CenterLoader(label: 'Cargando torneos...')
@@ -6683,27 +6622,24 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
     final no = attendanceCount(event, 'no');
     final mine = myAttendanceStatus(event);
     final color = eventKindColor(event);
-    final progress = minPeople <= 0 ? 0.0 : min(1.0, yes / minPeople);
     final missing = max(0, minPeople - yes);
+    final progress = minPeople <= 0 ? 0.0 : min(1.0, yes / minPeople);
 
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(.78),
-            eventKindSoftColor(event).withOpacity(.82),
-          ],
+          colors: [Colors.white.withOpacity(.86), eventKindSoftColor(event).withOpacity(.70)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: color.withOpacity(.16)),
-        boxShadow: [BoxShadow(color: AppColors.ink.withOpacity(.055), blurRadius: 22, offset: const Offset(0, 10))],
+        border: Border.all(color: color.withOpacity(.14)),
+        boxShadow: [BoxShadow(color: AppColors.ink.withOpacity(.045), blurRadius: 18, offset: const Offset(0, 8))],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
@@ -6712,59 +6648,47 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
                 widget.onChanged();
               },
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 11),
+                padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                  Row(children: [
                     Container(
-                      width: 50,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(.72),
-                        borderRadius: BorderRadius.circular(17),
-                        border: Border.all(color: color.withOpacity(.14)),
-                      ),
+                      width: 48,
+                      height: 52,
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(.74), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withOpacity(.12))),
                       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                         Text(shortWeekday(date).toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900)),
-                        Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 22, fontWeight: FontWeight.w900, height: 1.02)),
-                        Text(DateFormat('MMM', 'es_ES').format(date).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 9.5, fontWeight: FontWeight.w800)),
+                        Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 19, fontWeight: FontWeight.w900, height: 1)),
+                        Text(DateFormat('MMM', 'es_ES').format(date).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 9, fontWeight: FontWeight.w800)),
                       ]),
                     ),
                     const SizedBox(width: 11),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        EventKindPill(event: event, compact: true),
-                        if (eventIsRoutine(event)) ...[
-                          const SizedBox(width: 6),
-                          RoutineBadge(label: eventRoutineBadge(event)),
-                        ],
-                      ]),
-                      const SizedBox(height: 6),
-                      Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w900, height: 1.03, letterSpacing: -.35)),
-                      const SizedBox(height: 6),
+                      Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 19, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -.25)),
+                      const SizedBox(height: 5),
                       Row(children: [
                         Icon(Icons.schedule_rounded, size: 14, color: color),
                         const SizedBox(width: 4),
                         Text(DateFormat('HH:mm', 'es_ES').format(date), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.ink)),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Icon(Icons.place_outlined, size: 14, color: color),
                         const SizedBox(width: 4),
-                        Expanded(child: Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink))),
+                        Expanded(child: Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.muted))),
                       ]),
                     ])),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      decoration: BoxDecoration(color: missing == 0 ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(999)),
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                      decoration: BoxDecoration(color: missing == 0 ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(99)),
                       child: Text(missing == 0 ? 'Listo' : 'Faltan $missing', style: TextStyle(color: missing == 0 ? AppColors.green : AppColors.orange, fontSize: 11, fontWeight: FontWeight.w900)),
                     ),
                   ]),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 9),
                   Row(children: [
-                    Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 5, backgroundColor: Colors.white.withOpacity(.72), color: color))),
+                    Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 4, backgroundColor: Colors.white.withOpacity(.70), color: color))),
                     const SizedBox(width: 8),
                     Text('$yes/$minPeople', style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12)),
                   ]),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 9),
                   Row(children: [
                     Expanded(child: GlassAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
                     const SizedBox(width: 7),
@@ -6813,11 +6737,11 @@ class MiniSummaryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AppCard(
     onTap: onTap,
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Icon(icon, color: color, size: 19),
-      const SizedBox(height: 7),
-      Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 15, fontWeight: FontWeight.w900)),
+      Icon(icon, color: color, size: 18),
+      const SizedBox(height: 6),
+      Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 14.5, fontWeight: FontWeight.w900)),
       const SizedBox(height: 2),
       Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 11.5, fontWeight: FontWeight.w800)),
     ]),
@@ -6878,56 +6802,79 @@ class DashboardActivityCard extends StatelessWidget {
 
   List<_DashboardActivityItem> _items() {
     final items = <_DashboardActivityItem>[];
+    final routineGroups = <String, List<Map<String, dynamic>>>{};
+    final singleEvents = <Map<String, dynamic>>[];
 
-    for (final event in events.take(6)) {
+    for (final event in events) {
+      if (eventIsRoutine(event)) {
+        final key = AppData.text(event['title'], 'Rutina');
+        routineGroups.putIfAbsent(key, () => <Map<String, dynamic>>[]).add(event);
+      } else {
+        singleEvents.add(event);
+      }
+    }
+
+    routineGroups.forEach((title, groupEvents) {
+      groupEvents.sort((a, b) {
+        final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
+        final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now();
+        return da.compareTo(db);
+      });
+      final first = groupEvents.first;
+      final date = DateTime.tryParse(first['starts_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+      items.add(_DashboardActivityItem(
+        date: date,
+        icon: Icons.repeat_rounded,
+        color: eventKindColor(first),
+        title: title,
+        body: '${groupEvents.length} fechas programadas',
+        onTapKind: 'calendar',
+      ));
+    });
+
+    for (final event in singleEvents.take(4)) {
       final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
       if (date == null) continue;
-      final title = AppData.text(event['title'], 'Quedada');
       final yes = attendanceCount(event, 'yes');
       final minPeople = AppData.intValue(event['min_people'], 1);
       items.add(_DashboardActivityItem(
         date: date,
         icon: Icons.event_available_rounded,
-        color: AppColors.teal,
-        title: title,
-        body: '${longDateTime(date)} · $yes/$minPeople confirmados',
+        color: eventKindColor(event),
+        title: AppData.text(event['title'], 'Quedada'),
+        body: '${shortWeekday(date)} ${date.day} · $yes/$minPeople',
         onTapKind: 'calendar',
       ));
     }
 
-    for (final expense in expenses.take(6)) {
+    for (final expense in expenses.take(2)) {
       final created = DateTime.tryParse(expense['created_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
-      final concept = AppData.text(expense['concept'], 'Gasto');
-      final amount = AppData.doubleValue(expense['amount']);
       final status = AppData.text(expense['status'], 'pending') == 'paid' ? 'liquidado' : 'pendiente';
       items.add(_DashboardActivityItem(
         date: created,
         icon: Icons.account_balance_wallet_rounded,
         color: AppData.text(expense['status'], 'pending') == 'paid' ? AppColors.green : AppColors.amber,
-        title: concept,
-        body: '${money(amount)} · $status',
+        title: AppData.text(expense['concept'], 'Gasto'),
+        body: '${money(AppData.doubleValue(expense['amount']))} · $status',
         onTapKind: 'finances',
       ));
     }
 
-    for (final tournament in tournaments.take(6)) {
+    for (final tournament in tournaments.take(2)) {
       final created = DateTime.tryParse(tournament['created_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
-      final name = AppData.text(tournament['name'], 'Competición');
-      final teams = AppData.asList(tournament['tournament_teams']).length;
-      final matches = AppData.asList(tournament['matches']).length;
       final finished = AppData.text(tournament['status'], 'active') == 'finished';
       items.add(_DashboardActivityItem(
         date: created,
         icon: Icons.emoji_events_rounded,
         color: finished ? AppColors.violet : AppColors.orange,
-        title: name,
-        body: '$teams participantes · $matches partidos · ${finished ? 'finalizado' : 'en curso'}',
+        title: AppData.text(tournament['name'], 'Competición'),
+        body: finished ? 'Finalizado' : 'En curso',
         onTapKind: 'tournaments',
       ));
     }
 
     items.sort((a, b) => b.date.compareTo(a.date));
-    return items.take(5).toList();
+    return items.take(3).toList();
   }
 
   @override
@@ -6937,13 +6884,13 @@ class DashboardActivityCard extends StatelessWidget {
     if (items.isEmpty) {
       return EmptySlim(
         icon: Icons.bolt_rounded,
-        title: 'Todavía no hay actividad real',
-        body: 'Cuando el grupo cree quedadas, gastos o torneos, aparecerán aquí sin usar ejemplos falsos.',
+        title: 'Sin actividad todavía',
+        body: 'Los próximos planes aparecerán aquí.',
       );
     }
 
     return AppCard(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         children: [
           for (int i = 0; i < items.length; i++) ...[
@@ -6956,7 +6903,7 @@ class DashboardActivityCard extends StatelessWidget {
               },
             ),
             if (i != items.length - 1)
-              const Divider(height: 1, indent: 58, color: AppColors.line),
+              const Divider(height: 1, indent: 56, color: AppColors.line),
           ],
         ],
       ),
@@ -7153,7 +7100,7 @@ class WeekStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 88,
+      height: 76,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: days.length,
@@ -7167,14 +7114,14 @@ class WeekStrip extends StatelessWidget {
           final today = sameDay(day, DateTime.now());
           return InkWell(
             onTap: () => onSelect(day),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              width: 68,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+              width: 58,
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
               decoration: BoxDecoration(
                 color: active ? AppColors.teal : hasEvents ? eventKindSoftColor(dayEvents.first) : AppColors.surface,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(
                   color: active ? AppColors.teal : today ? AppColors.teal.withOpacity(.45) : hasEvents ? mainColor.withOpacity(.38) : AppColors.line,
                   width: active || today || hasEvents ? 1.4 : 1,
@@ -7722,14 +7669,14 @@ class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(15),
+    this.padding = const EdgeInsets.all(13),
     this.onTap,
     this.color = AppColors.white,
   });
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(24);
+    final radius = BorderRadius.circular(20);
     final card = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
@@ -7739,8 +7686,7 @@ class AppCard extends StatelessWidget {
         borderRadius: radius,
         border: Border.all(color: AppColors.lineSoft),
         boxShadow: const [
-          BoxShadow(color: Color(0x07102033), blurRadius: 20, offset: Offset(0, 8)),
-          BoxShadow(color: Color(0x03102033), blurRadius: 4, offset: Offset(0, 1)),
+          BoxShadow(color: Color(0x06102033), blurRadius: 16, offset: Offset(0, 6)),
         ],
       ),
       child: child,
@@ -7826,13 +7772,13 @@ class GroupHomeCard extends StatelessWidget {
     final events = AppData.intValue(group['events_count'], 0);
     final cover = AppData.text(group['cover_url']);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 11),
+      padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
         onTap: onTap,
         padding: const EdgeInsets.all(12),
         child: Row(children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
             child: Container(
               width: 60,
               height: 60,
@@ -7951,12 +7897,6 @@ class PageHeader extends StatelessWidget {
   @override Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
     if (leading) ...[RoundBackButton(onTap: () => Navigator.of(context).maybePop()), const SizedBox(width: 12)],
     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(99)),
-        child: const Text('GRUPLI', style: TextStyle(color: AppColors.teal, fontSize: 10.5, letterSpacing: .8, fontWeight: FontWeight.w900)),
-      ),
-      const SizedBox(height: 8),
       Text(title, style: Theme.of(context).textTheme.headlineMedium),
       if (subtitle.isNotEmpty) ...[const SizedBox(height: 6), Text(subtitle, style: Theme.of(context).textTheme.bodyMedium)],
     ]))
@@ -8042,42 +7982,33 @@ class CalendarDaySummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kinds = <String, Map<String, dynamic>>{};
-    for (final event in events) {
-      kinds.putIfAbsent(eventKind(event), () => event);
-    }
-    final mainColor = events.isEmpty ? AppColors.teal : eventKindColor(events.first);
+    final hasEvents = events.isNotEmpty;
+    final color = hasEvents ? eventKindColor(events.first) : AppColors.teal;
     return AppCard(
-      padding: const EdgeInsets.all(14),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+      child: Row(children: [
         DateBadge(date: day),
-        const SizedBox(width: 12),
+        const SizedBox(width: 11),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(child: Text(longDay(day), style: Theme.of(context).textTheme.titleMedium)),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-              decoration: BoxDecoration(color: mainColor.withOpacity(.10), borderRadius: BorderRadius.circular(99)),
-              child: Text(events.isEmpty ? 'Libre' : '${events.length} evento${events.length == 1 ? '' : 's'}', style: TextStyle(color: mainColor, fontWeight: FontWeight.w900, fontSize: 11.5)),
-            ),
-          ]),
-          const SizedBox(height: 6),
+          Text(longDay(day), maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
           Text(
-            events.isEmpty
-                ? 'No hay eventos creados para este día.'
-                : '$confirmed confirmados · $maybe en duda · ${events.length == 1 ? '1 plan en agenda' : '${events.length} planes en agenda'}',
-            style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700),
+            hasEvents ? '${events.length} plan${events.length == 1 ? '' : 'es'} · $confirmed van · $maybe duda' : 'Día libre',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12.5),
           ),
-          if (events.isNotEmpty) ...[
-            const SizedBox(height: 9),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: kinds.values.map((event) => EventKindPill(event: event, compact: true)).toList(),
-            ),
-          ],
         ])),
-        IconButton(onPressed: onCreate, icon: const Icon(Icons.add_circle_rounded, color: AppColors.teal, size: 30)),
+        const SizedBox(width: 8),
+        SizedBox(
+          height: 38,
+          child: TextButton.icon(
+            onPressed: onCreate,
+            style: TextButton.styleFrom(backgroundColor: color.withOpacity(.10), foregroundColor: color, padding: const EdgeInsets.symmetric(horizontal: 11), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Crear', style: TextStyle(fontWeight: FontWeight.w900)),
+          ),
+        ),
       ]),
     );
   }
@@ -8134,7 +8065,7 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
           child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Container(width: 6, color: color),
             Expanded(child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(11),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 InkWell(
                   onTap: open,
@@ -8789,7 +8720,7 @@ class MonthGrid extends StatelessWidget {
         crossAxisCount: 7,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        childAspectRatio: 1.04,
+        childAspectRatio: 1.08,
         children: cells.map((day) {
           if (day == null) return const SizedBox();
           final active = sameDay(day, selected);

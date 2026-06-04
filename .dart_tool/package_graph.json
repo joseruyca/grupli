@@ -5,7 +5,7 @@
   "packages": [
     {
       "name": "grupli",
-      "version": "0.15.9+160",
+      "version": "0.15.10+1510",
       "dependencies": [
         "firebase_core",
         "firebase_messaging",

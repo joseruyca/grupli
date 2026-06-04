@@ -150,3 +150,6 @@ SQL nuevo: `supabase/patch_v15_7_visual_group_cover.sql`.
 
 
 Última corrección incluida: `docs/V15_9_1_COMPILE_FIX.md`.
+
+
+Última mejora incluida: `docs/V15_10_ULTRA_SIMPLE_UX.md`.
