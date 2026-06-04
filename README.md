@@ -153,3 +153,11 @@ SQL nuevo: `supabase/patch_v15_7_visual_group_cover.sql`.
 
 
 Última mejora incluida: `docs/V15_10_ULTRA_SIMPLE_UX.md`.
+
+## v15.11
+
+- Landing de Mis grupos más limpia, sin métricas superiores innecesarias.
+- Próximo plan en Inicio del grupo con fondo más visible y botones Voy/Duda/No más claros.
+- Finanzas rehechas para mostrar primero qué debes, qué te deben y quién paga a quién.
+- Torneos/Ligas con sistema de puntuación configurable: general, fútbol, tenis/pádel, baloncesto, mus/cartas y personalizado.
+- SQL nuevo: `supabase/patch_v15_11_finance_tournament_ux.sql`.

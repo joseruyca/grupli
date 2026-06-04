@@ -166,6 +166,8 @@ CREATE TABLE public.tournaments (
   name text NOT NULL CHECK (char_length(trim(name)) >= 2),
   format text NOT NULL DEFAULT 'liga' CHECK (format IN ('liga','eliminatoria','americano')),
   team_type text NOT NULL DEFAULT 'equipo' CHECK (team_type IN ('individual','pareja','equipo')),
+  scoring_type text NOT NULL DEFAULT 'general' CHECK (scoring_type IN ('general','football','tennis_padel','basketball','cards_mus','custom')),
+  scoring_config jsonb NOT NULL DEFAULT '{"win":3,"draw":1,"loss":0,"unit":"puntos","allowDraw":true}'::jsonb,
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','finished')),
   created_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),

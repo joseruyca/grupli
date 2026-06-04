@@ -651,15 +651,31 @@ class AppData {
     String name, {
     String format = 'liga',
     String teamType = 'equipo',
+    String scoringType = 'general',
+    Map<String, dynamic>? scoringConfig,
   }) async {
-    final row = await sb.from('tournaments').insert({
+    final payload = {
       'group_id': groupId,
       'name': name.trim(),
       'format': format,
       'team_type': teamType,
+      'scoring_type': scoringType,
+      'scoring_config': scoringConfig ?? scoringConfigForType(scoringType),
       'created_by': user?.id,
-    }).select('id').single();
-    return row['id'].toString();
+    };
+
+    try {
+      final row = await sb.from('tournaments').insert(payload).select('id').single();
+      return row['id'].toString();
+    } catch (e) {
+      final text = e.toString().toLowerCase();
+      if (!text.contains('scoring_type') && !text.contains('scoring_config')) rethrow;
+      final fallback = Map<String, dynamic>.from(payload)
+        ..remove('scoring_type')
+        ..remove('scoring_config');
+      final row = await sb.from('tournaments').insert(fallback).select('id').single();
+      return row['id'].toString();
+    }
   }
 
   static Future<void> updateTournamentStatus(String tournamentId, String status) async {
@@ -1116,6 +1132,93 @@ String tournamentFormatSubtitle(String format) {
   }
 }
 
+String scoringTypeLabel(String type) {
+  switch (type) {
+    case 'football':
+      return 'Fútbol';
+    case 'tennis_padel':
+      return 'Tenis / Pádel';
+    case 'basketball':
+      return 'Baloncesto';
+    case 'cards_mus':
+      return 'Mus / Cartas';
+    case 'custom':
+      return 'Personalizado';
+    default:
+      return 'General';
+  }
+}
+
+String scoringTypeSubtitle(String type) {
+  switch (type) {
+    case 'football':
+      return 'Victoria 3 puntos, empate 1. Desempate por diferencia de goles.';
+    case 'tennis_padel':
+      return 'Pensado para sets, juegos o partidos: gana quien tenga más marcador.';
+    case 'basketball':
+      return 'Victoria 2 puntos. El marcador representa puntos anotados.';
+    case 'cards_mus':
+      return 'Victoria 1 punto. El marcador puede ser juegos, piedras o rondas.';
+    case 'custom':
+      return 'Base flexible: victoria 3, empate 1. Podrás ajustarlo en futuras mejoras.';
+    default:
+      return 'Sistema simple: victoria 3, empate 1, derrota 0.';
+  }
+}
+
+Map<String, dynamic> scoringConfigForType(String type) {
+  switch (type) {
+    case 'football':
+      return {'win': 3, 'draw': 1, 'loss': 0, 'unit': 'goles', 'allowDraw': true};
+    case 'tennis_padel':
+      return {'win': 2, 'draw': 0, 'loss': 0, 'unit': 'sets/juegos', 'allowDraw': false};
+    case 'basketball':
+      return {'win': 2, 'draw': 0, 'loss': 1, 'unit': 'puntos', 'allowDraw': false};
+    case 'cards_mus':
+      return {'win': 1, 'draw': 0, 'loss': 0, 'unit': 'juegos', 'allowDraw': false};
+    case 'custom':
+      return {'win': 3, 'draw': 1, 'loss': 0, 'unit': 'puntos', 'allowDraw': true};
+    default:
+      return {'win': 3, 'draw': 1, 'loss': 0, 'unit': 'puntos', 'allowDraw': true};
+  }
+}
+
+int scoringWinPoints(String type) => AppData.intValue(scoringConfigForType(type)['win'], 3);
+int scoringDrawPoints(String type) => AppData.intValue(scoringConfigForType(type)['draw'], 1);
+int scoringLossPoints(String type) => AppData.intValue(scoringConfigForType(type)['loss'], 0);
+String scoringMetricUnit(String type) => AppData.text(scoringConfigForType(type)['unit'], 'puntos');
+
+String standingsHeaderForScoring(String type) {
+  switch (type) {
+    case 'football':
+      return 'PTS · DG · PJ';
+    case 'tennis_padel':
+      return 'PTS · DIF · PJ';
+    case 'basketball':
+      return 'PTS · DIF · PJ';
+    case 'cards_mus':
+      return 'PTS · DIF · PJ';
+    default:
+      return 'PTS · DIF · PJ';
+  }
+}
+
+String matchInputLabel(String type, bool local) {
+  final side = local ? 'Local' : 'Visitante';
+  switch (type) {
+    case 'football':
+      return '$side goles';
+    case 'tennis_padel':
+      return '$side sets/juegos';
+    case 'basketball':
+      return '$side puntos';
+    case 'cards_mus':
+      return '$side juegos';
+    default:
+      return side;
+  }
+}
+
 String teamTypeLabel(String type) {
   switch (type) {
     case 'individual':
@@ -1156,7 +1259,7 @@ Map<String, String> teamNameMap(List<Map<String, dynamic>> teams) {
   return {for (final team in teams) team['id'].toString(): AppData.text(team['name'], 'Participante')};
 }
 
-List<TeamStanding> calculateStandings(List<Map<String, dynamic>> teams, List<Map<String, dynamic>> matches) {
+List<TeamStanding> calculateStandings(List<Map<String, dynamic>> teams, List<Map<String, dynamic>> matches, {String scoringType = 'general'}) {
   final table = <String, TeamStanding>{
     for (final team in teams)
       team['id'].toString(): TeamStanding(
@@ -1185,16 +1288,18 @@ List<TeamStanding> calculateStandings(List<Map<String, dynamic>> teams, List<Map
     if (scoreA > scoreB) {
       a.wins++;
       b.losses++;
-      a.points += 3;
+      a.points += scoringWinPoints(scoringType);
+      b.points += scoringLossPoints(scoringType);
     } else if (scoreA < scoreB) {
       b.wins++;
       a.losses++;
-      b.points += 3;
+      b.points += scoringWinPoints(scoringType);
+      a.points += scoringLossPoints(scoringType);
     } else {
       a.draws++;
       b.draws++;
-      a.points += 1;
-      b.points += 1;
+      a.points += scoringDrawPoints(scoringType);
+      b.points += scoringDrawPoints(scoringType);
     }
   }
 
@@ -1589,17 +1694,7 @@ class _HomeScreenState extends State<HomeScreen> {
               if (snapshot.connectionState == ConnectionState.waiting) return const HomeLoading();
               if (snapshot.hasError) return ErrorBlock(message: snapshot.error.toString(), onRetry: reload);
               final groups = snapshot.data ?? [];
-              final members = groups.fold<int>(0, (sum, g) => sum + AppData.intValue(g['members_count'], 1));
-              final events = groups.fold<int>(0, (sum, g) => sum + AppData.intValue(g['events_count'], 0));
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Expanded(child: StatCard(icon: Icons.lock_rounded, value: groups.length.toString(), label: 'Grupos', color: AppColors.teal)),
-                  const SizedBox(width: 10),
-                  Expanded(child: StatCard(icon: Icons.groups_rounded, value: members.toString(), label: 'Miembros', color: AppColors.violet)),
-                  const SizedBox(width: 10),
-                  Expanded(child: StatCard(icon: Icons.calendar_month_rounded, value: events.toString(), label: 'Eventos', color: AppColors.orange)),
-                ]),
-                const SizedBox(height: 26),
                 Row(children: [
                   Text('Tus grupos', style: Theme.of(context).textTheme.titleLarge),
                   const Spacer(),
@@ -2899,8 +2994,8 @@ class _FinancesTabState extends State<FinancesTab> {
             final sortedBalances = summary.sortedBalances;
             final pendingExpenses = data.expenses.where((e) => AppData.text(e['status'], 'pending') != 'paid').toList();
             final settledExpenses = data.expenses.where((e) => AppData.text(e['status'], 'pending') == 'paid').toList();
-            final pendingCount = pendingExpenses.length;
-            final settledCount = settledExpenses.length;
+            final myId = AppData.user?.id ?? '';
+            final mySettlements = summary.settlements.where((d) => d.fromId == myId || d.toId == myId).toList();
 
             return RefreshIndicator(
               color: AppColors.teal,
@@ -2908,27 +3003,19 @@ class _FinancesTabState extends State<FinancesTab> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
                 children: [
-                  PageHeader(title: 'Finanzas', subtitle: 'Cuentas claras para ${AppData.text(widget.group['name'], 'el grupo')}', leading: false),
+                  PageHeader(title: 'Finanzas', subtitle: 'Quién paga a quién, sin líos', leading: false),
                   const SizedBox(height: 14),
                   FinanceHeroCard(summary: summary, onCreate: openCreate),
                   const SizedBox(height: 12),
-                  Row(children: [
-                    Expanded(child: FinanceMiniMetric(icon: Icons.receipt_long_rounded, label: 'Histórico', value: money(summary.totalExpenses), color: AppColors.teal)),
-                    const SizedBox(width: 10),
-                    Expanded(child: FinanceMiniMetric(icon: Icons.swap_horiz_rounded, label: 'A mover', value: money(summary.settlementAmount), color: AppColors.orange)),
-                    const SizedBox(width: 10),
-                    Expanded(child: FinanceMiniMetric(icon: Icons.auto_awesome_rounded, label: 'Restado', value: money(summary.compensatedAmount), color: AppColors.green)),
-                  ]),
-                  const SizedBox(height: 14),
-                  FinanceAutoBalanceCard(summary: summary, openCount: pendingCount, settledCount: settledCount),
-                  const SizedBox(height: 20),
-                  SectionHeader(title: 'Pagos recomendados', action: 'Actualizar', onTap: reload),
+                  FinanceMyStatusCard(summary: summary, settlements: mySettlements, onCreate: openCreate),
+                  const SizedBox(height: 18),
+                  SectionHeader(title: 'Pagos para liquidar', action: 'Actualizar', onTap: reload),
                   const SizedBox(height: 8),
                   if (summary.settlements.isEmpty)
-                    EmptySlim(icon: Icons.verified_rounded, title: 'Todo está cuadrado', body: 'No hace falta mover dinero entre miembros ahora mismo.')
+                    EmptySlim(icon: Icons.verified_rounded, title: 'Todo está cuadrado', body: 'Nadie tiene que pagar nada ahora mismo.')
                   else
                     AppCard(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Column(children: [
                         for (int i = 0; i < summary.settlements.length; i++) ...[
                           SettlementPaymentRow(debt: summary.settlements[i]),
@@ -2936,14 +3023,14 @@ class _FinancesTabState extends State<FinancesTab> {
                         ],
                       ]),
                     ),
-                  const SizedBox(height: 20),
-                  SectionHeader(title: 'Personas'),
+                  const SizedBox(height: 18),
+                  SectionHeader(title: 'Balance de cada persona'),
                   const SizedBox(height: 8),
                   if (sortedBalances.isEmpty)
-                    EmptySlim(icon: Icons.people_alt_rounded, title: 'Todos los balances están a cero', body: 'Nadie debe ni tiene que recibir dinero ahora mismo.')
+                    EmptySlim(icon: Icons.people_alt_rounded, title: 'Todos están a cero', body: 'No hay dinero pendiente entre miembros.')
                   else
                     AppCard(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Column(children: [
                         for (int i = 0; i < sortedBalances.length; i++) ...[
                           BalanceRow(name: summary.names[sortedBalances[i].key] ?? 'Miembro', value: sortedBalances[i].value),
@@ -2951,8 +3038,8 @@ class _FinancesTabState extends State<FinancesTab> {
                         ],
                       ]),
                     ),
-                  const SizedBox(height: 20),
-                  SectionHeader(title: 'Gastos abiertos', action: 'Añadir', onTap: openCreate),
+                  const SizedBox(height: 18),
+                  SectionHeader(title: 'Gastos recientes', action: 'Añadir', onTap: openCreate),
                   const SizedBox(height: 8),
                   if (pendingExpenses.isEmpty)
                     EmptyBlock(icon: Icons.account_balance_wallet_rounded, title: 'No hay gastos pendientes', body: 'Cuando alguien pague una pista, cena o reserva, Grupli calculará automáticamente quién debe a quién.')
@@ -3356,7 +3443,7 @@ class FinanceHeroCard extends StatelessWidget {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(_financeMainTitle(summary), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, letterSpacing: -.25)),
           const SizedBox(height: 4),
-          Text(clean ? 'Nadie debe dinero.' : 'Movimiento real: ${money(summary.settlementAmount)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w700)),
+          Text(clean ? 'Nadie debe dinero.' : '${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} para liquidar todo', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w700)),
         ])),
         const SizedBox(width: 10),
         SizedBox(
@@ -3387,6 +3474,42 @@ class _HeroFinanceMetric extends StatelessWidget {
         Text(label, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 11, fontWeight: FontWeight.w800)),
         const SizedBox(height: 4),
         Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+      ]),
+    );
+  }
+}
+
+class FinanceMyStatusCard extends StatelessWidget {
+  final FinanceSummary summary;
+  final List<SettlementDebt> settlements;
+  final VoidCallback onCreate;
+  const FinanceMyStatusCard({super.key, required this.summary, required this.settlements, required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = summary.myNet > 0.01 ? AppColors.green : summary.myNet < -0.01 ? AppColors.red : AppColors.teal;
+    final title = summary.myNet > 0.01
+        ? 'Te deben ${money(summary.myNet)}'
+        : summary.myNet < -0.01
+            ? 'Debes ${money(-summary.myNet)}'
+            : 'Tú estás a cero';
+    final body = settlements.isEmpty
+        ? 'No tienes pagos pendientes. Puedes revisar abajo el balance del grupo.'
+        : settlements.map((d) => d.fromId == AppData.user?.id ? 'Pagas a ${d.toName}: ${money(d.amount)}' : '${d.fromName} te paga: ${money(d.amount)}').join(' · ');
+
+    return AppCard(
+      padding: const EdgeInsets.all(15),
+      color: color.withOpacity(.09),
+      child: Row(children: [
+        Container(width: 44, height: 44, decoration: BoxDecoration(color: color.withOpacity(.14), borderRadius: BorderRadius.circular(15)), child: Icon(summary.myNet.abs() <= .01 ? Icons.check_circle_rounded : Icons.payments_rounded, color: color, size: 23)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25)),
+        ])),
+        const SizedBox(width: 8),
+        IconButton(onPressed: onCreate, icon: Icon(Icons.add_circle_rounded, color: color), tooltip: 'Añadir gasto'),
       ]),
     );
   }
@@ -3427,9 +3550,9 @@ class SettlementPaymentRow extends StatelessWidget {
         Container(width: 36, height: 36, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.swap_horiz_rounded, color: AppColors.teal, size: 20)),
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('${debt.fromName} paga a ${debt.toName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+          Text('${debt.fromName} → ${debt.toName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
           const SizedBox(height: 2),
-          const Text('Pago mínimo calculado tras compensar deudas cruzadas', style: TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
+          const Text('Pago recomendado para dejar las cuentas a cero', style: TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
         ])),
         const SizedBox(width: 8),
         Text(money(debt.amount), style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 15)),
@@ -3909,6 +4032,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   final name = TextEditingController();
   String format = 'liga';
   String teamType = 'pareja';
+  String scoringType = 'general';
   int step = 0;
   bool loading = false;
 
@@ -3939,7 +4063,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
     if (step == 0 && name.text.trim().length < 2) {
       name.text = defaultName;
     }
-    setState(() => step = min(3, step + 1));
+    setState(() => step = min(4, step + 1));
   }
 
   Future<void> create() async {
@@ -3956,6 +4080,8 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
         cleanName,
         format: format,
         teamType: teamType,
+        scoringType: scoringType,
+        scoringConfig: scoringConfigForType(scoringType),
       );
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(MaterialPageRoute(
@@ -4020,6 +4146,53 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
             onTap: () => setState(() => format = 'americano'),
           ),
         ] else if (step == 2) ...[
+          Text('Sistema de puntuación', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
+          Text('Elige cómo se interpretan los resultados. No es lo mismo una liga de fútbol que una de pádel, basket o cartas.', style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 10),
+          TournamentScoringOption(
+            selected: scoringType == 'general',
+            icon: Icons.tune_rounded,
+            title: 'General',
+            body: scoringTypeSubtitle('general'),
+            onTap: () => setState(() => scoringType = 'general'),
+          ),
+          TournamentScoringOption(
+            selected: scoringType == 'football',
+            icon: Icons.sports_soccer_rounded,
+            title: 'Fútbol',
+            body: scoringTypeSubtitle('football'),
+            onTap: () => setState(() => scoringType = 'football'),
+          ),
+          TournamentScoringOption(
+            selected: scoringType == 'tennis_padel',
+            icon: Icons.sports_tennis_rounded,
+            title: 'Tenis / Pádel',
+            body: scoringTypeSubtitle('tennis_padel'),
+            onTap: () => setState(() => scoringType = 'tennis_padel'),
+          ),
+          TournamentScoringOption(
+            selected: scoringType == 'basketball',
+            icon: Icons.sports_basketball_rounded,
+            title: 'Baloncesto',
+            body: scoringTypeSubtitle('basketball'),
+            onTap: () => setState(() => scoringType = 'basketball'),
+          ),
+          TournamentScoringOption(
+            selected: scoringType == 'cards_mus',
+            icon: Icons.style_rounded,
+            title: 'Mus / Cartas',
+            body: scoringTypeSubtitle('cards_mus'),
+            onTap: () => setState(() => scoringType = 'cards_mus'),
+          ),
+          TournamentScoringOption(
+            selected: scoringType == 'custom',
+            icon: Icons.edit_note_rounded,
+            title: 'Personalizado',
+            body: scoringTypeSubtitle('custom'),
+            onTap: () => setState(() => scoringType = 'custom'),
+          ),
+        ] else if (step == 3) ...[
           Text('¿Quién participa?', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Row(children: [
@@ -4034,6 +4207,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
             name: previewName,
             format: format,
             teamType: teamType,
+            scoringType: scoringType,
           ),
         ] else ...[
           Text('Resumen antes de crear', style: Theme.of(context).textTheme.titleMedium),
@@ -4042,6 +4216,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
             name: previewName,
             format: format,
             teamType: teamType,
+            scoringType: scoringType,
             detailed: true,
           ),
           const SizedBox(height: 14),
@@ -4055,10 +4230,10 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
           ],
           Expanded(
             child: PrimaryButton(
-              label: step == 3 ? 'Crear competición' : 'Continuar',
-              icon: step == 3 ? Icons.emoji_events_rounded : Icons.arrow_forward_rounded,
+              label: step == 4 ? 'Crear competición' : 'Continuar',
+              icon: step == 4 ? Icons.emoji_events_rounded : Icons.arrow_forward_rounded,
               loading: loading,
-              onTap: step == 3 ? create : nextStep,
+              onTap: step == 4 ? create : nextStep,
             ),
           ),
         ]),
@@ -4244,10 +4419,11 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
           final teams = tournamentTeams(tournament);
           final matches = tournamentMatches(tournament);
           final format = AppData.text(tournament['format'], 'liga');
+          final scoringType = AppData.text(tournament['scoring_type'], 'general');
           final status = AppData.text(tournament['status'], 'active');
           final played = matches.where((m) => AppData.text(m['status']) == 'played').length;
           final pending = matches.length - played;
-          final standings = calculateStandings(teams, matches);
+          final standings = calculateStandings(teams, matches, scoringType: scoringType);
 
           return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Container(
@@ -4288,7 +4464,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                   const SizedBox(height: 14),
                   Text(AppData.text(tournament['name'], 'Competición'), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, height: 1.05)),
                   const SizedBox(height: 7),
-                  Text('${tournamentFormatLabel(format)} · ${teamTypeLabel(AppData.text(tournament['team_type'], 'equipo'))} · ${status == 'finished' ? 'Finalizada' : 'En curso'}', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
+                  Text('${tournamentFormatLabel(format)} · ${teamTypeLabel(AppData.text(tournament['team_type'], 'equipo'))} · ${scoringTypeLabel(scoringType)} · ${status == 'finished' ? 'Finalizada' : 'En curso'}', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
                 ]),
               ),
             ),
@@ -4326,11 +4502,12 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                     onGenerate: () => generate(tournament),
                   )
                 else if (section == 1)
-                  _TournamentStandingsSection(standings: standings, format: format)
+                  _TournamentStandingsSection(standings: standings, format: format, scoringType: scoringType)
                 else if (section == 2)
                   _TournamentMatchesSection(
                     matches: matches,
                     teams: teams,
+                    scoringType: scoringType,
                     onResultChanged: reload,
                   )
                 else
@@ -4531,16 +4708,17 @@ class _TournamentSummarySection extends StatelessWidget {
 class _TournamentStandingsSection extends StatelessWidget {
   final List<TeamStanding> standings;
   final String format;
-  const _TournamentStandingsSection({required this.standings, required this.format});
+  final String scoringType;
+  const _TournamentStandingsSection({required this.standings, required this.format, required this.scoringType});
 
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SectionHeader(title: format == 'eliminatoria' ? 'Rendimiento' : 'Clasificación', action: 'PTS · DG · PJ'),
+      SectionHeader(title: format == 'eliminatoria' ? 'Rendimiento' : 'Clasificación', action: standingsHeaderForScoring(scoringType)),
       if (standings.isEmpty)
         EmptyBlock(icon: Icons.leaderboard_rounded, title: 'Sin clasificación', body: 'Añade participantes y registra resultados para calcular la tabla.')
       else
-        ...standings.asMap().entries.map((entry) => StandingRow(position: entry.key + 1, standing: entry.value, detailed: true)),
+        ...standings.asMap().entries.map((entry) => StandingRow(position: entry.key + 1, standing: entry.value, detailed: true, scoringType: scoringType)),
     ]);
   }
 }
@@ -4548,8 +4726,9 @@ class _TournamentStandingsSection extends StatelessWidget {
 class _TournamentMatchesSection extends StatelessWidget {
   final List<Map<String, dynamic>> matches;
   final List<Map<String, dynamic>> teams;
+  final String scoringType;
   final VoidCallback onResultChanged;
-  const _TournamentMatchesSection({required this.matches, required this.teams, required this.onResultChanged});
+  const _TournamentMatchesSection({required this.matches, required this.teams, required this.scoringType, required this.onResultChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -4567,7 +4746,7 @@ class _TournamentMatchesSection extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       ...rounds.entries.map((entry) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SectionHeader(title: 'Ronda ${entry.key}', action: '${entry.value.length} partidos'),
-        ...entry.value.map((m) => MatchResultCard(match: m, names: names, onChanged: onResultChanged)),
+        ...entry.value.map((m) => MatchResultCard(match: m, names: names, scoringType: scoringType, onChanged: onResultChanged)),
         const SizedBox(height: 8),
       ])),
     ]);
@@ -4869,7 +5048,7 @@ class TournamentCreateStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labels = ['Nombre', 'Formato', 'Participantes', 'Revisar'];
+    final labels = ['Nombre', 'Formato', 'Puntos', 'Quién', 'Revisar'];
     return Row(children: List.generate(labels.length, (i) {
       final active = i == step;
       final done = i < step;
@@ -4891,8 +5070,9 @@ class TournamentPreviewCard extends StatelessWidget {
   final String name;
   final String format;
   final String teamType;
+  final String scoringType;
   final bool detailed;
-  const TournamentPreviewCard({super.key, required this.name, required this.format, required this.teamType, this.detailed = false});
+  const TournamentPreviewCard({super.key, required this.name, required this.format, required this.teamType, this.scoringType = 'general', this.detailed = false});
 
   @override
   Widget build(BuildContext context) => AppCard(
@@ -4905,12 +5085,14 @@ class TournamentPreviewCard extends StatelessWidget {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
-          Text('${tournamentFormatLabel(format)} · ${teamTypeLabel(teamType)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+          Text('${tournamentFormatLabel(format)} · ${teamTypeLabel(teamType)} · ${scoringTypeLabel(scoringType)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
         ])),
       ]),
       if (detailed) ...[
         const SizedBox(height: 14),
         StatusNotice(ok: true, text: tournamentFormatSubtitle(format)),
+        const SizedBox(height: 8),
+        StatusNotice(ok: true, text: scoringTypeSubtitle(scoringType)),
         const SizedBox(height: 10),
         const Text('Después de crearla, añade participantes y pulsa “Generar partidos”. La tabla se actualizará al registrar resultados.', style: TextStyle(color: AppColors.muted, height: 1.35, fontWeight: FontWeight.w700)),
       ],
@@ -4942,6 +5124,43 @@ class TournamentFormatOption extends StatelessWidget {
         child: Row(children: [
           Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: selected ? AppColors.teal : AppColors.muted)),
           const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+            const SizedBox(height: 3),
+            Text(body, style: Theme.of(context).textTheme.bodyMedium),
+          ])),
+          Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: selected ? AppColors.teal : AppColors.muted),
+        ]),
+      ),
+    ),
+  );
+}
+
+class TournamentScoringOption extends StatelessWidget {
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String body;
+  final VoidCallback onTap;
+  const TournamentScoringOption({super.key, required this.selected, required this.icon, required this.title, required this.body, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 9),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(17),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.tealSoft : Colors.white,
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: selected ? AppColors.teal : AppColors.line),
+        ),
+        child: Row(children: [
+          Container(width: 40, height: 40, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: selected ? AppColors.teal : AppColors.muted)),
+          const SizedBox(width: 11),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
             const SizedBox(height: 3),
@@ -4999,8 +5218,9 @@ class MatchCompactCard extends StatelessWidget {
 class MatchResultCard extends StatelessWidget {
   final Map<String, dynamic> match;
   final Map<String, String> names;
+  final String scoringType;
   final VoidCallback onChanged;
-  const MatchResultCard({super.key, required this.match, required this.names, required this.onChanged});
+  const MatchResultCard({super.key, required this.match, required this.names, this.scoringType = 'general', required this.onChanged});
 
   Future<void> editResult(BuildContext context) async {
     final aController = TextEditingController(text: AppData.text(match['score_a']));
@@ -5010,9 +5230,9 @@ class MatchResultCard extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: const Text('Resultado'),
         content: Row(children: [
-          Expanded(child: TextField(controller: aController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Local'))),
+          Expanded(child: TextField(controller: aController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: matchInputLabel(scoringType, true)))),
           const SizedBox(width: 12),
-          Expanded(child: TextField(controller: bController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Visitante'))),
+          Expanded(child: TextField(controller: bController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: matchInputLabel(scoringType, false)))),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
@@ -5081,7 +5301,8 @@ class StandingRow extends StatelessWidget {
   final int position;
   final TeamStanding standing;
   final bool detailed;
-  const StandingRow({super.key, required this.position, required this.standing, this.detailed = false});
+  final String scoringType;
+  const StandingRow({super.key, required this.position, required this.standing, this.detailed = false, this.scoringType = 'general'});
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -5093,7 +5314,7 @@ class StandingRow extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(standing.name, style: const TextStyle(fontWeight: FontWeight.w900)),
-          if (detailed) Text('${standing.wins}G · ${standing.draws}E · ${standing.losses}P · GF ${standing.goalsFor} · GC ${standing.goalsAgainst}', style: Theme.of(context).textTheme.bodyMedium),
+          if (detailed) Text('${standing.wins}G · ${standing.draws}E · ${standing.losses}P · ${scoringMetricUnit(scoringType)} ${standing.goalsFor}-${standing.goalsAgainst}', style: Theme.of(context).textTheme.bodyMedium),
         ])),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text('${standing.points}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.teal)),
@@ -6629,7 +6850,7 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
         gradient: LinearGradient(
-          colors: [Colors.white.withOpacity(.86), eventKindSoftColor(event).withOpacity(.70)],
+          colors: [color.withOpacity(.18), eventKindSoftColor(event).withOpacity(.96)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -6764,17 +6985,17 @@ class GlassAttendanceButton extends StatelessWidget {
       duration: const Duration(milliseconds: 150),
       height: 35,
       decoration: BoxDecoration(
-        color: selected ? color.withOpacity(.14) : Colors.white.withOpacity(.70),
+        color: selected ? color : color.withOpacity(.13),
         borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: selected ? color.withOpacity(.80) : Colors.white.withOpacity(.85), width: 1),
-        boxShadow: selected ? [BoxShadow(color: color.withOpacity(.10), blurRadius: 10, offset: const Offset(0, 4))] : null,
+        border: Border.all(color: selected ? color : color.withOpacity(.24), width: 1),
+        boxShadow: selected ? [BoxShadow(color: color.withOpacity(.18), blurRadius: 12, offset: const Offset(0, 5))] : null,
       ),
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: color, size: 14),
+        Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: selected ? Colors.white : color, size: 14),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w900)),
+        Text(label, style: TextStyle(color: selected ? Colors.white : color, fontSize: 11.5, fontWeight: FontWeight.w900)),
         const SizedBox(width: 3),
-        Text(count.toString(), style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w900)),
+        Text(count.toString(), style: TextStyle(color: selected ? Colors.white : color, fontSize: 11.5, fontWeight: FontWeight.w900)),
       ]),
     ),
   );
@@ -8333,6 +8554,7 @@ class TournamentCard extends StatelessWidget {
     final played = tournament['matches'] is List ? (tournament['matches'] as List).where((m) => m is Map && m['status'] == 'played').length : 0;
     final format = AppData.text(tournament['format'], 'liga');
     final status = AppData.text(tournament['status'], 'active');
+    final scoringType = AppData.text(tournament['scoring_type'], 'general');
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: AppCard(
@@ -8348,7 +8570,7 @@ class TournamentCard extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(AppData.text(tournament['name'], 'Torneo'), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 3),
-            Text('${tournamentFormatLabel(format)} · ${teamTypeLabel(AppData.text(tournament['team_type'], 'equipo'))}', style: Theme.of(context).textTheme.bodyMedium),
+            Text('${tournamentFormatLabel(format)} · ${teamTypeLabel(AppData.text(tournament['team_type'], 'equipo'))} · ${scoringTypeLabel(scoringType)}', style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 5),
             Wrap(spacing: 6, runSpacing: 6, children: [
               _MiniChip(text: '$teams participantes', color: AppColors.teal),
