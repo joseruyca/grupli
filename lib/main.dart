@@ -477,6 +477,7 @@ class AppData {
     int occurrences,
   ) async {
     final total = max(2, min(52, occurrences));
+    final seriesId = newLocalUuid();
     final cleanTitle = title.trim();
     final cleanLocation = location.trim();
     final frequencyLabel = switch (frequency) {
@@ -509,6 +510,10 @@ class AppData {
         'location': cleanLocation.isEmpty ? null : cleanLocation,
         'notes': cleanNotes,
         'min_people': minPeople,
+        'event_series_id': seriesId,
+        'recurrence_frequency': frequency,
+        'recurrence_index': index,
+        'recurrence_count': total,
         'created_by': user?.id,
       };
     });
@@ -533,11 +538,68 @@ class AppData {
     }).eq('id', eventId);
   }
 
+  static Future<void> updateEventWithScope(String eventId, String scope, String title, DateTime startsAt, String location, String notes, int minPeople) async {
+    final current = asMap(await sb.from('events').select('id,group_id,starts_at,event_series_id').eq('id', eventId).single());
+    final seriesId = text(current['event_series_id']);
+    if (seriesId.isEmpty || scope == 'single') {
+      await updateEvent(eventId, title, startsAt, location, notes, minPeople);
+      return;
+    }
+
+    final currentStart = DateTime.tryParse(text(current['starts_at']))?.toLocal() ?? startsAt;
+    final rows = asList(await sb
+        .from('events')
+        .select('id,starts_at')
+        .eq('event_series_id', seriesId)
+        .eq('group_id', current['group_id'])
+        .neq('status', 'cancelled')
+        .order('starts_at'));
+
+    final cleanTitle = title.trim();
+    final cleanLocation = location.trim();
+    final cleanNotes = notes.trim();
+    for (final row in rows) {
+      final rowId = text(row['id']);
+      final rowDate = DateTime.tryParse(text(row['starts_at']))?.toLocal();
+      if (rowId.isEmpty || rowDate == null) continue;
+      if (scope == 'future' && rowDate.isBefore(currentStart.subtract(const Duration(minutes: 1)))) continue;
+      final nextStart = rowId == eventId
+          ? startsAt
+          : DateTime(rowDate.year, rowDate.month, rowDate.day, startsAt.hour, startsAt.minute);
+      await sb.from('events').update({
+        'title': cleanTitle,
+        'starts_at': nextStart.toUtc().toIso8601String(),
+        'location': cleanLocation.isEmpty ? null : cleanLocation,
+        'notes': cleanNotes.isEmpty ? null : cleanNotes,
+        'min_people': minPeople,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', rowId);
+    }
+  }
+
   static Future<void> cancelEvent(String eventId) async {
     await sb.from('events').update({
       'status': 'cancelled',
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', eventId);
+  }
+
+  static Future<void> cancelEventWithScope(String eventId, String scope) async {
+    final current = asMap(await sb.from('events').select('id,group_id,starts_at,event_series_id').eq('id', eventId).single());
+    final seriesId = text(current['event_series_id']);
+    if (seriesId.isEmpty || scope == 'single') {
+      await cancelEvent(eventId);
+      return;
+    }
+    dynamic query = sb
+        .from('events')
+        .update({'status': 'cancelled', 'updated_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('event_series_id', seriesId)
+        .eq('group_id', current['group_id']);
+    if (scope == 'future') {
+      query = query.gte('starts_at', text(current['starts_at']));
+    }
+    await query;
   }
 
   static Future<void> setAttendance(String eventId, String status) async {
@@ -626,6 +688,79 @@ class AppData {
 
   static Future<void> deleteExpense(String expenseId) async {
     await sb.from('expenses').delete().eq('id', expenseId);
+  }
+
+  static Future<void> updateExpenseWithShares(
+    String expenseId,
+    String concept,
+    double amount,
+    String paidBy,
+    Map<String, double> shares,
+    String note,
+  ) async {
+    final cleanShares = <String, double>{};
+    shares.forEach((id, value) {
+      if (id.trim().isEmpty) return;
+      final cleanValue = double.parse(max(0, value).toStringAsFixed(2));
+      if (cleanValue > 0 || id == paidBy) cleanShares[id] = cleanValue;
+    });
+    cleanShares.putIfAbsent(paidBy, () => 0);
+
+    await sb.from('expenses').update({
+      'concept': concept.trim(),
+      'amount': double.parse(amount.toStringAsFixed(2)),
+      'paid_by': paidBy,
+      'note': note.trim().isEmpty ? null : note.trim(),
+      'status': 'pending',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', expenseId);
+
+    await sb.from('expense_participants').delete().eq('expense_id', expenseId);
+
+    final rows = cleanShares.entries.map((entry) => {
+      'expense_id': expenseId,
+      'user_id': entry.key,
+      'share_amount': double.parse(entry.value.toStringAsFixed(2)),
+      'paid': entry.key == paidBy,
+    }).toList();
+
+    if (rows.isNotEmpty) {
+      await sb.from('expense_participants').insert(rows);
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> settlementPayments(String groupId) async {
+    try {
+      final res = await sb
+          .from('settlement_payments')
+          .select()
+          .eq('group_id', groupId)
+          .eq('status', 'paid')
+          .order('paid_at', ascending: false);
+      return asList(res);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<String> createSettlementPayment(
+    String groupId,
+    String fromUser,
+    String toUser,
+    double amount,
+  ) async {
+    final cleanAmount = double.parse(amount.toStringAsFixed(2));
+    if (cleanAmount <= 0) throw Exception('El importe debe ser mayor que cero.');
+    final row = await sb.from('settlement_payments').insert({
+      'group_id': groupId,
+      'from_user': fromUser,
+      'to_user': toUser,
+      'amount': cleanAmount,
+      'status': 'paid',
+      'created_by': user?.id,
+      'paid_at': DateTime.now().toUtc().toIso8601String(),
+    }).select('id').single();
+    return row['id'].toString();
   }
 
   static Future<List<Map<String, dynamic>>> tournaments(String groupId) async {
@@ -967,6 +1102,13 @@ String money(double value) {
   return '$sign€ ${value.abs().toStringAsFixed(2).replaceAll('.', ',')}';
 }
 
+
+String newLocalUuid() {
+  final random = Random.secure();
+  String hex(int length) => List.generate(length, (_) => random.nextInt(16).toRadixString(16)).join();
+  return '${hex(8)}-${hex(4)}-4${hex(3)}-${(8 + random.nextInt(4)).toRadixString(16)}${hex(3)}-${hex(12)}';
+}
+
 String eventKind(Map<String, dynamic> event) {
   final explicit = AppData.text(event['kind']).toLowerCase();
   final title = AppData.text(event['title']).toLowerCase();
@@ -980,14 +1122,19 @@ String eventKind(Map<String, dynamic> event) {
 }
 
 bool eventIsRoutine(Map<String, dynamic> event) {
+  if (AppData.text(event['event_series_id']).isNotEmpty) return true;
   final notes = AppData.text(event['notes']).toLowerCase();
   final title = AppData.text(event['title']).toLowerCase();
   return notes.contains('rutina:') || title.contains('semanal') || title.contains('mensual');
 }
 
 String eventRoutineBadge(Map<String, dynamic> event) {
+  final frequency = AppData.text(event['recurrence_frequency']);
+  if (frequency == 'weekly') return 'Cada semana';
+  if (frequency == 'biweekly') return 'Cada 2 semanas';
+  if (frequency == 'monthly') return 'Cada mes';
   final notes = AppData.text(event['notes']);
-  final match = RegExp(r'Rutina:\s*([^·\n]+)', caseSensitive: false).firstMatch(notes);
+  final match = RegExp(r'Rutina:\s*([^·\\n]+)', caseSensitive: false).firstMatch(notes);
   if (match != null) return _cap(match.group(1)?.trim() ?? 'rutina');
   return 'Rutina';
 }
@@ -1174,13 +1321,13 @@ String scoringTypeSubtitle(String type) {
     case 'football':
       return 'Victoria 3 puntos, empate 1. Desempate por diferencia de goles.';
     case 'tennis_padel':
-      return 'Pensado para sets, juegos o partidos: gana quien tenga más marcador.';
+      return 'Resultado por sets: registra cada set y calcula sets/juegos para desempatar.';
     case 'basketball':
       return 'Victoria 2 puntos. El marcador representa puntos anotados.';
     case 'cards_mus':
-      return 'Victoria 1 punto. El marcador puede ser juegos, piedras o rondas.';
+      return 'Victoria 1 punto. Sirve para juegos, piedras, manos o rondas.';
     case 'custom':
-      return 'Base flexible: victoria 3, empate 1. Podrás ajustarlo en futuras mejoras.';
+      return 'Flexible: marcador directo o por sets/rondas, con puntos y unidades editables.';
     default:
       return 'Sistema simple: victoria 3, empate 1, derrota 0.';
   }
@@ -1282,7 +1429,7 @@ String scoringRankingLabel(String type, [dynamic raw]) => AppData.text(resolvedS
 String scoringConfigShortText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
   if (scoringUsesSetMode(type, cfg)) {
-    return 'Resultado por sets · mejor de ${scoringBestOf(type, cfg)}';
+    return 'Resultado por sets/rondas · mejor de ${scoringBestOf(type, cfg)}';
   }
   return 'Victoria ${scoringWinPoints(type, cfg)} · empate ${scoringDrawPoints(type, cfg)} · derrota ${scoringLossPoints(type, cfg)}';
 }
@@ -1290,13 +1437,28 @@ String scoringConfigShortText(String type, [dynamic raw]) {
 String scoringConfigFullText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
   if (scoringUsesSetMode(type, cfg)) {
-    return 'Se registra cada set (${scoringSetLabel(type, cfg)} por set) y la app calcula automáticamente el ganador del partido.';
+    return 'Se registra cada set/ronda (${scoringSetLabel(type, cfg)} por parcial) y la app calcula ganador, parciales y desempates.';
   }
   return 'Marcador directo en ${scoringScoreLabel(type, cfg)}. La clasificación usa victoria ${scoringWinPoints(type, cfg)}, empate ${scoringDrawPoints(type, cfg)} y derrota ${scoringLossPoints(type, cfg)}.';
 }
 
 String standingsHeaderForScoring(String type, [dynamic raw]) {
+  if (scoringUsesSetMode(type, raw)) return 'PTS · DP · ${scoringSetLabel(type, raw).toUpperCase()}';
   return 'PTS · ${scoringRankingLabel(type, raw)} · PJ';
+}
+
+String standingDetailText(TeamStanding standing, String scoringType, [dynamic scoringConfig]) {
+  if (scoringUsesSetMode(scoringType, scoringConfig)) {
+    return '${standing.wins}G · ${standing.losses}P · parciales ${standing.goalsFor}-${standing.goalsAgainst} · ${scoringSetLabel(scoringType, scoringConfig)} ${standing.secondaryFor}-${standing.secondaryAgainst}';
+  }
+  return '${standing.wins}G · ${standing.draws}E · ${standing.losses}P · ${scoringMetricUnit(scoringType, scoringConfig)} ${standing.goalsFor}-${standing.goalsAgainst}';
+}
+
+String standingMetricText(TeamStanding standing, String scoringType, [dynamic scoringConfig]) {
+  if (scoringUsesSetMode(scoringType, scoringConfig)) {
+    return 'DP ${standing.goalDifference} · DIF ${standing.secondaryDifference}';
+  }
+  return 'PTS · ${scoringRankingLabel(scoringType, scoringConfig)} ${standing.goalDifference}';
 }
 
 String matchInputLabel(String type, bool local, [dynamic raw]) {
@@ -1372,6 +1534,7 @@ List<TeamStanding> calculateStandings(List<Map<String, dynamic>> teams, List<Map
         name: AppData.text(team['name'], 'Participante'),
       ),
   };
+  final setMode = scoringUsesSetMode(scoringType, scoringConfig);
 
   for (final match in matches) {
     if (AppData.text(match['status']) != 'played') continue;
@@ -1389,6 +1552,17 @@ List<TeamStanding> calculateStandings(List<Map<String, dynamic>> teams, List<Map
     a.goalsAgainst += scoreB;
     b.goalsFor += scoreB;
     b.goalsAgainst += scoreA;
+
+    if (setMode) {
+      for (final set in matchDetailSets(match)) {
+        final setA = AppData.intValue(set['a']);
+        final setB = AppData.intValue(set['b']);
+        a.secondaryFor += setA;
+        a.secondaryAgainst += setB;
+        b.secondaryFor += setB;
+        b.secondaryAgainst += setA;
+      }
+    }
 
     if (scoreA > scoreB) {
       a.wins++;
@@ -1414,6 +1588,12 @@ List<TeamStanding> calculateStandings(List<Map<String, dynamic>> teams, List<Map
     if (points != 0) return points;
     final diff = b.goalDifference.compareTo(a.goalDifference);
     if (diff != 0) return diff;
+    if (setMode) {
+      final secondary = b.secondaryDifference.compareTo(a.secondaryDifference);
+      if (secondary != 0) return secondary;
+      final secondaryFor = b.secondaryFor.compareTo(a.secondaryFor);
+      if (secondaryFor != 0) return secondaryFor;
+    }
     final gf = b.goalsFor.compareTo(a.goalsFor);
     if (gf != 0) return gf;
     return a.name.compareTo(b.name);
@@ -1430,11 +1610,14 @@ class TeamStanding {
   int losses = 0;
   int goalsFor = 0;
   int goalsAgainst = 0;
+  int secondaryFor = 0;
+  int secondaryAgainst = 0;
   int points = 0;
 
   TeamStanding({required this.id, required this.name});
 
   int get goalDifference => goalsFor - goalsAgainst;
+  int get secondaryDifference => secondaryFor - secondaryAgainst;
 }
 
 Future<void> showToast(BuildContext context, String message, {bool danger = false}) async {
@@ -1782,16 +1965,14 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(22, 24, 22, 28),
         children: [
-          Row(children: [
-            Text('Mis grupos', style: Theme.of(context).textTheme.headlineMedium),
-            const Spacer(),
+          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Expanded(child: PageHeader(title: 'Mis grupos', subtitle: 'Hola, $name 👋 Organiza planes, gastos y torneos.')),
+            const SizedBox(width: 12),
             CircleIconButton(icon: Icons.add_rounded, filled: true, onTap: () async {
               final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const CreateJoinScreen()));
               if (ok == true) { reload(); widget.onChanged(); }
             }),
           ]),
-          const SizedBox(height: 9),
-          Text('Hola, $name 👋', style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 20),
           FutureBuilder<List<Map<String, dynamic>>>(
             future: future,
@@ -1806,23 +1987,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   TextButton(onPressed: reload, child: const Text('Actualizar')),
                 ]),
                 const SizedBox(height: 10),
-                if (groups.isEmpty)
-                  EmptyBlock(icon: Icons.groups_rounded, title: 'Aún no tienes grupos', body: 'Crea un grupo privado o únete con un código de invitación.')
-                else
+                if (groups.isEmpty) ...[
+                  EmptyBlock(icon: Icons.groups_rounded, title: 'Aún no tienes grupos', body: 'Crea un grupo privado o únete con un código de invitación.'),
+                  const SizedBox(height: 14),
+                  PrimaryButton(label: 'Crear grupo', icon: Icons.add_rounded, onTap: () async {
+                    final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const CreateGroupScreen()));
+                    if (ok == true) reload();
+                  }),
+                  const SizedBox(height: 10),
+                  SecondaryButton(label: 'Unirme con código', icon: Icons.qr_code_rounded, onTap: () async {
+                    final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const JoinGroupScreen()));
+                    if (ok == true) reload();
+                  }),
+                ] else ...[
                   ...groups.map((g) => GroupHomeCard(group: g, onTap: () async {
                     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupShell(groupId: g['id'].toString())));
                     reload();
                   })),
-                const SizedBox(height: 22),
-                PrimaryButton(label: 'Crear grupo', icon: Icons.add_rounded, onTap: () async {
-                  final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const CreateGroupScreen()));
-                  if (ok == true) reload();
-                }),
-                const SizedBox(height: 10),
-                SecondaryButton(label: 'Unirme con código', icon: Icons.qr_code_rounded, onTap: () async {
-                  final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const JoinGroupScreen()));
-                  if (ok == true) reload();
-                }),
+                  const SizedBox(height: 14),
+                  EmptySlim(icon: Icons.add_circle_outline_rounded, title: 'Crear o unirte a otro grupo', body: 'Usa el botón + de arriba para añadir otro grupo cuando lo necesites.'),
+                ],
               ]);
             },
           ),
@@ -1839,10 +2023,8 @@ class CreateJoinScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return DirectPage(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        RoundBackButton(onTap: () => Navigator.pop(context)),
-        const SizedBox(height: 28),
-        Center(child: Text('¿Qué quieres hacer?', style: Theme.of(context).textTheme.titleLarge)),
-        const SizedBox(height: 22),
+        PageHeader(title: 'Añadir grupo', subtitle: 'Crea un grupo nuevo o entra con invitación.', leading: true),
+        const SizedBox(height: 20),
         ChoiceBigCard(icon: Icons.groups_rounded, title: 'Crear un grupo', body: 'Crea tu grupo privado y empieza a organizar.', onTap: () async {
           final ok = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const CreateGroupScreen()));
           if (context.mounted && ok == true) Navigator.pop(context, true);
@@ -2263,7 +2445,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                         EmptySlim(
                           icon: Icons.event_available_rounded,
                           title: 'Sin quedadas',
-                          body: 'Crea un plan para empezar.',
+                          body: 'Crea un plan para que el grupo pueda confirmar asistencia.',
                         )
                       else
                         DashboardEventCard(event: nextEvent, group: group, onChanged: reload),
@@ -2278,7 +2460,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                         onTournaments: () => widget.onNavigateTab?.call(3),
                       ),
                       const SizedBox(height: 12),
-                      SectionHeader(title: 'Reciente', action: 'Ver calendario', onTap: () => widget.onNavigateTab?.call(1)),
+                      SectionHeader(title: 'Actividad reciente', action: 'Calendario', onTap: () => widget.onNavigateTab?.call(1)),
                       const SizedBox(height: 8),
                       DashboardActivityCard(
                         events: events,
@@ -2364,28 +2546,28 @@ class GroupMoreTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
         children: [
-          PageHeader(title: 'Más', subtitle: name, leading: false),
+          PageHeader(title: 'Más', subtitle: 'Invitaciones, miembros y ajustes de $name', leading: false),
           const SizedBox(height: 14),
           InviteAccessCard(groupName: name, code: code),
           const SizedBox(height: 14),
-          SectionHeader(title: 'Gestión del grupo'),
+          SectionHeader(title: 'Grupo'),
           const SizedBox(height: 8),
           SettingsRow(
             icon: Icons.groups_rounded,
             title: 'Miembros y admins',
-            subtitle: 'Roles, permisos, owner y expulsiones seguras',
+            subtitle: 'Roles, admins y expulsiones seguras',
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group))),
           ),
           SettingsRow(
             icon: Icons.verified_user_rounded,
             title: 'Permisos',
-            subtitle: 'Qué puede hacer owner, admin y miembro',
+            subtitle: 'Qué puede hacer cada rol',
             onTap: () => showPermissionSheet(context),
           ),
           SettingsRow(
             icon: Icons.settings_rounded,
             title: 'Ajustes del grupo',
-            subtitle: 'Nombre, privacidad y acciones importantes',
+            subtitle: 'Nombre, portada y acciones importantes',
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group, onChanged: refresh))),
           ),
           SettingsRow(
@@ -2396,12 +2578,6 @@ class GroupMoreTab extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           PermissionMatrixCard(compact: true),
-          const SizedBox(height: 16),
-          EmptySlim(
-            icon: Icons.info_outline_rounded,
-            title: 'Más es el centro de control',
-            body: 'Aquí viven invitaciones, miembros, permisos y ajustes. La actividad diaria sigue en Inicio.',
-          ),
         ],
       ),
     );
@@ -2510,8 +2686,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   bool repeatEnabled = false;
   String repeatFrequency = 'weekly';
   int repeatOccurrences = 8;
+  String editScope = 'single';
 
   bool get editing => widget.event != null;
+  bool get editingRoutine => editing && eventIsRoutine(widget.event!);
 
   String get frequencyLabel {
     switch (repeatFrequency) {
@@ -2583,7 +2761,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     setState(() => loading = true);
     try {
       if (editing) {
-        await AppData.updateEvent(widget.event!['id'].toString(), cleanTitle, start, location.text, notes.text, minPeople);
+        await AppData.updateEventWithScope(widget.event!['id'].toString(), editScope, cleanTitle, start, location.text, notes.text, minPeople);
       } else if (repeatEnabled) {
         final created = await AppData.createEventSeries(
           widget.group['id'].toString(),
@@ -2620,8 +2798,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         location: location.text.trim(),
         minPeople: minPeople,
         template: template,
-        repeatLabel: repeatEnabled ? routinePreview : null,
+        repeatLabel: repeatEnabled ? routinePreview : (editingRoutine ? eventRoutineBadge(widget.event!) : null),
       ),
+      if (editingRoutine) ...[
+        const SizedBox(height: 14),
+        EventScopeCard(
+          title: 'Editar rutina',
+          value: editScope,
+          onChanged: (value) => setState(() => editScope = value),
+        ),
+      ],
       const SizedBox(height: 16),
       SectionHeader(title: 'Tipo de plan'),
       const SizedBox(height: 8),
@@ -2704,7 +2890,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                 ),
               ]),
               const SizedBox(height: 12),
-              RoutineInfoBox(text: 'Se crearán $repeatOccurrences eventos independientes. Después podrás editar o cancelar cada fecha por separado.'),
+              RoutineInfoBox(text: 'Se crearán $repeatOccurrences fechas conectadas en una misma rutina. Después podrás editar solo una fecha, esta y futuras, o toda la rutina.'),
             ],
           ]),
         ),
@@ -2781,20 +2967,28 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   Future<void> cancelEvent(Map<String, dynamic> event) async {
-    final yes = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Cancelar evento'),
-        content: const Text('El evento dejará de aparecer en el calendario del grupo. Esta acción no borra el grupo.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cancelar evento')),
-        ],
-      ),
-    );
-    if (yes != true) return;
+    String scope = 'single';
+    final isRoutine = eventIsRoutine(event);
+    if (isRoutine) {
+      final selectedScope = await showRoutineScopeDialog(context, title: 'Cancelar rutina', actionLabel: 'Cancelar');
+      if (selectedScope == null) return;
+      scope = selectedScope;
+    } else {
+      final yes = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Cancelar evento'),
+          content: const Text('El evento dejará de aparecer en el calendario del grupo. Esta acción no borra el grupo.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Cancelar evento')),
+          ],
+        ),
+      );
+      if (yes != true) return;
+    }
     try {
-      await AppData.cancelEvent(event['id'].toString());
+      await AppData.cancelEventWithScope(event['id'].toString(), scope);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       await showToast(context, e.toString(), danger: true);
@@ -2826,6 +3020,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           PageHeader(title: AppData.text(event['title'], 'Evento'), subtitle: AppData.text(widget.group['name'], 'Grupo'), leading: true),
           const SizedBox(height: 12),
           PremiumEventDetailHero(event: event, date: date, yes: yes, minPeople: minPeople),
+          if (eventIsRoutine(event)) ...[
+            const SizedBox(height: 12),
+            RoutineInfoBox(text: '${eventRoutineBadge(event)} · al editar o cancelar podrás aplicar el cambio a una fecha, a futuras fechas o a toda la rutina.'),
+          ],
           const SizedBox(height: 16),
           SectionHeader(title: 'Tu respuesta'),
           const SizedBox(height: 10),
@@ -2909,31 +3107,10 @@ class _CalendarTabState extends State<CalendarTab> {
     reload();
   }
 
-  int _eventCountForDay(List<Map<String, dynamic>> events, DateTime day) {
-    return events.where((event) {
-      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
-      return date != null && sameDay(date, day);
-    }).length;
-  }
-
   List<Map<String, dynamic>> _eventsForDay(List<Map<String, dynamic>> events, DateTime day) {
     final list = events.where((event) {
       final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
       return date != null && sameDay(date, day);
-    }).toList();
-    list.sort((a, b) {
-      final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
-      final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now();
-      return da.compareTo(db);
-    });
-    return list;
-  }
-
-  List<Map<String, dynamic>> _upcoming(List<Map<String, dynamic>> events) {
-    final now = DateTime.now().subtract(const Duration(hours: 2));
-    final list = events.where((event) {
-      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
-      return date != null && date.isAfter(now);
     }).toList();
     list.sort((a, b) {
       final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
@@ -2976,7 +3153,7 @@ class _CalendarTabState extends State<CalendarTab> {
               color: AppColors.teal,
               onRefresh: () async => reload(),
               child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 112), children: [
-                PageHeader(title: 'Calendario', subtitle: AppData.text(widget.group['name']), leading: false),
+                PageHeader(title: 'Agenda', subtitle: 'Elige un día y confirma planes rápido.', leading: false),
                 const SizedBox(height: 10),
                 WeekStrip(
                   days: weekDays,
@@ -3018,10 +3195,10 @@ class _CalendarTabState extends State<CalendarTab> {
                   onCreate: () => createFor(selected),
                 ),
                 const SizedBox(height: 18),
-                SectionHeader(title: 'Ese día', action: 'Crear', onTap: () => createFor(selected)),
+                SectionHeader(title: DateFormat('d MMM', 'es_ES').format(selected), action: 'Crear plan', onTap: () => createFor(selected)),
                 const SizedBox(height: 10),
                 if (selectedEvents.isEmpty)
-                  EmptySlim(icon: Icons.calendar_month_rounded, title: 'Día libre', body: 'Pulsa + Evento para crear un plan.')
+                  EmptySlim(icon: Icons.calendar_month_rounded, title: 'No hay planes este día', body: 'Crea una quedada, partido o rutina desde este día.')
                 else
                   ...selectedEvents.map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
               ]),
@@ -3056,6 +3233,7 @@ class FinancesTab extends StatefulWidget {
 class _FinancesTabState extends State<FinancesTab> {
   late Future<_FinanceData> future;
   int financeSection = 0;
+  bool savingSettlement = false;
 
   @override
   void initState() {
@@ -3075,6 +3253,19 @@ class _FinancesTabState extends State<FinancesTab> {
   Future<void> openCreate() async {
     final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateExpenseScreen(groupId: widget.group['id'].toString())));
     if (ok == true) reload();
+  }
+
+  Future<void> markSettlementPaid(SettlementDebt debt) async {
+    setState(() => savingSettlement = true);
+    try {
+      await AppData.createSettlementPayment(widget.group['id'].toString(), debt.fromId, debt.toId, debt.amount);
+      reload();
+      if (mounted) await showToast(context, 'Liquidación registrada.');
+    } catch (e) {
+      if (mounted) await showToast(context, humanError(e), danger: true);
+    } finally {
+      if (mounted) setState(() => savingSettlement = false);
+    }
   }
 
   @override
@@ -3109,7 +3300,7 @@ class _FinancesTabState extends State<FinancesTab> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
                 children: [
-                  PageHeader(title: 'Finanzas', subtitle: AppData.text(widget.group['name'], 'Grupo'), leading: false),
+                  PageHeader(title: 'Finanzas', subtitle: 'Gastos, saldos y liquidaciones del grupo.', leading: false),
                   const SizedBox(height: 14),
                   FinanceHeroCard(summary: summary, onCreate: openCreate),
                   const SizedBox(height: 12),
@@ -3129,12 +3320,10 @@ class _FinancesTabState extends State<FinancesTab> {
                           if (ok == true) reload();
                         },
                       )),
-                    const SizedBox(height: 8),
-                    EmptySlim(icon: Icons.info_outline_rounded, title: '${data.expenses.length} gastos en total', body: 'Los gastos liquidados también aparecen aquí para que todo sea fácil de revisar.'),
                   ] else if (financeSection == 1) ...[
                     FinanceMyStatusCard(summary: summary, settlements: mySettlements, onCreate: openCreate),
                     const SizedBox(height: 14),
-                    SectionHeader(title: 'Balance del grupo', action: 'Verde / Rojo'),
+                    SectionHeader(title: 'Balance del grupo', action: '${sortedBalances.length} personas'),
                     const SizedBox(height: 8),
                     if (sortedBalances.isEmpty)
                       EmptySlim(icon: Icons.people_alt_rounded, title: 'Todos están a cero', body: 'No hay dinero pendiente entre miembros.')
@@ -3152,8 +3341,6 @@ class _FinancesTabState extends State<FinancesTab> {
                           ],
                         ]),
                       ),
-                    const SizedBox(height: 12),
-                    EmptySlim(icon: Icons.info_outline_rounded, title: 'Verde: te deben · Rojo: debes', body: 'La pestaña Liquidar muestra los pagos mínimos para dejarlo todo a cero.'),
                   ] else ...[
                     SectionHeader(title: 'Liquidar ahora', action: summary.settlements.isEmpty ? '' : '${summary.settlements.length} pagos'),
                     const SizedBox(height: 8),
@@ -3174,13 +3361,31 @@ class _FinancesTabState extends State<FinancesTab> {
                             ]),
                           ),
                           for (int i = 0; i < summary.settlements.length; i++) ...[
-                            SettlementPaymentRow(debt: summary.settlements[i], large: true),
+                            SettlementPaymentRow(
+                              debt: summary.settlements[i],
+                              large: true,
+                              onPaid: savingSettlement ? null : () => markSettlementPaid(summary.settlements[i]),
+                            ),
                             if (i != summary.settlements.length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
                           ],
                         ]),
                       ),
                     const SizedBox(height: 12),
                     FinanceAutoBalanceCard(summary: summary, openCount: pendingExpenses.length, settledCount: settledExpenses.length),
+                    if (data.settlementPayments.isNotEmpty) ...[
+                      const SizedBox(height: 18),
+                      SectionHeader(title: 'Pagos ya registrados', action: '${data.settlementPayments.length}'),
+                      const SizedBox(height: 8),
+                      AppCard(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Column(children: [
+                          for (int i = 0; i < data.settlementPayments.take(6).length; i++) ...[
+                            SettlementHistoryRow(payment: data.settlementPayments[i], members: data.members),
+                            if (i != data.settlementPayments.take(6).length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
+                          ],
+                        ]),
+                      ),
+                    ],
                   ],
                 ],
               ),
@@ -3205,7 +3410,9 @@ class _FinancesTabState extends State<FinancesTab> {
 
 class CreateExpenseScreen extends StatefulWidget {
   final String groupId;
-  const CreateExpenseScreen({super.key, required this.groupId});
+  final Map<String, dynamic>? expense;
+  const CreateExpenseScreen({super.key, required this.groupId, this.expense});
+  bool get editing => expense != null;
   @override
   State<CreateExpenseScreen> createState() => _CreateExpenseScreenState();
 }
@@ -3225,6 +3432,14 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
   @override
   void initState() {
     super.initState();
+    final editingExpense = widget.expense;
+    if (editingExpense != null) {
+      concept.text = AppData.text(editingExpense['concept']);
+      final value = AppData.doubleValue(editingExpense['amount']);
+      amount.text = value > 0 ? value.toStringAsFixed(2).replaceAll('.', ',') : '';
+      note.text = AppData.text(editingExpense['note']);
+      splitMode = 'custom';
+    }
     membersFuture = AppData.members(widget.groupId);
     amount.addListener(() {
       if (mounted) setState(() {});
@@ -3246,11 +3461,31 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
 
   void initMembers(List<Map<String, dynamic>> members) {
     if (initialized || members.isEmpty) return;
-    paidBy = members.any((m) => m['user_id']?.toString() == AppData.user?.id) ? AppData.user?.id : members.first['user_id'].toString();
-    selected.addAll(members.map((m) => m['user_id'].toString()));
-    for (final member in members) {
-      final id = member['user_id'].toString();
-      customShares[id] = TextEditingController();
+    final editingExpense = widget.expense;
+    if (editingExpense != null) {
+      paidBy = AppData.text(editingExpense['paid_by']);
+      final participants = expenseParticipants(editingExpense);
+      selected
+        ..clear()
+        ..addAll(participants.map((p) => p['user_id'].toString()));
+      if (paidBy != null && paidBy!.isNotEmpty) selected.add(paidBy!);
+      for (final member in members) {
+        final id = member['user_id'].toString();
+        final participant = participants.where((p) => p['user_id']?.toString() == id).toList();
+        final controller = TextEditingController();
+        if (participant.isNotEmpty) {
+          final share = AppData.doubleValue(participant.first['share_amount']);
+          controller.text = share > 0 ? share.toStringAsFixed(2).replaceAll('.', ',') : '';
+        }
+        customShares[id] = controller;
+      }
+    } else {
+      paidBy = members.any((m) => m['user_id']?.toString() == AppData.user?.id) ? AppData.user?.id : members.first['user_id'].toString();
+      selected.addAll(members.map((m) => m['user_id'].toString()));
+      for (final member in members) {
+        final id = member['user_id'].toString();
+        customShares[id] = TextEditingController();
+      }
     }
     initialized = true;
   }
@@ -3318,7 +3553,11 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
     }
     setState(() => loading = true);
     try {
-      await AppData.createExpenseWithShares(widget.groupId, concept.text, value, paidBy!, sharesFor(members), note.text);
+      if (widget.editing) {
+        await AppData.updateExpenseWithShares(widget.expense!['id'].toString(), concept.text, value, paidBy!, sharesFor(members), note.text);
+      } else {
+        await AppData.createExpenseWithShares(widget.groupId, concept.text, value, paidBy!, sharesFor(members), note.text);
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       await showToast(context, e.toString(), danger: true);
@@ -3330,15 +3569,15 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
   @override
   Widget build(BuildContext context) {
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: 'Nuevo gasto', subtitle: 'Como Tricount: claro, rápido y sin cuentas manuales', leading: true),
+      PageHeader(title: widget.editing ? 'Editar gasto' : 'Nuevo gasto', subtitle: widget.editing ? 'Ajusta importe, pagador o reparto.' : 'Importe, pagador y reparto en pocos pasos.', leading: true),
       const SizedBox(height: 18),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Container(width: 46, height: 46, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.receipt_long_rounded, color: AppColors.teal)),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('¿Qué se ha pagado?', style: Theme.of(context).textTheme.titleMedium),
-            Text('Elige quién pagó y cómo se reparte.', style: Theme.of(context).textTheme.bodyMedium),
+            Text(widget.editing ? 'Actualizar gasto' : '¿Qué se ha pagado?', style: Theme.of(context).textTheme.titleMedium),
+            Text(widget.editing ? 'Los cambios recalculan los saldos al guardar.' : 'Elige quién pagó y cómo se reparte.', style: Theme.of(context).textTheme.bodyMedium),
           ])),
         ]),
         const SizedBox(height: 16),
@@ -3463,7 +3702,7 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
         future: membersFuture,
         builder: (context, snapshot) {
           final members = snapshot.data ?? [];
-          return PrimaryButton(label: 'Guardar gasto', loading: loading, onTap: () => save(members));
+          return PrimaryButton(label: widget.editing ? 'Guardar cambios' : 'Guardar gasto', loading: loading, onTap: () => save(members));
         },
       ),
     ]));
@@ -3492,6 +3731,18 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  Future<void> editExpense(Map<String, dynamic> expense) async {
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CreateExpenseScreen(
+          groupId: AppData.text(expense['group_id']),
+          expense: expense,
+        ),
+      ),
+    );
+    if (ok == true && mounted) Navigator.pop(context, true);
   }
 
   @override
@@ -3550,6 +3801,8 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
         );
       }).toList())),
       const SizedBox(height: 18),
+      SecondaryButton(label: 'Editar gasto', icon: Icons.edit_rounded, onTap: loading ? () {} : () => editExpense(expense)),
+      const SizedBox(height: 10),
       if (unpaid > .01) PrimaryButton(label: 'Marcar gasto liquidado', icon: Icons.verified_rounded, loading: loading, onTap: () => run(() => AppData.markExpenseSettled(expenseId))),
       if (unpaid <= .01 || status == 'paid') ...[
         SecondaryButton(label: 'Reabrir pagos', icon: Icons.restart_alt_rounded, onTap: () => run(() => AppData.reopenExpense(expenseId))),
@@ -3730,7 +3983,8 @@ class FinanceMiniMetric extends StatelessWidget {
 class SettlementPaymentRow extends StatelessWidget {
   final SettlementDebt debt;
   final bool large;
-  const SettlementPaymentRow({super.key, required this.debt, this.large = false});
+  final VoidCallback? onPaid;
+  const SettlementPaymentRow({super.key, required this.debt, this.large = false, this.onPaid});
 
   @override
   Widget build(BuildContext context) {
@@ -3763,11 +4017,67 @@ class SettlementPaymentRow extends StatelessWidget {
           Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
         ])),
         const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(99)),
-          child: Text(money(debt.amount), style: const TextStyle(color: AppColors.tealDark, fontWeight: FontWeight.w900, fontSize: 14.5)),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(99)),
+            child: Text(money(debt.amount), style: const TextStyle(color: AppColors.tealDark, fontWeight: FontWeight.w900, fontSize: 14.5)),
+          ),
+          if (onPaid != null) ...[
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 32,
+              child: TextButton.icon(
+                onPressed: onPaid,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 9),
+                  foregroundColor: AppColors.green,
+                  backgroundColor: AppColors.greenSoft,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+                ),
+                icon: const Icon(Icons.check_rounded, size: 15),
+                label: const Text('Pagado', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+              ),
+            ),
+          ],
+        ]),
+      ]),
+    );
+  }
+}
+
+class SettlementHistoryRow extends StatelessWidget {
+  final Map<String, dynamic> payment;
+  final List<Map<String, dynamic>> members;
+  const SettlementHistoryRow({super.key, required this.payment, required this.members});
+
+  @override
+  Widget build(BuildContext context) {
+    final fromId = AppData.text(payment['from_user']);
+    final toId = AppData.text(payment['to_user']);
+    final amount = AppData.doubleValue(payment['amount']);
+    final date = DateTime.tryParse(AppData.text(payment['paid_at']))?.toLocal();
+    final dateText = date == null ? 'Registrado' : DateFormat('d MMM', 'es_ES').format(date).replaceAll('.', '');
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      child: Row(children: [
+        SizedBox(
+          width: 58,
+          height: 38,
+          child: Stack(children: [
+            Positioned(left: 0, top: 1, child: ProfileAvatar(name: financeMemberName(fromId, members), avatarUrl: financeMemberAvatarUrl(fromId, members), radius: 18)),
+            Positioned(right: 0, top: 1, child: ProfileAvatar(name: financeMemberName(toId, members), avatarUrl: financeMemberAvatarUrl(toId, members), radius: 18)),
+            Positioned(left: 23, top: 11, child: Container(width: 18, height: 18, decoration: BoxDecoration(color: AppColors.white, shape: BoxShape.circle, border: Border.all(color: AppColors.line)), child: const Icon(Icons.check_rounded, size: 12, color: AppColors.green))),
+          ]),
         ),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${financeMemberName(fromId, members)} pagó a ${financeMemberName(toId, members)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+          const SizedBox(height: 2),
+          Text(dateText, style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
+        ])),
+        const SizedBox(width: 8),
+        Text(money(amount), style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900, fontSize: 14.5)),
       ]),
     );
   }
@@ -3879,17 +4189,18 @@ class FinanceSplitPreview extends StatelessWidget {
 class _FinanceData {
   final List<Map<String, dynamic>> expenses;
   final List<Map<String, dynamic>> members;
+  final List<Map<String, dynamic>> settlementPayments;
   late final FinanceSummary summary;
 
-  _FinanceData({required this.expenses, required this.members}) {
-    summary = FinanceSummary.from(expenses, members);
+  _FinanceData({required this.expenses, required this.members, required this.settlementPayments}) {
+    summary = FinanceSummary.from(expenses, members, settlementPayments);
   }
 
-  static _FinanceData empty() => _FinanceData(expenses: const [], members: const []);
+  static _FinanceData empty() => _FinanceData(expenses: const [], members: const [], settlementPayments: const []);
 
   static Future<_FinanceData> load(String groupId) async {
-    final results = await Future.wait([AppData.expenses(groupId), AppData.members(groupId)]);
-    return _FinanceData(expenses: results[0], members: results[1]);
+    final results = await Future.wait([AppData.expenses(groupId), AppData.members(groupId), AppData.settlementPayments(groupId)]);
+    return _FinanceData(expenses: results[0], members: results[1], settlementPayments: results[2]);
   }
 }
 
@@ -3925,7 +4236,7 @@ class FinanceSummary {
     return list;
   }
 
-  factory FinanceSummary.from(List<Map<String, dynamic>> expenses, List<Map<String, dynamic>> members) {
+  factory FinanceSummary.from(List<Map<String, dynamic>> expenses, List<Map<String, dynamic>> members, List<Map<String, dynamic>> settlementPayments) {
     final names = <String, String>{};
     final avatars = <String, String>{};
     final balances = <String, double>{};
@@ -3938,7 +4249,6 @@ class FinanceSummary {
     }
 
     double total = 0;
-    double pending = 0;
     for (final e in expenses) {
       if (AppData.text(e['status']) == 'cancelled') continue;
       total += AppData.doubleValue(e['amount']);
@@ -3957,12 +4267,28 @@ class FinanceSummary {
         if (!alreadyPaid) {
           balances[paidBy] = double.parse(((balances[paidBy] ?? 0) + share).toStringAsFixed(2));
           balances[userId] = double.parse(((balances[userId] ?? 0) - share).toStringAsFixed(2));
-          pending += share;
         }
       }
     }
 
+    for (final payment in settlementPayments) {
+      if (AppData.text(payment['status'], 'paid') != 'paid') continue;
+      final fromId = AppData.text(payment['from_user']);
+      final toId = AppData.text(payment['to_user']);
+      final amount = AppData.doubleValue(payment['amount']);
+      if (fromId.isEmpty || toId.isEmpty || amount <= 0) continue;
+      names.putIfAbsent(fromId, () => financeMemberName(fromId, members));
+      names.putIfAbsent(toId, () => financeMemberName(toId, members));
+      avatars.putIfAbsent(fromId, () => financeMemberAvatarUrl(fromId, members));
+      avatars.putIfAbsent(toId, () => financeMemberAvatarUrl(toId, members));
+      balances.putIfAbsent(fromId, () => 0);
+      balances.putIfAbsent(toId, () => 0);
+      balances[fromId] = double.parse(((balances[fromId] ?? 0) + amount).toStringAsFixed(2));
+      balances[toId] = double.parse(((balances[toId] ?? 0) - amount).toStringAsFixed(2));
+    }
+
     final settlements = buildSettlements(balances, names, avatars);
+    final netPending = balances.values.where((value) => value > 0.01).fold<double>(0, (sum, value) => sum + value);
     final myId = AppData.user?.id ?? '';
     return FinanceSummary(
       names: names,
@@ -3970,7 +4296,7 @@ class FinanceSummary {
       balances: balances,
       settlements: settlements,
       totalExpenses: double.parse(total.toStringAsFixed(2)),
-      pendingAmount: double.parse(pending.toStringAsFixed(2)),
+      pendingAmount: double.parse(netPending.toStringAsFixed(2)),
       myNet: double.parse((balances[myId] ?? 0).toStringAsFixed(2)),
     );
   }
@@ -4193,7 +4519,7 @@ class _TournamentsTabState extends State<TournamentsTab> {
                   children: [
                     PageHeader(
                       title: 'Torneos / Ligas',
-                      subtitle: 'Competición guiada para ${AppData.text(widget.group['name'], 'tu grupo')}',
+                      subtitle: 'Ligas, eliminatorias y resultados claros.',
                       leading: false,
                     ),
                     const SizedBox(height: 16),
@@ -4212,7 +4538,7 @@ class _TournamentsTabState extends State<TournamentsTab> {
                             },
                     ),
                     const SizedBox(height: 18),
-                    Text('Tus competiciones', style: Theme.of(context).textTheme.titleLarge),
+                    Text('Competiciones', style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 8),
                     if (snapshot.connectionState == ConnectionState.waiting)
                       const CenterLoader(label: 'Cargando torneos...')
@@ -4298,7 +4624,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
       'allowDraw': customAllowDraw,
       'result_mode': customResultMode,
       'best_of': customBestOf,
-      'set_label': customUnit.text.trim().isEmpty ? 'juegos' : customUnit.text.trim(),
+      'set_label': customUnit.text.trim().isEmpty ? 'juegos/rondas' : customUnit.text.trim(),
       'score_label': customUnit.text.trim().isEmpty ? 'puntos' : customUnit.text.trim(),
       'ranking_label': customResultMode == 'sets' ? 'DS' : 'DIF',
     };
@@ -4459,7 +4785,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
                 Row(children: [
                   Expanded(child: PickPill(label: 'Marcador directo', selected: customResultMode == 'simple', onTap: () => setState(() => customResultMode = 'simple'))),
                   const SizedBox(width: 8),
-                  Expanded(child: PickPill(label: 'Por sets', selected: customResultMode == 'sets', onTap: () => setState(() => customResultMode = 'sets'))),
+                  Expanded(child: PickPill(label: 'Por sets/rondas', selected: customResultMode == 'sets', onTap: () => setState(() => customResultMode = 'sets'))),
                 ]),
                 const SizedBox(height: 12),
                 if (customResultMode == 'simple') ...[
@@ -4481,7 +4807,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
                     onChanged: (v) => setState(() => customAllowDraw = v),
                   ),
                 ] else ...[
-                  FieldLabel('Unidad por set'),
+                  FieldLabel('Unidad por set/ronda'),
                   TextField(controller: customUnit, decoration: const InputDecoration(hintText: 'Ej. juegos, puntos, manos...')),
                   const SizedBox(height: 12),
                   Row(children: [
@@ -4492,7 +4818,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
                     Expanded(child: SmallStepperField(label: 'Mejor de', value: customBestOf, min: 1, step: 2, onChanged: (v) => setState(() => customBestOf = v.isEven ? v + 1 : v))),
                   ]),
                   const SizedBox(height: 8),
-                  const Text('Ejemplo: mejor de 3 sets o mejor de 5 sets.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+                  const Text('Ejemplo: mejor de 3 sets, 5 rondas o las partidas que decida el grupo.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
                 ],
               ]),
             ),
@@ -4993,6 +5319,10 @@ class _TournamentSummarySection extends StatelessWidget {
           Expanded(child: Text(tournamentFormatSubtitle(format), style: Theme.of(context).textTheme.bodyMedium)),
         ]),
       ),
+      if (format == 'eliminatoria' && matches.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        EliminationBracketPreview(matches: matches, names: names),
+      ],
       const SizedBox(height: 16),
       SectionHeader(title: 'Próximos partidos', action: pending.isEmpty ? '' : '${pending.length} pendientes'),
       if (pending.isEmpty)
@@ -5015,6 +5345,87 @@ class _TournamentSummarySection extends StatelessWidget {
     ]);
   }
 }
+
+
+class EliminationBracketPreview extends StatelessWidget {
+  final List<Map<String, dynamic>> matches;
+  final Map<String, String> names;
+  const EliminationBracketPreview({super.key, required this.matches, required this.names});
+
+  @override
+  Widget build(BuildContext context) {
+    final rounds = <int, List<Map<String, dynamic>>>{};
+    for (final match in matches) {
+      final round = AppData.intValue(match['round'], 1);
+      rounds.putIfAbsent(round, () => <Map<String, dynamic>>[]).add(match);
+    }
+    final orderedRounds = rounds.keys.toList()..sort();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SectionHeader(title: 'Cuadro de eliminatoria', action: '${orderedRounds.length} rondas'),
+      const SizedBox(height: 8),
+      SizedBox(
+        height: 190,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: orderedRounds.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 10),
+          itemBuilder: (context, index) {
+            final round = orderedRounds[index];
+            final items = rounds[round] ?? const <Map<String, dynamic>>[];
+            return SizedBox(
+              width: 230,
+              child: AppCard(
+                padding: const EdgeInsets.all(12),
+                color: index == orderedRounds.length - 1 ? AppColors.orangeSoft : AppColors.surface,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(11)),
+                      child: Center(child: Text('R$round', style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 11))),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(round == orderedRounds.last ? 'Final / última ronda' : 'Ronda $round', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
+                  ]),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: ListView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: min(items.length, 3),
+                      itemBuilder: (context, i) {
+                        final match = items[i];
+                        final played = AppData.text(match['status']) == 'played';
+                        final a = teamName(AppData.text(match['team_a']), names);
+                        final b = teamName(AppData.text(match['team_b']), names);
+                        final score = played ? '${AppData.intValue(match['score_a'])}-${AppData.intValue(match['score_b'])}' : 'pendiente';
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Container(
+                            padding: const EdgeInsets.all(9),
+                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13), border: Border.all(color: AppColors.line)),
+                            child: Row(children: [
+                              Expanded(child: Text('$a vs $b', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink, fontSize: 12))),
+                              const SizedBox(width: 6),
+                              Text(score, style: TextStyle(color: played ? AppColors.teal : AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12)),
+                            ]),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  if (items.length > 3)
+                    Text('+${items.length - 3} partidos más', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11)),
+                ]),
+              ),
+            );
+          },
+        ),
+      ),
+    ]);
+  }
+}
+
 
 class _TournamentStandingsSection extends StatelessWidget {
   final List<TeamStanding> standings;
@@ -5593,19 +6004,19 @@ class MatchResultCard extends StatelessWidget {
       final result = await showDialog<Map<String, dynamic>>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Resultado por sets'),
+          title: const Text('Resultado por sets/rondas'),
           content: SizedBox(
             width: 360,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Introduce ${scoringSetLabel(scoringType, config)} por set. Grupli calculará automáticamente el ganador del partido.', style: Theme.of(context).textTheme.bodyMedium),
+                Text('Introduce ${scoringSetLabel(scoringType, config)} por parcial. Grupli calculará automáticamente el ganador.', style: Theme.of(context).textTheme.bodyMedium),
                 const SizedBox(height: 12),
                 for (int i = 0; i < bestOf; i++)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(children: [
-                      SizedBox(width: 54, child: Text('Set ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w800))),
+                      SizedBox(width: 68, child: Text('Parcial ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w800))),
                       Expanded(child: TextField(controller: controllersA[i], keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'A'))),
                       const SizedBox(width: 10),
                       Expanded(child: TextField(controller: controllersB[i], keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'B'))),
@@ -5769,11 +6180,11 @@ class StandingRow extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(standing.name, style: const TextStyle(fontWeight: FontWeight.w900)),
-          if (detailed) Text('${standing.wins}G · ${standing.draws}E · ${standing.losses}P · ${scoringMetricUnit(scoringType, scoringConfig)} ${standing.goalsFor}-${standing.goalsAgainst}', style: Theme.of(context).textTheme.bodyMedium),
+          if (detailed) Text(standingDetailText(standing, scoringType, scoringConfig), style: Theme.of(context).textTheme.bodyMedium),
         ])),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text('${standing.points}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.teal)),
-          Text('PTS · ${scoringRankingLabel(scoringType, scoringConfig)} ${standing.goalDifference}', style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w800)),
+          Text(standingMetricText(standing, scoringType, scoringConfig), style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w800)),
         ]),
       ]),
     ),
@@ -5882,9 +6293,9 @@ class _MembersScreenState extends State<MembersScreen> {
     final code = AppData.text(widget.group['invite_code'], '------');
     return DirectPage(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        PageHeader(title: 'Miembros', subtitle: groupName, leading: true),
+        PageHeader(title: 'Miembros', subtitle: 'Personas, roles y permisos del grupo.', leading: true),
         const SizedBox(height: 14),
-        InviteAccessCard(groupName: groupName, code: code, compact: true),
+        InviteAccessCard(groupName: groupName, code: code, compact: false),
         const SizedBox(height: 14),
         FutureBuilder<List<Map<String, dynamic>>>(
           future: future,
@@ -6845,7 +7256,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SectionHeader(title: 'Ajustes'),
             const SizedBox(height: 8),
             SettingsRow(icon: Icons.notifications_none_rounded, title: 'Notificaciones', subtitle: 'Eventos, gastos y torneos', onTap: showNotificationsSheet),
+            SettingsRow(icon: Icons.language_rounded, title: 'Idioma', subtitle: 'Español por defecto', onTap: () => showToast(context, 'Idioma fijado en español para esta versión.')),
             SettingsRow(icon: Icons.lock_outline_rounded, title: 'Privacidad y seguridad', subtitle: 'Grupos cerrados, roles y acceso privado', onTap: showPrivacySheet),
+            SettingsRow(icon: Icons.download_rounded, title: 'Datos de la cuenta', subtitle: 'Perfil, grupos y actividad visible', onTap: () => showToast(context, 'Exportación preparada para una fase posterior.')),
             SettingsRow(icon: Icons.help_outline_rounded, title: 'Ayuda y soporte', subtitle: 'Guía rápida y contacto próximamente', onTap: () => showToast(context, 'Soporte preparado para la siguiente fase.')),
             SettingsRow(icon: Icons.info_outline_rounded, title: 'Acerca de Grupli', subtitle: 'Versión y estado del producto', onTap: showAboutSheet),
             SettingsRow(icon: Icons.delete_forever_rounded, title: 'Eliminar cuenta', subtitle: 'Borra tu cuenta y datos personales de Grupli', danger: true, onTap: deleteAccountFlow),
@@ -7164,7 +7577,7 @@ class GroupHeroCard extends StatelessWidget {
           if (hasCover)
             Positioned.fill(child: Image.network(coverUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink())),
           Positioned.fill(child: Container(color: hasCover ? const Color(0xAA073A57) : Colors.transparent)),
-          if (!hasCover) Positioned.fill(child: Opacity(opacity: .08, child: PatternIcons())),
+          if (!hasCover) Positioned.fill(child: Opacity(opacity: .08, child: const PatternIcons())),
           Positioned(left: 16, right: 16, top: 14, child: Row(children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -7917,6 +8330,65 @@ class EventKindPill extends StatelessWidget {
 }
 
 
+class EventScopeCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final ValueChanged<String> onChanged;
+  const EventScopeCard({super.key, required this.title, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    color: AppColors.violetSoft,
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.repeat_rounded, color: AppColors.violet)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 3),
+          const Text('Elige qué fechas quieres modificar.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+        ])),
+      ]),
+      const SizedBox(height: 12),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        RoutineChoice(label: 'Solo esta fecha', selected: value == 'single', onTap: () => onChanged('single')),
+        RoutineChoice(label: 'Esta y futuras', selected: value == 'future', onTap: () => onChanged('future')),
+        RoutineChoice(label: 'Toda la rutina', selected: value == 'all', onTap: () => onChanged('all')),
+      ]),
+    ]),
+  );
+}
+
+Future<String?> showRoutineScopeDialog(BuildContext context, {required String title, required String actionLabel}) {
+  return showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        ListTile(
+          leading: const Icon(Icons.event_rounded),
+          title: const Text('Solo esta fecha'),
+          subtitle: const Text('No cambia el resto de la rutina.'),
+          onTap: () => Navigator.pop(context, 'single'),
+        ),
+        ListTile(
+          leading: const Icon(Icons.update_rounded),
+          title: const Text('Esta y futuras'),
+          subtitle: const Text('Mantiene las fechas pasadas intactas.'),
+          onTap: () => Navigator.pop(context, 'future'),
+        ),
+        ListTile(
+          leading: const Icon(Icons.repeat_rounded),
+          title: const Text('Toda la rutina'),
+          subtitle: const Text('Aplica a todas las fechas conectadas.'),
+          onTap: () => Navigator.pop(context, 'all'),
+        ),
+      ]),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar'))],
+    ),
+  );
+}
+
 class RoutineChoice extends StatelessWidget {
   final String label;
   final bool selected;
@@ -8489,9 +8961,10 @@ class GroupBottomNav extends StatelessWidget {
       child: BottomBar(
         items: const [
           NavSpec(Icons.home_rounded, 'Inicio'),
-          NavSpec(Icons.calendar_month_rounded, 'Calendario'),
+          NavSpec(Icons.calendar_month_rounded, 'Agenda'),
           NavSpec(Icons.account_balance_wallet_rounded, 'Finanzas'),
           NavSpec(Icons.emoji_events_rounded, 'Torneos'),
+          NavSpec(Icons.more_horiz_rounded, 'Más'),
         ],
         index: index,
         onTap: onTap,
@@ -8531,8 +9004,8 @@ class BottomBar extends StatelessWidget {
               AnimatedContainer(
                 duration: const Duration(milliseconds: 170),
                 curve: Curves.easeOutCubic,
-                height: 32,
-                width: active ? 48 : 36,
+                height: 31,
+                width: active ? 44 : 34,
                 decoration: BoxDecoration(
                   color: active ? AppColors.tealSoft : Colors.transparent,
                   borderRadius: BorderRadius.circular(99),
@@ -8541,7 +9014,7 @@ class BottomBar extends StatelessWidget {
                 child: Icon(spec.icon, size: 21, color: active ? AppColors.teal : AppColors.muted),
               ),
               const SizedBox(height: 2),
-              Text(spec.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.3, fontWeight: active ? FontWeight.w900 : FontWeight.w700, color: active ? AppColors.ink : AppColors.muted)),
+              Text(spec.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: items.length >= 5 ? 9.4 : 10.3, fontWeight: active ? FontWeight.w900 : FontWeight.w700, color: active ? AppColors.ink : AppColors.muted)),
             ]),
           ),
         ),
@@ -8553,11 +9026,14 @@ class BottomBar extends StatelessWidget {
 class PageHeader extends StatelessWidget {
   final String title; final String subtitle; final bool leading;
   const PageHeader({super.key, required this.title, this.subtitle = '', this.leading = false});
-  @override Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  @override Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
     if (leading) ...[RoundBackButton(onTap: () => Navigator.of(context).maybePop()), const SizedBox(width: 12)],
     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(title, style: Theme.of(context).textTheme.headlineMedium),
-      if (subtitle.isNotEmpty) ...[const SizedBox(height: 6), Text(subtitle, style: Theme.of(context).textTheme.bodyMedium)],
+      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.headlineMedium),
+      if (subtitle.trim().isNotEmpty) ...[
+        const SizedBox(height: 5),
+        Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+      ],
     ]))
   ]);
 }
@@ -8566,9 +9042,38 @@ class CenterLoader extends StatelessWidget { final String label; const CenterLoa
 
 class ErrorBlock extends StatelessWidget { final String message; final VoidCallback onRetry; const ErrorBlock({super.key, required this.message, required this.onRetry}); @override Widget build(BuildContext context) => AppCard(child: Column(children: [Container(width: 58, height: 58, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.redSoft), child: const Icon(Icons.error_outline_rounded, color: AppColors.red, size: 30)), const SizedBox(height: 12), const Text('Algo no ha cargado bien', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)), const SizedBox(height: 7), Text(humanizeError(message), textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium), const SizedBox(height: 14), SecondaryButton(label: 'Reintentar', icon: Icons.refresh_rounded, onTap: onRetry)])); }
 
-class EmptyBlock extends StatelessWidget { final IconData icon; final String title; final String body; const EmptyBlock({super.key, required this.icon, required this.title, required this.body}); @override Widget build(BuildContext context) => AppCard(color: AppColors.surface, child: Column(children: [Container(width: 66, height: 66, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft), child: Icon(icon, color: AppColors.teal, size: 31)), const SizedBox(height: 13), Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 7), Text(body, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium)])); }
+class EmptyBlock extends StatelessWidget {
+  final IconData icon; final String title; final String body;
+  const EmptyBlock({super.key, required this.icon, required this.title, required this.body});
+  @override Widget build(BuildContext context) => AppCard(
+    color: AppColors.surface,
+    padding: const EdgeInsets.fromLTRB(18, 22, 18, 22),
+    child: Column(children: [
+      Container(width: 68, height: 68, decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft, border: Border.all(color: const Color(0x220B6B8F))), child: Icon(icon, color: AppColors.teal, size: 32)),
+      const SizedBox(height: 14),
+      Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 7),
+      Text(body, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.35)),
+    ]),
+  );
+}
 
-class EmptySlim extends StatelessWidget { final IconData icon; final String title; final String body; const EmptySlim({super.key, required this.icon, required this.title, this.body = ''}); @override Widget build(BuildContext context) => AppCard(color: AppColors.surface, padding: const EdgeInsets.all(14), child: Row(children: [Container(width: 38, height: 38, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft), child: Icon(icon, color: AppColors.teal, size: 20)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)), if (body.trim().isNotEmpty) ...[const SizedBox(height: 4), Text(body, style: Theme.of(context).textTheme.bodyMedium)]]))])); }
+class EmptySlim extends StatelessWidget {
+  final IconData icon; final String title; final String body;
+  const EmptySlim({super.key, required this.icon, required this.title, this.body = ''});
+  @override Widget build(BuildContext context) => AppCard(
+    color: AppColors.surface,
+    padding: const EdgeInsets.all(14),
+    child: Row(children: [
+      Container(width: 40, height: 40, decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft, border: Border.all(color: const Color(0x1A0B6B8F))), child: Icon(icon, color: AppColors.teal, size: 20)),
+      const SizedBox(width: 12),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+        if (body.trim().isNotEmpty) ...[const SizedBox(height: 4), Text(body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25))],
+      ])),
+    ]),
+  );
+}
 
 String humanizeError(String raw) {
   final original = raw.replaceAll('Exception: ', '').trim();
@@ -9273,6 +9778,71 @@ class PermissionLine extends StatelessWidget {
   }
 }
 
+
+Future<void> showMemberProfileSheet(
+  BuildContext context,
+  Map<String, dynamic> member,
+  bool canEditThis,
+  Future<void> Function(Map<String, dynamic> member, String role) onRole,
+  Future<void> Function(Map<String, dynamic> member) onRemove,
+) async {
+  final profile = AppData.asMap(member['profiles']);
+  final name = memberName(member);
+  final role = AppData.text(member['role'], 'member');
+  final email = AppData.text(profile['email'], 'sin email');
+  await showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (context) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 22),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Center(child: ProfileAvatar(name: name, avatarUrl: AppData.text(profile['avatar_url']), radius: 42)),
+          const SizedBox(height: 12),
+          Center(child: Text(name, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge)),
+          const SizedBox(height: 4),
+          Center(child: Text(email, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium)),
+          const SizedBox(height: 12),
+          Center(child: RoleBadge(role: role)),
+          const SizedBox(height: 18),
+          RoleInfoCard(role: role),
+          if (canEditThis) ...[
+            const SizedBox(height: 14),
+            Row(children: [
+              Expanded(child: SecondaryButton(
+                label: role == 'admin' ? 'Quitar admin' : 'Hacer admin',
+                icon: role == 'admin' ? Icons.person_outline_rounded : Icons.admin_panel_settings_rounded,
+                onTap: () {
+                  Navigator.pop(context);
+                  onRole(member, role == 'admin' ? 'member' : 'admin');
+                },
+              )),
+              const SizedBox(width: 10),
+              Expanded(child: DangerButton(
+                label: 'Expulsar',
+                icon: Icons.person_remove_rounded,
+                onTap: () {
+                  Navigator.pop(context);
+                  onRemove(member);
+                },
+              )),
+            ]),
+          ] else ...[
+            const SizedBox(height: 14),
+            EmptySlim(
+              icon: Icons.lock_outline_rounded,
+              title: 'Sin acciones disponibles',
+              body: role == 'owner' ? 'El owner está protegido.' : 'Solo owner/admins pueden gestionar otros miembros.',
+            ),
+          ],
+        ]),
+      ),
+    ),
+  );
+}
+
+
 class ManageMemberCard extends StatelessWidget {
   final Map<String, dynamic> member;
   final bool canManage;
@@ -9290,6 +9860,7 @@ class ManageMemberCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
+        onTap: () => showMemberProfileSheet(context, member, canEditThis, onRole, onRemove),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         child: Row(children: [
           ProfileAvatar(name: name, avatarUrl: AppData.text(profile['avatar_url']), radius: 22),
@@ -9460,7 +10031,7 @@ class MonthGrid extends StatelessWidget {
 }
 
 
-class PatternIcons extends StatelessWidget { @override Widget build(BuildContext context) => Wrap(spacing: 24, runSpacing: 20, children: List.generate(70, (i) => Icon([Icons.event_available_rounded, Icons.calendar_month_rounded, Icons.account_balance_wallet_rounded, Icons.emoji_events_rounded, Icons.lock_rounded, Icons.qr_code_rounded][i % 6], size: 17, color: Colors.white))); }
+class PatternIcons extends StatelessWidget { const PatternIcons({super.key}); @override Widget build(BuildContext context) => Wrap(spacing: 24, runSpacing: 20, children: List.generate(70, (i) => Icon([Icons.event_available_rounded, Icons.calendar_month_rounded, Icons.account_balance_wallet_rounded, Icons.emoji_events_rounded, Icons.lock_rounded, Icons.qr_code_rounded][i % 6], size: 17, color: Colors.white))); }
 
 void showPermissionSheet(BuildContext context) {
   showModalBottomSheet(

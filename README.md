@@ -167,3 +167,23 @@ SQL nuevo: `supabase/patch_v15_7_visual_group_cover.sql`.
 
 - Finanzas rediseñadas con pestañas: Gastos, Saldos y Liquidar.
 - Fotos de perfil en finanzas, gastos, asistencia y miembros cuando `avatar_url` exista.
+
+## v15.14 — Repaso global de UX y navegación
+
+- Barra inferior del grupo con acceso directo a Más.
+- Pantallas con textos más claros y headers unificados.
+- Mis grupos, Agenda, Finanzas y Más más limpias y con menos duplicaciones.
+- Estados vacíos mejorados.
+- No requiere SQL nuevo.
+
+
+## v15.15
+
+Calendario y eventos: rutinas conectadas, edición/cancelación por alcance, agenda por día más clara y asistencia con avatares.
+
+## v15.17 / v15.18
+
+- Torneos y ligas con sistemas de puntuación más cerrados por deporte.
+- Resultados por sets/rondas con parciales y desempates secundarios.
+- Cuadro de eliminatoria más visual por rondas.
+- Perfil, miembros, permisos, invitaciones y notificaciones revisados.

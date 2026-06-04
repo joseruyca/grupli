@@ -56,6 +56,7 @@ DROP TABLE IF EXISTS public.user_devices CASCADE;
 DROP TABLE IF EXISTS public.matches CASCADE;
 DROP TABLE IF EXISTS public.tournament_teams CASCADE;
 DROP TABLE IF EXISTS public.tournaments CASCADE;
+DROP TABLE IF EXISTS public.settlement_payments CASCADE;
 DROP TABLE IF EXISTS public.expense_participants CASCADE;
 DROP TABLE IF EXISTS public.expenses CASCADE;
 DROP TABLE IF EXISTS public.event_attendance CASCADE;
@@ -121,6 +122,10 @@ CREATE TABLE public.events (
   location text,
   notes text,
   min_people int NOT NULL DEFAULT 2 CHECK (min_people > 0),
+  event_series_id uuid,
+  recurrence_frequency text CHECK (recurrence_frequency IS NULL OR recurrence_frequency IN ('weekly','biweekly','monthly')),
+  recurrence_index int,
+  recurrence_count int,
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','cancelled')),
   created_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -158,6 +163,21 @@ CREATE TABLE public.expense_participants (
   paid boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(expense_id, user_id)
+);
+
+CREATE TABLE public.settlement_payments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id uuid NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  from_user uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  to_user uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  amount numeric(12,2) NOT NULL CHECK (amount > 0),
+  status text NOT NULL DEFAULT 'paid' CHECK (status IN ('paid','cancelled')),
+  note text,
+  created_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  paid_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (from_user <> to_user)
 );
 
 CREATE TABLE public.tournaments (
@@ -199,7 +219,9 @@ CREATE TABLE public.matches (
 CREATE INDEX idx_group_members_group ON public.group_members(group_id);
 CREATE INDEX idx_group_members_user ON public.group_members(user_id);
 CREATE INDEX idx_events_group_start ON public.events(group_id, starts_at);
+CREATE INDEX idx_events_series ON public.events(event_series_id, starts_at);
 CREATE INDEX idx_expenses_group_created ON public.expenses(group_id, created_at DESC);
+CREATE INDEX idx_settlement_payments_group_paid ON public.settlement_payments(group_id, paid_at DESC);
 CREATE INDEX idx_tournaments_group_created ON public.tournaments(group_id, created_at DESC);
 
 CREATE OR REPLACE FUNCTION public.ensure_current_profile()
@@ -427,6 +449,7 @@ ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.event_attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expense_participants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.settlement_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tournaments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tournament_teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.matches ENABLE ROW LEVEL SECURITY;
@@ -473,6 +496,11 @@ CREATE POLICY expense_participants_select_member ON public.expense_participants 
 CREATE POLICY expense_participants_insert_member ON public.expense_participants FOR INSERT TO authenticated WITH CHECK (EXISTS (SELECT 1 FROM public.expenses e WHERE e.id = expense_id AND public.is_group_member(e.group_id)));
 CREATE POLICY expense_participants_update_member ON public.expense_participants FOR UPDATE TO authenticated USING (EXISTS (SELECT 1 FROM public.expenses e WHERE e.id = expense_id AND public.is_group_member(e.group_id))) WITH CHECK (EXISTS (SELECT 1 FROM public.expenses e WHERE e.id = expense_id AND public.is_group_member(e.group_id)));
 CREATE POLICY expense_participants_delete_member ON public.expense_participants FOR DELETE TO authenticated USING (EXISTS (SELECT 1 FROM public.expenses e WHERE e.id = expense_id AND public.is_group_member(e.group_id)));
+
+CREATE POLICY settlement_payments_select_member ON public.settlement_payments FOR SELECT TO authenticated USING (public.is_group_member(group_id));
+CREATE POLICY settlement_payments_insert_member ON public.settlement_payments FOR INSERT TO authenticated WITH CHECK (public.is_group_member(group_id) AND created_by = auth.uid());
+CREATE POLICY settlement_payments_update_admin_or_creator ON public.settlement_payments FOR UPDATE TO authenticated USING (public.is_group_admin(group_id) OR created_by = auth.uid()) WITH CHECK (public.is_group_member(group_id));
+CREATE POLICY settlement_payments_delete_admin_or_creator ON public.settlement_payments FOR DELETE TO authenticated USING (public.is_group_admin(group_id) OR created_by = auth.uid());
 
 CREATE POLICY tournaments_member_all ON public.tournaments FOR ALL TO authenticated USING (public.is_group_member(group_id)) WITH CHECK (public.is_group_member(group_id));
 CREATE POLICY tournament_teams_member_all ON public.tournament_teams FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id))) WITH CHECK (EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id)));
