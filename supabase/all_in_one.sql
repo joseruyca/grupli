@@ -188,6 +188,7 @@ CREATE TABLE public.matches (
   team_b uuid REFERENCES public.tournament_teams(id) ON DELETE SET NULL,
   score_a int,
   score_b int,
+  result_details jsonb,
   round int NOT NULL DEFAULT 1,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','played')),
   played_at timestamptz,

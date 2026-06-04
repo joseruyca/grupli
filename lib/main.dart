@@ -631,7 +631,7 @@ class AppData {
   static Future<List<Map<String, dynamic>>> tournaments(String groupId) async {
     final res = await sb
         .from('tournaments')
-        .select('*, tournament_teams(id,name), matches(id,team_a,team_b,score_a,score_b,round,status,played_at)')
+        .select('*, tournament_teams(id,name), matches(id,team_a,team_b,score_a,score_b,result_details,round,status,played_at)')
         .eq('group_id', groupId)
         .order('created_at', ascending: false);
     return asList(res);
@@ -640,7 +640,7 @@ class AppData {
   static Future<Map<String, dynamic>> tournament(String tournamentId) async {
     final res = await sb
         .from('tournaments')
-        .select('*, tournament_teams(id,name), matches(id,team_a,team_b,score_a,score_b,round,status,played_at,created_at)')
+        .select('*, tournament_teams(id,name), matches(id,team_a,team_b,score_a,score_b,result_details,round,status,played_at,created_at)')
         .eq('id', tournamentId)
         .single();
     return asMap(res);
@@ -782,10 +782,11 @@ class AppData {
     await sb.from('matches').insert(rows);
   }
 
-  static Future<void> setMatchResult(String matchId, int scoreA, int scoreB) async {
+  static Future<void> setMatchResult(String matchId, int scoreA, int scoreB, {Map<String, dynamic>? details}) async {
     await sb.from('matches').update({
       'score_a': scoreA,
       'score_b': scoreB,
+      'result_details': details,
       'status': 'played',
       'played_at': DateTime.now().toUtc().toIso8601String(),
       'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -796,6 +797,7 @@ class AppData {
     await sb.from('matches').update({
       'score_a': null,
       'score_b': null,
+      'result_details': null,
       'status': 'pending',
       'played_at': null,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -1169,54 +1171,139 @@ String scoringTypeSubtitle(String type) {
 Map<String, dynamic> scoringConfigForType(String type) {
   switch (type) {
     case 'football':
-      return {'win': 3, 'draw': 1, 'loss': 0, 'unit': 'goles', 'allowDraw': true};
+      return {
+        'win': 3,
+        'draw': 1,
+        'loss': 0,
+        'unit': 'goles',
+        'allowDraw': true,
+        'result_mode': 'simple',
+        'score_label': 'goles',
+        'ranking_label': 'DG',
+      };
     case 'tennis_padel':
-      return {'win': 2, 'draw': 0, 'loss': 0, 'unit': 'sets/juegos', 'allowDraw': false};
+      return {
+        'win': 2,
+        'draw': 0,
+        'loss': 0,
+        'unit': 'sets',
+        'allowDraw': false,
+        'result_mode': 'sets',
+        'best_of': 3,
+        'set_label': 'juegos',
+        'ranking_label': 'DS',
+      };
     case 'basketball':
-      return {'win': 2, 'draw': 0, 'loss': 1, 'unit': 'puntos', 'allowDraw': false};
+      return {
+        'win': 2,
+        'draw': 0,
+        'loss': 1,
+        'unit': 'puntos',
+        'allowDraw': false,
+        'result_mode': 'simple',
+        'score_label': 'puntos',
+        'ranking_label': 'DP',
+      };
     case 'cards_mus':
-      return {'win': 1, 'draw': 0, 'loss': 0, 'unit': 'juegos', 'allowDraw': false};
+      return {
+        'win': 1,
+        'draw': 0,
+        'loss': 0,
+        'unit': 'juegos',
+        'allowDraw': false,
+        'result_mode': 'simple',
+        'score_label': 'juegos',
+        'ranking_label': 'DIF',
+      };
     case 'custom':
-      return {'win': 3, 'draw': 1, 'loss': 0, 'unit': 'puntos', 'allowDraw': true};
+      return {
+        'win': 3,
+        'draw': 1,
+        'loss': 0,
+        'unit': 'puntos',
+        'allowDraw': true,
+        'result_mode': 'simple',
+        'score_label': 'puntos',
+        'ranking_label': 'DIF',
+      };
     default:
-      return {'win': 3, 'draw': 1, 'loss': 0, 'unit': 'puntos', 'allowDraw': true};
+      return {
+        'win': 3,
+        'draw': 1,
+        'loss': 0,
+        'unit': 'puntos',
+        'allowDraw': true,
+        'result_mode': 'simple',
+        'score_label': 'puntos',
+        'ranking_label': 'DIF',
+      };
   }
 }
 
-int scoringWinPoints(String type) => AppData.intValue(scoringConfigForType(type)['win'], 3);
-int scoringDrawPoints(String type) => AppData.intValue(scoringConfigForType(type)['draw'], 1);
-int scoringLossPoints(String type) => AppData.intValue(scoringConfigForType(type)['loss'], 0);
-String scoringMetricUnit(String type) => AppData.text(scoringConfigForType(type)['unit'], 'puntos');
-
-String standingsHeaderForScoring(String type) {
-  switch (type) {
-    case 'football':
-      return 'PTS · DG · PJ';
-    case 'tennis_padel':
-      return 'PTS · DIF · PJ';
-    case 'basketball':
-      return 'PTS · DIF · PJ';
-    case 'cards_mus':
-      return 'PTS · DIF · PJ';
-    default:
-      return 'PTS · DIF · PJ';
+Map<String, dynamic> resolvedScoringConfig(String type, [dynamic raw]) {
+  final base = Map<String, dynamic>.from(scoringConfigForType(type));
+  if (raw is Map) {
+    for (final entry in raw.entries) {
+      base[entry.key.toString()] = entry.value;
+    }
   }
+  return base;
 }
 
-String matchInputLabel(String type, bool local) {
+int scoringWinPoints(String type, [dynamic raw]) => AppData.intValue(resolvedScoringConfig(type, raw)['win'], 3);
+int scoringDrawPoints(String type, [dynamic raw]) => AppData.intValue(resolvedScoringConfig(type, raw)['draw'], 1);
+int scoringLossPoints(String type, [dynamic raw]) => AppData.intValue(resolvedScoringConfig(type, raw)['loss'], 0);
+String scoringMetricUnit(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['unit'], 'puntos');
+bool scoringAllowDraw(String type, [dynamic raw]) => resolvedScoringConfig(type, raw)['allowDraw'] == true;
+bool scoringUsesSetMode(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['result_mode'], 'simple') == 'sets';
+int scoringBestOf(String type, [dynamic raw]) => max(1, AppData.intValue(resolvedScoringConfig(type, raw)['best_of'], 3));
+String scoringScoreLabel(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['score_label'], scoringMetricUnit(type, raw));
+String scoringSetLabel(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['set_label'], 'juegos');
+String scoringRankingLabel(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['ranking_label'], 'DIF');
+
+String scoringConfigShortText(String type, [dynamic raw]) {
+  final cfg = resolvedScoringConfig(type, raw);
+  if (scoringUsesSetMode(type, cfg)) {
+    return 'Resultado por sets · mejor de ${scoringBestOf(type, cfg)}';
+  }
+  return 'Victoria ${scoringWinPoints(type, cfg)} · empate ${scoringDrawPoints(type, cfg)} · derrota ${scoringLossPoints(type, cfg)}';
+}
+
+String scoringConfigFullText(String type, [dynamic raw]) {
+  final cfg = resolvedScoringConfig(type, raw);
+  if (scoringUsesSetMode(type, cfg)) {
+    return 'Se registra cada set (${scoringSetLabel(type, cfg)} por set) y la app calcula automáticamente el ganador del partido.';
+  }
+  return 'Marcador directo en ${scoringScoreLabel(type, cfg)}. La clasificación usa victoria ${scoringWinPoints(type, cfg)}, empate ${scoringDrawPoints(type, cfg)} y derrota ${scoringLossPoints(type, cfg)}.';
+}
+
+String standingsHeaderForScoring(String type, [dynamic raw]) {
+  return 'PTS · ${scoringRankingLabel(type, raw)} · PJ';
+}
+
+String matchInputLabel(String type, bool local, [dynamic raw]) {
   final side = local ? 'Local' : 'Visitante';
-  switch (type) {
-    case 'football':
-      return '$side goles';
-    case 'tennis_padel':
-      return '$side sets/juegos';
-    case 'basketball':
-      return '$side puntos';
-    case 'cards_mus':
-      return '$side juegos';
-    default:
-      return side;
+  if (scoringUsesSetMode(type, raw)) {
+    return '$side sets';
   }
+  return '$side ${scoringScoreLabel(type, raw)}';
+}
+
+List<Map<String, int>> matchDetailSets(Map<String, dynamic> match) {
+  final details = AppData.asMap(match['result_details']);
+  final rawSets = details['sets'];
+  if (rawSets is! List) return const [];
+  return rawSets
+      .whereType<Map>()
+      .map((e) => {'a': AppData.intValue(e['a']), 'b': AppData.intValue(e['b'])})
+      .toList();
+}
+
+String? matchDetailScoreText(Map<String, dynamic> match, String type, [dynamic raw]) {
+  if (!scoringUsesSetMode(type, raw)) return null;
+  final sets = matchDetailSets(match);
+  if (sets.isEmpty) return null;
+  return sets.map((set) => '${set['a']}-${set['b']}').join(' · ');
 }
 
 String teamTypeLabel(String type) {
@@ -1259,7 +1346,7 @@ Map<String, String> teamNameMap(List<Map<String, dynamic>> teams) {
   return {for (final team in teams) team['id'].toString(): AppData.text(team['name'], 'Participante')};
 }
 
-List<TeamStanding> calculateStandings(List<Map<String, dynamic>> teams, List<Map<String, dynamic>> matches, {String scoringType = 'general'}) {
+List<TeamStanding> calculateStandings(List<Map<String, dynamic>> teams, List<Map<String, dynamic>> matches, {String scoringType = 'general', Map<String, dynamic>? scoringConfig}) {
   final table = <String, TeamStanding>{
     for (final team in teams)
       team['id'].toString(): TeamStanding(
@@ -1288,18 +1375,18 @@ List<TeamStanding> calculateStandings(List<Map<String, dynamic>> teams, List<Map
     if (scoreA > scoreB) {
       a.wins++;
       b.losses++;
-      a.points += scoringWinPoints(scoringType);
-      b.points += scoringLossPoints(scoringType);
+      a.points += scoringWinPoints(scoringType, scoringConfig);
+      b.points += scoringLossPoints(scoringType, scoringConfig);
     } else if (scoreA < scoreB) {
       b.wins++;
       a.losses++;
-      b.points += scoringWinPoints(scoringType);
-      a.points += scoringLossPoints(scoringType);
+      b.points += scoringWinPoints(scoringType, scoringConfig);
+      a.points += scoringLossPoints(scoringType, scoringConfig);
     } else {
       a.draws++;
       b.draws++;
-      a.points += scoringDrawPoints(scoringType);
-      b.points += scoringDrawPoints(scoringType);
+      a.points += scoringDrawPoints(scoringType, scoringConfig);
+      b.points += scoringDrawPoints(scoringType, scoringConfig);
     }
   }
 
@@ -2996,6 +3083,7 @@ class _FinancesTabState extends State<FinancesTab> {
             final settledExpenses = data.expenses.where((e) => AppData.text(e['status'], 'pending') == 'paid').toList();
             final myId = AppData.user?.id ?? '';
             final mySettlements = summary.settlements.where((d) => d.fromId == myId || d.toId == myId).toList();
+            final groupSettlements = summary.settlements.where((d) => d.fromId != myId && d.toId != myId).toList();
 
             return RefreshIndicator(
               color: AppColors.teal,
@@ -3008,8 +3096,24 @@ class _FinancesTabState extends State<FinancesTab> {
                   FinanceHeroCard(summary: summary, onCreate: openCreate),
                   const SizedBox(height: 12),
                   FinanceMyStatusCard(summary: summary, settlements: mySettlements, onCreate: openCreate),
+                  const SizedBox(height: 12),
+                  FinanceAutoBalanceCard(summary: summary, openCount: pendingExpenses.length, settledCount: settledExpenses.length),
+                  if (mySettlements.isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    SectionHeader(title: 'Tus pagos recomendados', action: '${mySettlements.length}'),
+                    const SizedBox(height: 8),
+                    AppCard(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(children: [
+                        for (int i = 0; i < mySettlements.length; i++) ...[
+                          SettlementPaymentRow(debt: mySettlements[i]),
+                          if (i != mySettlements.length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
+                        ],
+                      ]),
+                    ),
+                  ],
                   const SizedBox(height: 18),
-                  SectionHeader(title: 'Pagos para liquidar', action: 'Actualizar', onTap: reload),
+                  SectionHeader(title: 'Liquidación del grupo', action: 'Actualizar', onTap: reload),
                   const SizedBox(height: 8),
                   if (summary.settlements.isEmpty)
                     EmptySlim(icon: Icons.verified_rounded, title: 'Todo está cuadrado', body: 'Nadie tiene que pagar nada ahora mismo.')
@@ -3172,8 +3276,18 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
     if (splitMode == 'custom') {
       return {for (final id in selected) id: double.parse(customShareFor(id).toStringAsFixed(2))};
     }
-    final share = selected.isEmpty ? 0.0 : amountValue / selected.length;
-    return {for (final id in selected) id: double.parse(share.toStringAsFixed(2))};
+    final ids = selected.toList();
+    if (ids.isEmpty) return {};
+    final totalCents = (amountValue * 100).round();
+    final base = totalCents ~/ ids.length;
+    var remainder = totalCents - (base * ids.length);
+    final result = <String, double>{};
+    for (final id in ids) {
+      final cents = base + (remainder > 0 ? 1 : 0);
+      if (remainder > 0) remainder--;
+      result[id] = double.parse((cents / 100).toStringAsFixed(2));
+    }
+    return result;
   }
 
   Future<void> save(List<Map<String, dynamic>> members) async {
@@ -3432,29 +3546,39 @@ class FinanceHeroCard extends StatelessWidget {
     return AppCard(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       color: AppColors.tealDark,
-      child: Row(children: [
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(15)),
-          child: Icon(clean ? Icons.verified_rounded : Icons.account_balance_wallet_rounded, color: Colors.white, size: 24),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_financeMainTitle(summary), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, letterSpacing: -.25)),
-          const SizedBox(height: 4),
-          Text(clean ? 'Nadie debe dinero.' : '${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} para liquidar todo', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w700)),
-        ])),
-        const SizedBox(width: 10),
-        SizedBox(
-          height: 40,
-          child: TextButton.icon(
-            onPressed: onCreate,
-            style: TextButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.tealDark, padding: const EdgeInsets.symmetric(horizontal: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Gasto', style: TextStyle(fontWeight: FontWeight.w900)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(15)),
+            child: Icon(clean ? Icons.verified_rounded : Icons.account_balance_wallet_rounded, color: Colors.white, size: 24),
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(_financeMainTitle(summary), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, letterSpacing: -.25)),
+            const SizedBox(height: 4),
+            Text(clean ? 'Nadie debe dinero.' : '${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} para liquidar todo', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w700)),
+          ])),
+          const SizedBox(width: 10),
+          SizedBox(
+            height: 40,
+            child: TextButton.icon(
+              onPressed: onCreate,
+              style: TextButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.tealDark, padding: const EdgeInsets.symmetric(horizontal: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Gasto', style: TextStyle(fontWeight: FontWeight.w900)),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: _HeroFinanceMetric(label: 'Gastado', value: money(summary.totalExpenses))),
+          const SizedBox(width: 8),
+          Expanded(child: _HeroFinanceMetric(label: 'Pendiente', value: money(summary.pendingAmount))),
+          const SizedBox(width: 8),
+          Expanded(child: _HeroFinanceMetric(label: 'A mover', value: money(summary.settlementAmount))),
+        ]),
       ]),
     );
   }
@@ -3544,18 +3668,31 @@ class SettlementPaymentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final myId = AppData.user?.id ?? '';
+    final title = debt.fromId == myId
+        ? 'Pagas a ${debt.toName}'
+        : debt.toId == myId
+            ? '${debt.fromName} te paga'
+            : '${debt.fromName} paga a ${debt.toName}';
+    final subtitle = debt.fromId == myId || debt.toId == myId
+        ? 'Movimiento directo para dejar tu balance a cero'
+        : 'Pago recomendado para compensar las deudas del grupo';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       child: Row(children: [
-        Container(width: 36, height: 36, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.swap_horiz_rounded, color: AppColors.teal, size: 20)),
+        Container(width: 38, height: 38, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.swap_horiz_rounded, color: AppColors.teal, size: 20)),
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('${debt.fromName} → ${debt.toName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
           const SizedBox(height: 2),
-          const Text('Pago recomendado para dejar las cuentas a cero', style: TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
+          Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
         ])),
         const SizedBox(width: 8),
-        Text(money(debt.amount), style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 15)),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(99)),
+          child: Text(money(debt.amount), style: const TextStyle(color: AppColors.tealDark, fontWeight: FontWeight.w900, fontSize: 14.5)),
+        ),
       ]),
     );
   }
@@ -3851,7 +3988,7 @@ class BalanceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = value > 0.01 ? AppColors.green : value < -0.01 ? AppColors.red : AppColors.muted;
-    final label = value > 0.01 ? 'Le deben dinero' : value < -0.01 ? 'Debe dinero' : 'Cuadrado';
+    final label = value > 0.01 ? 'A favor' : value < -0.01 ? 'Debe' : 'Cuadrado';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       child: Row(children: [
@@ -3866,7 +4003,11 @@ class BalanceRow extends StatelessWidget {
           const SizedBox(height: 2),
           Text(label, style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
         ])),
-        Text(money(value), style: TextStyle(color: color, fontWeight: FontWeight.w900)),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(99)),
+          child: Text(money(value), style: TextStyle(color: color, fontWeight: FontWeight.w900)),
+        ),
       ]),
     );
   }
@@ -4030,9 +4171,16 @@ class CreateTournamentScreen extends StatefulWidget {
 
 class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   final name = TextEditingController();
+  final customUnit = TextEditingController(text: 'puntos');
   String format = 'liga';
   String teamType = 'pareja';
   String scoringType = 'general';
+  String customResultMode = 'simple';
+  bool customAllowDraw = true;
+  int customWinPoints = 3;
+  int customDrawPoints = 1;
+  int customLossPoints = 0;
+  int customBestOf = 3;
   int step = 0;
   bool loading = false;
 
@@ -4045,7 +4193,24 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   @override
   void dispose() {
     name.dispose();
+    customUnit.dispose();
     super.dispose();
+  }
+
+  Map<String, dynamic> get currentScoringConfig {
+    if (scoringType != 'custom') return resolvedScoringConfig(scoringType);
+    return {
+      'win': customWinPoints,
+      'draw': customAllowDraw ? customDrawPoints : 0,
+      'loss': customLossPoints,
+      'unit': customResultMode == 'sets' ? 'sets' : customUnit.text.trim().isEmpty ? 'puntos' : customUnit.text.trim(),
+      'allowDraw': customAllowDraw,
+      'result_mode': customResultMode,
+      'best_of': customBestOf,
+      'set_label': customUnit.text.trim().isEmpty ? 'juegos' : customUnit.text.trim(),
+      'score_label': customUnit.text.trim().isEmpty ? 'puntos' : customUnit.text.trim(),
+      'ranking_label': customResultMode == 'sets' ? 'DS' : 'DIF',
+    };
   }
 
   String get defaultName {
@@ -4081,7 +4246,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
         format: format,
         teamType: teamType,
         scoringType: scoringType,
-        scoringConfig: scoringConfigForType(scoringType),
+        scoringConfig: currentScoringConfig,
       );
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(MaterialPageRoute(
@@ -4192,6 +4357,55 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
             body: scoringTypeSubtitle('custom'),
             onTap: () => setState(() => scoringType = 'custom'),
           ),
+          if (scoringType == 'custom') ...[
+            const SizedBox(height: 8),
+            AppCard(
+              padding: const EdgeInsets.all(14),
+              color: AppColors.surface,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Configura tu sistema', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(child: PickPill(label: 'Marcador directo', selected: customResultMode == 'simple', onTap: () => setState(() => customResultMode = 'simple'))),
+                  const SizedBox(width: 8),
+                  Expanded(child: PickPill(label: 'Por sets', selected: customResultMode == 'sets', onTap: () => setState(() => customResultMode = 'sets'))),
+                ]),
+                const SizedBox(height: 12),
+                if (customResultMode == 'simple') ...[
+                  FieldLabel('Nombre del marcador'),
+                  TextField(controller: customUnit, decoration: const InputDecoration(hintText: 'Ej. goles, puntos, manos...')),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: SmallStepperField(label: 'Victoria', value: customWinPoints, onChanged: (v) => setState(() => customWinPoints = v))),
+                    const SizedBox(width: 8),
+                    Expanded(child: SmallStepperField(label: 'Empate', value: customDrawPoints, onChanged: (v) => setState(() => customDrawPoints = v))),
+                    const SizedBox(width: 8),
+                    Expanded(child: SmallStepperField(label: 'Derrota', value: customLossPoints, onChanged: (v) => setState(() => customLossPoints = v))),
+                  ]),
+                  const SizedBox(height: 12),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Permitir empate', style: TextStyle(fontWeight: FontWeight.w800)),
+                    value: customAllowDraw,
+                    onChanged: (v) => setState(() => customAllowDraw = v),
+                  ),
+                ] else ...[
+                  FieldLabel('Unidad por set'),
+                  TextField(controller: customUnit, decoration: const InputDecoration(hintText: 'Ej. juegos, puntos, manos...')),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: SmallStepperField(label: 'Victoria', value: customWinPoints, onChanged: (v) => setState(() => customWinPoints = v))),
+                    const SizedBox(width: 8),
+                    Expanded(child: SmallStepperField(label: 'Derrota', value: customLossPoints, onChanged: (v) => setState(() => customLossPoints = v))),
+                    const SizedBox(width: 8),
+                    Expanded(child: SmallStepperField(label: 'Mejor de', value: customBestOf, min: 1, step: 2, onChanged: (v) => setState(() => customBestOf = v.isEven ? v + 1 : v))),
+                  ]),
+                  const SizedBox(height: 8),
+                  const Text('Ejemplo: mejor de 3 sets o mejor de 5 sets.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+                ],
+              ]),
+            ),
+          ],
         ] else if (step == 3) ...[
           Text('¿Quién participa?', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -4208,6 +4422,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
             format: format,
             teamType: teamType,
             scoringType: scoringType,
+            scoringConfig: currentScoringConfig,
           ),
         ] else ...[
           Text('Resumen antes de crear', style: Theme.of(context).textTheme.titleMedium),
@@ -4217,6 +4432,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
             format: format,
             teamType: teamType,
             scoringType: scoringType,
+            scoringConfig: currentScoringConfig,
             detailed: true,
           ),
           const SizedBox(height: 14),
@@ -4420,10 +4636,11 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
           final matches = tournamentMatches(tournament);
           final format = AppData.text(tournament['format'], 'liga');
           final scoringType = AppData.text(tournament['scoring_type'], 'general');
+          final scoringConfig = resolvedScoringConfig(scoringType, tournament['scoring_config']);
           final status = AppData.text(tournament['status'], 'active');
           final played = matches.where((m) => AppData.text(m['status']) == 'played').length;
           final pending = matches.length - played;
-          final standings = calculateStandings(teams, matches, scoringType: scoringType);
+          final standings = calculateStandings(teams, matches, scoringType: scoringType, scoringConfig: scoringConfig);
 
           return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Container(
@@ -4465,6 +4682,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                   Text(AppData.text(tournament['name'], 'Competición'), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, height: 1.05)),
                   const SizedBox(height: 7),
                   Text('${tournamentFormatLabel(format)} · ${teamTypeLabel(AppData.text(tournament['team_type'], 'equipo'))} · ${scoringTypeLabel(scoringType)} · ${status == 'finished' ? 'Finalizada' : 'En curso'}', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  Text(scoringConfigShortText(scoringType, scoringConfig), style: const TextStyle(color: Colors.white60, fontWeight: FontWeight.w700, fontSize: 12)),
                 ]),
               ),
             ),
@@ -4502,12 +4721,13 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                     onGenerate: () => generate(tournament),
                   )
                 else if (section == 1)
-                  _TournamentStandingsSection(standings: standings, format: format, scoringType: scoringType)
+                  _TournamentStandingsSection(standings: standings, format: format, scoringType: scoringType, scoringConfig: scoringConfig)
                 else if (section == 2)
                   _TournamentMatchesSection(
                     matches: matches,
                     teams: teams,
                     scoringType: scoringType,
+                    scoringConfig: scoringConfig,
                     onResultChanged: reload,
                   )
                 else
@@ -4709,16 +4929,17 @@ class _TournamentStandingsSection extends StatelessWidget {
   final List<TeamStanding> standings;
   final String format;
   final String scoringType;
-  const _TournamentStandingsSection({required this.standings, required this.format, required this.scoringType});
+  final Map<String, dynamic> scoringConfig;
+  const _TournamentStandingsSection({required this.standings, required this.format, required this.scoringType, required this.scoringConfig});
 
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SectionHeader(title: format == 'eliminatoria' ? 'Rendimiento' : 'Clasificación', action: standingsHeaderForScoring(scoringType)),
+      SectionHeader(title: format == 'eliminatoria' ? 'Rendimiento' : 'Clasificación', action: standingsHeaderForScoring(scoringType, scoringConfig)),
       if (standings.isEmpty)
         EmptyBlock(icon: Icons.leaderboard_rounded, title: 'Sin clasificación', body: 'Añade participantes y registra resultados para calcular la tabla.')
       else
-        ...standings.asMap().entries.map((entry) => StandingRow(position: entry.key + 1, standing: entry.value, detailed: true, scoringType: scoringType)),
+        ...standings.asMap().entries.map((entry) => StandingRow(position: entry.key + 1, standing: entry.value, detailed: true, scoringType: scoringType, scoringConfig: scoringConfig)),
     ]);
   }
 }
@@ -4727,8 +4948,9 @@ class _TournamentMatchesSection extends StatelessWidget {
   final List<Map<String, dynamic>> matches;
   final List<Map<String, dynamic>> teams;
   final String scoringType;
+  final Map<String, dynamic> scoringConfig;
   final VoidCallback onResultChanged;
-  const _TournamentMatchesSection({required this.matches, required this.teams, required this.scoringType, required this.onResultChanged});
+  const _TournamentMatchesSection({required this.matches, required this.teams, required this.scoringType, required this.scoringConfig, required this.onResultChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -4746,7 +4968,7 @@ class _TournamentMatchesSection extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       ...rounds.entries.map((entry) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SectionHeader(title: 'Ronda ${entry.key}', action: '${entry.value.length} partidos'),
-        ...entry.value.map((m) => MatchResultCard(match: m, names: names, scoringType: scoringType, onChanged: onResultChanged)),
+        ...entry.value.map((m) => MatchResultCard(match: m, names: names, scoringType: scoringType, scoringConfig: scoringConfig, onChanged: onResultChanged)),
         const SizedBox(height: 8),
       ])),
     ]);
@@ -5071,8 +5293,9 @@ class TournamentPreviewCard extends StatelessWidget {
   final String format;
   final String teamType;
   final String scoringType;
+  final Map<String, dynamic>? scoringConfig;
   final bool detailed;
-  const TournamentPreviewCard({super.key, required this.name, required this.format, required this.teamType, this.scoringType = 'general', this.detailed = false});
+  const TournamentPreviewCard({super.key, required this.name, required this.format, required this.teamType, this.scoringType = 'general', this.scoringConfig, this.detailed = false});
 
   @override
   Widget build(BuildContext context) => AppCard(
@@ -5086,13 +5309,15 @@ class TournamentPreviewCard extends StatelessWidget {
           Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           Text('${tournamentFormatLabel(format)} · ${teamTypeLabel(teamType)} · ${scoringTypeLabel(scoringType)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 3),
+          Text(scoringConfigShortText(scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
         ])),
       ]),
       if (detailed) ...[
         const SizedBox(height: 14),
         StatusNotice(ok: true, text: tournamentFormatSubtitle(format)),
         const SizedBox(height: 8),
-        StatusNotice(ok: true, text: scoringTypeSubtitle(scoringType)),
+        StatusNotice(ok: true, text: scoringConfigFullText(scoringType, scoringConfig)),
         const SizedBox(height: 10),
         const Text('Después de crearla, añade participantes y pulsa “Generar partidos”. La tabla se actualizará al registrar resultados.', style: TextStyle(color: AppColors.muted, height: 1.35, fontWeight: FontWeight.w700)),
       ],
@@ -5191,6 +5416,49 @@ class PickPill extends StatelessWidget {
   );
 }
 
+
+class SmallStepperField extends StatelessWidget {
+  final String label;
+  final int value;
+  final int min;
+  final int step;
+  final ValueChanged<int> onChanged;
+  const SmallStepperField({super.key, required this.label, required this.value, required this.onChanged, this.min = 0, this.step = 1});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.line)),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
+      const SizedBox(height: 7),
+      Row(children: [
+        _StepperMiniButton(icon: Icons.remove_rounded, onTap: () => onChanged(max(min, value - step))),
+        Expanded(child: Center(child: Text('$value', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink, fontSize: 16)))),
+        _StepperMiniButton(icon: Icons.add_rounded, onTap: () => onChanged(value + step)),
+      ]),
+    ]),
+  );
+}
+
+class _StepperMiniButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _StepperMiniButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(10),
+    child: Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(10)),
+      child: Icon(icon, size: 18, color: AppColors.teal),
+    ),
+  );
+}
+
 class MatchCompactCard extends StatelessWidget {
   final Map<String, dynamic> match;
   final Map<String, String> names;
@@ -5219,10 +5487,96 @@ class MatchResultCard extends StatelessWidget {
   final Map<String, dynamic> match;
   final Map<String, String> names;
   final String scoringType;
+  final Map<String, dynamic>? scoringConfig;
   final VoidCallback onChanged;
-  const MatchResultCard({super.key, required this.match, required this.names, this.scoringType = 'general', required this.onChanged});
+  const MatchResultCard({super.key, required this.match, required this.names, this.scoringType = 'general', this.scoringConfig, required this.onChanged});
 
   Future<void> editResult(BuildContext context) async {
+    final config = resolvedScoringConfig(scoringType, scoringConfig);
+    if (scoringUsesSetMode(scoringType, config)) {
+      final bestOf = scoringBestOf(scoringType, config);
+      final requiredSets = (bestOf / 2).ceil();
+      final existingSets = matchDetailSets(match);
+      final controllersA = List.generate(bestOf, (i) => TextEditingController(text: i < existingSets.length ? AppData.text(existingSets[i]['a']) : ''));
+      final controllersB = List.generate(bestOf, (i) => TextEditingController(text: i < existingSets.length ? AppData.text(existingSets[i]['b']) : ''));
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Resultado por sets'),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Introduce ${scoringSetLabel(scoringType, config)} por set. Grupli calculará automáticamente el ganador del partido.', style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 12),
+                for (int i = 0; i < bestOf; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(children: [
+                      SizedBox(width: 54, child: Text('Set ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w800))),
+                      Expanded(child: TextField(controller: controllersA[i], keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'A'))),
+                      const SizedBox(width: 10),
+                      Expanded(child: TextField(controller: controllersB[i], keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'B'))),
+                    ]),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+            FilledButton(
+              onPressed: () {
+                final sets = <Map<String, int>>[];
+                var winsA = 0;
+                var winsB = 0;
+                for (int i = 0; i < bestOf; i++) {
+                  final rawA = controllersA[i].text.trim();
+                  final rawB = controllersB[i].text.trim();
+                  if (rawA.isEmpty && rawB.isEmpty) continue;
+                  final a = int.tryParse(rawA);
+                  final b = int.tryParse(rawB);
+                  if (a == null || b == null || a < 0 || b < 0 || a == b) {
+                    return;
+                  }
+                  sets.add({'a': a, 'b': b});
+                  if (a > b) {
+                    winsA++;
+                  } else {
+                    winsB++;
+                  }
+                }
+                if (sets.isEmpty || winsA == winsB || max(winsA, winsB) < requiredSets) {
+                  return;
+                }
+                Navigator.pop(context, {
+                  'scoreA': winsA,
+                  'scoreB': winsB,
+                  'details': {
+                    'mode': 'sets',
+                    'best_of': bestOf,
+                    'sets': sets,
+                  },
+                });
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      );
+      for (final c in [...controllersA, ...controllersB]) {
+        c.dispose();
+      }
+      if (result == null) return;
+      try {
+        await AppData.setMatchResult(match['id'].toString(), AppData.intValue(result['scoreA']), AppData.intValue(result['scoreB']), details: AppData.asMap(result['details']));
+        onChanged();
+      } catch (e) {
+        await showToast(context, e.toString(), danger: true);
+      }
+      return;
+    }
+
     final aController = TextEditingController(text: AppData.text(match['score_a']));
     final bController = TextEditingController(text: AppData.text(match['score_b']));
     final result = await showDialog<List<int>>(
@@ -5230,9 +5584,9 @@ class MatchResultCard extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: const Text('Resultado'),
         content: Row(children: [
-          Expanded(child: TextField(controller: aController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: matchInputLabel(scoringType, true)))),
+          Expanded(child: TextField(controller: aController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: matchInputLabel(scoringType, true, config)))),
           const SizedBox(width: 12),
-          Expanded(child: TextField(controller: bController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: matchInputLabel(scoringType, false)))),
+          Expanded(child: TextField(controller: bController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: matchInputLabel(scoringType, false, config)))),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
@@ -5240,6 +5594,7 @@ class MatchResultCard extends StatelessWidget {
             final a = int.tryParse(aController.text.trim());
             final b = int.tryParse(bController.text.trim());
             if (a == null || b == null || a < 0 || b < 0) return;
+            if (!scoringAllowDraw(scoringType, config) && a == b) return;
             Navigator.pop(context, [a, b]);
           }, child: const Text('Guardar')),
         ],
@@ -5249,7 +5604,7 @@ class MatchResultCard extends StatelessWidget {
     bController.dispose();
     if (result == null) return;
     try {
-      await AppData.setMatchResult(match['id'].toString(), result[0], result[1]);
+      await AppData.setMatchResult(match['id'].toString(), result[0], result[1], details: null);
       onChanged();
     } catch (e) {
       await showToast(context, e.toString(), danger: true);
@@ -5271,6 +5626,7 @@ class MatchResultCard extends StatelessWidget {
     final a = teamName(AppData.text(match['team_a']), names);
     final b = teamName(AppData.text(match['team_b']), names);
     final score = played ? '${AppData.intValue(match['score_a'])} - ${AppData.intValue(match['score_b'])}' : 'Pendiente';
+    final detailText = played ? matchDetailScoreText(match, scoringType, scoringConfig) : null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 9),
@@ -5282,6 +5638,13 @@ class MatchResultCard extends StatelessWidget {
             Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7), decoration: BoxDecoration(color: played ? AppColors.tealSoft : AppColors.faint, borderRadius: BorderRadius.circular(99)), child: Text(score, style: TextStyle(fontWeight: FontWeight.w900, color: played ? AppColors.tealDark : AppColors.muted))),
             Expanded(child: Text(b, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w900))),
           ]),
+          if (detailText != null) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(detailText, style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w800)),
+            ),
+          ],
           const SizedBox(height: 10),
           Row(children: [
             Text('Ronda ${AppData.intValue(match['round'], 1)}', style: Theme.of(context).textTheme.bodyMedium),
@@ -5302,7 +5665,8 @@ class StandingRow extends StatelessWidget {
   final TeamStanding standing;
   final bool detailed;
   final String scoringType;
-  const StandingRow({super.key, required this.position, required this.standing, this.detailed = false, this.scoringType = 'general'});
+  final Map<String, dynamic>? scoringConfig;
+  const StandingRow({super.key, required this.position, required this.standing, this.detailed = false, this.scoringType = 'general', this.scoringConfig});
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -5314,11 +5678,11 @@ class StandingRow extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(standing.name, style: const TextStyle(fontWeight: FontWeight.w900)),
-          if (detailed) Text('${standing.wins}G · ${standing.draws}E · ${standing.losses}P · ${scoringMetricUnit(scoringType)} ${standing.goalsFor}-${standing.goalsAgainst}', style: Theme.of(context).textTheme.bodyMedium),
+          if (detailed) Text('${standing.wins}G · ${standing.draws}E · ${standing.losses}P · ${scoringMetricUnit(scoringType, scoringConfig)} ${standing.goalsFor}-${standing.goalsAgainst}', style: Theme.of(context).textTheme.bodyMedium),
         ])),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text('${standing.points}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.teal)),
-          Text('PTS · DG ${standing.goalDifference}', style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w800)),
+          Text('PTS · ${scoringRankingLabel(scoringType, scoringConfig)} ${standing.goalDifference}', style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w800)),
         ]),
       ]),
     ),
@@ -6846,83 +7210,66 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
     final missing = max(0, minPeople - yes);
     final progress = minPeople <= 0 ? 0.0 : min(1.0, yes / minPeople);
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        gradient: LinearGradient(
-          colors: [color.withOpacity(.18), eventKindSoftColor(event).withOpacity(.96)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: color.withOpacity(.14)),
-        boxShadow: [BoxShadow(color: AppColors.ink.withOpacity(.045), blurRadius: 18, offset: const Offset(0, 8))],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () async {
-                await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: widget.group)));
-                widget.onChanged();
-              },
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    Container(
-                      width: 48,
-                      height: 52,
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(.74), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withOpacity(.12))),
-                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Text(shortWeekday(date).toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900)),
-                        Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 19, fontWeight: FontWeight.w900, height: 1)),
-                        Text(DateFormat('MMM', 'es_ES').format(date).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 9, fontWeight: FontWeight.w800)),
-                      ]),
-                    ),
-                    const SizedBox(width: 11),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 19, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -.25)),
-                      const SizedBox(height: 5),
-                      Row(children: [
-                        Icon(Icons.schedule_rounded, size: 14, color: color),
-                        const SizedBox(width: 4),
-                        Text(DateFormat('HH:mm', 'es_ES').format(date), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.ink)),
-                        const SizedBox(width: 8),
-                        Icon(Icons.place_outlined, size: 14, color: color),
-                        const SizedBox(width: 4),
-                        Expanded(child: Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.muted))),
-                      ]),
-                    ])),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                      decoration: BoxDecoration(color: missing == 0 ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(99)),
-                      child: Text(missing == 0 ? 'Listo' : 'Faltan $missing', style: TextStyle(color: missing == 0 ? AppColors.green : AppColors.orange, fontSize: 11, fontWeight: FontWeight.w900)),
-                    ),
-                  ]),
-                  const SizedBox(height: 9),
-                  Row(children: [
-                    Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 4, backgroundColor: Colors.white.withOpacity(.70), color: color))),
-                    const SizedBox(width: 8),
-                    Text('$yes/$minPeople', style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12)),
-                  ]),
-                  const SizedBox(height: 9),
-                  Row(children: [
-                    Expanded(child: GlassAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
-                    const SizedBox(width: 7),
-                    Expanded(child: GlassAttendanceButton(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
-                    const SizedBox(width: 7),
-                    Expanded(child: GlassAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
-                  ]),
-                ]),
-              ),
-            ),
+    return AppCard(
+      color: Color.alphaBlend(color.withOpacity(.10), AppColors.white),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      onTap: () async {
+        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: widget.group)));
+        widget.onChanged();
+      },
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 58,
+            height: 62,
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withOpacity(.18))),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text(shortWeekday(date).toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900)),
+              Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 24, fontWeight: FontWeight.w900, height: 1)),
+              Text(DateFormat('MMM', 'es_ES').format(date).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800)),
+            ]),
           ),
-        ),
-      ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 21, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -.25))),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(color: missing == 0 ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(99)),
+                child: Text(missing == 0 ? 'Listo' : 'Faltan $missing', style: TextStyle(color: missing == 0 ? AppColors.green : AppColors.orange, fontSize: 11.5, fontWeight: FontWeight.w900)),
+              ),
+            ]),
+            const SizedBox(height: 7),
+            Wrap(spacing: 10, runSpacing: 6, children: [
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.schedule_rounded, size: 15, color: color),
+                const SizedBox(width: 4),
+                Text(DateFormat('HH:mm', 'es_ES').format(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.ink)),
+              ]),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.place_outlined, size: 15, color: color),
+                const SizedBox(width: 4),
+                Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.muted)),
+              ]),
+            ]),
+          ])),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 6, backgroundColor: const Color(0xFFE5EEF3), color: color))),
+          const SizedBox(width: 10),
+          Text('$yes/$minPeople', style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 13)),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: GlassAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
+          const SizedBox(width: 8),
+          Expanded(child: GlassAttendanceButton(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
+          const SizedBox(width: 8),
+          Expanded(child: GlassAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
+        ]),
+      ]),
     );
   }
 }
@@ -6980,22 +7327,22 @@ class GlassAttendanceButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
-    borderRadius: BorderRadius.circular(13),
+    borderRadius: BorderRadius.circular(15),
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 150),
-      height: 35,
+      height: 42,
       decoration: BoxDecoration(
-        color: selected ? color : color.withOpacity(.13),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: selected ? color : color.withOpacity(.24), width: 1),
-        boxShadow: selected ? [BoxShadow(color: color.withOpacity(.18), blurRadius: 12, offset: const Offset(0, 5))] : null,
+        color: selected ? color : Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: selected ? color : color.withOpacity(.36), width: 1.2),
+        boxShadow: selected ? [BoxShadow(color: color.withOpacity(.20), blurRadius: 14, offset: const Offset(0, 6))] : const [BoxShadow(color: Color(0x08111B34), blurRadius: 10, offset: Offset(0, 4))],
       ),
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: selected ? Colors.white : color, size: 14),
+        Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: selected ? Colors.white : color, size: 15),
+        const SizedBox(width: 5),
+        Text(label, style: TextStyle(color: selected ? Colors.white : color, fontSize: 12.5, fontWeight: FontWeight.w900)),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(color: selected ? Colors.white : color, fontSize: 11.5, fontWeight: FontWeight.w900)),
-        const SizedBox(width: 3),
-        Text(count.toString(), style: TextStyle(color: selected ? Colors.white : color, fontSize: 11.5, fontWeight: FontWeight.w900)),
+        Text(count.toString(), style: TextStyle(color: selected ? Colors.white : color, fontSize: 12.5, fontWeight: FontWeight.w900)),
       ]),
     ),
   );

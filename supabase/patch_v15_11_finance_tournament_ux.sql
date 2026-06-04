@@ -26,3 +26,7 @@ UPDATE public.tournaments
 SET
   scoring_type = COALESCE(NULLIF(scoring_type, ''), 'general'),
   scoring_config = COALESCE(scoring_config, '{"win":3,"draw":1,"loss":0,"unit":"puntos","allowDraw":true}'::jsonb);
+
+
+ALTER TABLE public.matches
+ADD COLUMN IF NOT EXISTS result_details jsonb;

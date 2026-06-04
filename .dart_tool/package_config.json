@@ -219,13 +219,13 @@
     },
     {
       "name": "functions_client",
-      "rootUri": "file:///C:/Users/Jose/AppData/Local/Pub/Cache/hosted/pub.dev/functions_client-2.5.0",
+      "rootUri": "file:///C:/Users/Jose/AppData/Local/Pub/Cache/hosted/pub.dev/functions_client-2.6.0",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.3"
     },
     {
       "name": "gotrue",
-      "rootUri": "file:///C:/Users/Jose/AppData/Local/Pub/Cache/hosted/pub.dev/gotrue-2.20.0",
+      "rootUri": "file:///C:/Users/Jose/AppData/Local/Pub/Cache/hosted/pub.dev/gotrue-2.21.0",
       "packageUri": "lib/",
       "languageVersion": "3.3"
     },
@@ -561,7 +561,7 @@
     },
     {
       "name": "storage_client",
-      "rootUri": "file:///C:/Users/Jose/AppData/Local/Pub/Cache/hosted/pub.dev/storage_client-2.5.2",
+      "rootUri": "file:///C:/Users/Jose/AppData/Local/Pub/Cache/hosted/pub.dev/storage_client-2.5.4",
       "packageUri": "lib/",
       "languageVersion": "3.3"
     },
@@ -579,13 +579,13 @@
     },
     {
       "name": "supabase",
-      "rootUri": "file:///C:/Users/Jose/AppData/Local/Pub/Cache/hosted/pub.dev/supabase-2.10.6",
+      "rootUri": "file:///C:/Users/Jose/AppData/Local/Pub/Cache/hosted/pub.dev/supabase-2.12.0",
       "packageUri": "lib/",
       "languageVersion": "3.3"
     },
     {
       "name": "supabase_flutter",
-      "rootUri": "file:///C:/Users/Jose/AppData/Local/Pub/Cache/hosted/pub.dev/supabase_flutter-2.12.4",
+      "rootUri": "file:///C:/Users/Jose/AppData/Local/Pub/Cache/hosted/pub.dev/supabase_flutter-2.14.0",
       "packageUri": "lib/",
       "languageVersion": "3.3"
     },
