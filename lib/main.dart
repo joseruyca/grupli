@@ -74,11 +74,11 @@ class AppConfig {
 }
 
 class AppColors {
-  static const bgShell = Color(0xFFF4F7FB);
+  static const bgShell = Color(0xFFF3F7FB);
   static const white = Color(0xFFFFFFFF);
   static const ink = Color(0xFF102033);
   static const muted = Color(0xFF66758A);
-  static const faint = Color(0xFFF7FAFD);
+  static const faint = Color(0xFFF8FAFF);
   static const surface = Color(0xFFFBFDFF);
   static const line = Color(0xFFE4EBF4);
   static const lineSoft = Color(0xFFF0F5FA);
@@ -1966,7 +1966,7 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.fromLTRB(22, 24, 22, 28),
         children: [
           Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-            Expanded(child: PageHeader(title: 'Mis grupos', subtitle: 'Hola, $name 👋 Organiza planes, gastos y torneos.')),
+            Expanded(child: PageHeader(title: 'Mis grupos 👋', subtitle: 'Hola, $name. Organiza planes, gastos y torneos en un solo lugar.')),
             const SizedBox(width: 12),
             CircleIconButton(icon: Icons.add_rounded, filled: true, onTap: () async {
               final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const CreateJoinScreen()));
@@ -7561,38 +7561,53 @@ class GroupHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasCover = coverUrl.trim().isNotEmpty;
     return Container(
-      height: 118,
+      height: 154,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(30),
         gradient: const LinearGradient(
-          colors: [Color(0xFF073A57), Color(0xFF0B6B8F), Color(0xFF3A8EBD)],
+          colors: [Color(0xFF041F33), Color(0xFF073A57), Color(0xFF087A78)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        boxShadow: const [BoxShadow(color: Color(0x1A073A57), blurRadius: 24, offset: Offset(0, 12))],
+        boxShadow: const [BoxShadow(color: Color(0x22073A57), blurRadius: 28, offset: Offset(0, 14))],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(30),
         child: Stack(children: [
           if (hasCover)
             Positioned.fill(child: Image.network(coverUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink())),
-          Positioned.fill(child: Container(color: hasCover ? const Color(0xAA073A57) : Colors.transparent)),
-          if (!hasCover) Positioned.fill(child: Opacity(opacity: .08, child: const PatternIcons())),
-          Positioned(left: 16, right: 16, top: 14, child: Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white.withOpacity(.16))),
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.lock_rounded, color: Colors.white, size: 13),
-                SizedBox(width: 5),
-                Text('Privado', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5)),
-              ]),
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: hasCover
+                      ? const [Color(0xE8041F33), Color(0xB3073A57), Color(0xDA041F33)]
+                      : const [Color(0xFF041F33), Color(0xFF073A57), Color(0xFF087A78)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
             ),
+          ),
+          Positioned.fill(child: Opacity(opacity: hasCover ? .05 : .08, child: const PatternIcons())),
+          Positioned(left: 17, top: 16, child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white.withOpacity(.18))),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.lock_rounded, color: Colors.white, size: 13),
+              SizedBox(width: 5),
+              Text('Privado', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5)),
+            ]),
+          )),
+          Positioned(right: 16, top: 14, child: Row(children: [
+            Container(width: 31, height: 31, decoration: BoxDecoration(color: Colors.white.withOpacity(.18), shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(.22))), child: const Icon(Icons.edit_rounded, color: Colors.white, size: 16)),
+            const SizedBox(width: 8),
+            Container(width: 31, height: 31, decoration: BoxDecoration(color: Colors.white.withOpacity(.18), shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(.22))), child: const Icon(Icons.more_horiz_rounded, color: Colors.white, size: 18)),
           ])),
-          Positioned(left: 18, right: 18, bottom: 18, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: -0.75)),
-            const SizedBox(height: 7),
-            const Text('Resumen del grupo', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xEFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w700)),
+          Positioned(left: 20, right: 20, bottom: 20, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: -0.85)),
+            const SizedBox(height: 8),
+            const Text('Somos 2  ·  Planes, gastos y torneos', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xEFFFFFFF), fontSize: 13, fontWeight: FontWeight.w800)),
           ])),
         ]),
       ),
@@ -8807,7 +8822,7 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(20);
+    final radius = BorderRadius.circular(22);
     final card = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
@@ -8817,7 +8832,7 @@ class AppCard extends StatelessWidget {
         borderRadius: radius,
         border: Border.all(color: AppColors.lineSoft),
         boxShadow: const [
-          BoxShadow(color: Color(0x06102033), blurRadius: 16, offset: Offset(0, 6)),
+          BoxShadow(color: Color(0x08102033), blurRadius: 18, offset: Offset(0, 8)),
         ],
       ),
       child: child,
@@ -8902,40 +8917,90 @@ class GroupHomeCard extends StatelessWidget {
     final members = AppData.intValue(group['members_count'], 1);
     final events = AppData.intValue(group['events_count'], 0);
     final cover = AppData.text(group['cover_url']);
+    final hasCover = cover.trim().isNotEmpty;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: AppCard(
-        onTap: onTap,
-        padding: const EdgeInsets.all(12),
-        child: Row(children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: Container(
-              width: 60,
-              height: 60,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(colors: [Color(0xFF0B6B8F), Color(0xFF073A57)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(26),
+          onTap: onTap,
+          child: Container(
+            height: 116,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(26),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF06283D), Color(0xFF073A57), Color(0xFF0B6B8F)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              child: cover.isNotEmpty
-                  ? Image.network(cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.lock_rounded, color: Colors.white, size: 23))
-                  : const Icon(Icons.lock_rounded, color: Colors.white, size: 23),
+              boxShadow: const [BoxShadow(color: Color(0x1F073A57), blurRadius: 26, offset: Offset(0, 12))],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(26),
+              child: Stack(children: [
+                if (hasCover) Positioned.fill(child: Image.network(cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink())),
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: hasCover
+                            ? const [Color(0xE5073A57), Color(0xB3073A57), Color(0xDD06283D)]
+                            : const [Color(0xFF06283D), Color(0xFF073A57), Color(0xFF0B6B8F)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                    ),
+                  ),
+                ),
+                if (!hasCover) Positioned.fill(child: Opacity(opacity: .08, child: const PatternIcons())),
+                Positioned(
+                  left: 16,
+                  top: 16,
+                  bottom: 16,
+                  child: Container(
+                    width: 72,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(.13),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: Colors.white.withOpacity(.16)),
+                    ),
+                    child: hasCover
+                        ? ClipRRect(borderRadius: BorderRadius.circular(22), child: Image.network(cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.groups_rounded, color: Colors.white)))
+                        : const Icon(Icons.groups_rounded, color: Colors.white, size: 30),
+                  ),
+                ),
+                Positioned(left: 102, right: 48, top: 19, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -.25))),
+                    const SizedBox(width: 6),
+                    Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle)),
+                  ]),
+                  const SizedBox(height: 6),
+                  Row(children: [
+                    const Icon(Icons.lock_rounded, size: 13, color: Color(0xDFFFFFFF)),
+                    const SizedBox(width: 4),
+                    Text('Privado · $members ${members == 1 ? 'miembro' : 'miembros'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w800)),
+                  ]),
+                  const Spacer(),
+                  Row(children: [
+                    _MiniChip(text: events == 0 ? 'sin eventos' : '$events eventos', color: AppColors.teal),
+                    const SizedBox(width: 6),
+                    const _MiniChip(text: 'Invitación', color: AppColors.violet),
+                  ]),
+                ])),
+                Positioned(
+                  right: 14,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white.withOpacity(.14), shape: BoxShape.circle), child: const Icon(Icons.chevron_right_rounded, color: Colors.white)),
+                  ),
+                ),
+              ]),
             ),
           ),
-          const SizedBox(width: 13),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text('$members ${members == 1 ? 'miembro' : 'miembros'} · privado', maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 8),
-            Row(children: [
-              _MiniChip(text: events == 0 ? 'sin eventos' : '$events eventos', color: events == 0 ? AppColors.muted : AppColors.teal),
-              const SizedBox(width: 6),
-              const _MiniChip(text: 'invitación', color: AppColors.violet),
-            ]),
-          ])),
-          const SizedBox(width: 8),
-          Container(width: 32, height: 32, decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle), child: const Icon(Icons.chevron_right_rounded, color: AppColors.ink)),
-        ]),
+        ),
       ),
     );
   }
