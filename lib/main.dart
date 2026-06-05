@@ -17,6 +17,18 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Android 15+ activa el modo edge-to-edge por defecto.
+  // Mantenemos las barras del sistema limpias y usamos SafeArea global abajo
+  // para que los botones nativos del móvil no tapen la navegación de Grupli.
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+    statusBarBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.dark,
+    systemNavigationBarDividerColor: Colors.transparent,
+  ));
+
   ErrorWidget.builder = (details) {
     return Material(
       color: Colors.white,
@@ -107,6 +119,15 @@ class GrupliApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Grupli',
+      builder: (context, child) {
+        return SafeArea(
+          top: false,
+          left: false,
+          right: false,
+          bottom: true,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.white,
@@ -9736,20 +9757,26 @@ class MoneyStat extends StatelessWidget {
 }
 
 class GroupHomeCard extends StatelessWidget {
-  final Map<String, dynamic> group; final VoidCallback onTap;
+  final Map<String, dynamic> group;
+  final VoidCallback onTap;
   const GroupHomeCard({super.key, required this.group, required this.onTap});
-  @override Widget build(BuildContext context) {
+
+  @override
+  Widget build(BuildContext context) {
     final name = AppData.text(group['name'], 'Grupo');
     final members = AppData.intValue(group['members_count'], 1);
     final events = AppData.intValue(group['events_count'], 0);
     final cover = AppData.text(group['cover_url']);
     final hasCover = cover.trim().isNotEmpty;
+    final memberLabel = members == 1 ? 'miembro' : 'miembros';
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(26),
+      child: Semantics(
+        button: true,
+        label: 'Abrir grupo $name',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: onTap,
           child: Container(
             height: 116,
@@ -9765,13 +9792,20 @@ class GroupHomeCard extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(26),
               child: Stack(children: [
-                if (hasCover) Positioned.fill(child: Image.network(cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink())),
+                if (hasCover)
+                  Positioned.fill(
+                    child: Image.network(
+                      cover,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: hasCover
-                            ? const [Color(0xE5073A57), Color(0xB3073A57), Color(0xDD06283D)]
+                            ? const [Color(0xEA06283D), Color(0xBA073A57), Color(0xE806283D)]
                             : const [Color(0xFF06283D), Color(0xFF073A57), Color(0xFF0B6B8F)],
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
@@ -9779,7 +9813,8 @@ class GroupHomeCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (!hasCover) Positioned.fill(child: Opacity(opacity: .08, child: const PatternIcons())),
+                if (!hasCover)
+                  Positioned.fill(child: Opacity(opacity: .08, child: const PatternIcons())),
                 Positioned(
                   left: 16,
                   top: 16,
@@ -9792,35 +9827,66 @@ class GroupHomeCard extends StatelessWidget {
                       border: Border.all(color: Colors.white.withOpacity(.16)),
                     ),
                     child: hasCover
-                        ? ClipRRect(borderRadius: BorderRadius.circular(22), child: Image.network(cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.groups_rounded, color: Colors.white)))
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(22),
+                            child: Image.network(
+                              cover,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.groups_rounded, color: Colors.white),
+                            ),
+                          )
                         : const Icon(Icons.groups_rounded, color: Colors.white, size: 30),
                   ),
                 ),
-                Positioned(left: 102, right: 48, top: 19, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -.25))),
-                    const SizedBox(width: 6),
-                    Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle)),
+                Positioned(
+                  left: 102,
+                  right: 48,
+                  top: 18,
+                  bottom: 16,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -.25),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle)),
+                    ]),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      const Icon(Icons.lock_rounded, size: 13, color: Color(0xDFFFFFFF)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          'Privado · $members $memberLabel',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ]),
+                    const Spacer(),
+                    Wrap(spacing: 6, runSpacing: 6, children: [
+                      _MiniChip(text: events == 0 ? 'sin eventos' : '$events eventos', color: AppColors.teal),
+                      const _MiniChip(text: 'Invitación', color: AppColors.violet),
+                    ]),
                   ]),
-                  const SizedBox(height: 6),
-                  Row(children: [
-                    const Icon(Icons.lock_rounded, size: 13, color: Color(0xDFFFFFFF)),
-                    const SizedBox(width: 4),
-                    Text('Privado · $members ${members == 1 ? 'miembro' : 'miembros'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w800)),
-                  ]),
-                  const Spacer(),
-                  Row(children: [
-                    _MiniChip(text: events == 0 ? 'sin eventos' : '$events eventos', color: AppColors.teal),
-                    const SizedBox(width: 6),
-                    const _MiniChip(text: 'Invitación', color: AppColors.violet),
-                  ]),
-                ])),
+                ),
                 Positioned(
                   right: 14,
                   top: 0,
                   bottom: 0,
                   child: Center(
-                    child: Container(width: 34, height: 34, decoration: BoxDecoration(color: Colors.white.withOpacity(.14), shape: BoxShape.circle), child: const Icon(Icons.chevron_right_rounded, color: Colors.white)),
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(.14), shape: BoxShape.circle),
+                      child: const Icon(Icons.chevron_right_rounded, color: Colors.white),
+                    ),
                   ),
                 ),
               ]),
