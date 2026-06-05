@@ -43,6 +43,9 @@ if (Test-Path ".\.env") {
   }
 }
 
+Write-Host "Preparando Firebase Android/notificaciones..." -ForegroundColor Cyan
+& "$PSScriptRoot\configure_firebase_android.ps1"
+
 Write-Host "Preparando dependencias..." -ForegroundColor Cyan
 flutter clean
 flutter pub get

@@ -14,8 +14,30 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
+@pragma('vm:entry-point')
+Future<void> grupliFirebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    if (Firebase.apps.isEmpty) {
+      if (AppConfig.firebaseConfigured) {
+        await Firebase.initializeApp(options: PushNotificationService.firebaseOptions);
+      } else {
+        await Firebase.initializeApp();
+      }
+    }
+  } catch (_) {
+    // El handler de background nunca debe bloquear la recepción del mensaje.
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (!kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(grupliFirebaseMessagingBackgroundHandler);
+  }
+
 
   // Android 15+ activa el modo edge-to-edge por defecto.
   // Mantenemos las barras del sistema limpias y usamos SafeArea global abajo
@@ -117,6 +139,7 @@ class GrupliApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Grupli',
       builder: (context, child) {
@@ -207,8 +230,10 @@ class _AppRootState extends State<AppRoot> {
     final prefs = await SharedPreferences.getInstance();
     final introSeen = prefs.getBool(OnboardingStore.seenKey) ?? false;
     final hasInvite = InviteLinks.currentCode != null;
+    final validSession = await AppData.recoverStoredSession();
     if (!mounted) return;
     setState(() {
+      _session = validSession;
       _showOnboarding = _session == null && !introSeen && !hasInvite;
       _ready = true;
     });
@@ -304,6 +329,36 @@ class DirectPage extends StatelessWidget {
 class AppData {
   static SupabaseClient get sb => Supabase.instance.client;
   static User? get user => sb.auth.currentUser;
+
+  static Future<void> clearLocalSession() async {
+    try {
+      await sb.auth.signOut(scope: SignOutScope.local);
+    } catch (_) {
+      try {
+        await sb.auth.signOut();
+      } catch (_) {}
+    }
+  }
+
+  static Future<Session?> recoverStoredSession() async {
+    final current = sb.auth.currentSession;
+    if (current == null) return null;
+    try {
+      final refreshed = await sb.auth.refreshSession();
+      return refreshed.session ?? sb.auth.currentSession;
+    } catch (e) {
+      final raw = e.toString();
+      if (looksLikeNetworkError(raw)) {
+        return current;
+      }
+      if (looksLikeSessionProblem(raw) || raw.toLowerCase().contains('refresh')) {
+        await clearLocalSession();
+        return null;
+      }
+      await clearLocalSession();
+      return null;
+    }
+  }
 
   static List<Map<String, dynamic>> asList(dynamic value) {
     if (value is List) return value.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -437,6 +492,15 @@ class AppData {
   static Future<Map<String, dynamic>> group(String groupId) async {
     final res = await sb.from('groups').select().eq('id', groupId).single();
     return asMap(res);
+  }
+
+  static Future<void> updateGroupInfo(String groupId, {required String name}) async {
+    final cleanName = name.trim();
+    if (cleanName.length < 2) throw Exception('El nombre del grupo es demasiado corto.');
+    await sb.from('groups').update({
+      'name': cleanName,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', groupId);
   }
 
   static Future<String> uploadGroupCoverBytes(String groupId, Uint8List bytes, String filename) async {
@@ -1057,10 +1121,29 @@ class AppData {
       'fcm_token': token.trim(),
       'platform': platform,
       'device_label': kIsWeb ? 'Web' : platform,
+      'app_version': 'v15.22',
       'enabled': true,
       'last_seen_at': DateTime.now().toUtc().toIso8601String(),
     }, onConflict: 'fcm_token');
     await updateNotificationSettings({'push_enabled': true});
+  }
+
+
+  static Future<void> createTestNotification() async {
+    await ensureProfile();
+    await sb.rpc('create_test_notification');
+  }
+
+  static Future<void> disableCurrentDeviceToken(String token) async {
+    final uid = user?.id;
+    if (uid == null || token.trim().isEmpty) return;
+    try {
+      await sb.from('user_devices').update({
+        'enabled': false,
+        'disabled_at': DateTime.now().toUtc().toIso8601String(),
+        'last_seen_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('user_id', uid).eq('fcm_token', token.trim());
+    } catch (_) {}
   }
 
 
@@ -1107,7 +1190,7 @@ class AppData {
       'description': cleanDescription,
       'priority': priority,
       'screen': screen,
-      'app_version': 'v15.21',
+      'app_version': 'v15.22',
       'device_info': kIsWeb ? 'web' : defaultTargetPlatform.name,
       'status': 'open',
     }).select('id').single();
@@ -1189,7 +1272,7 @@ class AppData {
         'event_type': type,
         'screen': screen,
         'message': message,
-        'app_version': 'v15.21',
+        'app_version': 'v15.22',
         'platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
         'metadata': metadata ?? <String, dynamic>{},
       });
@@ -1204,7 +1287,7 @@ class PushNotificationService {
   static bool _configured = false;
   static bool _listenersReady = false;
 
-  static FirebaseOptions get _options => const FirebaseOptions(
+  static FirebaseOptions get firebaseOptions => const FirebaseOptions(
     apiKey: AppConfig.firebaseApiKey,
     appId: AppConfig.firebaseAppId,
     messagingSenderId: AppConfig.firebaseMessagingSenderId,
@@ -1226,20 +1309,18 @@ class PushNotificationService {
   static Future<bool> configureIfPossible() async {
     if (_configured) return true;
     if (_initializing) return false;
-    if (!AppConfig.firebaseConfigured) return false;
+    if (kIsWeb && !AppConfig.firebaseConfigured) return false;
     _initializing = true;
     try {
       if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(options: _options);
+        if (AppConfig.firebaseConfigured) {
+          await Firebase.initializeApp(options: firebaseOptions);
+        } else {
+          await Firebase.initializeApp();
+        }
       }
       _configured = true;
-      if (!_listenersReady) {
-        _listenersReady = true;
-        FirebaseMessaging.onMessage.listen((message) {
-          // Las notificaciones visibles dentro de la app se leen desde Supabase.
-          // Este listener queda preparado para foreground push al empaquetar móvil.
-        });
-      }
+      _wireListenersOnce();
       return true;
     } catch (_) {
       _configured = false;
@@ -1249,14 +1330,62 @@ class PushNotificationService {
     }
   }
 
+  static void _wireListenersOnce() {
+    if (_listenersReady) return;
+    _listenersReady = true;
+
+    FirebaseMessaging.onMessage.listen((message) async {
+      // En foreground no duplicamos banners: la campana de Avisos lee las filas de Supabase.
+      // Android/iOS mostrarán la notificación automáticamente cuando llegue en background/killed.
+      await AppData.logQualityEvent(
+        'push_foreground_received',
+        screen: 'push',
+        message: message.notification?.title ?? AppData.text(message.data['title'], 'Push recibido'),
+        metadata: message.data,
+      );
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen(handleMessageTap);
+    FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
+      await AppData.registerDeviceToken(token, platformLabel);
+      await AppData.logQualityEvent('push_token_refresh', screen: 'push', message: 'Token actualizado');
+    });
+
+    FirebaseMessaging.instance.getInitialMessage().then((message) {
+      if (message != null) handleMessageTap(message);
+    });
+  }
+
+  static Future<void> handleMessageTap(RemoteMessage message) async {
+    final notificationId = AppData.text(message.data['notification_id']);
+    final groupId = AppData.text(message.data['group_id']);
+    if (notificationId.isNotEmpty) {
+      try {
+        await AppData.markNotificationRead(notificationId);
+      } catch (_) {}
+    }
+    final nav = appNavigatorKey.currentState;
+    if (nav == null) return;
+    if (groupId.isNotEmpty) {
+      await nav.push(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)));
+    } else {
+      await nav.push(MaterialPageRoute(builder: (_) => NotificationsScreen(onChanged: () {})));
+    }
+  }
+
   static Future<String?> enableForCurrentDevice() async {
     final ready = await configureIfPossible();
     if (!ready) return null;
     final messaging = FirebaseMessaging.instance;
-    await messaging.requestPermission(alert: true, badge: true, sound: true);
+    final settings = await messaging.requestPermission(alert: true, badge: true, sound: true);
+    if (settings.authorizationStatus == AuthorizationStatus.denied) {
+      await AppData.logQualityEvent('push_permission_denied', screen: 'push', message: 'Permiso denegado');
+      return null;
+    }
     final token = await messaging.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
     if (token != null && token.trim().isNotEmpty) {
       await AppData.registerDeviceToken(token, platformLabel);
+      await AppData.logQualityEvent('push_token_registered', screen: 'push', message: 'Token registrado', metadata: {'platform': platformLabel});
     }
     return token;
   }
@@ -1265,6 +1394,8 @@ class PushNotificationService {
     try {
       final ready = await configureIfPossible();
       if (!ready) return;
+      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      if (settings.authorizationStatus == AuthorizationStatus.denied || settings.authorizationStatus == AuthorizationStatus.notDetermined) return;
       final token = await FirebaseMessaging.instance.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
       if (token != null && token.trim().isNotEmpty) {
         await AppData.registerDeviceToken(token, platformLabel);
@@ -1272,6 +1403,17 @@ class PushNotificationService {
     } catch (_) {
       // No bloquear la app si Firebase todavía no está configurado.
     }
+  }
+
+  static Future<void> disableForCurrentDevice() async {
+    try {
+      final ready = await configureIfPossible();
+      if (!ready) return;
+      final token = await FirebaseMessaging.instance.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
+      if (token != null && token.trim().isNotEmpty) {
+        await AppData.disableCurrentDeviceToken(token);
+      }
+    } catch (_) {}
   }
 }
 
@@ -2231,6 +2373,9 @@ class _AuthScreenState extends State<AuthScreen> {
       if (widget.register) {
         await AppData.sb.auth.signUp(email: email.text.trim(), password: password.text.trim());
       } else {
+        // En APK puede quedar una sesión local vieja de otra instalación o de una prueba anterior.
+        // La limpiamos solo en el dispositivo antes de iniciar sesión para evitar bucles de sesión caducada.
+        await AppData.clearLocalSession();
         await AppData.sb.auth.signInWithPassword(email: email.text.trim(), password: password.text.trim());
       }
       await AppData.ensureProfile();
@@ -2245,6 +2390,7 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> oauth(OAuthProvider provider) async {
     try {
       await PendingInviteStore.save(widget.inviteCode ?? InviteLinks.currentCode);
+      await AppData.clearLocalSession();
       await AppData.sb.auth.signInWithOAuth(provider, redirectTo: Uri.base.origin);
     } catch (e) {
       await showToast(context, e.toString(), danger: true);
@@ -2277,6 +2423,18 @@ class _AuthScreenState extends State<AuthScreen> {
           decoration: InputDecoration(prefixIcon: const Icon(Icons.lock_outline_rounded), hintText: '••••••••', suffixIcon: IconButton(icon: Icon(hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined), onPressed: () => setState(() => hidden = !hidden))),
         ),
         if (!widget.register) Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => showToast(context, 'Usa Supabase Auth para recuperar contraseña más adelante.'), child: const Text('¿Olvidaste tu contraseña?'))),
+        if (!widget.register)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: loading ? null : () async {
+                await AppData.clearLocalSession();
+                if (context.mounted) await showToast(context, 'Sesión local limpiada. Vuelve a iniciar sesión.');
+              },
+              icon: const Icon(Icons.restart_alt_rounded, size: 18),
+              label: const Text('Limpiar sesión de este móvil'),
+            ),
+          ),
         const SizedBox(height: 16),
         PrimaryButton(label: widget.register ? 'Crear cuenta' : 'Iniciar sesión', icon: widget.register ? Icons.person_add_alt_1_rounded : Icons.login_rounded, loading: loading, onTap: submit),
         const SizedBox(height: 22),
@@ -2702,7 +2860,7 @@ class _GroupShellState extends State<GroupShell> {
         final group = snapshot.data ?? {};
         final name = AppData.text(group['name'], 'Grupo');
         final pages = [
-          GroupDashboardTab(group: group, refreshSeed: refreshKey, onNavigateTab: (i) => setState(() => tab = i)),
+          GroupDashboardTab(group: group, refreshSeed: refreshKey, onNavigateTab: (i) => setState(() => tab = i), onGroupChanged: refresh),
           CalendarTab(group: group, refreshSeed: refreshKey),
           FinancesTab(group: group, refreshSeed: refreshKey),
           TournamentsTab(group: group, refreshSeed: refreshKey),
@@ -2731,7 +2889,8 @@ class GroupDashboardTab extends StatefulWidget {
   final Map<String, dynamic> group;
   final int refreshSeed;
   final ValueChanged<int>? onNavigateTab;
-  const GroupDashboardTab({super.key, required this.group, required this.refreshSeed, this.onNavigateTab});
+  final VoidCallback? onGroupChanged;
+  const GroupDashboardTab({super.key, required this.group, required this.refreshSeed, this.onNavigateTab, this.onGroupChanged});
 
   @override
   State<GroupDashboardTab> createState() => _GroupDashboardTabState();
@@ -2809,6 +2968,31 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                 reload();
               }
 
+              Future<void> openGroupSettings() async {
+                await Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => GroupSettingsScreen(
+                    group: group,
+                    onChanged: () {
+                      widget.onGroupChanged?.call();
+                      reload();
+                    },
+                  ),
+                ));
+                widget.onGroupChanged?.call();
+                reload();
+              }
+
+              void openGroupActions() {
+                showGroupQuickActionsSheet(
+                  context,
+                  group: group,
+                  onSettings: openGroupSettings,
+                  onMembers: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group))),
+                  onMore: () => widget.onNavigateTab?.call(4),
+                  onReport: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SupportTicketScreen(group: group, screen: 'grupo'))),
+                );
+              }
+
               return RefreshIndicator(
                 color: AppColors.teal,
                 onRefresh: () async => reload(),
@@ -2831,7 +3015,12 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                       ),
                     ]),
                     const SizedBox(height: 12),
-                    GroupHeroCard(name: name, coverUrl: AppData.text(group['cover_url'])),
+                    GroupHeroCard(
+                      name: name,
+                      coverUrl: AppData.text(group['cover_url']),
+                      onEdit: openGroupSettings,
+                      onMore: openGroupActions,
+                    ),
                     const SizedBox(height: 12),
                     if (snapshot.connectionState == ConnectionState.waiting)
                       const CenterLoader(label: 'Cargando resumen...')
@@ -3730,26 +3919,39 @@ class _FinancesTabState extends State<FinancesTab> {
                         },
                       )),
                   ] else if (financeSection == 1) ...[
-                    FinanceMyStatusCard(summary: summary, settlements: mySettlements, onCreate: openCreate),
-                    const SizedBox(height: 14),
-                    SectionHeader(title: 'Balance del grupo', action: '${sortedBalances.length} personas'),
+                    FinanceBalanceBarsCard(summary: summary),
+                    const SizedBox(height: 16),
+                    SectionHeader(title: 'Quién debe a quién', action: summary.settlements.isEmpty ? '0 pagos' : '${summary.settlements.length} pagos'),
                     const SizedBox(height: 8),
-                    if (sortedBalances.isEmpty)
-                      EmptySlim(icon: Icons.people_alt_rounded, title: 'Todos están a cero', body: 'No hay dinero pendiente entre miembros.')
+                    if (summary.settlements.isEmpty)
+                      EmptySlim(icon: Icons.verified_rounded, title: 'Todo queda a cero', body: 'No hay pagos pendientes entre miembros.')
                     else
                       AppCard(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Column(children: [
-                          for (int i = 0; i < sortedBalances.length; i++) ...[
-                            BalanceRow(
-                              name: summary.names[sortedBalances[i].key] ?? 'Miembro',
-                              avatarUrl: summary.avatars[sortedBalances[i].key] ?? '',
-                              value: sortedBalances[i].value,
+                          for (int i = 0; i < summary.settlements.length; i++) ...[
+                            SettlementPaymentRow(
+                              debt: summary.settlements[i],
+                              onPaid: savingSettlement ? null : () => markSettlementPaid(summary.settlements[i]),
                             ),
-                            if (i != sortedBalances.length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
+                            if (i != summary.settlements.length - 1) const Divider(height: 1, indent: 76, color: AppColors.line),
                           ],
                         ]),
                       ),
+                    if (data.settlementPayments.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      SectionHeader(title: 'Pagos registrados', action: '${data.settlementPayments.length}'),
+                      const SizedBox(height: 8),
+                      AppCard(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Column(children: [
+                          for (int i = 0; i < data.settlementPayments.take(4).length; i++) ...[
+                            SettlementHistoryRow(payment: data.settlementPayments[i], members: data.members),
+                            if (i != data.settlementPayments.take(4).length - 1) const Divider(height: 1, indent: 76, color: AppColors.line),
+                          ],
+                        ]),
+                      ),
+                    ],
                   ] else ...[
                     SectionHeader(title: 'Liquidar ahora', action: summary.settlements.isEmpty ? '' : '${summary.settlements.length} pagos'),
                     const SizedBox(height: 8),
@@ -4384,6 +4586,123 @@ class FinanceMiniMetric extends StatelessWidget {
         Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink, fontSize: 14)),
         const SizedBox(height: 2),
         Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.muted, fontSize: 10.5)),
+      ]),
+    );
+  }
+}
+
+class FinanceBalanceBarsCard extends StatelessWidget {
+  final FinanceSummary summary;
+  const FinanceBalanceBarsCard({super.key, required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = summary.balances.entries.toList()
+      ..sort((a, b) => b.value.abs().compareTo(a.value.abs()));
+    final visible = entries.where((e) => e.value.abs() > .01).toList();
+    final maxValue = visible.isEmpty ? 1.0 : visible.map((e) => e.value.abs()).reduce(max);
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.bar_chart_rounded, color: AppColors.teal)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Saldos del grupo', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 3),
+            const Text('Verde: le deben · Rojo: debe', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
+          ])),
+        ]),
+        const SizedBox(height: 14),
+        if (visible.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: Text('Todos están a cero. No hay dinero pendiente.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+          )
+        else
+          ...visible.map((entry) => FinanceBalanceBarRow(
+            name: summary.names[entry.key] ?? 'Miembro',
+            avatarUrl: summary.avatars[entry.key] ?? '',
+            value: entry.value,
+            maxValue: maxValue,
+          )),
+      ]),
+    );
+  }
+}
+
+class FinanceBalanceBarRow extends StatelessWidget {
+  final String name;
+  final String avatarUrl;
+  final double value;
+  final double maxValue;
+  const FinanceBalanceBarRow({super.key, required this.name, required this.avatarUrl, required this.value, required this.maxValue});
+
+  @override
+  Widget build(BuildContext context) {
+    final positive = value > 0.01;
+    final negative = value < -0.01;
+    final color = positive ? AppColors.green : negative ? AppColors.red : AppColors.muted;
+    final label = positive ? 'le deben' : negative ? 'debe' : 'en equilibrio';
+    final factor = max(.12, min(1.0, value.abs() / max(1.0, maxValue)));
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          ProfileAvatar(name: name, avatarUrl: avatarUrl, radius: 16),
+          const SizedBox(width: 9),
+          Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
+          Text('${value >= 0 ? '+' : '-'}${money(value.abs())}', style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 15)),
+        ]),
+        const SizedBox(height: 7),
+        SizedBox(
+          height: 34,
+          child: Row(children: [
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: FractionallySizedBox(
+                  widthFactor: negative ? factor : .02,
+                  alignment: Alignment.centerRight,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    height: 32,
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: negative ? AppColors.red.withOpacity(.22) : AppColors.faint,
+                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(11)),
+                    ),
+                    child: negative ? Text('-${money(value.abs())}', maxLines: 1, overflow: TextOverflow.fade, style: const TextStyle(color: AppColors.red, fontWeight: FontWeight.w900, fontSize: 12)) : null,
+                  ),
+                ),
+              ),
+            ),
+            Container(width: 1, height: 34, color: AppColors.line),
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: positive ? factor : .02,
+                  alignment: Alignment.centerLeft,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    height: 32,
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: positive ? AppColors.green.withOpacity(.24) : AppColors.faint,
+                      borderRadius: const BorderRadius.horizontal(right: Radius.circular(11)),
+                    ),
+                    child: positive ? Text('+${money(value.abs())}', maxLines: 1, overflow: TextOverflow.fade, style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900, fontSize: 12)) : null,
+                  ),
+                ),
+              ),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 3),
+        Text(label, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11)),
       ]),
     );
   }
@@ -6775,12 +7094,37 @@ class GroupSettingsScreen extends StatefulWidget {
 
 class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   late Map<String, dynamic> group;
+  late final TextEditingController nameController;
   bool savingCover = false;
+  bool savingInfo = false;
 
   @override
   void initState() {
     super.initState();
     group = Map<String, dynamic>.from(widget.group);
+    nameController = TextEditingController(text: AppData.text(group['name'], 'Grupo'));
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> saveInfo() async {
+    setState(() => savingInfo = true);
+    try {
+      await AppData.updateGroupInfo(group['id'].toString(), name: nameController.text);
+      if (!mounted) return;
+      setState(() => group['name'] = nameController.text.trim());
+      widget.onChanged?.call();
+      await showToast(context, 'Grupo actualizado.');
+    } catch (e) {
+      if (!mounted) return;
+      await showToast(context, humanError(e), danger: true);
+    } finally {
+      if (mounted) setState(() => savingInfo = false);
+    }
   }
 
   Future<void> changeCover() async {
@@ -6824,6 +7168,13 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     final code = AppData.text(group['invite_code'], '------');
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       PageHeader(title: 'Ajustes del grupo', subtitle: name, leading: true),
+      const SizedBox(height: 16),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        FieldLabel('Nombre del grupo'),
+        TextField(controller: nameController, textInputAction: TextInputAction.done, decoration: const InputDecoration(hintText: 'Nombre del grupo')),
+        const SizedBox(height: 12),
+        PrimaryButton(label: savingInfo ? 'Guardando...' : 'Guardar cambios', icon: Icons.save_rounded, loading: savingInfo, onTap: saveInfo),
+      ])),
       const SizedBox(height: 16),
       GroupCoverSettingsCard(
         group: group,
@@ -7177,7 +7528,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   final token = await PushNotificationService.enableForCurrentDevice();
                   if (!mounted) return;
                   if (token == null) {
-                    await showToast(context, 'Falta configurar Firebase para activar push real en este entorno.', danger: true);
+                    await showToast(context, 'Falta Firebase o el permiso de notificaciones está desactivado.', danger: true);
                   } else {
                     await showToast(context, 'Notificaciones push activadas en este dispositivo.');
                   }
@@ -7218,7 +7569,7 @@ class PushStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final configured = AppConfig.firebaseConfigured;
+    final configured = AppConfig.firebaseConfigured || !kIsWeb;
     return AppCard(
       color: configured ? AppColors.tealSoft : AppColors.surface,
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -7230,12 +7581,12 @@ class PushStatusCard extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(configured ? 'Push preparado' : 'Push pendiente de Firebase', style: Theme.of(context).textTheme.titleMedium),
+          Text(configured ? 'Push preparado para APK' : 'Push pendiente de Firebase', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           Text(
             configured
                 ? 'Activa este dispositivo para recibir avisos del grupo aunque la app no esté abierta.'
-                : 'Los avisos internos ya funcionan. Para push al móvil hay que añadir las claves Firebase en el build.',
+                : 'Los avisos internos ya funcionan. Para push real necesitas Firebase y google-services.json en Android.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 10),
@@ -7942,9 +8293,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     final token = await PushNotificationService.enableForCurrentDevice();
                     if (!mounted) return;
                     if (token == null) {
-                      await showToast(context, 'Falta configurar Firebase para activar push real en este entorno.', danger: true);
+                      await showToast(context, 'Falta Firebase o el permiso de notificaciones está desactivado.', danger: true);
                     } else {
                       await showToast(context, 'Push activado en este dispositivo.');
+                    }
+                  }),
+                  const SizedBox(height: 8),
+                  SecondaryButton(label: 'Enviar aviso de prueba', icon: Icons.bolt_rounded, onTap: () async {
+                    try {
+                      await AppData.createTestNotification();
+                      if (!mounted) return;
+                      await showToast(context, 'Aviso de prueba creado. Si el webhook está activo, llegará push al móvil.');
+                    } catch (e) {
+                      if (!mounted) return;
+                      await showToast(context, 'No se pudo crear la prueba. Ejecuta el SQL v15.22.', danger: true);
                     }
                   }),
                 ]);
@@ -7983,7 +8345,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: const [
           SheetTitle(icon: Icons.auto_awesome_rounded, title: 'Grupli', body: 'App para organizar grupos privados: quedadas, calendario, gastos, torneos, miembros y permisos.'),
           SizedBox(height: 12),
-          PreferencePreviewRow(icon: Icons.phone_android_rounded, title: 'Versión', body: 'v15.21 · Admin, soporte y control de calidad'),
+          PreferencePreviewRow(icon: Icons.phone_android_rounded, title: 'Versión', body: 'v15.22 · Push notifications reales'),
           PreferencePreviewRow(icon: Icons.web_rounded, title: 'Preparada para web/PWA/APK', body: 'Lista para pruebas reales y control interno'),
         ]),
       ),
@@ -8399,10 +8761,53 @@ class SmartPromptCard extends StatelessWidget {
   }
 }
 
+void showGroupQuickActionsSheet(
+  BuildContext context, {
+  required Map<String, dynamic> group,
+  required VoidCallback onSettings,
+  required VoidCallback onMembers,
+  required VoidCallback onMore,
+  required VoidCallback onReport,
+}) {
+  final name = AppData.text(group['name'], 'Grupo');
+  final code = AppData.text(group['invite_code'], '------');
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) => SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(28), boxShadow: const [BoxShadow(color: Color(0x1C061A2A), blurRadius: 32, offset: Offset(0, 14))]),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.tune_rounded, color: AppColors.teal)),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
+              const Text('Acciones rápidas del grupo', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
+            ])),
+          ]),
+          const SizedBox(height: 12),
+          SettingsRow(icon: Icons.edit_rounded, title: 'Editar grupo', subtitle: 'Nombre, portada y ajustes', onTap: () { Navigator.pop(sheetContext); onSettings(); }),
+          SettingsRow(icon: Icons.groups_rounded, title: 'Miembros', subtitle: 'Roles, admins y expulsiones', onTap: () { Navigator.pop(sheetContext); onMembers(); }),
+          SettingsRow(icon: Icons.link_rounded, title: 'Copiar enlace', subtitle: InviteLinks.joinUrl(code), onTap: () { Navigator.pop(sheetContext); copyInviteLink(context, code); }),
+          SettingsRow(icon: Icons.share_rounded, title: 'Compartir invitación', subtitle: 'Enviar por WhatsApp u otra app', onTap: () { Navigator.pop(sheetContext); Share.share(inviteText(name, code)); }),
+          SettingsRow(icon: Icons.more_horiz_rounded, title: 'Ver todo', subtitle: 'Invitaciones, permisos y privacidad', onTap: () { Navigator.pop(sheetContext); onMore(); }),
+          SettingsRow(icon: Icons.support_agent_rounded, title: 'Reportar problema', subtitle: 'Enviar incidencia sobre este grupo', onTap: () { Navigator.pop(sheetContext); onReport(); }),
+        ]),
+      ),
+    ),
+  );
+}
+
 class GroupHeroCard extends StatelessWidget {
   final String name;
   final String coverUrl;
-  const GroupHeroCard({super.key, required this.name, this.coverUrl = ''});
+  final VoidCallback? onEdit;
+  final VoidCallback? onMore;
+  const GroupHeroCard({super.key, required this.name, this.coverUrl = '', this.onEdit, this.onMore});
 
   @override
   Widget build(BuildContext context) {
@@ -8437,26 +8842,45 @@ class GroupHeroCard extends StatelessWidget {
             ),
           ),
           Positioned.fill(child: Opacity(opacity: hasCover ? .05 : .08, child: const PatternIcons())),
-          Positioned(left: 17, top: 16, child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white.withOpacity(.18))),
-            child: const Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.lock_rounded, color: Colors.white, size: 13),
-              SizedBox(width: 5),
-              Text('Privado', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5)),
-            ]),
-          )),
           Positioned(right: 16, top: 14, child: Row(children: [
-            Container(width: 31, height: 31, decoration: BoxDecoration(color: Colors.white.withOpacity(.18), shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(.22))), child: const Icon(Icons.edit_rounded, color: Colors.white, size: 16)),
+            _HeroActionButton(icon: Icons.edit_rounded, tooltip: 'Editar grupo', onTap: onEdit),
             const SizedBox(width: 8),
-            Container(width: 31, height: 31, decoration: BoxDecoration(color: Colors.white.withOpacity(.18), shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(.22))), child: const Icon(Icons.more_horiz_rounded, color: Colors.white, size: 18)),
+            _HeroActionButton(icon: Icons.more_horiz_rounded, tooltip: 'Más acciones', onTap: onMore),
           ])),
           Positioned(left: 20, right: 20, bottom: 20, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: -0.85)),
             const SizedBox(height: 8),
-            const Text('Somos 2  ·  Planes, gastos y torneos', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xEFFFFFFF), fontSize: 13, fontWeight: FontWeight.w800)),
+            const Text('Planes, gastos y torneos del grupo', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xEFFFFFFF), fontSize: 13, fontWeight: FontWeight.w800)),
           ])),
         ]),
+      ),
+    );
+  }
+}
+
+class _HeroActionButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+  const _HeroActionButton({required this.icon, required this.tooltip, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(99),
+        onTap: onTap,
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(.18),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withOpacity(.24)),
+          ),
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
       ),
     );
   }
@@ -9997,7 +10421,36 @@ class PageHeader extends StatelessWidget {
 
 class CenterLoader extends StatelessWidget { final String label; const CenterLoader({super.key, required this.label}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 40), child: Column(children: [const CircularProgressIndicator(color: AppColors.teal), const SizedBox(height: 12), Text(label, style: Theme.of(context).textTheme.bodyMedium)])); }
 
-class ErrorBlock extends StatelessWidget { final String message; final VoidCallback onRetry; const ErrorBlock({super.key, required this.message, required this.onRetry}); @override Widget build(BuildContext context) => AppCard(child: Column(children: [Container(width: 58, height: 58, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.redSoft), child: const Icon(Icons.error_outline_rounded, color: AppColors.red, size: 30)), const SizedBox(height: 12), const Text('Algo no ha cargado bien', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)), const SizedBox(height: 7), Text(humanizeError(message), textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium), const SizedBox(height: 14), SecondaryButton(label: 'Reintentar', icon: Icons.refresh_rounded, onTap: onRetry)])); }
+class ErrorBlock extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const ErrorBlock({super.key, required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final sessionProblem = looksLikeSessionProblem(message);
+    return AppCard(child: Column(children: [
+      Container(width: 58, height: 58, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.redSoft), child: const Icon(Icons.error_outline_rounded, color: AppColors.red, size: 30)),
+      const SizedBox(height: 12),
+      Text(sessionProblem ? 'Sesión caducada' : 'Algo no ha cargado bien', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+      const SizedBox(height: 7),
+      Text(humanizeError(message), textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+      const SizedBox(height: 14),
+      if (sessionProblem) ...[
+        PrimaryButton(
+          label: 'Salir y volver a entrar',
+          icon: Icons.logout_rounded,
+          onTap: () async {
+            await AppData.clearLocalSession();
+            onRetry();
+          },
+        ),
+        const SizedBox(height: 10),
+      ],
+      SecondaryButton(label: 'Reintentar', icon: Icons.refresh_rounded, onTap: onRetry),
+    ]));
+  }
+}
 
 class EmptyBlock extends StatelessWidget {
   final IconData icon; final String title; final String body;
@@ -10032,17 +10485,50 @@ class EmptySlim extends StatelessWidget {
   );
 }
 
+bool looksLikeNetworkError(String raw) {
+  final text = raw.toLowerCase();
+  return text.contains('network') ||
+      text.contains('socket') ||
+      text.contains('connection') ||
+      text.contains('failed host lookup') ||
+      text.contains('xmlhttprequest') ||
+      text.contains('internet');
+}
+
+bool looksLikeSessionProblem(String raw) {
+  final text = raw.toLowerCase();
+  if (text.contains('invalid login credentials') || text.contains('email not confirmed') || text.contains('invalid email')) return false;
+  return text.contains('not_authenticated') ||
+      text.contains('usuario no autenticado') ||
+      text.contains('jwt') ||
+      text.contains('refresh token') ||
+      text.contains('invalid refresh') ||
+      text.contains('invalid_grant') ||
+      text.contains('session_id') ||
+      text.contains('session not found') ||
+      text.contains('session from') ||
+      text.contains('auth session missing') ||
+      text.contains('no current user') ||
+      text.contains('session expired') ||
+      text.contains('expired token');
+}
+
 String humanizeError(String raw) {
   final original = raw.replaceAll('Exception: ', '').trim();
   final text = original.toLowerCase();
   if (text.isEmpty) return 'No se pudo completar la acción. Inténtalo de nuevo.';
+  if (text.contains('invalid login credentials')) return 'Email o contraseña incorrectos.';
+  if (text.contains('email not confirmed')) return 'Confirma tu email antes de iniciar sesión.';
+  if (text.contains('invalid email')) return 'El email no tiene un formato válido.';
+  if (text.contains('weak password')) return 'La contraseña es demasiado débil.';
+  if (text.contains('user already registered') || text.contains('already registered')) return 'Esta cuenta ya existe. Inicia sesión en lugar de registrarte.';
   if (text.contains('confirmation_required')) return 'Para eliminar la cuenta debes escribir ELIMINAR exactamente.';
-  if (text.contains('not_authenticated') || text.contains('usuario no autenticado') || text.contains('jwt') || text.contains('session') || text.contains('auth')) return 'Tu sesión necesita actualizarse. Cierra sesión y vuelve a entrar.';
+  if (looksLikeSessionProblem(original)) return 'La sesión guardada en este móvil estaba caducada. Pulsa “Salir y volver a entrar” o “Limpiar sesión de este móvil” e inicia sesión otra vez.';
   if (text.contains('owner_protected') || text.contains('owner') || text.contains('creador del grupo')) return 'El creador del grupo está protegido. Transfiere o elimina el grupo antes de hacer esa acción.';
   if (text.contains('member_not_found') || text.contains('not_member')) return 'Ese miembro ya no está disponible en el grupo.';
   if (text.contains('invalid_role')) return 'Ese rol no es válido.';
   if (text.contains('permission') || text.contains('policy') || text.contains('rls') || text.contains('not allowed') || text.contains('denied') || text.contains('violates row-level')) return 'No tienes permiso para hacer esa acción.';
-  if (text.contains('network') || text.contains('socket') || text.contains('connection') || text.contains('failed host lookup')) return 'No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.';
+  if (looksLikeNetworkError(original)) return 'No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.';
   if (text.contains('duplicate') || text.contains('already') || text.contains('unique constraint')) return 'Parece que esto ya existe o ya se había guardado.';
   if (text.contains('foreign key') || text.contains('violates') || text.contains('constraint')) return 'No se pudo guardar porque hay datos relacionados. Revisa la acción e inténtalo de nuevo.';
   if (text.contains('postgrestexception') || text.contains('pgrst') || text.contains('supabase') || text.contains('postgres')) return 'No se pudo completar la acción en la base de datos. Inténtalo otra vez.';
