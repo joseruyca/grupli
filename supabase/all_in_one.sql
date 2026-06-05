@@ -39,6 +39,8 @@ DROP FUNCTION IF EXISTS public.is_group_member(uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.is_group_admin(uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.is_group_owner(uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.create_group_atomic(text) CASCADE;
+DROP FUNCTION IF EXISTS public.create_group_atomic_v2(text,text,text,text,text,text) CASCADE;
+DROP FUNCTION IF EXISTS public.regenerate_group_invite_code(uuid) CASCADE;
 DROP FUNCTION IF EXISTS public.join_group_with_code(text) CASCADE;
 DROP FUNCTION IF EXISTS public.get_my_groups() CASCADE;
 DROP FUNCTION IF EXISTS public.protect_owner_role() CASCADE;
@@ -98,10 +100,16 @@ CREATE TABLE public.groups (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   name text NOT NULL CHECK (char_length(trim(name)) BETWEEN 2 AND 80),
-  type text NOT NULL DEFAULT 'otro' CHECK (type IN ('deporte','cartas','otro')),
+  type text NOT NULL DEFAULT 'otro' CHECK (type IN ('deporte','amigos','viaje','cartas','otro')),
   privacy text NOT NULL DEFAULT 'privado' CHECK (privacy = 'privado'),
   invite_code text NOT NULL UNIQUE DEFAULT public.random_invite_code(),
+  invite_updated_at timestamptz NOT NULL DEFAULT now(),
   cover_url text,
+  description text,
+  currency text NOT NULL DEFAULT 'EUR' CHECK (currency IN ('EUR','USD','GBP')),
+  timezone text NOT NULL DEFAULT 'Europe/Madrid',
+  language text NOT NULL DEFAULT 'es' CHECK (language IN ('es','en')),
+  rules text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -355,6 +363,79 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.create_group_atomic_v2(
+  p_name text,
+  p_type text DEFAULT 'otro',
+  p_description text DEFAULT NULL,
+  p_currency text DEFAULT 'EUR',
+  p_timezone text DEFAULT 'Europe/Madrid',
+  p_language text DEFAULT 'es'
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  new_group_id uuid;
+  clean_name text;
+  clean_type text;
+  clean_currency text;
+  clean_language text;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Usuario no autenticado';
+  END IF;
+
+  PERFORM public.ensure_current_profile();
+  clean_name := trim(coalesce(p_name, ''));
+  clean_type := lower(trim(coalesce(p_type, 'otro')));
+  clean_currency := upper(trim(coalesce(p_currency, 'EUR')));
+  clean_language := lower(trim(coalesce(p_language, 'es')));
+
+  IF char_length(clean_name) < 2 THEN
+    RAISE EXCEPTION 'El nombre del grupo es demasiado corto';
+  END IF;
+  IF clean_type NOT IN ('deporte','amigos','viaje','cartas','otro') THEN clean_type := 'otro'; END IF;
+  IF clean_currency NOT IN ('EUR','USD','GBP') THEN clean_currency := 'EUR'; END IF;
+  IF clean_language NOT IN ('es','en') THEN clean_language := 'es'; END IF;
+
+  INSERT INTO public.groups (owner_id, name, type, privacy, description, currency, timezone, language)
+  VALUES (auth.uid(), clean_name, clean_type, 'privado', nullif(trim(coalesce(p_description, '')), ''), clean_currency, nullif(trim(coalesce(p_timezone, 'Europe/Madrid')), ''), clean_language)
+  RETURNING id INTO new_group_id;
+
+  INSERT INTO public.group_members (group_id, user_id, role)
+  VALUES (new_group_id, auth.uid(), 'owner')
+  ON CONFLICT (group_id, user_id) DO NOTHING;
+
+  RETURN new_group_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.regenerate_group_invite_code(p_group_id uuid)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  new_code text;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Usuario no autenticado';
+  END IF;
+  IF NOT public.is_group_admin(p_group_id) THEN
+    RAISE EXCEPTION 'No tienes permiso para regenerar este código';
+  END IF;
+  LOOP
+    new_code := public.random_invite_code();
+    EXIT WHEN NOT EXISTS (SELECT 1 FROM public.groups WHERE invite_code = new_code);
+  END LOOP;
+  UPDATE public.groups SET invite_code = new_code, invite_updated_at = now(), updated_at = now() WHERE id = p_group_id;
+  RETURN new_code;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.join_group_with_code(code text)
 RETURNS uuid
 LANGUAGE plpgsql
@@ -395,7 +476,11 @@ RETURNS TABLE (
   members_count int,
   events_count int,
   balance numeric,
-  created_at timestamptz
+  created_at timestamptz,
+  description text,
+  currency text,
+  timezone text,
+  language text
 )
 LANGUAGE sql
 SECURITY DEFINER
@@ -412,7 +497,11 @@ AS $$
     (SELECT count(*)::int FROM public.group_members x WHERE x.group_id = g.id) AS members_count,
     (SELECT count(*)::int FROM public.events e WHERE e.group_id = g.id AND e.status = 'active' AND e.starts_at >= now() - interval '2 hours') AS events_count,
     0::numeric AS balance,
-    g.created_at
+    g.created_at,
+    g.description,
+    g.currency,
+    g.timezone,
+    g.language
   FROM public.groups g
   JOIN public.group_members gm ON gm.group_id = g.id
   WHERE gm.user_id = auth.uid()
@@ -575,10 +664,14 @@ CREATE POLICY matches_member_all ON public.matches FOR ALL TO authenticated USIN
 
 REVOKE ALL ON FUNCTION public.ensure_current_profile() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.create_group_atomic(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.create_group_atomic_v2(text,text,text,text,text,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.regenerate_group_invite_code(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.join_group_with_code(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_my_groups() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.ensure_current_profile() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.create_group_atomic(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_group_atomic_v2(text,text,text,text,text,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.regenerate_group_invite_code(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.join_group_with_code(text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_my_groups() TO authenticated;
 

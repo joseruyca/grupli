@@ -28,6 +28,7 @@ if [ "$1" = "build" ]; then
     --dart-define=SUPABASE_URL="${SUPABASE_URL:-}" \
     --dart-define=SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}" \
     --dart-define=APP_BASE_URL="${APP_BASE_URL:-https://grupli.vercel.app}" \
+    --dart-define=OSM_GEOCODER_ENDPOINT="${OSM_GEOCODER_ENDPOINT:-}" \
     --dart-define=FIREBASE_API_KEY="${FIREBASE_API_KEY:-}" \
     --dart-define=FIREBASE_APP_ID="${FIREBASE_APP_ID:-}" \
     --dart-define=FIREBASE_MESSAGING_SENDER_ID="${FIREBASE_MESSAGING_SENDER_ID:-}" \
