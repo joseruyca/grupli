@@ -873,13 +873,34 @@ class AppData {
   ) async {
     final cleanAmount = double.parse(amount.toStringAsFixed(2));
     if (cleanAmount <= 0) throw Exception('El importe debe ser mayor que cero.');
+
+    // Preferimos RPC para evitar fallos de RLS/SQL al registrar una liquidación.
+    // Si la base aún no tiene la función del parche, usamos el insert directo como respaldo.
+    try {
+      final rpcId = await sb.rpc('create_settlement_payment_atomic', params: {
+        'p_group_id': groupId,
+        'p_from_user': fromUser,
+        'p_to_user': toUser,
+        'p_amount': cleanAmount,
+      });
+      final id = rpcId?.toString() ?? '';
+      if (id.isNotEmpty) return id;
+    } catch (_) {
+      // Compatibilidad con instalaciones que todavía no han ejecutado el parche.
+    }
+
+    final currentUser = user?.id;
+    if (currentUser == null || currentUser.isEmpty) {
+      throw Exception('Tu sesión no está activa. Cierra sesión y vuelve a entrar.');
+    }
+
     final row = await sb.from('settlement_payments').insert({
       'group_id': groupId,
       'from_user': fromUser,
       'to_user': toUser,
       'amount': cleanAmount,
       'status': 'paid',
-      'created_by': user?.id,
+      'created_by': currentUser,
       'paid_at': DateTime.now().toUtc().toIso8601String(),
     }).select('id').single();
     return row['id'].toString();
@@ -2508,14 +2529,53 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late Future<List<Map<String, dynamic>>> future;
+  RealtimeChannel? _homeRealtimeChannel;
+  Timer? _homeRealtimeDebounce;
 
   @override
   void initState() {
     super.initState();
     future = AppData.myGroups();
+    _subscribeHomeRealtime();
+  }
+
+  @override
+  void dispose() {
+    _homeRealtimeDebounce?.cancel();
+    final channel = _homeRealtimeChannel;
+    if (channel != null) {
+      AppData.sb.removeChannel(channel);
+    }
+    super.dispose();
   }
 
   void reload() => setState(() => future = AppData.myGroups());
+
+  void _scheduleHomeRealtimeReload() {
+    _homeRealtimeDebounce?.cancel();
+    _homeRealtimeDebounce = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) reload();
+    });
+  }
+
+  void _subscribeHomeRealtime() {
+    final userId = AppData.user?.id ?? 'anon';
+    final channel = AppData.sb.channel('grupli-home-$userId-live')
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'groups',
+        callback: (_) => _scheduleHomeRealtimeReload(),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'group_members',
+        callback: (_) => _scheduleHomeRealtimeReload(),
+      )
+      ..subscribe();
+    _homeRealtimeChannel = channel;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2834,17 +2894,106 @@ class _GroupShellState extends State<GroupShell> {
   int tab = 0;
   int refreshKey = 0;
   late Future<Map<String, dynamic>> groupFuture;
+  RealtimeChannel? _groupRealtimeChannel;
+  Timer? _realtimeDebounce;
 
   @override
   void initState() {
     super.initState();
     groupFuture = AppData.group(widget.groupId);
+    _subscribeGroupRealtime();
+  }
+
+  @override
+  void dispose() {
+    _realtimeDebounce?.cancel();
+    final channel = _groupRealtimeChannel;
+    if (channel != null) {
+      AppData.sb.removeChannel(channel);
+    }
+    super.dispose();
   }
 
   void refresh() => setState(() {
     refreshKey++;
     groupFuture = AppData.group(widget.groupId);
   });
+
+  void _scheduleRealtimeRefresh() {
+    _realtimeDebounce?.cancel();
+    _realtimeDebounce = Timer(const Duration(milliseconds: 450), () {
+      if (mounted) refresh();
+    });
+  }
+
+  void _subscribeGroupRealtime() {
+    final groupId = widget.groupId;
+    final channel = AppData.sb.channel('grupli-group-$groupId-live')
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'groups',
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'id', value: groupId),
+        callback: (_) => _scheduleRealtimeRefresh(),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'group_members',
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
+        callback: (_) => _scheduleRealtimeRefresh(),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'events',
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
+        callback: (_) => _scheduleRealtimeRefresh(),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'expenses',
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
+        callback: (_) => _scheduleRealtimeRefresh(),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'settlement_payments',
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
+        callback: (_) => _scheduleRealtimeRefresh(),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'tournaments',
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
+        callback: (_) => _scheduleRealtimeRefresh(),
+      )
+      // Estas tablas no tienen group_id directo. Se escuchan de forma global para
+      // refrescar el grupo si otro móvil cambia asistencias, participantes de gastos o partidos.
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'event_attendance',
+        callback: (_) => _scheduleRealtimeRefresh(),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'expense_participants',
+        callback: (_) => _scheduleRealtimeRefresh(),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'matches',
+        callback: (_) => _scheduleRealtimeRefresh(),
+      )
+      ..subscribe();
+    _groupRealtimeChannel = channel;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -10527,6 +10676,7 @@ String humanizeError(String raw) {
   if (text.contains('owner_protected') || text.contains('owner') || text.contains('creador del grupo')) return 'El creador del grupo está protegido. Transfiere o elimina el grupo antes de hacer esa acción.';
   if (text.contains('member_not_found') || text.contains('not_member')) return 'Ese miembro ya no está disponible en el grupo.';
   if (text.contains('invalid_role')) return 'Ese rol no es válido.';
+  if (text.contains('settlement_payments') || text.contains('create_settlement_payment_atomic')) return 'Falta actualizar la base de datos de finanzas. Ejecuta el parche SQL v15.22.3 y vuelve a probar.';
   if (text.contains('permission') || text.contains('policy') || text.contains('rls') || text.contains('not allowed') || text.contains('denied') || text.contains('violates row-level')) return 'No tienes permiso para hacer esa acción.';
   if (looksLikeNetworkError(original)) return 'No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.';
   if (text.contains('duplicate') || text.contains('already') || text.contains('unique constraint')) return 'Parece que esto ya existe o ya se había guardado.';
