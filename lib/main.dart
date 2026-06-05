@@ -162,14 +162,48 @@ class AppRoot extends StatefulWidget {
 class _AppRootState extends State<AppRoot> {
   Session? _session;
   late final StreamSubscription<AuthState> _authSub;
+  bool _ready = false;
+  bool _showOnboarding = false;
 
   @override
   void initState() {
     super.initState();
     _session = Supabase.instance.client.auth.currentSession;
+    _loadFirstRunState();
     _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
-      if (mounted) setState(() => _session = event.session);
+      if (!mounted) return;
+      setState(() {
+        _session = event.session;
+        if (_session != null) _showOnboarding = false;
+      });
+      if (event.session != null) {
+        PushNotificationService.tryRegisterSilently();
+      }
     });
+  }
+
+  Future<void> _loadFirstRunState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final introSeen = prefs.getBool(OnboardingStore.seenKey) ?? false;
+    final hasInvite = InviteLinks.currentCode != null;
+    if (!mounted) return;
+    setState(() {
+      _showOnboarding = _session == null && !introSeen && !hasInvite;
+      _ready = true;
+    });
+    if (_session != null) {
+      PushNotificationService.tryRegisterSilently();
+    }
+  }
+
+  Future<void> _finishOnboarding() async {
+    await OnboardingStore.markSeen();
+    if (mounted) setState(() => _showOnboarding = false);
+  }
+
+  Future<void> _restartOnboarding() async {
+    await OnboardingStore.reset();
+    if (mounted) setState(() => _showOnboarding = true);
   }
 
   @override
@@ -180,9 +214,12 @@ class _AppRootState extends State<AppRoot> {
 
   @override
   Widget build(BuildContext context) {
-    return AppSurface(
-      child: _session == null ? const WelcomeScreen() : const AuthedShell(),
-    );
+    final child = !_ready
+        ? const Scaffold(backgroundColor: AppColors.white, body: CenterLoader(label: 'Preparando Grupli...'))
+        : _session == null
+            ? (_showOnboarding ? OnboardingScreen(onFinish: _finishOnboarding) : WelcomeScreen(onShowIntro: _restartOnboarding))
+            : const AuthedShell();
+    return AppSurface(child: child);
   }
 }
 
@@ -1706,8 +1743,210 @@ class PendingInviteStore {
   }
 }
 
+
+class OnboardingStore {
+  static const seenKey = 'grupli_onboarding_seen_v1';
+
+  static Future<void> markSeen() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(seenKey, true);
+  }
+
+  static Future<void> reset() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(seenKey);
+  }
+}
+
+class OnboardingScreen extends StatefulWidget {
+  final Future<void> Function() onFinish;
+  const OnboardingScreen({super.key, required this.onFinish});
+
+  @override
+  State<OnboardingScreen> createState() => _OnboardingScreenState();
+}
+
+class _OnboardingScreenState extends State<OnboardingScreen> {
+  final controller = PageController();
+  int index = 0;
+
+  static const slides = [
+    _OnboardingSlideData(
+      icon: Icons.groups_rounded,
+      title: 'Todo tu grupo\nen un solo lugar',
+      body: 'Crea grupos privados para quedar, organizar planes y saber qué toca esta semana sin perderte en chats.',
+      accent: AppColors.teal,
+      soft: AppColors.tealSoft,
+    ),
+    _OnboardingSlideData(
+      icon: Icons.event_available_rounded,
+      title: 'Agenda clara\ny asistencia rápida',
+      body: 'Cada plan muestra quién va, quién duda y si falta gente. Confirmar es cuestión de un toque.',
+      accent: AppColors.violet,
+      soft: AppColors.violetSoft,
+    ),
+    _OnboardingSlideData(
+      icon: Icons.account_balance_wallet_rounded,
+      title: 'Gastos y torneos\nsin líos',
+      body: 'Reparte pagos tipo Tricount, liquida saldos y monta ligas o torneos con resultados y clasificación.',
+      accent: AppColors.orange,
+      soft: AppColors.orangeSoft,
+    ),
+  ];
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> next() async {
+    if (index >= slides.length - 1) {
+      await widget.onFinish();
+      return;
+    }
+    await controller.nextPage(duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final last = index == slides.length - 1;
+    return DirectPage(
+      scroll: false,
+      padding: const EdgeInsets.fromLTRB(22, 18, 22, 24),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(color: AppColors.tealDark, borderRadius: BorderRadius.circular(15)),
+            child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(child: Text('Grupli', style: TextStyle(fontSize: 24, color: AppColors.ink, fontWeight: FontWeight.w900, letterSpacing: -.7))),
+          TextButton(onPressed: () => widget.onFinish(), child: const Text('Saltar', style: TextStyle(fontWeight: FontWeight.w900))),
+        ]),
+        const SizedBox(height: 18),
+        Expanded(
+          child: PageView.builder(
+            controller: controller,
+            itemCount: slides.length,
+            onPageChanged: (value) => setState(() => index = value),
+            itemBuilder: (context, i) => OnboardingSlide(data: slides[i], index: i),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(children: [
+          ...List.generate(slides.length, (i) => AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: i == index ? 28 : 8,
+                height: 8,
+                margin: const EdgeInsets.only(right: 7),
+                decoration: BoxDecoration(
+                  color: i == index ? AppColors.tealDark : AppColors.line,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              )),
+          const Spacer(),
+          SizedBox(
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: next,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.tealDark,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              ),
+              icon: Icon(last ? Icons.check_rounded : Icons.arrow_forward_rounded),
+              label: Text(last ? 'Empezar' : 'Siguiente', style: const TextStyle(fontWeight: FontWeight.w900)),
+            ),
+          ),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _OnboardingSlideData {
+  final IconData icon;
+  final String title;
+  final String body;
+  final Color accent;
+  final Color soft;
+  const _OnboardingSlideData({required this.icon, required this.title, required this.body, required this.accent, required this.soft});
+}
+
+class OnboardingSlide extends StatelessWidget {
+  final _OnboardingSlideData data;
+  final int index;
+  const OnboardingSlide({super.key, required this.data, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(34),
+            gradient: LinearGradient(
+              colors: index == 0
+                  ? const [Color(0xFF073A57), Color(0xFF0B6B8F)]
+                  : index == 1
+                      ? const [Color(0xFF4038A8), Color(0xFF6657D8)]
+                      : const [Color(0xFF016B62), Color(0xFFE98A2C)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: const [BoxShadow(color: Color(0x22073A57), blurRadius: 28, offset: Offset(0, 16))],
+          ),
+          child: Stack(children: [
+            Positioned.fill(
+              child: Wrap(
+                spacing: 23,
+                runSpacing: 22,
+                children: List.generate(48, (i) => Icon(_decorIcon(i), color: Colors.white.withOpacity(.08), size: 19)),
+              ),
+            ),
+            Align(
+              alignment: Alignment.center,
+              child: Container(
+                width: 170,
+                height: 170,
+                decoration: BoxDecoration(color: Colors.white.withOpacity(.14), shape: BoxShape.circle),
+                child: Center(
+                  child: Container(
+                    width: 104,
+                    height: 104,
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(32)),
+                    child: Icon(data.icon, color: data.accent, size: 48),
+                  ),
+                ),
+              ),
+            ),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 28),
+      Text(data.title, style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.02, letterSpacing: -1.1)),
+      const SizedBox(height: 12),
+      Text(data.body, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.muted, height: 1.42)),
+      const SizedBox(height: 4),
+    ]);
+  }
+
+  IconData _decorIcon(int i) {
+    const icons = [Icons.calendar_month_rounded, Icons.payments_rounded, Icons.emoji_events_rounded, Icons.check_circle_rounded, Icons.lock_rounded, Icons.people_alt_rounded];
+    return icons[i % icons.length];
+  }
+}
+
 class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({super.key});
+  final VoidCallback? onShowIntro;
+  const WelcomeScreen({super.key, this.onShowIntro});
 
   Future<void> _openAuth(BuildContext context, {required bool register}) async {
     await PendingInviteStore.save(InviteLinks.currentCode);
@@ -1762,6 +2001,14 @@ class WelcomeScreen extends StatelessWidget {
           Text('La app privada para coordinar grupos sin caos.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 10),
           const Text('Eventos, calendario, finanzas y torneos en un único espacio cerrado.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted, fontSize: 15, height: 1.35)),
+          if (inviteCode == null && onShowIntro != null) ...[
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: onShowIntro,
+              icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
+              label: const Text('Ver introducción', style: TextStyle(fontWeight: FontWeight.w900)),
+            ),
+          ],
         ],
       ),
     );
