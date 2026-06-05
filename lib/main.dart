@@ -1041,6 +1041,141 @@ class AppData {
     }, onConflict: 'fcm_token');
     await updateNotificationSettings({'push_enabled': true});
   }
+
+
+  static Future<void> ensureAdminClaim() async {
+    await ensureProfile();
+    try {
+      await sb.rpc('ensure_owner_admin');
+    } catch (_) {
+      // El panel admin queda oculto si el SQL de v15.21 aún no está ejecutado.
+    }
+  }
+
+  static Future<bool> isSuperAdmin() async {
+    await ensureAdminClaim();
+    try {
+      final res = await sb.rpc('is_app_admin');
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<String> createSupportTicket({
+    String? groupId,
+    required String type,
+    required String title,
+    required String description,
+    String priority = 'normal',
+    String screen = 'app',
+  }) async {
+    final uid = user?.id;
+    if (uid == null) throw Exception('Inicia sesión para enviar el reporte.');
+    await ensureProfile();
+    final cleanTitle = title.trim();
+    final cleanDescription = description.trim();
+    if (cleanTitle.length < 3 || cleanDescription.length < 8) {
+      throw Exception('Describe el problema con un poco más de detalle.');
+    }
+    final row = await sb.from('support_tickets').insert({
+      'user_id': uid,
+      'group_id': groupId,
+      'type': type,
+      'title': cleanTitle,
+      'description': cleanDescription,
+      'priority': priority,
+      'screen': screen,
+      'app_version': 'v15.21',
+      'device_info': kIsWeb ? 'web' : defaultTargetPlatform.name,
+      'status': 'open',
+    }).select('id').single();
+    await logQualityEvent('support_ticket_created', screen: screen, groupId: groupId, message: cleanTitle);
+    return row['id'].toString();
+  }
+
+  static Future<List<Map<String, dynamic>>> mySupportTickets() async {
+    final uid = user?.id;
+    if (uid == null) return [];
+    try {
+      final res = await sb
+          .from('support_tickets')
+          .select('*, groups(id,name)')
+          .eq('user_id', uid)
+          .order('created_at', ascending: false)
+          .limit(20);
+      return asList(res);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<Map<String, dynamic>> adminOverview() async {
+    await ensureAdminClaim();
+    try {
+      return asMap(await sb.rpc('admin_overview'));
+    } catch (_) {
+      return <String, dynamic>{};
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> adminSupportTickets({String status = 'open'}) async {
+    await ensureAdminClaim();
+    try {
+      dynamic query = sb
+          .from('support_tickets')
+          .select('*, profiles(id,email,full_name,avatar_url), groups(id,name)');
+      if (status != 'all') query = query.eq('status', status);
+      final res = await query.order('created_at', ascending: false).limit(80);
+      return asList(res);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> adminQualityEvents() async {
+    await ensureAdminClaim();
+    try {
+      final res = await sb
+          .from('app_quality_events')
+          .select('*, profiles(id,email,full_name,avatar_url), groups(id,name)')
+          .order('created_at', ascending: false)
+          .limit(40);
+      return asList(res);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> updateSupportTicketStatus(String ticketId, String status, {String? note}) async {
+    await ensureAdminClaim();
+    final payload = <String, dynamic>{
+      'status': status,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+      if (status == 'resolved' || status == 'closed') 'resolved_at': DateTime.now().toUtc().toIso8601String(),
+      if (note != null) 'admin_note': note.trim().isEmpty ? null : note.trim(),
+    };
+    await sb.from('support_tickets').update(payload).eq('id', ticketId);
+  }
+
+  static Future<void> logQualityEvent(String type, {String? groupId, String screen = 'app', String message = '', Map<String, dynamic>? metadata}) async {
+    final uid = user?.id;
+    if (uid == null) return;
+    try {
+      await sb.from('app_quality_events').insert({
+        'user_id': uid,
+        'group_id': groupId,
+        'event_type': type,
+        'screen': screen,
+        'message': message,
+        'app_version': 'v15.21',
+        'platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
+        'metadata': metadata ?? <String, dynamic>{},
+      });
+    } catch (_) {
+      // Nunca bloquear al usuario por telemetría interna.
+    }
+  }
 }
 
 class PushNotificationService {
@@ -2822,6 +2957,12 @@ class GroupMoreTab extends StatelessWidget {
             title: 'Privacidad',
             subtitle: 'Grupo privado por invitación. Nadie entra sin código.',
             onTap: () => showToast(context, 'Grupli funciona con grupos privados por invitación.'),
+          ),
+          SettingsRow(
+            icon: Icons.support_agent_rounded,
+            title: 'Reportar problema',
+            subtitle: 'Enviar una incidencia sobre este grupo',
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SupportTicketScreen(group: group, screen: 'grupo'))),
           ),
           const SizedBox(height: 16),
           PermissionMatrixCard(compact: true),
@@ -7161,6 +7302,429 @@ String notificationTime(DateTime date) {
 }
 
 
+class SupportTicketScreen extends StatefulWidget {
+  final Map<String, dynamic>? group;
+  final String screen;
+  const SupportTicketScreen({super.key, this.group, this.screen = 'perfil'});
+
+  @override
+  State<SupportTicketScreen> createState() => _SupportTicketScreenState();
+}
+
+class _SupportTicketScreenState extends State<SupportTicketScreen> {
+  final title = TextEditingController();
+  final description = TextEditingController();
+  String type = 'bug';
+  String priority = 'normal';
+  bool loading = false;
+  late Future<List<Map<String, dynamic>>> myTicketsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    myTicketsFuture = AppData.mySupportTickets();
+  }
+
+  @override
+  void dispose() {
+    title.dispose();
+    description.dispose();
+    super.dispose();
+  }
+
+  Future<void> submit() async {
+    setState(() => loading = true);
+    try {
+      await AppData.createSupportTicket(
+        groupId: widget.group?['id']?.toString(),
+        type: type,
+        priority: priority,
+        title: title.text,
+        description: description.text,
+        screen: widget.screen,
+      );
+      title.clear();
+      description.clear();
+      setState(() => myTicketsFuture = AppData.mySupportTickets());
+      if (mounted) await showToast(context, 'Reporte enviado. Gracias, lo revisarás desde el panel admin.');
+    } catch (e) {
+      if (mounted) await showToast(context, humanError(e), danger: true);
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final groupName = AppData.text(widget.group?['name'], 'Cuenta general');
+    return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      PageHeader(title: 'Ayuda y soporte', subtitle: 'Reporta errores, dudas o sugerencias sin salir de Grupli.', leading: true),
+      const SizedBox(height: 14),
+      AppCard(
+        padding: const EdgeInsets.all(16),
+        color: AppColors.tealSoft,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(width: 44, height: 44, decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.support_agent_rounded, color: AppColors.teal)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Enviar reporte', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text('Zona: $groupName · Versión v15.21 · ${kIsWeb ? 'web' : defaultTargetPlatform.name}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+          ])),
+        ]),
+      ),
+      const SizedBox(height: 14),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        FieldLabel('Tipo de reporte'),
+        DropdownButtonFormField<String>(
+          value: type,
+          items: const [
+            DropdownMenuItem(value: 'bug', child: Text('Bug o fallo')),
+            DropdownMenuItem(value: 'cuenta', child: Text('Cuenta / acceso')),
+            DropdownMenuItem(value: 'grupo', child: Text('Grupo / invitación')),
+            DropdownMenuItem(value: 'evento', child: Text('Evento / asistencia')),
+            DropdownMenuItem(value: 'finanzas', child: Text('Finanzas / pagos')),
+            DropdownMenuItem(value: 'torneo', child: Text('Torneos / resultados')),
+            DropdownMenuItem(value: 'sugerencia', child: Text('Sugerencia')),
+            DropdownMenuItem(value: 'otro', child: Text('Otro')),
+          ],
+          onChanged: (v) => setState(() => type = v ?? 'bug'),
+        ),
+        const SizedBox(height: 12),
+        FieldLabel('Prioridad'),
+        DropdownButtonFormField<String>(
+          value: priority,
+          items: const [
+            DropdownMenuItem(value: 'low', child: Text('Baja')),
+            DropdownMenuItem(value: 'normal', child: Text('Normal')),
+            DropdownMenuItem(value: 'high', child: Text('Alta')),
+            DropdownMenuItem(value: 'critical', child: Text('Crítica')),
+          ],
+          onChanged: (v) => setState(() => priority = v ?? 'normal'),
+        ),
+        const SizedBox(height: 12),
+        FieldLabel('Título'),
+        TextField(controller: title, decoration: const InputDecoration(hintText: 'Ej. No me deja marcar un pago')),
+        const SizedBox(height: 12),
+        FieldLabel('Descripción'),
+        TextField(controller: description, minLines: 4, maxLines: 7, decoration: const InputDecoration(hintText: 'Cuenta qué ha pasado, en qué pantalla y qué esperabas que ocurriera.')),
+        const SizedBox(height: 16),
+        PrimaryButton(label: 'Enviar reporte', icon: Icons.send_rounded, loading: loading, onTap: submit),
+      ])),
+      const SizedBox(height: 18),
+      SectionHeader(title: 'Tus reportes recientes'),
+      const SizedBox(height: 8),
+      FutureBuilder<List<Map<String, dynamic>>>(
+        future: myTicketsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) return const CenterLoader(label: 'Cargando reportes...');
+          final tickets = snapshot.data ?? [];
+          if (tickets.isEmpty) return EmptySlim(icon: Icons.inbox_rounded, title: 'Sin reportes todavía', body: 'Cuando envíes algo aparecerá aquí.');
+          return Column(children: tickets.take(5).map((ticket) => SupportTicketCard(ticket: ticket)).toList());
+        },
+      ),
+    ]));
+  }
+}
+
+class AdminDashboardScreen extends StatefulWidget {
+  const AdminDashboardScreen({super.key});
+
+  @override
+  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+}
+
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  String filter = 'open';
+  late Future<_AdminDashboardData> future;
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  void load() {
+    future = _AdminDashboardData.load(status: filter);
+  }
+
+  void reload() => setState(load);
+
+  Future<void> changeStatus(Map<String, dynamic> ticket, String status) async {
+    try {
+      await AppData.updateSupportTicketStatus(ticket['id'].toString(), status);
+      reload();
+      if (mounted) await showToast(context, 'Reporte actualizado.');
+    } catch (e) {
+      if (mounted) await showToast(context, humanError(e), danger: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DirectPage(child: FutureBuilder<_AdminDashboardData>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) return const CenterLoader(label: 'Cargando panel admin...');
+        if (snapshot.hasError) return ErrorBlock(message: humanError(snapshot.error), onRetry: reload);
+        final data = snapshot.data ?? _AdminDashboardData.empty();
+        final overview = data.overview;
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          PageHeader(title: 'Panel admin', subtitle: 'Soporte, calidad y estado general de Grupli.', leading: true),
+          const SizedBox(height: 14),
+          AdminOverviewHero(overview: overview),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: AdminMetricCard(label: 'Usuarios', value: '${AppData.intValue(overview['users'])}', icon: Icons.people_alt_rounded, color: AppColors.teal)),
+            const SizedBox(width: 9),
+            Expanded(child: AdminMetricCard(label: 'Grupos', value: '${AppData.intValue(overview['groups'])}', icon: Icons.groups_rounded, color: AppColors.violet)),
+          ]),
+          const SizedBox(height: 9),
+          Row(children: [
+            Expanded(child: AdminMetricCard(label: 'Reportes', value: '${AppData.intValue(overview['open_tickets'])}', icon: Icons.support_agent_rounded, color: AppColors.orange)),
+            const SizedBox(width: 9),
+            Expanded(child: AdminMetricCard(label: 'Críticos', value: '${AppData.intValue(overview['critical_tickets'])}', icon: Icons.warning_amber_rounded, color: AppColors.red)),
+          ]),
+          const SizedBox(height: 18),
+          SectionHeader(title: 'Reportes de usuarios', action: filter == 'open' ? 'Ver todos' : 'Abiertos', onTap: () { setState(() { filter = filter == 'open' ? 'all' : 'open'; load(); }); }),
+          const SizedBox(height: 8),
+          if (data.tickets.isEmpty)
+            EmptySlim(icon: Icons.verified_rounded, title: filter == 'open' ? 'No hay reportes abiertos' : 'No hay reportes', body: 'Cuando un usuario reporte algo aparecerá aquí.')
+          else
+            ...data.tickets.map((ticket) => AdminTicketCard(ticket: ticket, onStatus: (status) => changeStatus(ticket, status))),
+          const SizedBox(height: 18),
+          SectionHeader(title: 'Eventos de calidad recientes'),
+          const SizedBox(height: 8),
+          if (data.qualityEvents.isEmpty)
+            EmptySlim(icon: Icons.insights_rounded, title: 'Sin eventos todavía', body: 'Se guardarán reportes y señales internas útiles.')
+          else
+            ...data.qualityEvents.take(6).map((event) => QualityEventCard(event: event)),
+        ]);
+      },
+    ));
+  }
+}
+
+class _AdminDashboardData {
+  final Map<String, dynamic> overview;
+  final List<Map<String, dynamic>> tickets;
+  final List<Map<String, dynamic>> qualityEvents;
+  const _AdminDashboardData({required this.overview, required this.tickets, required this.qualityEvents});
+  static _AdminDashboardData empty() => const _AdminDashboardData(overview: {}, tickets: [], qualityEvents: []);
+  static Future<_AdminDashboardData> load({String status = 'open'}) async {
+    final results = await Future.wait([
+      AppData.adminOverview(),
+      AppData.adminSupportTickets(status: status),
+      AppData.adminQualityEvents(),
+    ]);
+    return _AdminDashboardData(
+      overview: AppData.asMap(results[0]),
+      tickets: AppData.asList(results[1]),
+      qualityEvents: AppData.asList(results[2]),
+    );
+  }
+}
+
+class SupportTicketCard extends StatelessWidget {
+  final Map<String, dynamic> ticket;
+  const SupportTicketCard({super.key, required this.ticket});
+  @override
+  Widget build(BuildContext context) {
+    final status = AppData.text(ticket['status'], 'open');
+    final color = ticketStatusColor(status);
+    final group = AppData.asMap(ticket['groups']);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: AppCard(child: Row(children: [
+        Container(width: 40, height: 40, decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(14)), child: Icon(ticketTypeIcon(AppData.text(ticket['type'])), color: color)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(AppData.text(ticket['title'], 'Reporte'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+          const SizedBox(height: 3),
+          Text('${ticketStatusLabel(status)} · ${AppData.text(group['name'], 'Cuenta general')}', style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+        ])),
+        _MiniChip(text: ticketPriorityLabel(AppData.text(ticket['priority'], 'normal')), color: ticketPriorityColor(AppData.text(ticket['priority'], 'normal'))),
+      ])),
+    );
+  }
+}
+
+class AdminOverviewHero extends StatelessWidget {
+  final Map<String, dynamic> overview;
+  const AdminOverviewHero({super.key, required this.overview});
+  @override
+  Widget build(BuildContext context) {
+    final open = AppData.intValue(overview['open_tickets']);
+    final critical = AppData.intValue(overview['critical_tickets']);
+    final good = open == 0 && critical == 0;
+    return AppCard(
+      color: good ? AppColors.greenSoft : AppColors.tealDark,
+      padding: const EdgeInsets.all(16),
+      child: Row(children: [
+        Container(width: 48, height: 48, decoration: BoxDecoration(color: good ? AppColors.white : Colors.white.withOpacity(.13), borderRadius: BorderRadius.circular(16)), child: Icon(good ? Icons.verified_rounded : Icons.admin_panel_settings_rounded, color: good ? AppColors.green : Colors.white)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(good ? 'Todo controlado' : '$open reportes abiertos', style: TextStyle(color: good ? AppColors.ink : Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+          const SizedBox(height: 4),
+          Text(critical > 0 ? '$critical críticos necesitan revisión prioritaria.' : 'Revisa soporte, usuarios y señales de calidad desde aquí.', style: TextStyle(color: good ? AppColors.muted : const Color(0xDFFFFFFF), fontWeight: FontWeight.w700)),
+        ])),
+      ]),
+    );
+  }
+}
+
+class AdminMetricCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  const AdminMetricCard({super.key, required this.label, required this.value, required this.icon, required this.color});
+  @override
+  Widget build(BuildContext context) => AppCard(
+    padding: const EdgeInsets.all(14),
+    child: Row(children: [
+      Container(width: 38, height: 38, decoration: BoxDecoration(color: color.withOpacity(.11), borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: color, size: 20)),
+      const SizedBox(width: 10),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink, fontSize: 19)),
+        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
+      ])),
+    ]),
+  );
+}
+
+class AdminTicketCard extends StatelessWidget {
+  final Map<String, dynamic> ticket;
+  final ValueChanged<String> onStatus;
+  const AdminTicketCard({super.key, required this.ticket, required this.onStatus});
+  @override
+  Widget build(BuildContext context) {
+    final profile = AppData.asMap(ticket['profiles']);
+    final group = AppData.asMap(ticket['groups']);
+    final status = AppData.text(ticket['status'], 'open');
+    final priority = AppData.text(ticket['priority'], 'normal');
+    final name = AppData.text(profile['full_name'], AppData.text(profile['email'], 'Usuario'));
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ProfileAvatar(name: name, avatarUrl: AppData.text(profile['avatar_url']), radius: 21),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text(AppData.text(ticket['title'], 'Reporte'), style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
+              _MiniChip(text: ticketPriorityLabel(priority), color: ticketPriorityColor(priority)),
+            ]),
+            const SizedBox(height: 3),
+            Text('${ticketTypeLabel(AppData.text(ticket['type']))} · ${AppData.text(group['name'], 'Cuenta general')} · ${ticketStatusLabel(status)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+          ])),
+        ]),
+        const SizedBox(height: 10),
+        Text(AppData.text(ticket['description'], 'Sin descripción'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, height: 1.35)),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          _MiniChip(text: AppData.text(ticket['app_version'], 'v15.21'), color: AppColors.teal),
+          _MiniChip(text: AppData.text(ticket['device_info'], 'dispositivo'), color: AppColors.violet),
+          _MiniChip(text: AppData.text(ticket['screen'], 'app'), color: AppColors.muted),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: SecondaryButton(label: 'Revisando', icon: Icons.search_rounded, onTap: () => onStatus('reviewing'))),
+          const SizedBox(width: 8),
+          Expanded(child: PrimaryButton(label: 'Resolver', icon: Icons.check_rounded, onTap: () => onStatus('resolved'))),
+        ]),
+      ])),
+    );
+  }
+}
+
+class QualityEventCard extends StatelessWidget {
+  final Map<String, dynamic> event;
+  const QualityEventCard({super.key, required this.event});
+  @override
+  Widget build(BuildContext context) {
+    final profile = AppData.asMap(event['profiles']);
+    final group = AppData.asMap(event['groups']);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: AppCard(
+        padding: const EdgeInsets.all(12),
+        child: Row(children: [
+          Container(width: 36, height: 36, decoration: BoxDecoration(color: AppColors.blueSoft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.insights_rounded, color: AppColors.blue, size: 19)),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AppData.text(event['event_type'], 'evento'), style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+            const SizedBox(height: 2),
+            Text('${AppData.text(profile['email'], 'usuario')} · ${AppData.text(group['name'], 'sin grupo')} · ${AppData.text(event['screen'], 'app')}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+          ])),
+        ]),
+      ),
+    );
+  }
+}
+
+IconData ticketTypeIcon(String type) {
+  switch (type) {
+    case 'cuenta': return Icons.person_outline_rounded;
+    case 'grupo': return Icons.groups_rounded;
+    case 'evento': return Icons.event_rounded;
+    case 'finanzas': return Icons.account_balance_wallet_rounded;
+    case 'torneo': return Icons.emoji_events_rounded;
+    case 'sugerencia': return Icons.lightbulb_outline_rounded;
+    default: return Icons.bug_report_rounded;
+  }
+}
+
+String ticketTypeLabel(String type) {
+  switch (type) {
+    case 'cuenta': return 'Cuenta';
+    case 'grupo': return 'Grupo';
+    case 'evento': return 'Evento';
+    case 'finanzas': return 'Finanzas';
+    case 'torneo': return 'Torneo';
+    case 'sugerencia': return 'Sugerencia';
+    case 'otro': return 'Otro';
+    default: return 'Bug';
+  }
+}
+
+String ticketStatusLabel(String status) {
+  switch (status) {
+    case 'reviewing': return 'En revisión';
+    case 'resolved': return 'Resuelto';
+    case 'closed': return 'Cerrado';
+    default: return 'Abierto';
+  }
+}
+
+Color ticketStatusColor(String status) {
+  switch (status) {
+    case 'reviewing': return AppColors.blue;
+    case 'resolved': return AppColors.green;
+    case 'closed': return AppColors.muted;
+    default: return AppColors.orange;
+  }
+}
+
+String ticketPriorityLabel(String priority) {
+  switch (priority) {
+    case 'critical': return 'Crítica';
+    case 'high': return 'Alta';
+    case 'low': return 'Baja';
+    default: return 'Normal';
+  }
+}
+
+Color ticketPriorityColor(String priority) {
+  switch (priority) {
+    case 'critical': return AppColors.red;
+    case 'high': return AppColors.orange;
+    case 'low': return AppColors.muted;
+    default: return AppColors.teal;
+  }
+}
+
+
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onChanged;
   final ValueChanged<int>? onNavigateRoot;
@@ -7398,11 +7962,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: const [
           SheetTitle(icon: Icons.auto_awesome_rounded, title: 'Grupli', body: 'App para organizar grupos privados: quedadas, calendario, gastos, torneos, miembros y permisos.'),
           SizedBox(height: 12),
-          PreferencePreviewRow(icon: Icons.phone_android_rounded, title: 'Versión', body: 'v15.6 · Seguridad, errores humanos y borrado de cuenta'),
-          PreferencePreviewRow(icon: Icons.web_rounded, title: 'Preparada para web/PWA', body: 'Lista para seguir hacia revisión final y stores'),
+          PreferencePreviewRow(icon: Icons.phone_android_rounded, title: 'Versión', body: 'v15.21 · Admin, soporte y control de calidad'),
+          PreferencePreviewRow(icon: Icons.web_rounded, title: 'Preparada para web/PWA/APK', body: 'Lista para pruebas reales y control interno'),
         ]),
       ),
     );
+  }
+
+  Future<void> openSupport() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SupportTicketScreen(screen: 'perfil')));
+    reload();
+  }
+
+  Future<void> openAdminPanel() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminDashboardScreen()));
+    reload();
   }
 
   @override
@@ -7506,7 +8080,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SettingsRow(icon: Icons.language_rounded, title: 'Idioma', subtitle: 'Español por defecto', onTap: () => showToast(context, 'Idioma fijado en español para esta versión.')),
             SettingsRow(icon: Icons.lock_outline_rounded, title: 'Privacidad y seguridad', subtitle: 'Grupos cerrados, roles y acceso privado', onTap: showPrivacySheet),
             SettingsRow(icon: Icons.download_rounded, title: 'Datos de la cuenta', subtitle: 'Perfil, grupos y actividad visible', onTap: () => showToast(context, 'Exportación preparada para una fase posterior.')),
-            SettingsRow(icon: Icons.help_outline_rounded, title: 'Ayuda y soporte', subtitle: 'Guía rápida y contacto próximamente', onTap: () => showToast(context, 'Soporte preparado para la siguiente fase.')),
+            SettingsRow(icon: Icons.help_outline_rounded, title: 'Ayuda y soporte', subtitle: 'Reportar bugs, dudas o sugerencias', onTap: openSupport),
+            if (data.isAdmin)
+              SettingsRow(icon: Icons.admin_panel_settings_rounded, title: 'Panel admin', subtitle: 'Usuarios, reportes, calidad y estado de la app', onTap: openAdminPanel),
             SettingsRow(icon: Icons.info_outline_rounded, title: 'Acerca de Grupli', subtitle: 'Versión y estado del producto', onTap: showAboutSheet),
             SettingsRow(icon: Icons.delete_forever_rounded, title: 'Eliminar cuenta', subtitle: 'Borra tu cuenta y datos personales de Grupli', danger: true, onTap: deleteAccountFlow),
             const SizedBox(height: 10),
@@ -7521,19 +8097,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class _ProfileData {
   final Map<String, dynamic> profile;
   final List<Map<String, dynamic>> groups;
+  final bool isAdmin;
 
-  const _ProfileData({required this.profile, required this.groups});
+  const _ProfileData({required this.profile, required this.groups, this.isAdmin = false});
 
-  static _ProfileData empty() => const _ProfileData(profile: {}, groups: []);
+  static _ProfileData empty() => const _ProfileData(profile: {}, groups: [], isAdmin: false);
 
   static Future<_ProfileData> load() async {
     final results = await Future.wait([
       AppData.profile(),
       AppData.myGroups(),
+      AppData.isSuperAdmin(),
     ]);
     return _ProfileData(
       profile: AppData.asMap(results[0]),
       groups: AppData.asList(results[1]),
+      isAdmin: results[2] == true,
     );
   }
 
