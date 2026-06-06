@@ -2971,6 +2971,7 @@ Future<Uint8List> cropImageBytes({
   return data.buffer.asUint8List();
 }
 
+
 class ImageFrameEditorScreen extends StatefulWidget {
   final Uint8List bytes;
   final String title;
@@ -2996,6 +2997,7 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
   double zoom = 1;
   double offsetX = 0;
   double offsetY = 0;
+  double _gestureStartZoom = 1;
   bool saving = false;
 
   Future<void> save() async {
@@ -3017,6 +3019,28 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
     }
   }
 
+  void _onScaleStart(ScaleStartDetails details) {
+    _gestureStartZoom = zoom;
+  }
+
+  void _onScaleUpdate(ScaleUpdateDetails details, double frameWidth, double frameHeight) {
+    final nextZoom = (_gestureStartZoom * details.scale).clamp(1.0, 4.0).toDouble();
+    final moveFactorX = frameWidth <= 0 ? 0.0 : details.focalPointDelta.dx / max(90.0, frameWidth * .42);
+    final moveFactorY = frameHeight <= 0 ? 0.0 : details.focalPointDelta.dy / max(90.0, frameHeight * .42);
+    setState(() {
+      zoom = nextZoom;
+      // Arrastrar la foto hacia la derecha debe mostrar más zona izquierda del original.
+      offsetX = (offsetX - moveFactorX).clamp(-1.0, 1.0).toDouble();
+      offsetY = (offsetY - moveFactorY).clamp(-1.0, 1.0).toDouble();
+    });
+  }
+
+  void reset() => setState(() {
+    zoom = 1;
+    offsetX = 0;
+    offsetY = 0;
+  });
+
   @override
   Widget build(BuildContext context) {
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -3029,61 +3053,97 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
       Text(widget.title, style: Theme.of(context).textTheme.headlineMedium),
       const SizedBox(height: 6),
       Text(widget.helper, style: Theme.of(context).textTheme.bodyMedium),
-      const SizedBox(height: 18),
+      const SizedBox(height: 14),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0x240B6B8F))),
+        child: const Row(children: [
+          Icon(Icons.touch_app_rounded, color: AppColors.teal, size: 19),
+          SizedBox(width: 8),
+          Expanded(child: Text('Arrastra con el dedo para mover. Pellizca para hacer zoom.', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, fontSize: 12.5))),
+        ]),
+      ),
+      const SizedBox(height: 14),
       AppCard(
         padding: const EdgeInsets.all(12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          AspectRatio(
-            aspectRatio: widget.aspectRatio,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(widget.circularPreview ? 999 : 22),
-              child: Container(
-                color: AppColors.navHome,
-                child: ClipRect(
-                  child: Transform.scale(
-                    scale: zoom,
-                    child: Image.memory(
-                      widget.bytes,
-                      fit: BoxFit.cover,
-                      alignment: Alignment(offsetX, offsetY),
-                      width: double.infinity,
-                      height: double.infinity,
-                    ),
+          LayoutBuilder(builder: (context, constraints) {
+            final frameWidth = constraints.maxWidth;
+            final frameHeight = frameWidth / widget.aspectRatio;
+            return AspectRatio(
+              aspectRatio: widget.aspectRatio,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onScaleStart: _onScaleStart,
+                onScaleUpdate: (details) => _onScaleUpdate(details, frameWidth, frameHeight),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(widget.circularPreview ? 999 : 22),
+                  child: Container(
+                    color: AppColors.navHome,
+                    child: Stack(children: [
+                      Positioned.fill(
+                        child: ClipRect(
+                          child: Transform.scale(
+                            scale: zoom,
+                            child: Image.memory(
+                              widget.bytes,
+                              fit: BoxFit.cover,
+                              alignment: Alignment(offsetX, offsetY),
+                              width: double.infinity,
+                              height: double.infinity,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.white.withOpacity(.78), width: widget.circularPreview ? 3 : 2),
+                              borderRadius: BorderRadius.circular(widget.circularPreview ? 999 : 22),
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (!widget.circularPreview)
+                        Positioned(
+                          left: 12,
+                          right: 12,
+                          bottom: 12,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                            decoration: BoxDecoration(color: const Color(0x99000000), borderRadius: BorderRadius.circular(999)),
+                            child: const Text('La zona visible será la que se guarde', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                          ),
+                        ),
+                    ]),
                   ),
                 ),
               ),
+            );
+          }),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(
+              child: Slider(
+                value: zoom.clamp(1.0, 4.0).toDouble(),
+                min: 1,
+                max: 4,
+                onChanged: (v) => setState(() => zoom = v),
+                activeColor: AppColors.teal,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          _ImageFrameSlider(label: 'Zoom', value: zoom, min: 1, max: 2.8, onChanged: (v) => setState(() => zoom = v)),
-          _ImageFrameSlider(label: 'Mover horizontal', value: offsetX, min: -1, max: 1, onChanged: (v) => setState(() => offsetX = v)),
-          _ImageFrameSlider(label: 'Mover vertical', value: offsetY, min: -1, max: 1, onChanged: (v) => setState(() => offsetY = v)),
+            const SizedBox(width: 8),
+            Text('${zoom.toStringAsFixed(1)}x', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+          ]),
         ]),
       ),
       const SizedBox(height: 16),
       PrimaryButton(label: 'Guardar encuadre', icon: Icons.check_rounded, loading: saving, onTap: save),
       const SizedBox(height: 10),
-      SecondaryButton(label: 'Restablecer encuadre', icon: Icons.restart_alt_rounded, onTap: () => setState(() { zoom = 1; offsetX = 0; offsetY = 0; })),
+      SecondaryButton(label: 'Restablecer encuadre', icon: Icons.restart_alt_rounded, onTap: reset),
     ]));
   }
-}
-
-class _ImageFrameSlider extends StatelessWidget {
-  final String label;
-  final double value;
-  final double min;
-  final double max;
-  final ValueChanged<double> onChanged;
-  const _ImageFrameSlider({required this.label, required this.value, required this.min, required this.max, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12)),
-      Slider(value: value.clamp(min, max).toDouble(), min: min, max: max, onChanged: onChanged, activeColor: AppColors.teal),
-    ]),
-  );
 }
 
 class CreateGroupScreen extends StatefulWidget {
@@ -3134,7 +3194,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       builder: (_) => ImageFrameEditorScreen(
         bytes: raw,
         title: 'Ajustar portada',
-        helper: 'Mueve el encuadre con los controles para que la portada quede limpia.',
+        helper: 'Arrastra y pellizca la imagen para encajar la portada como en una app real.',
         aspectRatio: 16 / 7,
         outputWidth: 1600,
       ),
@@ -3807,9 +3867,17 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                         onChanged: reload,
                       ),
                       const SizedBox(width: 8),
-                      CircleIconButton(
-                        icon: Icons.more_horiz_rounded,
-                        onTap: () => widget.onNavigateTab?.call(4),
+                      OwnProfileButton(
+                        onTap: () async {
+                          await Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => ProfileScreen(onChanged: () {
+                              widget.onGroupChanged?.call();
+                              reload();
+                            }),
+                          ));
+                          widget.onGroupChanged?.call();
+                          reload();
+                        },
                       ),
                     ]),
                     const SizedBox(height: 12),
@@ -8254,7 +8322,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         builder: (_) => ImageFrameEditorScreen(
           bytes: raw,
           title: 'Ajustar portada',
-          helper: 'Encaja la foto antes de subirla para que no quede cortada o mal centrada.',
+          helper: 'Arrastra y pellizca la imagen para dejar el banner bien encuadrado.',
           aspectRatio: 16 / 7,
           outputWidth: 1600,
         ),
@@ -9383,7 +9451,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         builder: (_) => ImageFrameEditorScreen(
           bytes: raw,
           title: 'Ajustar foto',
-          helper: 'Centra tu cara o avatar dentro del círculo.',
+          helper: 'Arrastra y pellizca para centrar tu foto dentro del círculo.',
           aspectRatio: 1,
           outputWidth: 900,
           circularPreview: true,
@@ -10024,6 +10092,7 @@ void showGroupQuickActionsSheet(
   );
 }
 
+
 class GroupHeroCard extends StatelessWidget {
   final String name;
   final String coverUrl;
@@ -10044,31 +10113,54 @@ class GroupHeroCard extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(30),
         child: Stack(children: [
-          Positioned(right: 16, top: 14, child: Row(children: [
-            _HeroActionButton(icon: Icons.edit_rounded, tooltip: 'Editar grupo', onTap: onEdit),
-            const SizedBox(width: 8),
-            _HeroActionButton(icon: Icons.more_horiz_rounded, tooltip: 'Más acciones', onTap: onMore),
-          ])),
-          Positioned(left: 18, right: 18, bottom: 18, child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Container(
-              width: 66,
-              height: 66,
-              decoration: BoxDecoration(
-                color: const Color(0xFF0D4A66),
-                borderRadius: BorderRadius.circular(19),
-                border: Border.all(color: const Color(0x33FFFFFF)),
+          Positioned.fill(
+            child: hasCover
+                ? Image.network(
+                    coverUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(color: AppColors.navHome),
+                  )
+                : Container(color: AppColors.navHome),
+          ),
+          if (hasCover)
+            const Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x12000000), Color(0x55000000)],
+                  ),
+                ),
               ),
-              clipBehavior: Clip.antiAlias,
-              child: hasCover
-                  ? Image.network(coverUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.groups_rounded, color: Colors.white))
-                  : const Icon(Icons.groups_rounded, color: Colors.white, size: 29),
             ),
-            const SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: -0.85)),
-              const SizedBox(height: 8),
-              const Text('Planes, gastos y torneos del grupo', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xEFFFFFFF), fontSize: 13, fontWeight: FontWeight.w800)),
-            ])),
+          Positioned(right: 16, top: 14, child: _HeroActionButton(icon: Icons.edit_rounded, tooltip: 'Editar grupo', onTap: onEdit)),
+          Positioned(left: 18, right: 18, bottom: 20, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 29,
+                fontWeight: FontWeight.w900,
+                height: 1.0,
+                letterSpacing: -0.85,
+                shadows: [Shadow(color: Color(0x88000000), blurRadius: 12, offset: Offset(0, 3))],
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Planes, gastos y torneos del grupo',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                shadows: [Shadow(color: Color(0x88000000), blurRadius: 10, offset: Offset(0, 2))],
+              ),
+            ),
           ])),
         ]),
       ),
@@ -11345,6 +11437,40 @@ class RoundBackButton extends StatelessWidget {
   );
 }
 
+
+class OwnProfileButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const OwnProfileButton({super.key, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: AppData.profile(),
+      builder: (context, snapshot) {
+        final profile = snapshot.data ?? const <String, dynamic>{};
+        final name = AppData.text(profile['full_name'], AppData.user?.email?.split('@').first ?? 'Perfil');
+        final avatar = AppData.text(profile['avatar_url']);
+        return InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: onTap,
+          child: Container(
+            width: 42,
+            height: 42,
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.line),
+              boxShadow: const [BoxShadow(color: Color(0x07111B34), blurRadius: 12, offset: Offset(0, 4))],
+            ),
+            child: ProfileAvatar(name: name, avatarUrl: avatar, radius: 18),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class CircleIconButton extends StatelessWidget {
   final IconData icon; final VoidCallback onTap; final bool filled;
   const CircleIconButton({super.key, required this.icon, required this.onTap, this.filled = false});
@@ -11398,6 +11524,7 @@ class MoneyStat extends StatelessWidget {
   }
 }
 
+
 class GroupHomeCard extends StatelessWidget {
   final Map<String, dynamic> group;
   final VoidCallback onTap;
@@ -11430,32 +11557,43 @@ class GroupHomeCard extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(28),
               child: Stack(children: [
-                Positioned(
-                  left: 16,
-                  top: 16,
-                  bottom: 16,
-                  child: Container(
-                    width: 90,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0D4A66),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: const Color(0x33FFFFFF)),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: hasCover
-                        ? Image.network(
-                            cover,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.groups_rounded, color: Colors.white),
-                          )
-                        : const Icon(Icons.groups_rounded, color: Colors.white, size: 31),
-                  ),
+                Positioned.fill(
+                  child: hasCover
+                      ? Image.network(
+                          cover,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(color: AppColors.navHome),
+                        )
+                      : Container(color: AppColors.navHome),
                 ),
+                if (hasCover)
+                  const Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [Color(0x99000000), Color(0x44000000), Color(0x22000000)],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (!hasCover)
+                  Positioned(
+                    left: 18,
+                    top: 24,
+                    child: Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(color: const Color(0x22000000), borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0x33FFFFFF))),
+                      child: Icon(groupTypeIcon(AppData.text(group['type'], 'otro')), color: Colors.white, size: 34),
+                    ),
+                  ),
                 Positioned(
-                  left: 124,
-                  right: 48,
-                  top: 19,
-                  bottom: 17,
+                  left: hasCover ? 24 : 108,
+                  right: 58,
+                  top: 21,
+                  bottom: 18,
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
                       Expanded(
@@ -11463,7 +11601,13 @@ class GroupHomeCard extends StatelessWidget {
                           name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -.35),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -.35,
+                            shadows: [Shadow(color: Color(0x88000000), blurRadius: 12, offset: Offset(0, 3))],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -11471,14 +11615,14 @@ class GroupHomeCard extends StatelessWidget {
                     ]),
                     const SizedBox(height: 6),
                     Row(children: [
-                      const Icon(Icons.lock_rounded, size: 13, color: Color(0xDFFFFFFF)),
+                      const Icon(Icons.lock_rounded, size: 13, color: Color(0xF2FFFFFF)),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           'Privado · $members $memberLabel',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w800),
+                          style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900, shadows: [Shadow(color: Color(0x88000000), blurRadius: 8, offset: Offset(0, 2))]),
                         ),
                       ),
                     ]),
@@ -11497,7 +11641,7 @@ class GroupHomeCard extends StatelessWidget {
                     child: Container(
                       width: 34,
                       height: 34,
-                      decoration: const BoxDecoration(color: Color(0x1FFFFFFF), shape: BoxShape.circle),
+                      decoration: const BoxDecoration(color: Color(0x30FFFFFF), shape: BoxShape.circle),
                       child: const Icon(Icons.chevron_right_rounded, color: Colors.white),
                     ),
                   ),
