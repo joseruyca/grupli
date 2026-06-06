@@ -236,29 +236,37 @@ Future<void> openAddressInGoogleMaps(BuildContext context, String address) async
 }
 
 class AppColors {
-  static const bgShell = Color(0xFFF3F7FB);
+  static const bgShell = Color(0xFFF6F9FC);
   static const white = Color(0xFFFFFFFF);
-  static const ink = Color(0xFF102033);
-  static const muted = Color(0xFF66758A);
-  static const faint = Color(0xFFF8FAFF);
-  static const surface = Color(0xFFFBFDFF);
-  static const line = Color(0xFFE4EBF4);
+  static const ink = Color(0xFF111B2D);
+  static const muted = Color(0xFF64748B);
+  static const faint = Color(0xFFF7FAFE);
+  static const surface = Color(0xFFFCFEFF);
+  static const line = Color(0xFFE2EAF3);
   static const lineSoft = Color(0xFFF0F5FA);
   static const teal = Color(0xFF0B6B8F);
-  static const tealDark = Color(0xFF073A57);
+  static const tealDark = Color(0xFF053A59);
   static const tealSoft = Color(0xFFEAF6FB);
+  static const navy = Color(0xFF06283D);
+  static const navyDeep = Color(0xFF031F33);
   static const blue = Color(0xFF2563EB);
   static const blueSoft = Color(0xFFEFF6FF);
-  static const violet = Color(0xFF6657D8);
+  static const violet = Color(0xFF6D4CD8);
   static const violetSoft = Color(0xFFF1F0FF);
-  static const orange = Color(0xFFE98A2C);
-  static const orangeSoft = Color(0xFFFFF4E8);
-  static const green = Color(0xFF17966B);
-  static const greenSoft = Color(0xFFEAF8F2);
-  static const red = Color(0xFFE05252);
-  static const redSoft = Color(0xFFFFF0F0);
-  static const amber = Color(0xFFD9A21B);
+  static const orange = Color(0xFFF2A100);
+  static const orangeSoft = Color(0xFFFFF4E0);
+  static const green = Color(0xFF159447);
+  static const greenDark = Color(0xFF0D7E3A);
+  static const greenSoft = Color(0xFFE9F8EF);
+  static const red = Color(0xFFE64836);
+  static const redSoft = Color(0xFFFFEFEC);
+  static const amber = Color(0xFFE6A115);
   static const amberSoft = Color(0xFFFFF7DD);
+  static const navHome = Color(0xFF053A59);
+  static const navAgenda = Color(0xFFF0A000);
+  static const navFinance = Color(0xFF159447);
+  static const navTournaments = Color(0xFFE64836);
+  static const navMore = Color(0xFF6D2A7B);
 }
 
 class GrupliApp extends StatelessWidget {
@@ -4808,7 +4816,7 @@ class _FinancesTabState extends State<FinancesTab> {
           right: 20,
           bottom: 20,
           child: FloatingActionButton.extended(
-            backgroundColor: AppColors.teal,
+            backgroundColor: AppColors.green,
             foregroundColor: Colors.white,
             onPressed: openCreate,
             icon: const Icon(Icons.add_rounded),
@@ -5248,7 +5256,7 @@ class FinanceSegmentedTabs extends StatelessWidget {
               duration: const Duration(milliseconds: 160),
               padding: const EdgeInsets.symmetric(vertical: 11),
               decoration: BoxDecoration(
-                color: selected ? AppColors.tealDark : Colors.transparent,
+                color: selected ? AppColors.green : Colors.transparent,
                 borderRadius: BorderRadius.circular(15),
                 boxShadow: selected ? const [BoxShadow(color: Color(0x1A073A57), blurRadius: 14, offset: Offset(0, 6))] : null,
               ),
@@ -5275,8 +5283,11 @@ class FinanceHeroCard extends StatelessWidget {
     final clean = summary.pendingAmount <= .01;
     return AppCard(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-      color: AppColors.tealDark,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      color: AppColors.greenDark,
+      child: Stack(children: [
+        Positioned(right: -6, top: -4, child: Icon(Icons.stacked_line_chart_rounded, size: 92, color: Colors.white.withOpacity(.06))),
+        Positioned(right: 22, top: 18, child: Icon(Icons.savings_rounded, size: 54, color: Colors.white.withOpacity(.18))),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Container(
             width: 46,
@@ -5295,7 +5306,7 @@ class FinanceHeroCard extends StatelessWidget {
             height: 40,
             child: TextButton.icon(
               onPressed: onCreate,
-              style: TextButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.tealDark, padding: const EdgeInsets.symmetric(horizontal: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              style: TextButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.greenDark, padding: const EdgeInsets.symmetric(horizontal: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
               icon: const Icon(Icons.add_rounded, size: 18),
               label: const Text('Gasto', style: TextStyle(fontWeight: FontWeight.w900)),
             ),
@@ -5308,6 +5319,7 @@ class FinanceHeroCard extends StatelessWidget {
           Expanded(child: _HeroFinanceMetric(label: 'Pendiente', value: money(summary.pendingAmount))),
           const SizedBox(width: 8),
           Expanded(child: _HeroFinanceMetric(label: 'A mover', value: money(summary.settlementAmount))),
+        ]),
         ]),
       ]),
     );
@@ -9813,15 +9825,15 @@ class GroupHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasCover = coverUrl.trim().isNotEmpty;
     return Container(
-      height: 154,
+      height: 148,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
         gradient: const LinearGradient(
-          colors: [Color(0xFF041F33), Color(0xFF073A57), Color(0xFF087A78)],
+          colors: [Color(0xFF031F33), Color(0xFF053A59), Color(0xFF075E7A)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        boxShadow: const [BoxShadow(color: Color(0x22073A57), blurRadius: 28, offset: Offset(0, 14))],
+        boxShadow: const [BoxShadow(color: Color(0x2A053A59), blurRadius: 30, offset: Offset(0, 14))],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(30),
@@ -9833,8 +9845,8 @@ class GroupHeroCard extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: hasCover
-                      ? const [Color(0xE8041F33), Color(0xB3073A57), Color(0xDA041F33)]
-                      : const [Color(0xFF041F33), Color(0xFF073A57), Color(0xFF087A78)],
+                      ? const [Color(0xEA031F33), Color(0xC5053A59), Color(0xE6053A59)]
+                      : const [Color(0xFF031F33), Color(0xFF053A59), Color(0xFF075E7A)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -9847,10 +9859,25 @@ class GroupHeroCard extends StatelessWidget {
             const SizedBox(width: 8),
             _HeroActionButton(icon: Icons.more_horiz_rounded, tooltip: 'Más acciones', onTap: onMore),
           ])),
-          Positioned(left: 20, right: 20, bottom: 20, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: -0.85)),
-            const SizedBox(height: 8),
-            const Text('Planes, gastos y torneos del grupo', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xEFFFFFFF), fontSize: 13, fontWeight: FontWeight.w800)),
+          Positioned(left: 18, right: 18, bottom: 18, child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Container(
+              width: 62,
+              height: 62,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(.13),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white.withOpacity(.18)),
+              ),
+              child: hasCover
+                  ? ClipRRect(borderRadius: BorderRadius.circular(18), child: Image.network(coverUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.groups_rounded, color: Colors.white)))
+                  : const Icon(Icons.groups_rounded, color: Colors.white, size: 28),
+            ),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: -0.85)),
+              const SizedBox(height: 8),
+              const Text('Planes, gastos y torneos del grupo', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Color(0xEFFFFFFF), fontSize: 13, fontWeight: FontWeight.w800)),
+            ])),
           ])),
         ]),
       ),
@@ -10001,7 +10028,7 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
     final progress = minPeople <= 0 ? 0.0 : min(1.0, yes / minPeople);
 
     return AppCard(
-      color: Color.alphaBlend(color.withOpacity(.10), AppColors.white),
+      color: AppColors.navy,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       onTap: () async {
         await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: widget.group)));
@@ -10012,9 +10039,9 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
           Container(
             width: 58,
             height: 62,
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withOpacity(.18))),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white.withOpacity(.18))),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text(shortWeekday(date).toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900)),
+              Text(shortWeekday(date).toUpperCase(), style: const TextStyle(color: AppColors.navAgenda, fontSize: 10, fontWeight: FontWeight.w900)),
               Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 24, fontWeight: FontWeight.w900, height: 1)),
               Text(DateFormat('MMM', 'es_ES').format(date).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800)),
             ]),
@@ -10022,7 +10049,7 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Expanded(child: Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 21, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -.25))),
+              Expanded(child: Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900, height: 1.05, letterSpacing: -.25))),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -10035,21 +10062,21 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
               Row(mainAxisSize: MainAxisSize.min, children: [
                 Icon(Icons.schedule_rounded, size: 15, color: color),
                 const SizedBox(width: 4),
-                Text(DateFormat('HH:mm', 'es_ES').format(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.ink)),
+                Text(DateFormat('HH:mm', 'es_ES').format(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
               ]),
               Row(mainAxisSize: MainAxisSize.min, children: [
                 Icon(Icons.place_outlined, size: 15, color: color),
                 const SizedBox(width: 4),
-                Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.muted)),
+                Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xDFFFFFFF))),
               ]),
             ]),
           ])),
         ]),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 6, backgroundColor: const Color(0xFFE5EEF3), color: color))),
+          Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 6, backgroundColor: Color(0x30FFFFFF), color: AppColors.green))),
           const SizedBox(width: 10),
-          Text('$yes/$minPeople', style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 13)),
+          Text('$yes/$minPeople', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
         ]),
         const SizedBox(height: 12),
         Row(children: [
@@ -10076,11 +10103,11 @@ class DashboardMiniSummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(children: [
-    Expanded(child: MiniSummaryTile(icon: Icons.calendar_month_rounded, label: 'Agenda', value: events.toString(), color: AppColors.teal, onTap: onCalendar)),
+    Expanded(child: MiniSummaryTile(icon: Icons.calendar_month_rounded, label: 'Agenda', value: events.toString(), color: AppColors.navAgenda, onTap: onCalendar)),
     const SizedBox(width: 8),
-    Expanded(child: MiniSummaryTile(icon: Icons.account_balance_wallet_rounded, label: 'Balance', value: money(balance), color: balance < -0.01 ? AppColors.red : AppColors.teal, onTap: onFinances)),
+    Expanded(child: MiniSummaryTile(icon: Icons.account_balance_wallet_rounded, label: 'Balance', value: money(balance), color: balance < -0.01 ? AppColors.red : AppColors.navFinance, onTap: onFinances)),
     const SizedBox(width: 8),
-    Expanded(child: MiniSummaryTile(icon: Icons.emoji_events_rounded, label: 'Torneos', value: tournaments.toString(), color: AppColors.orange, onTap: onTournaments)),
+    Expanded(child: MiniSummaryTile(icon: Icons.emoji_events_rounded, label: 'Torneos', value: tournaments.toString(), color: AppColors.navTournaments, onTap: onTournaments)),
   ]);
 }
 
@@ -10122,10 +10149,10 @@ class GlassAttendanceButton extends StatelessWidget {
       duration: const Duration(milliseconds: 150),
       height: 42,
       decoration: BoxDecoration(
-        color: selected ? color : Colors.white,
+        color: selected ? color : color.withOpacity(.12),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: selected ? color : color.withOpacity(.36), width: 1.2),
-        boxShadow: selected ? [BoxShadow(color: color.withOpacity(.20), blurRadius: 14, offset: const Offset(0, 6))] : const [BoxShadow(color: Color(0x08111B34), blurRadius: 10, offset: Offset(0, 4))],
+        border: Border.all(color: selected ? color : color.withOpacity(.28), width: 1.2),
+        boxShadow: selected ? [BoxShadow(color: color.withOpacity(.20), blurRadius: 14, offset: const Offset(0, 6))] : const [],
       ),
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: selected ? Colors.white : color, size: 15),
@@ -11093,7 +11120,7 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(22);
+    final radius = BorderRadius.circular(24);
     final card = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
@@ -11103,7 +11130,7 @@ class AppCard extends StatelessWidget {
         borderRadius: radius,
         border: Border.all(color: AppColors.lineSoft),
         boxShadow: const [
-          BoxShadow(color: Color(0x08102033), blurRadius: 18, offset: Offset(0, 8)),
+          BoxShadow(color: Color(0x0B0B1B2E), blurRadius: 24, offset: Offset(0, 10)),
         ],
       ),
       child: child,
@@ -11134,10 +11161,10 @@ class CircleIconButton extends StatelessWidget {
     width: 42,
     height: 42,
     decoration: BoxDecoration(
-      color: filled ? AppColors.teal : AppColors.white,
+      color: filled ? AppColors.navHome : AppColors.white,
       shape: BoxShape.circle,
       border: filled ? null : Border.all(color: AppColors.line),
-      boxShadow: filled ? const [BoxShadow(color: Color(0x24008F86), blurRadius: 16, offset: Offset(0, 7))] : const [BoxShadow(color: Color(0x07111B34), blurRadius: 12, offset: Offset(0, 4))],
+      boxShadow: filled ? const [BoxShadow(color: Color(0x33053A59), blurRadius: 18, offset: Offset(0, 8))] : const [BoxShadow(color: Color(0x07111B34), blurRadius: 12, offset: Offset(0, 4))],
     ),
     child: IconButton(onPressed: onTap, icon: Icon(icon, size: 20, color: filled ? Colors.white : AppColors.ink)),
   );
@@ -11203,15 +11230,15 @@ class GroupHomeCard extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           onTap: onTap,
           child: Container(
-            height: 116,
+            height: 122,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(26),
+              borderRadius: BorderRadius.circular(28),
               gradient: const LinearGradient(
-                colors: [Color(0xFF06283D), Color(0xFF073A57), Color(0xFF0B6B8F)],
+                colors: [Color(0xFF06283D), Color(0xFF053A59), Color(0xFF075E7A)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              boxShadow: const [BoxShadow(color: Color(0x1F073A57), blurRadius: 26, offset: Offset(0, 12))],
+              boxShadow: const [BoxShadow(color: Color(0x26053A59), blurRadius: 28, offset: Offset(0, 14))],
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(26),
@@ -11229,8 +11256,8 @@ class GroupHomeCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: hasCover
-                            ? const [Color(0xEA06283D), Color(0xBA073A57), Color(0xE806283D)]
-                            : const [Color(0xFF06283D), Color(0xFF073A57), Color(0xFF0B6B8F)],
+                            ? const [Color(0xF206283D), Color(0xCC053A59), Color(0xE8053A59)]
+                            : const [Color(0xFF06283D), Color(0xFF053A59), Color(0xFF075E7A)],
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
                       ),
@@ -11244,7 +11271,7 @@ class GroupHomeCard extends StatelessWidget {
                   top: 16,
                   bottom: 16,
                   child: Container(
-                    width: 72,
+                    width: 84,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(.13),
                       borderRadius: BorderRadius.circular(22),
@@ -11263,7 +11290,7 @@ class GroupHomeCard extends StatelessWidget {
                   ),
                 ),
                 Positioned(
-                  left: 102,
+                  left: 114,
                   right: 48,
                   top: 18,
                   bottom: 16,
@@ -11274,7 +11301,7 @@ class GroupHomeCard extends StatelessWidget {
                           name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -.25),
+                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -.35),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -11356,6 +11383,23 @@ class GroupBottomNav extends StatelessWidget {
 
 class NavSpec { final IconData icon; final String label; const NavSpec(this.icon, this.label); }
 
+Color navColorFor(int index, int count) {
+  if (count <= 3) {
+    switch (index) {
+      case 0: return AppColors.navHome;
+      case 1: return AppColors.amber;
+      default: return AppColors.violet;
+    }
+  }
+  switch (index) {
+    case 0: return AppColors.navHome;
+    case 1: return AppColors.navAgenda;
+    case 2: return AppColors.navFinance;
+    case 3: return AppColors.navTournaments;
+    default: return AppColors.navMore;
+  }
+}
+
 class BottomBar extends StatelessWidget {
   final List<NavSpec> items;
   final int index;
@@ -11364,38 +11408,41 @@ class BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-    padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
+    margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+    padding: const EdgeInsets.all(7),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(26),
+      borderRadius: BorderRadius.circular(28),
       border: Border.all(color: AppColors.lineSoft),
-      boxShadow: const [BoxShadow(color: Color(0x11111B34), blurRadius: 24, offset: Offset(0, -4))],
+      boxShadow: const [BoxShadow(color: Color(0x14111B34), blurRadius: 28, offset: Offset(0, -4))],
     ),
     child: Row(children: List.generate(items.length, (i) {
       final active = i == index;
       final spec = items[i];
+      final color = navColorFor(i, items.length);
       return Expanded(
         child: InkWell(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           onTap: () => onTap(i),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 1),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 170),
-                curve: Curves.easeOutCubic,
-                height: 31,
-                width: active ? 44 : 34,
-                decoration: BoxDecoration(
-                  color: active ? AppColors.tealSoft : Colors.transparent,
-                  borderRadius: BorderRadius.circular(99),
-                  border: active ? Border.all(color: const Color(0x1F008F86)) : null,
-                ),
-                child: Icon(spec.icon, size: 21, color: active ? AppColors.teal : AppColors.muted),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            height: 58,
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+            decoration: BoxDecoration(
+              color: active ? color : Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: active ? [BoxShadow(color: color.withOpacity(.24), blurRadius: 16, offset: const Offset(0, 7))] : null,
+            ),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(spec.icon, size: 22, color: active ? Colors.white : color),
+              const SizedBox(height: 3),
+              Text(
+                spec.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: items.length >= 5 ? 9.4 : 10.2, fontWeight: FontWeight.w900, color: active ? Colors.white : AppColors.muted),
               ),
-              const SizedBox(height: 2),
-              Text(spec.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: items.length >= 5 ? 9.4 : 10.3, fontWeight: active ? FontWeight.w900 : FontWeight.w700, color: active ? AppColors.ink : AppColors.muted)),
             ]),
           ),
         ),
