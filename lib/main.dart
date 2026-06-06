@@ -1375,14 +1375,25 @@ class AppData {
     }
   }
 
-  static Future<bool> isSuperAdmin() async {
+  static Future<String> currentAppAdminRole() async {
     await ensureAdminClaim();
     try {
-      final res = await sb.rpc('is_app_admin');
-      return res == true;
+      final res = await sb.rpc('app_admin_role');
+      final role = res?.toString() ?? '';
+      return ['owner', 'support', 'viewer'].contains(role) ? role : '';
     } catch (_) {
-      return false;
+      try {
+        final legacy = await sb.rpc('is_app_admin');
+        return legacy == true ? 'owner' : '';
+      } catch (_) {
+        return '';
+      }
     }
+  }
+
+  static Future<bool> isSuperAdmin() async {
+    final role = await currentAppAdminRole();
+    return role.isNotEmpty;
   }
 
   static Future<String> createSupportTicket({
@@ -9101,6 +9112,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void reload() => setState(load);
 
   Future<void> changeStatus(Map<String, dynamic> ticket, String status) async {
+    final role = await AppData.currentAppAdminRole();
+    if (role == 'viewer' || role.isEmpty) {
+      if (mounted) await showToast(context, 'Tu rol puede ver métricas, pero no modificar reportes.', danger: true);
+      return;
+    }
     try {
       await AppData.updateSupportTicketStatus(ticket['id'].toString(), status);
       reload();
@@ -9121,7 +9137,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final overview = data.overview;
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           PageHeader(title: 'Panel admin', subtitle: 'Soporte, calidad y estado general de Grupli.', leading: true),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
+          AdminRoleInfoCard(role: data.role),
+          const SizedBox(height: 12),
           AdminOverviewHero(overview: overview),
           const SizedBox(height: 12),
           Row(children: [
@@ -9136,12 +9154,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Expanded(child: AdminMetricCard(label: 'Críticos', value: '${AppData.intValue(overview['critical_tickets'])}', icon: Icons.warning_amber_rounded, color: AppColors.red)),
           ]),
           const SizedBox(height: 18),
-          SectionHeader(title: 'Reportes de usuarios', action: filter == 'open' ? 'Ver todos' : 'Abiertos', onTap: () { setState(() { filter = filter == 'open' ? 'all' : 'open'; load(); }); }),
+          SectionHeader(
+            title: 'Reportes de usuarios',
+            action: data.isViewer ? 'Solo lectura' : filter == 'open' ? 'Ver todos' : 'Abiertos',
+            onTap: data.isViewer ? null : () { setState(() { filter = filter == 'open' ? 'all' : 'open'; load(); }); },
+          ),
           const SizedBox(height: 8),
-          if (data.tickets.isEmpty)
+          if (data.isViewer)
+            EmptySlim(icon: Icons.visibility_rounded, title: 'Modo viewer', body: 'Puedes ver métricas y estado general, pero no detalles sensibles ni acciones de soporte.')
+          else if (data.tickets.isEmpty)
             EmptySlim(icon: Icons.verified_rounded, title: filter == 'open' ? 'No hay reportes abiertos' : 'No hay reportes', body: 'Cuando un usuario reporte algo aparecerá aquí.')
           else
-            ...data.tickets.map((ticket) => AdminTicketCard(ticket: ticket, onStatus: (status) => changeStatus(ticket, status))),
+            ...data.tickets.map((ticket) => AdminTicketCard(ticket: ticket, canHandle: data.canHandleSupport, onStatus: (status) => changeStatus(ticket, status))),
           const SizedBox(height: 18),
           SectionHeader(title: 'Eventos de calidad recientes'),
           const SizedBox(height: 8),
@@ -9159,18 +9183,24 @@ class _AdminDashboardData {
   final Map<String, dynamic> overview;
   final List<Map<String, dynamic>> tickets;
   final List<Map<String, dynamic>> qualityEvents;
-  const _AdminDashboardData({required this.overview, required this.tickets, required this.qualityEvents});
-  static _AdminDashboardData empty() => const _AdminDashboardData(overview: {}, tickets: [], qualityEvents: []);
+  final String role;
+  const _AdminDashboardData({required this.overview, required this.tickets, required this.qualityEvents, this.role = ''});
+  static _AdminDashboardData empty() => const _AdminDashboardData(overview: {}, tickets: [], qualityEvents: [], role: '');
+  bool get isOwner => role == 'owner';
+  bool get canHandleSupport => role == 'owner' || role == 'support';
+  bool get isViewer => role == 'viewer';
   static Future<_AdminDashboardData> load({String status = 'open'}) async {
+    final role = await AppData.currentAppAdminRole();
     final results = await Future.wait([
       AppData.adminOverview(),
-      AppData.adminSupportTickets(status: status),
+      role == 'viewer' ? Future.value(<Map<String, dynamic>>[]) : AppData.adminSupportTickets(status: status),
       AppData.adminQualityEvents(),
     ]);
     return _AdminDashboardData(
       overview: AppData.asMap(results[0]),
       tickets: AppData.asList(results[1]),
       qualityEvents: AppData.asList(results[2]),
+      role: role,
     );
   }
 }
@@ -9195,6 +9225,38 @@ class SupportTicketCard extends StatelessWidget {
         ])),
         _MiniChip(text: ticketPriorityLabel(AppData.text(ticket['priority'], 'normal')), color: ticketPriorityColor(AppData.text(ticket['priority'], 'normal'))),
       ])),
+    );
+  }
+}
+
+
+class AdminRoleInfoCard extends StatelessWidget {
+  final String role;
+  const AdminRoleInfoCard({super.key, required this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = role.isEmpty ? 'viewer' : role;
+    final color = normalized == 'owner' ? AppColors.orange : normalized == 'support' ? AppColors.teal : AppColors.violet;
+    final title = normalized == 'owner' ? 'Owner de la app' : normalized == 'support' ? 'Soporte' : 'Viewer';
+    final body = normalized == 'owner'
+        ? 'Control total: usuarios, grupos, reportes, métricas y acciones críticas.'
+        : normalized == 'support'
+            ? 'Puede ver y responder reportes, sin tocar acciones críticas de usuarios.'
+            : 'Solo métricas y estado general. No puede modificar información sensible.';
+    return AppCard(
+      padding: const EdgeInsets.all(13),
+      color: color.withOpacity(.08),
+      child: Row(children: [
+        Container(width: 42, height: 42, decoration: BoxDecoration(color: color.withOpacity(.14), borderRadius: BorderRadius.circular(14)), child: Icon(normalized == 'owner' ? Icons.workspace_premium_rounded : normalized == 'support' ? Icons.support_agent_rounded : Icons.visibility_rounded, color: color)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 3),
+          Text(body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12.5, height: 1.25)),
+        ])),
+        _MiniChip(text: normalized.toUpperCase(), color: color),
+      ]),
     );
   }
 }
@@ -9245,8 +9307,9 @@ class AdminMetricCard extends StatelessWidget {
 
 class AdminTicketCard extends StatelessWidget {
   final Map<String, dynamic> ticket;
+  final bool canHandle;
   final ValueChanged<String> onStatus;
-  const AdminTicketCard({super.key, required this.ticket, required this.onStatus});
+  const AdminTicketCard({super.key, required this.ticket, this.canHandle = true, required this.onStatus});
   @override
   Widget build(BuildContext context) {
     final profile = AppData.asMap(ticket['profiles']);
@@ -9278,11 +9341,14 @@ class AdminTicketCard extends StatelessWidget {
           _MiniChip(text: AppData.text(ticket['screen'], 'app'), color: AppColors.muted),
         ]),
         const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: SecondaryButton(label: 'Revisando', icon: Icons.search_rounded, onTap: () => onStatus('reviewing'))),
-          const SizedBox(width: 8),
-          Expanded(child: PrimaryButton(label: 'Resolver', icon: Icons.check_rounded, onTap: () => onStatus('resolved'))),
-        ]),
+        if (canHandle)
+          Row(children: [
+            Expanded(child: SecondaryButton(label: 'Revisando', icon: Icons.search_rounded, onTap: () => onStatus('reviewing'))),
+            const SizedBox(width: 8),
+            Expanded(child: PrimaryButton(label: 'Resolver', icon: Icons.check_rounded, onTap: () => onStatus('resolved'))),
+          ])
+        else
+          EmptySlim(icon: Icons.visibility_rounded, title: 'Solo lectura', body: 'Tu rol no permite modificar reportes.'),
       ])),
     );
   }
@@ -9755,7 +9821,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SettingsRow(icon: Icons.download_rounded, title: 'Datos de la cuenta', subtitle: 'Perfil, grupos y actividad visible', onTap: () => showToast(context, 'Exportación preparada para una fase posterior.')),
             SettingsRow(icon: Icons.help_outline_rounded, title: 'Ayuda y soporte', subtitle: 'Reportar bugs, dudas o sugerencias', onTap: openSupport),
             if (data.isAdmin)
-              SettingsRow(icon: Icons.admin_panel_settings_rounded, title: 'Panel admin', subtitle: 'Usuarios, reportes, calidad y estado de la app', onTap: openAdminPanel),
+              SettingsRow(icon: Icons.admin_panel_settings_rounded, title: 'Panel admin', subtitle: 'Roles, reportes, métricas y calidad de Grupli', onTap: openAdminPanel),
             SettingsRow(icon: Icons.info_outline_rounded, title: 'Acerca de Grupli', subtitle: 'Versión y estado del producto', onTap: showAboutSheet),
             SettingsRow(icon: Icons.delete_forever_rounded, title: 'Eliminar cuenta', subtitle: 'Borra tu cuenta y datos personales de Grupli', danger: true, onTap: deleteAccountFlow),
             const SizedBox(height: 10),
