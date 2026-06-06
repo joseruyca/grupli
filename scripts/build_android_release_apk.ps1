@@ -13,6 +13,7 @@ Get-Command flutter -ErrorAction Stop | Out-Null
 if (-not (Test-Path ".\android")) {
   Write-Host "Creando carpeta Android con package com.joseruyca.grupli..." -ForegroundColor Cyan
   flutter create --platforms=android --org com.joseruyca --project-name grupli .
+  Remove-Item ".\test" -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 $Keys = @(

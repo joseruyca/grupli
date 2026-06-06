@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:ui' show ImageFilter;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -2925,6 +2926,166 @@ class CreateJoinScreen extends StatelessWidget {
 }
 
 
+
+Future<ui.Image> _decodeUiImage(Uint8List bytes) async {
+  final completer = Completer<ui.Image>();
+  ui.decodeImageFromList(bytes, (image) => completer.complete(image));
+  return completer.future;
+}
+
+Future<Uint8List> cropImageBytes({
+  required Uint8List bytes,
+  required double aspectRatio,
+  required double zoom,
+  required double offsetX,
+  required double offsetY,
+  required int outputWidth,
+}) async {
+  final image = await _decodeUiImage(bytes);
+  final iw = image.width.toDouble();
+  final ih = image.height.toDouble();
+  final imageAspect = iw / ih;
+  final baseW = imageAspect > aspectRatio ? ih * aspectRatio : iw;
+  final baseH = imageAspect > aspectRatio ? ih : iw / aspectRatio;
+  final cropW = (baseW / zoom).clamp(64.0, iw).toDouble();
+  final cropH = (baseH / zoom).clamp(64.0, ih).toDouble();
+  final centerX = (iw / 2) + offsetX.clamp(-1.0, 1.0) * ((iw - cropW) / 2);
+  final centerY = (ih / 2) + offsetY.clamp(-1.0, 1.0) * ((ih - cropH) / 2);
+  final left = (centerX - cropW / 2).clamp(0.0, iw - cropW).toDouble();
+  final top = (centerY - cropH / 2).clamp(0.0, ih - cropH).toDouble();
+  final outputHeight = max(1, (outputWidth / aspectRatio).round());
+
+  final recorder = ui.PictureRecorder();
+  final canvas = ui.Canvas(recorder);
+  final paint = ui.Paint()..filterQuality = ui.FilterQuality.high;
+  canvas.drawImageRect(
+    image,
+    ui.Rect.fromLTWH(left, top, cropW, cropH),
+    ui.Rect.fromLTWH(0, 0, outputWidth.toDouble(), outputHeight.toDouble()),
+    paint,
+  );
+  final picture = recorder.endRecording();
+  final cropped = await picture.toImage(outputWidth, outputHeight);
+  final data = await cropped.toByteData(format: ui.ImageByteFormat.png);
+  if (data == null) throw Exception('No se pudo preparar la imagen.');
+  return data.buffer.asUint8List();
+}
+
+class ImageFrameEditorScreen extends StatefulWidget {
+  final Uint8List bytes;
+  final String title;
+  final String helper;
+  final double aspectRatio;
+  final int outputWidth;
+  final bool circularPreview;
+  const ImageFrameEditorScreen({
+    super.key,
+    required this.bytes,
+    required this.title,
+    required this.helper,
+    required this.aspectRatio,
+    required this.outputWidth,
+    this.circularPreview = false,
+  });
+
+  @override
+  State<ImageFrameEditorScreen> createState() => _ImageFrameEditorScreenState();
+}
+
+class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
+  double zoom = 1;
+  double offsetX = 0;
+  double offsetY = 0;
+  bool saving = false;
+
+  Future<void> save() async {
+    setState(() => saving = true);
+    try {
+      final cropped = await cropImageBytes(
+        bytes: widget.bytes,
+        aspectRatio: widget.aspectRatio,
+        zoom: zoom,
+        offsetX: offsetX,
+        offsetY: offsetY,
+        outputWidth: widget.outputWidth,
+      );
+      if (mounted) Navigator.pop(context, cropped);
+    } catch (e) {
+      if (mounted) await showToast(context, humanError(e), danger: true);
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        RoundBackButton(),
+        const Spacer(),
+        TextButton(onPressed: saving ? null : save, child: const Text('Guardar', style: TextStyle(fontWeight: FontWeight.w900))),
+      ]),
+      const SizedBox(height: 18),
+      Text(widget.title, style: Theme.of(context).textTheme.headlineMedium),
+      const SizedBox(height: 6),
+      Text(widget.helper, style: Theme.of(context).textTheme.bodyMedium),
+      const SizedBox(height: 18),
+      AppCard(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          AspectRatio(
+            aspectRatio: widget.aspectRatio,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(widget.circularPreview ? 999 : 22),
+              child: Container(
+                color: AppColors.navHome,
+                child: ClipRect(
+                  child: Transform.scale(
+                    scale: zoom,
+                    child: Image.memory(
+                      widget.bytes,
+                      fit: BoxFit.cover,
+                      alignment: Alignment(offsetX, offsetY),
+                      width: double.infinity,
+                      height: double.infinity,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _ImageFrameSlider(label: 'Zoom', value: zoom, min: 1, max: 2.8, onChanged: (v) => setState(() => zoom = v)),
+          _ImageFrameSlider(label: 'Mover horizontal', value: offsetX, min: -1, max: 1, onChanged: (v) => setState(() => offsetX = v)),
+          _ImageFrameSlider(label: 'Mover vertical', value: offsetY, min: -1, max: 1, onChanged: (v) => setState(() => offsetY = v)),
+        ]),
+      ),
+      const SizedBox(height: 16),
+      PrimaryButton(label: 'Guardar encuadre', icon: Icons.check_rounded, loading: saving, onTap: save),
+      const SizedBox(height: 10),
+      SecondaryButton(label: 'Restablecer encuadre', icon: Icons.restart_alt_rounded, onTap: () => setState(() { zoom = 1; offsetX = 0; offsetY = 0; })),
+    ]));
+  }
+}
+
+class _ImageFrameSlider extends StatelessWidget {
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final ValueChanged<double> onChanged;
+  const _ImageFrameSlider({required this.label, required this.value, required this.min, required this.max, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12)),
+      Slider(value: value.clamp(min, max).toDouble(), min: min, max: max, onChanged: onChanged, activeColor: AppColors.teal),
+    ]),
+  );
+}
+
 class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
 
@@ -2938,7 +3099,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   String type = 'deporte';
   String currency = 'EUR';
   bool loading = false;
-  XFile? coverFile;
+  Uint8List? coverBytes;
+  String? coverFileName;
   int step = 0;
 
   static const groupTypes = [
@@ -2964,9 +3126,24 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   Future<void> pickCover() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1600);
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 88, maxWidth: 2400);
     if (picked == null) return;
-    setState(() => coverFile = picked);
+    final raw = await picked.readAsBytes();
+    if (!mounted) return;
+    final framed = await Navigator.of(context).push<Uint8List>(MaterialPageRoute(
+      builder: (_) => ImageFrameEditorScreen(
+        bytes: raw,
+        title: 'Ajustar portada',
+        helper: 'Mueve el encuadre con los controles para que la portada quede limpia.',
+        aspectRatio: 16 / 7,
+        outputWidth: 1600,
+      ),
+    ));
+    if (framed == null) return;
+    setState(() {
+      coverBytes = framed;
+      coverFileName = 'group-cover.png';
+    });
   }
 
   void selectType(String value) {
@@ -2996,9 +3173,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         description: description.text,
         currency: currency,
       );
-      if (coverFile != null) {
-        final bytes = await coverFile!.readAsBytes();
-        await AppData.uploadGroupCoverBytes(groupId, bytes, coverFile!.name);
+      if (coverBytes != null) {
+        await AppData.uploadGroupCoverBytes(groupId, coverBytes!, coverFileName ?? 'group-cover.png');
       }
       if (!mounted) return;
       final goGroup = await Navigator.of(context).push<bool>(MaterialPageRoute(
@@ -3079,11 +3255,22 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   borderRadius: BorderRadius.circular(22),
                   gradient: const LinearGradient(colors: [Color(0xFF041F33), Color(0xFF087A78)]),
                 ),
-                child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(coverFile == null ? Icons.add_photo_alternate_rounded : Icons.check_circle_rounded, color: Colors.white, size: 34),
-                  const SizedBox(height: 8),
-                  Text(coverFile == null ? 'Añadir portada' : 'Portada seleccionada', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-                ])),
+                child: coverBytes == null
+                    ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: const [
+                        Icon(Icons.add_photo_alternate_rounded, color: Colors.white, size: 34),
+                        SizedBox(height: 8),
+                        Text('Añadir portada', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                        SizedBox(height: 4),
+                        Text('Después podrás encuadrarla', style: TextStyle(color: Color(0xCCFFFFFF), fontWeight: FontWeight.w700, fontSize: 12)),
+                      ]))
+                    : Stack(children: [
+                        Positioned.fill(child: ClipRRect(borderRadius: BorderRadius.circular(22), child: Image.memory(coverBytes!, fit: BoxFit.cover))),
+                        Positioned(right: 12, bottom: 12, child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          decoration: BoxDecoration(color: Colors.black.withOpacity(.38), borderRadius: BorderRadius.circular(99)),
+                          child: const Text('Cambiar encuadre', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                        )),
+                      ]),
               ),
             ),
             const SizedBox(height: 16),
@@ -8059,10 +8246,21 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     setState(() => savingCover = true);
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1600);
+      final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 88, maxWidth: 2400);
       if (picked == null) return;
-      final bytes = await picked.readAsBytes();
-      final url = await AppData.uploadGroupCoverBytes(group['id'].toString(), bytes, picked.name);
+      final raw = await picked.readAsBytes();
+      if (!mounted) return;
+      final framed = await Navigator.of(context).push<Uint8List>(MaterialPageRoute(
+        builder: (_) => ImageFrameEditorScreen(
+          bytes: raw,
+          title: 'Ajustar portada',
+          helper: 'Encaja la foto antes de subirla para que no quede cortada o mal centrada.',
+          aspectRatio: 16 / 7,
+          outputWidth: 1600,
+        ),
+      ));
+      if (framed == null) return;
+      final url = await AppData.uploadGroupCoverBytes(group['id'].toString(), framed, 'group-cover.png');
       if (!mounted) return;
       setState(() => group['cover_url'] = url);
       widget.onChanged?.call();
@@ -9175,12 +9373,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final picked = await ImagePicker().pickImage(
         source: ImageSource.gallery,
-        maxWidth: 900,
-        imageQuality: 82,
+        maxWidth: 1600,
+        imageQuality: 88,
       );
       if (picked == null) return;
-      final bytes = await picked.readAsBytes();
-      await AppData.uploadAvatarBytes(bytes, picked.name);
+      final raw = await picked.readAsBytes();
+      if (!mounted) return;
+      final framed = await Navigator.of(context).push<Uint8List>(MaterialPageRoute(
+        builder: (_) => ImageFrameEditorScreen(
+          bytes: raw,
+          title: 'Ajustar foto',
+          helper: 'Centra tu cara o avatar dentro del círculo.',
+          aspectRatio: 1,
+          outputWidth: 900,
+          circularPreview: true,
+        ),
+      ));
+      if (framed == null) return;
+      await AppData.uploadAvatarBytes(framed, 'avatar.png');
       reload();
       if (mounted) await showToast(context, 'Foto actualizada.');
     } catch (e) {
@@ -9827,33 +10037,13 @@ class GroupHeroCard extends StatelessWidget {
     return Container(
       height: 148,
       decoration: BoxDecoration(
+        color: AppColors.navHome,
         borderRadius: BorderRadius.circular(30),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF031F33), Color(0xFF053A59), Color(0xFF075E7A)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
         boxShadow: const [BoxShadow(color: Color(0x2A053A59), blurRadius: 30, offset: Offset(0, 14))],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(30),
         child: Stack(children: [
-          if (hasCover)
-            Positioned.fill(child: Image.network(coverUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink())),
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: hasCover
-                      ? const [Color(0xEA031F33), Color(0xC5053A59), Color(0xE6053A59)]
-                      : const [Color(0xFF031F33), Color(0xFF053A59), Color(0xFF075E7A)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-            ),
-          ),
-          Positioned.fill(child: Opacity(opacity: hasCover ? .05 : .08, child: const PatternIcons())),
           Positioned(right: 16, top: 14, child: Row(children: [
             _HeroActionButton(icon: Icons.edit_rounded, tooltip: 'Editar grupo', onTap: onEdit),
             const SizedBox(width: 8),
@@ -9861,16 +10051,17 @@ class GroupHeroCard extends StatelessWidget {
           ])),
           Positioned(left: 18, right: 18, bottom: 18, child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Container(
-              width: 62,
-              height: 62,
+              width: 66,
+              height: 66,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(.13),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withOpacity(.18)),
+                color: const Color(0xFF0D4A66),
+                borderRadius: BorderRadius.circular(19),
+                border: Border.all(color: const Color(0x33FFFFFF)),
               ),
+              clipBehavior: Clip.antiAlias,
               child: hasCover
-                  ? ClipRRect(borderRadius: BorderRadius.circular(18), child: Image.network(coverUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.groups_rounded, color: Colors.white)))
-                  : const Icon(Icons.groups_rounded, color: Colors.white, size: 28),
+                  ? Image.network(coverUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.groups_rounded, color: Colors.white))
+                  : const Icon(Icons.groups_rounded, color: Colors.white, size: 29),
             ),
             const SizedBox(width: 14),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
@@ -9902,9 +10093,9 @@ class _HeroActionButton extends StatelessWidget {
           width: 34,
           height: 34,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(.18),
+            color: const Color(0x22FFFFFF),
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withOpacity(.24)),
+            border: Border.all(color: const Color(0x33FFFFFF)),
           ),
           child: Icon(icon, color: Colors.white, size: 18),
         ),
@@ -11232,68 +11423,39 @@ class GroupHomeCard extends StatelessWidget {
           child: Container(
             height: 122,
             decoration: BoxDecoration(
+              color: AppColors.navHome,
               borderRadius: BorderRadius.circular(28),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF06283D), Color(0xFF053A59), Color(0xFF075E7A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
               boxShadow: const [BoxShadow(color: Color(0x26053A59), blurRadius: 28, offset: Offset(0, 14))],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(26),
+              borderRadius: BorderRadius.circular(28),
               child: Stack(children: [
-                if (hasCover)
-                  Positioned.fill(
-                    child: Image.network(
-                      cover,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    ),
-                  ),
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: hasCover
-                            ? const [Color(0xF206283D), Color(0xCC053A59), Color(0xE8053A59)]
-                            : const [Color(0xFF06283D), Color(0xFF053A59), Color(0xFF075E7A)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                    ),
-                  ),
-                ),
-                if (!hasCover)
-                  Positioned.fill(child: Opacity(opacity: .08, child: const PatternIcons())),
                 Positioned(
                   left: 16,
                   top: 16,
                   bottom: 16,
                   child: Container(
-                    width: 84,
+                    width: 90,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(.13),
+                      color: const Color(0xFF0D4A66),
                       borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: Colors.white.withOpacity(.16)),
+                      border: Border.all(color: const Color(0x33FFFFFF)),
                     ),
+                    clipBehavior: Clip.antiAlias,
                     child: hasCover
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(22),
-                            child: Image.network(
-                              cover,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.groups_rounded, color: Colors.white),
-                            ),
+                        ? Image.network(
+                            cover,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.groups_rounded, color: Colors.white),
                           )
-                        : const Icon(Icons.groups_rounded, color: Colors.white, size: 30),
+                        : const Icon(Icons.groups_rounded, color: Colors.white, size: 31),
                   ),
                 ),
                 Positioned(
-                  left: 114,
+                  left: 124,
                   right: 48,
-                  top: 18,
-                  bottom: 16,
+                  top: 19,
+                  bottom: 17,
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
                       Expanded(
@@ -11305,7 +11467,7 @@ class GroupHomeCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle)),
+                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle)),
                     ]),
                     const SizedBox(height: 6),
                     Row(children: [
@@ -11322,7 +11484,7 @@ class GroupHomeCard extends StatelessWidget {
                     ]),
                     const Spacer(),
                     Wrap(spacing: 6, runSpacing: 6, children: [
-                      _MiniChip(text: events == 0 ? 'sin eventos' : '$events eventos', color: AppColors.teal),
+                      _MiniChip(text: events == 0 ? 'Sin eventos' : '$events ${events == 1 ? 'evento' : 'eventos'}', color: AppColors.teal),
                       const _MiniChip(text: 'Invitación', color: AppColors.violet),
                     ]),
                   ]),
@@ -11335,7 +11497,7 @@ class GroupHomeCard extends StatelessWidget {
                     child: Container(
                       width: 34,
                       height: 34,
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(.14), shape: BoxShape.circle),
+                      decoration: const BoxDecoration(color: Color(0x1FFFFFFF), shape: BoxShape.circle),
                       child: const Icon(Icons.chevron_right_rounded, color: Colors.white),
                     ),
                   ),
