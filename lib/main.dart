@@ -846,8 +846,25 @@ class AppData {
   }
 
   static Future<List<Map<String, dynamic>>> events(String groupId) async {
-    final res = await sb.from('events').select('*, event_attendance(status,user_id)').eq('group_id', groupId).neq('status', 'cancelled').order('starts_at');
-    return asList(res);
+    try {
+      final res = await sb
+          .from('events')
+          .select('*, event_attendance(status,user_id)')
+          .eq('group_id', groupId)
+          .order('starts_at');
+      final rows = asList(res);
+      rows.sort((a, b) {
+        final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return da.compareTo(db);
+      });
+      return rows;
+    } catch (_) {
+      // Fallback defensivo: si Supabase no puede resolver el embed de asistencia
+      // por una relación/política temporal, la agenda debe seguir mostrando eventos.
+      final res = await sb.from('events').select('*').eq('group_id', groupId).order('starts_at');
+      return asList(res);
+    }
   }
 
   static Future<String> createEvent(String groupId, String title, DateTime startsAt, String location, String notes, int minPeople) async {
@@ -4968,7 +4985,9 @@ class _CalendarTabState extends State<CalendarTab> {
   @override
   void didUpdateWidget(covariant CalendarTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.refreshSeed != widget.refreshSeed) load();
+    if (oldWidget.refreshSeed != widget.refreshSeed && mounted) {
+      setState(load);
+    }
   }
 
   void load() => future = AppData.events(widget.group['id'].toString());
@@ -5019,6 +5038,18 @@ class _CalendarTabState extends State<CalendarTab> {
             final events = (snapshot.data ?? [])
                 .where((e) => AppData.text(e['status'], 'active') != 'cancelled')
                 .toList();
+            events.sort((a, b) {
+              final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
+              final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now();
+              return da.compareTo(db);
+            });
+            final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+            final upcomingEvents = events.where((event) {
+              final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
+              if (date == null) return false;
+              final eventDay = DateTime(date.year, date.month, date.day);
+              return !eventDay.isBefore(today);
+            }).toList();
             final selectedEvents = _eventsForDay(events, selected);
             final selectedYes = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
             final selectedMaybe = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
@@ -5032,7 +5063,13 @@ class _CalendarTabState extends State<CalendarTab> {
               color: AppColors.teal,
               onRefresh: () async => reload(),
               child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 112), children: [
-                PageHeader(title: 'Agenda', subtitle: 'Elige un día y confirma planes rápido.', leading: false),
+                PageHeader(title: 'Agenda', subtitle: 'Planes, rutinas y asistencia del grupo.', leading: false),
+                const SizedBox(height: 10),
+                CalendarOverviewCard(
+                  events: events,
+                  upcomingEvents: upcomingEvents,
+                  onCreate: () => createFor(selected),
+                ),
                 const SizedBox(height: 10),
                 WeekStrip(
                   days: weekDays,
@@ -5077,9 +5114,21 @@ class _CalendarTabState extends State<CalendarTab> {
                 SectionHeader(title: DateFormat('d MMM', 'es_ES').format(selected), action: 'Crear plan', onTap: () => createFor(selected)),
                 const SizedBox(height: 10),
                 if (selectedEvents.isEmpty)
-                  EmptySlim(icon: Icons.calendar_month_rounded, title: 'No hay planes este día', body: 'Crea una quedada, partido o rutina desde este día.')
+                  EmptySlim(
+                    icon: Icons.calendar_month_rounded,
+                    title: events.isEmpty ? 'Agenda vacía' : 'No hay planes este día',
+                    body: events.isEmpty
+                        ? 'Crea el primer evento del grupo y aparecerá aquí al momento.'
+                        : 'Este día no tiene planes. Abajo puedes ver los próximos eventos del grupo.',
+                  )
                 else
                   ...selectedEvents.map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
+                if (selectedEvents.isEmpty && upcomingEvents.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  SectionHeader(title: 'Próximos planes', action: '${upcomingEvents.length}'),
+                  const SizedBox(height: 10),
+                  ...upcomingEvents.take(5).map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
+                ],
               ]),
             );
           },
@@ -12645,6 +12694,160 @@ class DateBadge extends StatelessWidget {
       Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 24, fontWeight: FontWeight.w900)),
     ]),
   );
+}
+
+
+class CalendarOverviewCard extends StatelessWidget {
+  final List<Map<String, dynamic>> events;
+  final List<Map<String, dynamic>> upcomingEvents;
+  final VoidCallback onCreate;
+  const CalendarOverviewCard({super.key, required this.events, required this.upcomingEvents, required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) {
+    final next = upcomingEvents.isNotEmpty ? upcomingEvents.first : null;
+    final activeEvents = events.length;
+    final nextDate = next == null ? null : DateTime.tryParse(next['starts_at']?.toString() ?? '')?.toLocal();
+    final nextColor = next == null ? AppColors.teal : eventKindColor(next);
+    final totalYes = upcomingEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
+    final totalMaybe = upcomingEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.navy,
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Stack(children: [
+            Positioned(
+              right: -32,
+              top: -38,
+              child: Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  color: nextColor.withOpacity(.22),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            Positioned(
+              left: -26,
+              bottom: -34,
+              child: Container(
+                width: 108,
+                height: 108,
+                decoration: BoxDecoration(
+                  color: AppColors.blue.withOpacity(.18),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(.13), borderRadius: BorderRadius.circular(16)),
+                    child: Icon(next == null ? Icons.calendar_month_rounded : eventKindIcon(next), color: Colors.white),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(
+                      next == null ? 'Aún no hay planes' : 'Próximo plan',
+                      style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800, fontSize: 12),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      next == null ? 'Crea el primer evento del grupo' : AppData.text(next['title'], 'Evento'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19, height: 1.05),
+                    ),
+                  ])),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 38,
+                    child: TextButton.icon(
+                      onPressed: onCreate,
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppColors.navy,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Crear', style: TextStyle(fontWeight: FontWeight.w900)),
+                    ),
+                  ),
+                ]),
+                if (next != null) ...[
+                  const SizedBox(height: 12),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    _WhiteMetaPill(icon: Icons.schedule_rounded, text: nextDate == null ? 'Fecha pendiente' : longDateTime(nextDate)),
+                    _WhiteMetaPill(icon: Icons.place_outlined, text: AppData.text(next['location'], 'Sin ubicación')),
+                    _WhiteMetaPill(icon: Icons.people_alt_rounded, text: "${attendanceCount(next, 'yes')} van · mínimo ${AppData.intValue(next['min_people'], 2)}"),
+                  ]),
+                ],
+                const SizedBox(height: 13),
+                Row(children: [
+                  Expanded(child: _DarkAgendaMetric(label: 'Eventos', value: '$activeEvents')),
+                  const SizedBox(width: 8),
+                  Expanded(child: _DarkAgendaMetric(label: 'Próximos', value: '${upcomingEvents.length}')),
+                  const SizedBox(width: 8),
+                  Expanded(child: _DarkAgendaMetric(label: 'Van / duda', value: '$totalYes / $totalMaybe')),
+                ]),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _WhiteMetaPill extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _WhiteMetaPill({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 240),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(.14), borderRadius: BorderRadius.circular(99), border: Border.all(color: Colors.white.withOpacity(.12))),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, color: Colors.white, size: 15),
+        const SizedBox(width: 6),
+        Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12))),
+      ]),
+    );
+  }
+}
+
+class _DarkAgendaMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  const _DarkAgendaMetric({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white.withOpacity(.10))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 10.5, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 3),
+        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+      ]),
+    );
+  }
 }
 
 class CalendarDaySummary extends StatelessWidget {
