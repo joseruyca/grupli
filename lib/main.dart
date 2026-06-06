@@ -768,6 +768,26 @@ class AppData {
     }
   }
 
+  static Future<void> deleteGroup(String groupId, String confirmation) async {
+    final clean = confirmation.trim().toUpperCase();
+    if (clean != 'ELIMINAR GRUPO') {
+      throw Exception('Para eliminar el grupo escribe ELIMINAR GRUPO exactamente.');
+    }
+    try {
+      await sb.rpc('delete_group_safe', params: {
+        'p_group_id': groupId,
+        'p_confirm': clean,
+      });
+      return;
+    } catch (e) {
+      final message = e.toString().toLowerCase();
+      if (message.contains('function') || message.contains('delete_group_safe')) {
+        throw Exception('Falta ejecutar el SQL v15.25.5 para poder eliminar grupos de forma segura.');
+      }
+      rethrow;
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> events(String groupId) async {
     final res = await sb.from('events').select('*, event_attendance(status,user_id)').eq('group_id', groupId).neq('status', 'cancelled').order('starts_at');
     return asList(res);
@@ -3852,7 +3872,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
               }
 
               Future<void> openGroupSettings() async {
-                await Navigator.of(context).push(MaterialPageRoute(
+                final result = await Navigator.of(context).push<dynamic>(MaterialPageRoute(
                   builder: (_) => GroupSettingsScreen(
                     group: group,
                     onChanged: () {
@@ -3861,6 +3881,11 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                     },
                   ),
                 ));
+                if (result == 'deleted') {
+                  widget.onGroupChanged?.call();
+                  if (context.mounted) Navigator.of(context).pop(true);
+                  return;
+                }
                 widget.onGroupChanged?.call();
                 reload();
               }
@@ -4051,7 +4076,15 @@ class GroupMoreTab extends StatelessWidget {
             icon: Icons.settings_rounded,
             title: 'Ajustes del grupo',
             subtitle: 'Nombre, portada y acciones importantes',
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group, onChanged: refresh))),
+            onTap: () async {
+              final result = await Navigator.of(context).push<dynamic>(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group, onChanged: refresh)));
+              if (result == 'deleted') {
+                refresh();
+                if (context.mounted) Navigator.of(context).pop(true);
+              } else {
+                refresh();
+              }
+            },
           ),
           SettingsRow(
             icon: Icons.lock_rounded,
@@ -8406,6 +8439,55 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     }
   }
 
+  Future<void> deleteGroupFlow() async {
+    final isOwner = AppData.text(group['owner_id']) == AppData.user?.id;
+    if (!isOwner) {
+      await showToast(context, 'Solo el owner puede eliminar este grupo.', danger: true);
+      return;
+    }
+
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar grupo'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Vas a eliminar "${AppData.text(group['name'], 'este grupo')}".'),
+          const SizedBox(height: 10),
+          const Text('Se eliminarán sus miembros, eventos, asistencias, gastos, liquidaciones, torneos y notificaciones relacionadas.'),
+          const SizedBox(height: 14),
+          const Text('Escribe ELIMINAR GRUPO para confirmar.', style: TextStyle(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          TextField(controller: controller, textCapitalization: TextCapitalization.characters, decoration: const InputDecoration(hintText: 'ELIMINAR GRUPO')),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+            onPressed: () => Navigator.pop(context, controller.text.trim().toUpperCase() == 'ELIMINAR GRUPO'),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    final typed = controller.text;
+    controller.dispose();
+    if (confirmed != true) {
+      if (typed.trim().isNotEmpty && mounted) await showToast(context, 'Escribe ELIMINAR GRUPO exactamente para eliminarlo.', danger: true);
+      return;
+    }
+
+    try {
+      await AppData.deleteGroup(group['id'].toString(), 'ELIMINAR GRUPO');
+      widget.onChanged?.call();
+      if (!mounted) return;
+      await showToast(context, 'Grupo eliminado.');
+      if (mounted) Navigator.of(context).pop('deleted');
+    } catch (e) {
+      if (mounted) await showToast(context, humanError(e), danger: true);
+    }
+  }
+
   @override Widget build(BuildContext context) {
     final name = AppData.text(group['name'], 'Grupo');
     final code = AppData.text(group['invite_code'], '------');
@@ -8493,7 +8575,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       SettingsRow(icon: Icons.groups_rounded, title: 'Miembros y roles', subtitle: 'Owner, admins y miembros', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
       SettingsRow(icon: Icons.verified_user_rounded, title: 'Permisos', subtitle: 'Qué puede hacer cada rol', onTap: () => showPermissionSheet(context)),
       SettingsRow(icon: Icons.lock_rounded, title: 'Privacidad', subtitle: 'Grupo privado por invitación', onTap: () => showToast(context, 'Los grupos siguen siendo privados por seguridad.')),
-      SettingsRow(icon: Icons.delete_outline_rounded, title: 'Eliminar grupo', subtitle: 'Solo owner con confirmación segura', danger: true, onTap: () => showToast(context, 'Pendiente de confirmación avanzada antes de beta.')),
+      SettingsRow(icon: Icons.delete_outline_rounded, title: 'Eliminar grupo', subtitle: 'Solo owner · elimina eventos, gastos y torneos', danger: true, onTap: deleteGroupFlow),
     ]));
   }
 }
@@ -9732,6 +9814,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     reload();
   }
 
+  Future<void> openProfileGroup(Map<String, dynamic> group) async {
+    final groupId = group['id']?.toString() ?? '';
+    if (groupId.isEmpty) return;
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)));
+    reload();
+  }
+
+  Future<void> openAllGroups(List<Map<String, dynamic>> groups) async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ProfileAllGroupsScreen(groups: groups, onOpenGroup: openProfileGroup),
+    ));
+    reload();
+  }
+
+  void goBackFromProfile() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+    widget.onNavigateRoot?.call(0);
+  }
+
   @override
   Widget build(BuildContext context) {
     return DirectPage(
@@ -9754,6 +9858,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
+              RoundBackButton(onTap: goBackFromProfile),
+              const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Perfil', style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 4),
@@ -9818,14 +9924,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (avatarUrl.isNotEmpty)
               SettingsRow(icon: Icons.delete_outline_rounded, title: 'Quitar foto', subtitle: 'Volver al avatar con iniciales', danger: true, onTap: removePhoto),
             const SizedBox(height: 8),
-            SectionHeader(title: 'Tus grupos', action: 'Ver inicio', onTap: () => widget.onNavigateRoot?.call(0)),
+            SectionHeader(title: 'Tus grupos', action: 'Ver todos', onTap: () => openAllGroups(data.groups)),
             const SizedBox(height: 8),
             if (data.groups.isEmpty)
               EmptySlim(icon: Icons.groups_rounded, title: 'Aún no tienes grupos', body: 'Crea o únete a un grupo desde Inicio.')
             else
-              ...data.groups.take(3).map((group) => ProfileGroupMiniCard(group: group, onTap: () => widget.onNavigateRoot?.call(0))),
+              ...data.groups.take(3).map((group) => ProfileGroupMiniCard(group: group, onTap: () => openProfileGroup(group))),
             if (data.groups.length > 3)
-              SettingsRow(icon: Icons.more_horiz_rounded, title: 'Ver todos los grupos', subtitle: '${data.groups.length} grupos en total', onTap: () => widget.onNavigateRoot?.call(0)),
+              SettingsRow(icon: Icons.more_horiz_rounded, title: 'Ver todos los grupos', subtitle: '${data.groups.length} grupos en total', onTap: () => openAllGroups(data.groups)),
             const SizedBox(height: 8),
             SectionHeader(title: 'Ajustes'),
             const SizedBox(height: 8),
@@ -9843,6 +9949,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ]);
         },
       ),
+    );
+  }
+}
+
+class ProfileAllGroupsScreen extends StatelessWidget {
+  final List<Map<String, dynamic>> groups;
+  final Future<void> Function(Map<String, dynamic> group) onOpenGroup;
+  const ProfileAllGroupsScreen({super.key, required this.groups, required this.onOpenGroup});
+
+  @override
+  Widget build(BuildContext context) {
+    return DirectPage(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        PageHeader(title: 'Tus grupos', subtitle: '${groups.length} grupos en total. Toca uno para abrirlo.', leading: true),
+        const SizedBox(height: 14),
+        if (groups.isEmpty)
+          EmptyBlock(icon: Icons.groups_rounded, title: 'Aún no tienes grupos', body: 'Crea o únete a un grupo desde Inicio.')
+        else
+          ...groups.map((group) => ProfileGroupMiniCard(group: group, onTap: () => onOpenGroup(group))),
+      ]),
     );
   }
 }
