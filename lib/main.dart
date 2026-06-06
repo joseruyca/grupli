@@ -846,11 +846,27 @@ class AppData {
   }
 
   static Future<List<Map<String, dynamic>>> events(String groupId) async {
+    final cleanGroupId = groupId.trim();
+    if (cleanGroupId.isEmpty) return [];
+
+    try {
+      final res = await sb.rpc('group_events_with_attendance', params: {'p_group_id': cleanGroupId});
+      final rows = asList(res);
+      rows.sort((a, b) {
+        final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return da.compareTo(db);
+      });
+      return rows;
+    } catch (_) {
+      // Si el SQL de v15.29.4 aún no está ejecutado, seguimos con la consulta directa.
+    }
+
     try {
       final res = await sb
           .from('events')
           .select('*, event_attendance(status,user_id)')
-          .eq('group_id', groupId)
+          .eq('group_id', cleanGroupId)
           .order('starts_at');
       final rows = asList(res);
       rows.sort((a, b) {
@@ -862,8 +878,14 @@ class AppData {
     } catch (_) {
       // Fallback defensivo: si Supabase no puede resolver el embed de asistencia
       // por una relación/política temporal, la agenda debe seguir mostrando eventos.
-      final res = await sb.from('events').select('*').eq('group_id', groupId).order('starts_at');
-      return asList(res);
+      final res = await sb.from('events').select('*').eq('group_id', cleanGroupId).order('starts_at');
+      final rows = asList(res);
+      rows.sort((a, b) {
+        final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return da.compareTo(db);
+      });
+      return rows;
     }
   }
 
@@ -4108,7 +4130,7 @@ class _GroupShellState extends State<GroupShell> {
         final name = AppData.text(group['name'], 'Grupo');
         final pages = [
           GroupDashboardTab(group: group, refreshSeed: dashboardRefreshKey, onNavigateTab: (i) => setState(() => tab = i), onGroupChanged: refresh),
-          CalendarTab(group: group, refreshSeed: calendarRefreshKey),
+          CalendarTab(groupId: widget.groupId, group: group, refreshSeed: calendarRefreshKey),
           FinancesTab(group: group, refreshSeed: financeRefreshKey),
           TournamentsTab(group: group, refreshSeed: tournamentsRefreshKey),
           GroupMoreTab(group: group, refresh: refresh),
@@ -5128,17 +5150,23 @@ class _EventDetailData {
 
 
 
+
 class CalendarTab extends StatefulWidget {
+  final String groupId;
   final Map<String, dynamic> group;
   final int refreshSeed;
-  const CalendarTab({super.key, required this.group, required this.refreshSeed});
+  const CalendarTab({super.key, required this.groupId, required this.group, required this.refreshSeed});
   @override State<CalendarTab> createState() => _CalendarTabState();
 }
 
 class _CalendarTabState extends State<CalendarTab> {
   DateTime month = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime selected = DateTime.now();
-  late Future<List<Map<String, dynamic>>> future;
+  bool loading = true;
+  String? errorMessage;
+  List<Map<String, dynamic>> events = <Map<String, dynamic>>[];
+
+  String get groupId => widget.groupId.trim().isNotEmpty ? widget.groupId.trim() : AppData.text(widget.group['id']);
 
   @override
   void initState() {
@@ -5149,28 +5177,63 @@ class _CalendarTabState extends State<CalendarTab> {
   @override
   void didUpdateWidget(covariant CalendarTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.refreshSeed != widget.refreshSeed && mounted) {
-      setState(load);
+    if (oldWidget.refreshSeed != widget.refreshSeed || oldWidget.groupId != widget.groupId) {
+      load();
     }
   }
 
-  void load() => future = AppData.events(widget.group['id'].toString());
-  void reload() => setState(load);
+  Future<void> load() async {
+    final id = groupId;
+    if (id.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        loading = false;
+        errorMessage = 'No se ha podido identificar este grupo. Vuelve a Mis grupos y entra otra vez.';
+        events = <Map<String, dynamic>>[];
+      });
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        loading = true;
+        errorMessage = null;
+      });
+    }
+
+    try {
+      final rows = await AppData.events(id);
+      if (!mounted) return;
+      setState(() {
+        events = rows;
+        loading = false;
+        errorMessage = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        loading = false;
+        errorMessage = humanError(e);
+      });
+    }
+  }
+
+  Future<void> reload() async => load();
 
   Future<void> createFor(DateTime day) async {
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => CreateEventScreen(group: widget.group, initialDate: day)),
     );
-    if (ok == true) reload();
+    if (ok == true) await reload();
   }
 
   Future<void> openEvent(Map<String, dynamic> event) async {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: widget.group)));
-    reload();
+    await reload();
   }
 
-  List<Map<String, dynamic>> _eventsForDay(List<Map<String, dynamic>> events, DateTime day) {
-    final list = events.where((event) {
+  List<Map<String, dynamic>> _eventsForDay(List<Map<String, dynamic>> source, DateTime day) {
+    final list = source.where((event) {
       final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
       return date != null && sameDay(date, day);
     }).toList();
@@ -5184,124 +5247,128 @@ class _CalendarTabState extends State<CalendarTab> {
 
   @override
   Widget build(BuildContext context) {
+    final visibleEvents = events
+        .where((e) => AppData.text(e['status'], 'active') != 'cancelled')
+        .toList();
+    visibleEvents.sort((a, b) {
+      final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
+      final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now();
+      return da.compareTo(db);
+    });
+
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final upcomingEvents = visibleEvents.where((event) {
+      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
+      if (date == null) return false;
+      final eventDay = DateTime(date.year, date.month, date.day);
+      return !eventDay.isBefore(today);
+    }).toList();
+
+    final selectedEvents = _eventsForDay(visibleEvents, selected);
+    final selectedYes = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
+    final selectedMaybe = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
+
+    final weekDays = List<DateTime>.generate(7, (i) {
+      final start = DateTime.now();
+      return DateTime(start.year, start.month, start.day).add(Duration(days: i));
+    });
+
     return SafeArea(
       bottom: false,
       child: Stack(children: [
-        FutureBuilder<List<Map<String, dynamic>>>(
-          future: future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CenterLoader(label: 'Cargando calendario...');
-            }
-            if (snapshot.hasError) {
-              return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 112), children: [
-                ErrorBlock(message: snapshot.error.toString(), onRetry: reload),
-              ]);
-            }
-
-            final events = (snapshot.data ?? [])
-                .where((e) => AppData.text(e['status'], 'active') != 'cancelled')
-                .toList();
-            events.sort((a, b) {
-              final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
-              final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now();
-              return da.compareTo(db);
-            });
-            final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-            final upcomingEvents = events.where((event) {
-              final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
-              if (date == null) return false;
-              final eventDay = DateTime(date.year, date.month, date.day);
-              return !eventDay.isBefore(today);
-            }).toList();
-            final selectedEvents = _eventsForDay(events, selected);
-            final selectedYes = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
-            final selectedMaybe = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
-
-            final weekDays = List<DateTime>.generate(7, (i) {
-              final start = DateTime.now();
-              return DateTime(start.year, start.month, start.day).add(Duration(days: i));
-            });
-
-            return RefreshIndicator(
-              color: AppColors.teal,
-              onRefresh: () async => reload(),
-              child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 112), children: [
-                PageHeader(title: 'Agenda', subtitle: 'Planes, rutinas y asistencia del grupo.', leading: false),
-                const SizedBox(height: 10),
-                CalendarOverviewCard(
-                  events: events,
-                  upcomingEvents: upcomingEvents,
-                  onCreate: () => createFor(selected),
-                ),
-                const SizedBox(height: 10),
-                WeekStrip(
-                  days: weekDays,
+        RefreshIndicator(
+          color: AppColors.teal,
+          onRefresh: reload,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 112),
+            children: [
+              PageHeader(title: 'Agenda', subtitle: 'Planes, rutinas y asistencia del grupo.', leading: false),
+              const SizedBox(height: 10),
+              if (loading) ...[
+                const CenterLoader(label: 'Cargando agenda...'),
+                const SizedBox(height: 12),
+              ],
+              if (errorMessage != null) ...[
+                ErrorBlock(message: errorMessage!, onRetry: () { reload(); }),
+                const SizedBox(height: 12),
+                AgendaRecoveryCard(onCreate: () => createFor(selected), onRetry: () { reload(); }),
+                const SizedBox(height: 12),
+              ],
+              CalendarOverviewCard(
+                events: visibleEvents,
+                upcomingEvents: upcomingEvents,
+                onCreate: () => createFor(selected),
+              ),
+              const SizedBox(height: 10),
+              WeekStrip(
+                days: weekDays,
+                selected: selected,
+                events: visibleEvents,
+                onSelect: (day) => setState(() {
+                  selected = day;
+                  month = DateTime(day.year, day.month);
+                }),
+              ),
+              const SizedBox(height: 10),
+              AppCard(child: Column(children: [
+                Row(children: [
+                  IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month - 1)), icon: const Icon(Icons.chevron_left_rounded)),
+                  Expanded(child: Column(children: [
+                    Text(monthTitle(month), style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 2),
+                    Text('${eventsInMonth(visibleEvents, month)} eventos este mes', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+                  ])),
+                  IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month + 1)), icon: const Icon(Icons.chevron_right_rounded)),
+                ]),
+                const SizedBox(height: 8),
+                MonthGrid(
+                  month: month,
                   selected: selected,
-                  events: events,
-                  onSelect: (day) => setState(() {
-                    selected = day;
-                    month = DateTime(day.year, day.month);
+                  events: visibleEvents,
+                  onSelect: (d) => setState(() {
+                    selected = d;
+                    month = DateTime(d.year, d.month);
                   }),
                 ),
-                const SizedBox(height: 10),
-                AppCard(child: Column(children: [
-                  Row(children: [
-                    IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month - 1)), icon: const Icon(Icons.chevron_left_rounded)),
-                    Expanded(child: Column(children: [
-                      Text(monthTitle(month), style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 2),
-                      Text('${eventsInMonth(events, month)} eventos este mes', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
-                    ])),
-                    IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month + 1)), icon: const Icon(Icons.chevron_right_rounded)),
-                  ]),
-                  const SizedBox(height: 8),
-                  MonthGrid(
-                    month: month,
-                    selected: selected,
-                    events: events,
-                    onSelect: (d) => setState(() {
-                      selected = d;
-                      month = DateTime(d.year, d.month);
-                    }),
-                  ),
-                ])),
-                const SizedBox(height: 14),
-                CalendarDaySummary(
-                  day: selected,
-                  events: selectedEvents,
-                  confirmed: selectedYes,
-                  maybe: selectedMaybe,
-                  onCreate: () => createFor(selected),
-                ),
+              ])),
+              const SizedBox(height: 14),
+              CalendarDaySummary(
+                day: selected,
+                events: selectedEvents,
+                confirmed: selectedYes,
+                maybe: selectedMaybe,
+                onCreate: () => createFor(selected),
+              ),
+              const SizedBox(height: 18),
+              SectionHeader(title: DateFormat('d MMM', 'es_ES').format(selected), action: 'Crear plan', onTap: () => createFor(selected)),
+              const SizedBox(height: 10),
+              if (loading)
+                EmptySlim(icon: Icons.hourglass_empty_rounded, title: 'Actualizando agenda', body: 'Estoy cargando los planes del grupo.')
+              else if (selectedEvents.isEmpty)
+                EmptySlim(
+                  icon: Icons.calendar_month_rounded,
+                  title: visibleEvents.isEmpty ? 'Agenda vacía' : 'No hay planes este día',
+                  body: visibleEvents.isEmpty
+                      ? 'Crea el primer evento del grupo y aparecerá aquí al momento.'
+                      : 'Este día no tiene planes. Abajo puedes ver los próximos eventos del grupo.',
+                )
+              else
+                ...selectedEvents.map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
+              if (!loading && selectedEvents.isEmpty && upcomingEvents.isNotEmpty) ...[
                 const SizedBox(height: 18),
-                SectionHeader(title: DateFormat('d MMM', 'es_ES').format(selected), action: 'Crear plan', onTap: () => createFor(selected)),
+                SectionHeader(title: 'Próximos planes', action: '${upcomingEvents.length}'),
                 const SizedBox(height: 10),
-                if (selectedEvents.isEmpty)
-                  EmptySlim(
-                    icon: Icons.calendar_month_rounded,
-                    title: events.isEmpty ? 'Agenda vacía' : 'No hay planes este día',
-                    body: events.isEmpty
-                        ? 'Crea el primer evento del grupo y aparecerá aquí al momento.'
-                        : 'Este día no tiene planes. Abajo puedes ver los próximos eventos del grupo.',
-                  )
-                else
-                  ...selectedEvents.map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
-                if (selectedEvents.isEmpty && upcomingEvents.isNotEmpty) ...[
-                  const SizedBox(height: 18),
-                  SectionHeader(title: 'Próximos planes', action: '${upcomingEvents.length}'),
-                  const SizedBox(height: 10),
-                  ...upcomingEvents.take(5).map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
-                ],
-              ]),
-            );
-          },
+                ...upcomingEvents.take(5).map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
+              ],
+            ],
+          ),
         ),
         Positioned(
           right: 20,
           bottom: 20,
           child: FloatingActionButton.extended(
-            heroTag: 'calendar-create-event-${widget.group['id']}',
+            heroTag: 'calendar-create-event-${groupId.isEmpty ? 'unknown' : groupId}',
             backgroundColor: AppColors.teal,
             foregroundColor: Colors.white,
             onPressed: () => createFor(selected),
@@ -12860,6 +12927,35 @@ class DateBadge extends StatelessWidget {
   );
 }
 
+
+
+class AgendaRecoveryCard extends StatelessWidget {
+  final VoidCallback onCreate;
+  final VoidCallback onRetry;
+  const AgendaRecoveryCard({super.key, required this.onCreate, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      color: AppColors.tealSoft,
+      child: Row(children: [
+        Container(width: 44, height: 44, decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.event_available_rounded, color: AppColors.teal)),
+        const SizedBox(width: 12),
+        const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('La agenda no puede quedar en blanco', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+          SizedBox(height: 3),
+          Text('Aunque falle la carga, siempre verás este panel para reintentar o crear un plan.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12, height: 1.25)),
+        ])),
+        const SizedBox(width: 8),
+        Column(children: [
+          SizedBox(width: 96, child: PrimaryButton(label: 'Crear', icon: Icons.add_rounded, onTap: onCreate)),
+          const SizedBox(height: 7),
+          SizedBox(width: 96, child: SecondaryButton(label: 'Reintentar', icon: Icons.refresh_rounded, onTap: onRetry)),
+        ]),
+      ]),
+    );
+  }
+}
 
 class CalendarOverviewCard extends StatelessWidget {
   final List<Map<String, dynamic>> events;
