@@ -9790,7 +9790,7 @@ class AdminTicketCard extends StatelessWidget {
             SizedBox(width: 130, child: SecondaryButton(label: 'Revisando', icon: Icons.search_rounded, onTap: () => onStatus('reviewing'))),
             SizedBox(width: 130, child: PrimaryButton(label: 'Resolver', icon: Icons.check_rounded, onTap: () => onStatus('resolved'))),
             SizedBox(width: 120, child: SecondaryButton(label: 'Cerrar', icon: Icons.archive_rounded, onTap: () => onStatus('closed'))),
-            if (onReply != null) SizedBox(width: 130, child: SecondaryButton(label: 'Responder', icon: Icons.reply_rounded, onTap: onReply)),
+            if (onReply != null) SizedBox(width: 130, child: SecondaryButton(label: 'Responder', icon: Icons.reply_rounded, onTap: () => onReply!.call())),
           ])
         else
           EmptySlim(icon: Icons.visibility_rounded, title: 'Solo lectura', body: 'Tu rol no permite modificar reportes.'),
