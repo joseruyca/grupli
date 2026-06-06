@@ -86,7 +86,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v15.29';
+  static const appVersion = 'v15.29.3';
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
 
@@ -3098,6 +3098,30 @@ Future<ui.Image> _decodeUiImage(Uint8List bytes) async {
   return completer.future;
 }
 
+ui.Rect cropSourceRect({
+  required ui.Image image,
+  required double aspectRatio,
+  required double zoom,
+  required double offsetX,
+  required double offsetY,
+}) {
+  final iw = image.width.toDouble();
+  final ih = image.height.toDouble();
+  final imageAspect = iw / ih;
+  final baseW = imageAspect > aspectRatio ? ih * aspectRatio : iw;
+  final baseH = imageAspect > aspectRatio ? ih : iw / aspectRatio;
+  final safeZoom = zoom.clamp(1.0, 5.0).toDouble();
+  final minW = min(64.0, iw);
+  final minH = min(64.0, ih);
+  final cropW = (baseW / safeZoom).clamp(minW, iw).toDouble();
+  final cropH = (baseH / safeZoom).clamp(minH, ih).toDouble();
+  final centerX = (iw / 2) + offsetX.clamp(-1.0, 1.0) * ((iw - cropW) / 2);
+  final centerY = (ih / 2) + offsetY.clamp(-1.0, 1.0) * ((ih - cropH) / 2);
+  final left = (centerX - cropW / 2).clamp(0.0, iw - cropW).toDouble();
+  final top = (centerY - cropH / 2).clamp(0.0, ih - cropH).toDouble();
+  return ui.Rect.fromLTWH(left, top, cropW, cropH);
+}
+
 Future<Uint8List> cropImageBytes({
   required Uint8List bytes,
   required double aspectRatio,
@@ -3107,17 +3131,13 @@ Future<Uint8List> cropImageBytes({
   required int outputWidth,
 }) async {
   final image = await _decodeUiImage(bytes);
-  final iw = image.width.toDouble();
-  final ih = image.height.toDouble();
-  final imageAspect = iw / ih;
-  final baseW = imageAspect > aspectRatio ? ih * aspectRatio : iw;
-  final baseH = imageAspect > aspectRatio ? ih : iw / aspectRatio;
-  final cropW = (baseW / zoom).clamp(64.0, iw).toDouble();
-  final cropH = (baseH / zoom).clamp(64.0, ih).toDouble();
-  final centerX = (iw / 2) + offsetX.clamp(-1.0, 1.0) * ((iw - cropW) / 2);
-  final centerY = (ih / 2) + offsetY.clamp(-1.0, 1.0) * ((ih - cropH) / 2);
-  final left = (centerX - cropW / 2).clamp(0.0, iw - cropW).toDouble();
-  final top = (centerY - cropH / 2).clamp(0.0, ih - cropH).toDouble();
+  final src = cropSourceRect(
+    image: image,
+    aspectRatio: aspectRatio,
+    zoom: zoom,
+    offsetX: offsetX,
+    offsetY: offsetY,
+  );
   final outputHeight = max(1, (outputWidth / aspectRatio).round());
 
   final recorder = ui.PictureRecorder();
@@ -3125,7 +3145,7 @@ Future<Uint8List> cropImageBytes({
   final paint = ui.Paint()..filterQuality = ui.FilterQuality.high;
   canvas.drawImageRect(
     image,
-    ui.Rect.fromLTWH(left, top, cropW, cropH),
+    src,
     ui.Rect.fromLTWH(0, 0, outputWidth.toDouble(), outputHeight.toDouble()),
     paint,
   );
@@ -3135,6 +3155,7 @@ Future<Uint8List> cropImageBytes({
   if (data == null) throw Exception('No se pudo preparar la imagen.');
   return data.buffer.asUint8List();
 }
+
 
 
 class ImageFrameEditorScreen extends StatefulWidget {
@@ -3164,6 +3185,13 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
   double offsetY = 0;
   double _gestureStartZoom = 1;
   bool saving = false;
+  late Future<ui.Image> imageFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    imageFuture = _decodeUiImage(widget.bytes);
+  }
 
   Future<void> save() async {
     setState(() => saving = true);
@@ -3188,15 +3216,57 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
     _gestureStartZoom = zoom;
   }
 
-  void _onScaleUpdate(ScaleUpdateDetails details, double frameWidth, double frameHeight) {
-    final nextZoom = (_gestureStartZoom * details.scale).clamp(1.0, 4.0).toDouble();
-    final moveFactorX = frameWidth <= 0 ? 0.0 : details.focalPointDelta.dx / max(90.0, frameWidth * .42);
-    final moveFactorY = frameHeight <= 0 ? 0.0 : details.focalPointDelta.dy / max(90.0, frameHeight * .42);
+  void _onScaleUpdate(ScaleUpdateDetails details, double frameWidth, double frameHeight, ui.Image image) {
+    final nextZoom = (_gestureStartZoom * details.scale).clamp(1.0, 5.0).toDouble();
+    final src = cropSourceRect(
+      image: image,
+      aspectRatio: widget.aspectRatio,
+      zoom: nextZoom,
+      offsetX: offsetX,
+      offsetY: offsetY,
+    );
+
+    final rangeX = (image.width.toDouble() - src.width) / 2;
+    final rangeY = (image.height.toDouble() - src.height) / 2;
+
+    final deltaSrcX = frameWidth <= 0 ? 0.0 : -details.focalPointDelta.dx / frameWidth * src.width;
+    final deltaSrcY = frameHeight <= 0 ? 0.0 : -details.focalPointDelta.dy / frameHeight * src.height;
+
     setState(() {
       zoom = nextZoom;
-      // Arrastrar la foto hacia la derecha debe mostrar más zona izquierda del original.
-      offsetX = (offsetX - moveFactorX).clamp(-1.0, 1.0).toDouble();
-      offsetY = (offsetY - moveFactorY).clamp(-1.0, 1.0).toDouble();
+      if (rangeX > .5) {
+        offsetX = (offsetX + deltaSrcX / rangeX).clamp(-1.0, 1.0).toDouble();
+      } else {
+        offsetX = 0;
+      }
+      if (rangeY > .5) {
+        offsetY = (offsetY + deltaSrcY / rangeY).clamp(-1.0, 1.0).toDouble();
+      } else {
+        offsetY = 0;
+      }
+    });
+  }
+
+  void _focusAt(TapUpDetails details, double frameWidth, double frameHeight, ui.Image image) {
+    final src = cropSourceRect(
+      image: image,
+      aspectRatio: widget.aspectRatio,
+      zoom: zoom,
+      offsetX: offsetX,
+      offsetY: offsetY,
+    );
+    final local = details.localPosition;
+    final targetX = src.left + (local.dx / max(1.0, frameWidth)).clamp(0.0, 1.0) * src.width;
+    final targetY = src.top + (local.dy / max(1.0, frameHeight)).clamp(0.0, 1.0) * src.height;
+    final rangeX = (image.width.toDouble() - src.width) / 2;
+    final rangeY = (image.height.toDouble() - src.height) / 2;
+    setState(() {
+      if (rangeX > .5) {
+        offsetX = ((targetX - image.width / 2) / rangeX).clamp(-1.0, 1.0).toDouble();
+      }
+      if (rangeY > .5) {
+        offsetY = ((targetY - image.height / 2) / rangeY).clamp(-1.0, 1.0).toDouble();
+      }
     });
   }
 
@@ -3204,6 +3274,26 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
     zoom = 1;
     offsetX = 0;
     offsetY = 0;
+  });
+
+  void quickFocus(String value) => setState(() {
+    switch (value) {
+      case 'top':
+        offsetY = -1;
+        break;
+      case 'bottom':
+        offsetY = 1;
+        break;
+      case 'left':
+        offsetX = -1;
+        break;
+      case 'right':
+        offsetX = 1;
+        break;
+      default:
+        offsetX = 0;
+        offsetY = 0;
+    }
   });
 
   @override
@@ -3223,83 +3313,118 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0x240B6B8F))),
         child: const Row(children: [
-          Icon(Icons.touch_app_rounded, color: AppColors.teal, size: 19),
+          Icon(Icons.center_focus_strong_rounded, color: AppColors.teal, size: 19),
           SizedBox(width: 8),
-          Expanded(child: Text('Arrastra con el dedo para mover. Pellizca para hacer zoom.', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, fontSize: 12.5))),
+          Expanded(child: Text('Nuevo método: toca la cara o zona importante para centrarla. También puedes arrastrar y pellizcar con precisión real.', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, fontSize: 12.5))),
         ]),
       ),
       const SizedBox(height: 14),
       AppCard(
         padding: const EdgeInsets.all(12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          LayoutBuilder(builder: (context, constraints) {
-            final frameWidth = constraints.maxWidth;
-            final frameHeight = frameWidth / widget.aspectRatio;
-            return AspectRatio(
-              aspectRatio: widget.aspectRatio,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onScaleStart: _onScaleStart,
-                onScaleUpdate: (details) => _onScaleUpdate(details, frameWidth, frameHeight),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(widget.circularPreview ? 999 : 22),
-                  child: Container(
-                    color: AppColors.navHome,
-                    child: Stack(children: [
-                      Positioned.fill(
-                        child: ClipRect(
-                          child: Transform.scale(
-                            scale: zoom,
-                            child: Image.memory(
-                              widget.bytes,
-                              fit: BoxFit.cover,
-                              alignment: Alignment(offsetX, offsetY),
-                              width: double.infinity,
-                              height: double.infinity,
+          FutureBuilder<ui.Image>(
+            future: imageFuture,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return AspectRatio(
+                  aspectRatio: widget.aspectRatio,
+                  child: const CenterLoader(label: 'Preparando imagen...'),
+                );
+              }
+              final image = snapshot.data!;
+              return LayoutBuilder(builder: (context, constraints) {
+                final frameWidth = constraints.maxWidth;
+                final frameHeight = frameWidth / widget.aspectRatio;
+                return AspectRatio(
+                  aspectRatio: widget.aspectRatio,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapUp: (details) => _focusAt(details, frameWidth, frameHeight, image),
+                    onScaleStart: _onScaleStart,
+                    onScaleUpdate: (details) => _onScaleUpdate(details, frameWidth, frameHeight, image),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(widget.circularPreview ? 999 : 22),
+                      child: Container(
+                        color: AppColors.navHome,
+                        child: Stack(children: [
+                          Positioned.fill(
+                            child: CustomPaint(
+                              painter: CropFramePainter(
+                                image: image,
+                                aspectRatio: widget.aspectRatio,
+                                zoom: zoom,
+                                offsetX: offsetX,
+                                offsetY: offsetY,
+                              ),
+                              child: const SizedBox.expand(),
                             ),
                           ),
-                        ),
-                      ),
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.white.withOpacity(.78), width: widget.circularPreview ? 3 : 2),
-                              borderRadius: BorderRadius.circular(widget.circularPreview ? 999 : 22),
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.white.withOpacity(.80), width: widget.circularPreview ? 3 : 2),
+                                  borderRadius: BorderRadius.circular(widget.circularPreview ? 999 : 22),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      if (!widget.circularPreview)
-                        Positioned(
-                          left: 12,
-                          right: 12,
-                          bottom: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                            decoration: BoxDecoration(color: const Color(0x99000000), borderRadius: BorderRadius.circular(999)),
-                            child: const Text('La zona visible será la que se guarde', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                          Positioned(
+                            left: 12,
+                            right: 12,
+                            bottom: 12,
+                            child: IgnorePointer(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                decoration: BoxDecoration(color: const Color(0x99000000), borderRadius: BorderRadius.circular(999)),
+                                child: const Text('Toca una zona para centrarla · arrastra para ajustar', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                              ),
+                            ),
                           ),
-                        ),
-                    ]),
+                        ]),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          }),
+                );
+              });
+            },
+          ),
           const SizedBox(height: 14),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            ActionChip(label: const Text('Arriba'), avatar: const Icon(Icons.keyboard_arrow_up_rounded, size: 18), onPressed: () => quickFocus('top')),
+            ActionChip(label: const Text('Centro'), avatar: const Icon(Icons.filter_center_focus_rounded, size: 18), onPressed: () => quickFocus('center')),
+            ActionChip(label: const Text('Abajo'), avatar: const Icon(Icons.keyboard_arrow_down_rounded, size: 18), onPressed: () => quickFocus('bottom')),
+            ActionChip(label: const Text('Izquierda'), avatar: const Icon(Icons.keyboard_arrow_left_rounded, size: 18), onPressed: () => quickFocus('left')),
+            ActionChip(label: const Text('Derecha'), avatar: const Icon(Icons.keyboard_arrow_right_rounded, size: 18), onPressed: () => quickFocus('right')),
+          ]),
+          const SizedBox(height: 10),
           Row(children: [
+            const Icon(Icons.zoom_in_rounded, color: AppColors.teal),
             Expanded(
               child: Slider(
-                value: zoom.clamp(1.0, 4.0).toDouble(),
+                value: zoom.clamp(1.0, 5.0).toDouble(),
                 min: 1,
-                max: 4,
+                max: 5,
                 onChanged: (v) => setState(() => zoom = v),
                 activeColor: AppColors.teal,
               ),
             ),
             const SizedBox(width: 8),
             Text('${zoom.toStringAsFixed(1)}x', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+          ]),
+          Row(children: [
+            const Icon(Icons.swap_vert_rounded, color: AppColors.violet),
+            Expanded(
+              child: Slider(
+                value: offsetY.clamp(-1.0, 1.0).toDouble(),
+                min: -1,
+                max: 1,
+                onChanged: (v) => setState(() => offsetY = v),
+                activeColor: AppColors.violet,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text('alto', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12)),
           ]),
         ]),
       ),
@@ -3308,6 +3433,45 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
       const SizedBox(height: 10),
       SecondaryButton(label: 'Restablecer encuadre', icon: Icons.restart_alt_rounded, onTap: reset),
     ]));
+  }
+}
+
+class CropFramePainter extends CustomPainter {
+  final ui.Image image;
+  final double aspectRatio;
+  final double zoom;
+  final double offsetX;
+  final double offsetY;
+
+  CropFramePainter({
+    required this.image,
+    required this.aspectRatio,
+    required this.zoom,
+    required this.offsetX,
+    required this.offsetY,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final src = cropSourceRect(
+      image: image,
+      aspectRatio: aspectRatio,
+      zoom: zoom,
+      offsetX: offsetX,
+      offsetY: offsetY,
+    );
+    final dst = Offset.zero & size;
+    final paint = Paint()..filterQuality = FilterQuality.high;
+    canvas.drawImageRect(image, src, dst, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CropFramePainter oldDelegate) {
+    return oldDelegate.image != image ||
+        oldDelegate.aspectRatio != aspectRatio ||
+        oldDelegate.zoom != zoom ||
+        oldDelegate.offsetX != offsetX ||
+        oldDelegate.offsetY != offsetY;
   }
 }
 
