@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:app_links/app_links.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:image_picker/image_picker.dart';
@@ -85,6 +86,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
+  static const appVersion = 'v15.29';
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
 
@@ -343,6 +345,10 @@ class AppRoot extends StatefulWidget {
 class _AppRootState extends State<AppRoot> {
   Session? _session;
   late final StreamSubscription<AuthState> _authSub;
+  StreamSubscription<Uri>? _appLinksSub;
+  AppLinks? _appLinks;
+  String? _lastHandledInviteCode;
+  DateTime? _lastHandledInviteAt;
   bool _ready = false;
   bool _showOnboarding = false;
 
@@ -351,6 +357,7 @@ class _AppRootState extends State<AppRoot> {
     super.initState();
     _session = Supabase.instance.client.auth.currentSession;
     _loadFirstRunState();
+    _startAppLinkListener();
     _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
       if (!mounted) return;
       setState(() {
@@ -359,6 +366,55 @@ class _AppRootState extends State<AppRoot> {
       });
       if (event.session != null) {
         PushNotificationService.tryRegisterSilently();
+      }
+    });
+  }
+
+  Future<void> _startAppLinkListener() async {
+    if (kIsWeb) return;
+    final links = AppLinks();
+    _appLinks = links;
+
+    try {
+      final initial = await links.getInitialLink();
+      if (initial != null) {
+        await _handleIncomingInviteLink(initial, source: 'initial');
+      }
+    } catch (_) {
+      // Los enlaces externos nunca deben impedir que la app arranque.
+    }
+
+    _appLinksSub = links.uriLinkStream.listen(
+      (uri) => _handleIncomingInviteLink(uri, source: 'stream'),
+      onError: (_) {},
+    );
+  }
+
+  Future<void> _handleIncomingInviteLink(Uri uri, {required String source}) async {
+    final code = InviteLinks.codeFromUri(uri);
+    if (code == null || code.length < 4) return;
+
+    final now = DateTime.now();
+    if (_lastHandledInviteCode == code && _lastHandledInviteAt != null && now.difference(_lastHandledInviteAt!).inSeconds < 3) {
+      return;
+    }
+    _lastHandledInviteCode = code;
+    _lastHandledInviteAt = now;
+
+    await PendingInviteStore.save(code);
+    if (!mounted) return;
+
+    setState(() => _showOnboarding = false);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final nav = appNavigatorKey.currentState;
+      if (nav == null) return;
+
+      if (_session == null) {
+        nav.push(MaterialPageRoute(builder: (_) => AuthScreen(register: false, inviteCode: code)));
+      } else {
+        nav.push(MaterialPageRoute(builder: (_) => JoinInviteScreen(inviteCode: code)));
       }
     });
   }
@@ -391,6 +447,7 @@ class _AppRootState extends State<AppRoot> {
 
   @override
   void dispose() {
+    _appLinksSub?.cancel();
     _authSub.cancel();
     super.dispose();
   }
@@ -1124,6 +1181,25 @@ class AppData {
     return row['id'].toString();
   }
 
+  static Future<void> cancelSettlementPayment(String paymentId) async {
+    if (paymentId.trim().isEmpty) throw Exception('No se ha podido identificar el pago.');
+
+    // Preferimos RPC para validar permisos y evitar inconsistencias.
+    try {
+      await sb.rpc('cancel_settlement_payment_atomic', params: {
+        'p_payment_id': paymentId,
+      });
+      return;
+    } catch (_) {
+      // Compatibilidad con instalaciones que todavía no han ejecutado el parche.
+    }
+
+    await sb.from('settlement_payments').update({
+      'status': 'cancelled',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', paymentId);
+  }
+
   static Future<List<Map<String, dynamic>>> tournaments(String groupId) async {
     final res = await sb
         .from('tournaments')
@@ -1360,7 +1436,7 @@ class AppData {
       'fcm_token': token.trim(),
       'platform': platform,
       'device_label': kIsWeb ? 'Web' : platform,
-      'app_version': 'v15.22',
+      'app_version': AppConfig.appVersion,
       'enabled': true,
       'last_seen_at': DateTime.now().toUtc().toIso8601String(),
     }, onConflict: 'fcm_token');
@@ -1440,7 +1516,7 @@ class AppData {
       'description': cleanDescription,
       'priority': priority,
       'screen': screen,
-      'app_version': 'v15.22',
+      'app_version': AppConfig.appVersion,
       'device_info': kIsWeb ? 'web' : defaultTargetPlatform.name,
       'status': 'open',
     }).select('id').single();
@@ -1501,6 +1577,45 @@ class AppData {
     }
   }
 
+  static Future<List<Map<String, dynamic>>> adminUsersOverview() async {
+    await ensureAdminClaim();
+    try {
+      final res = await sb.rpc('admin_users_overview');
+      return asList(res);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> adminGroupsOverview() async {
+    await ensureAdminClaim();
+    try {
+      final res = await sb.rpc('admin_groups_overview');
+      return asList(res);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> adminDevicesOverview() async {
+    await ensureAdminClaim();
+    try {
+      final res = await sb.rpc('admin_devices_overview');
+      return asList(res);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> adminSetUserStatus(String email, String status, {String note = ''}) async {
+    await ensureAdminClaim();
+    await sb.rpc('admin_set_user_status_by_email', params: {
+      'target_email': email.trim().toLowerCase(),
+      'new_status': status,
+      'note': note.trim(),
+    });
+  }
+
   static Future<void> updateSupportTicketStatus(String ticketId, String status, {String? note}) async {
     await ensureAdminClaim();
     final payload = <String, dynamic>{
@@ -1522,7 +1637,7 @@ class AppData {
         'event_type': type,
         'screen': screen,
         'message': message,
-        'app_version': 'v15.22',
+        'app_version': AppConfig.appVersion,
         'platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
         'metadata': metadata ?? <String, dynamic>{},
       });
@@ -2294,6 +2409,7 @@ class InviteLinks {
   }
 
   static String joinUrl(String code) => '${AppConfig.appBaseUrl}/join/${normalizeCode(code)}';
+  static String appSchemeUrl(String code) => 'grupli://join/${normalizeCode(code)}';
 
   static String? codeFromUri(Uri uri) {
     final segments = uri.pathSegments.where((s) => s.trim().isNotEmpty).toList();
@@ -2867,6 +2983,7 @@ class _HomeScreenState extends State<HomeScreen> {
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'group_members',
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'user_id', value: userId),
         callback: (_) => _scheduleHomeRealtimeReload(),
       )
       ..subscribe();
@@ -3647,9 +3764,14 @@ class GroupShell extends StatefulWidget {
 class _GroupShellState extends State<GroupShell> {
   int tab = 0;
   int refreshKey = 0;
+  int dashboardRefreshKey = 0;
+  int calendarRefreshKey = 0;
+  int financeRefreshKey = 0;
+  int tournamentsRefreshKey = 0;
   late Future<Map<String, dynamic>> groupFuture;
   RealtimeChannel? _groupRealtimeChannel;
   Timer? _realtimeDebounce;
+  final Set<String> _pendingRealtimeScopes = <String>{};
 
   @override
   void initState() {
@@ -3668,15 +3790,47 @@ class _GroupShellState extends State<GroupShell> {
     super.dispose();
   }
 
-  void refresh() => setState(() {
-    refreshKey++;
-    groupFuture = AppData.group(widget.groupId);
-  });
+  void refresh() => _refreshGroupAndAll();
 
-  void _scheduleRealtimeRefresh() {
+  void _refreshGroupAndAll() {
+    if (!mounted) return;
+    setState(() {
+      refreshKey++;
+      dashboardRefreshKey++;
+      calendarRefreshKey++;
+      financeRefreshKey++;
+      tournamentsRefreshKey++;
+      groupFuture = AppData.group(widget.groupId);
+    });
+  }
+
+  void _refreshRealtimeScopes(Set<String> scopes) {
+    if (!mounted || scopes.isEmpty) return;
+    setState(() {
+      if (scopes.contains('group') || scopes.contains('all')) {
+        refreshKey++;
+        dashboardRefreshKey++;
+        calendarRefreshKey++;
+        financeRefreshKey++;
+        tournamentsRefreshKey++;
+        groupFuture = AppData.group(widget.groupId);
+        return;
+      }
+      final touchesDashboard = scopes.contains('dashboard') || scopes.contains('calendar') || scopes.contains('finance') || scopes.contains('tournaments');
+      if (touchesDashboard) dashboardRefreshKey++;
+      if (scopes.contains('calendar')) calendarRefreshKey++;
+      if (scopes.contains('finance')) financeRefreshKey++;
+      if (scopes.contains('tournaments')) tournamentsRefreshKey++;
+    });
+  }
+
+  void _scheduleRealtimeRefresh([String scope = 'all']) {
+    _pendingRealtimeScopes.add(scope);
     _realtimeDebounce?.cancel();
-    _realtimeDebounce = Timer(const Duration(milliseconds: 450), () {
-      if (mounted) refresh();
+    _realtimeDebounce = Timer(const Duration(milliseconds: 700), () {
+      final scopes = Set<String>.from(_pendingRealtimeScopes);
+      _pendingRealtimeScopes.clear();
+      _refreshRealtimeScopes(scopes);
     });
   }
 
@@ -3688,62 +3842,71 @@ class _GroupShellState extends State<GroupShell> {
         schema: 'public',
         table: 'groups',
         filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'id', value: groupId),
-        callback: (_) => _scheduleRealtimeRefresh(),
+        callback: (_) => _scheduleRealtimeRefresh('group'),
       )
       ..onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'group_members',
         filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
-        callback: (_) => _scheduleRealtimeRefresh(),
+        callback: (_) => _scheduleRealtimeRefresh('group'),
       )
       ..onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'events',
         filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
-        callback: (_) => _scheduleRealtimeRefresh(),
+        callback: (_) => _scheduleRealtimeRefresh('calendar'),
       )
       ..onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'expenses',
         filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
-        callback: (_) => _scheduleRealtimeRefresh(),
+        callback: (_) => _scheduleRealtimeRefresh('finance'),
       )
       ..onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'settlement_payments',
         filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
-        callback: (_) => _scheduleRealtimeRefresh(),
+        callback: (_) => _scheduleRealtimeRefresh('finance'),
       )
       ..onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'tournaments',
         filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
-        callback: (_) => _scheduleRealtimeRefresh(),
+        callback: (_) => _scheduleRealtimeRefresh('tournaments'),
       )
-      // Estas tablas no tienen group_id directo. Se escuchan de forma global para
-      // refrescar el grupo si otro móvil cambia asistencias, participantes de gastos o partidos.
+      // Tablas hijas con group_id directo para evitar refrescos globales.
       ..onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'event_attendance',
-        callback: (_) => _scheduleRealtimeRefresh(),
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
+        callback: (_) => _scheduleRealtimeRefresh('calendar'),
       )
       ..onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'expense_participants',
-        callback: (_) => _scheduleRealtimeRefresh(),
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
+        callback: (_) => _scheduleRealtimeRefresh('finance'),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'tournament_teams',
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
+        callback: (_) => _scheduleRealtimeRefresh('tournaments'),
       )
       ..onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
         table: 'matches',
-        callback: (_) => _scheduleRealtimeRefresh(),
+        filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
+        callback: (_) => _scheduleRealtimeRefresh('tournaments'),
       )
       ..subscribe();
     _groupRealtimeChannel = channel;
@@ -3763,10 +3926,10 @@ class _GroupShellState extends State<GroupShell> {
         final group = snapshot.data ?? {};
         final name = AppData.text(group['name'], 'Grupo');
         final pages = [
-          GroupDashboardTab(group: group, refreshSeed: refreshKey, onNavigateTab: (i) => setState(() => tab = i), onGroupChanged: refresh),
-          CalendarTab(group: group, refreshSeed: refreshKey),
-          FinancesTab(group: group, refreshSeed: refreshKey),
-          TournamentsTab(group: group, refreshSeed: refreshKey),
+          GroupDashboardTab(group: group, refreshSeed: dashboardRefreshKey, onNavigateTab: (i) => setState(() => tab = i), onGroupChanged: refresh),
+          CalendarTab(group: group, refreshSeed: calendarRefreshKey),
+          FinancesTab(group: group, refreshSeed: financeRefreshKey),
+          TournamentsTab(group: group, refreshSeed: tournamentsRefreshKey),
           GroupMoreTab(group: group, refresh: refresh),
         ];
         return WillPopScope(
@@ -4950,6 +5113,7 @@ class _FinancesTabState extends State<FinancesTab> {
   late Future<_FinanceData> future;
   int financeSection = 0;
   bool savingSettlement = false;
+  bool cancellingSettlement = false;
 
   @override
   void initState() {
@@ -4972,6 +5136,14 @@ class _FinancesTabState extends State<FinancesTab> {
   }
 
   Future<void> markSettlementPaid(SettlementDebt debt) async {
+    final confirmed = await confirmAction(
+      context,
+      title: 'Marcar pago como hecho',
+      body: '${debt.fromName} pagó a ${debt.toName} ${money(debt.amount)}. Esto actualizará el balance neto del grupo.',
+      confirmLabel: 'Registrar pago',
+    );
+    if (confirmed != true) return;
+
     setState(() => savingSettlement = true);
     try {
       await AppData.createSettlementPayment(widget.group['id'].toString(), debt.fromId, debt.toId, debt.amount);
@@ -4981,6 +5153,29 @@ class _FinancesTabState extends State<FinancesTab> {
       if (mounted) await showToast(context, humanError(e), danger: true);
     } finally {
       if (mounted) setState(() => savingSettlement = false);
+    }
+  }
+
+  Future<void> undoSettlementPayment(Map<String, dynamic> payment) async {
+    final amount = AppData.doubleValue(payment['amount']);
+    final confirmed = await confirmAction(
+      context,
+      title: 'Deshacer liquidación',
+      body: 'El pago de ${money(amount)} volverá a contarse como pendiente en el balance del grupo.',
+      confirmLabel: 'Deshacer',
+      danger: true,
+    );
+    if (confirmed != true) return;
+
+    setState(() => cancellingSettlement = true);
+    try {
+      await AppData.cancelSettlementPayment(AppData.text(payment['id']));
+      reload();
+      if (mounted) await showToast(context, 'Liquidación deshecha.');
+    } catch (e) {
+      if (mounted) await showToast(context, humanError(e), danger: true);
+    } finally {
+      if (mounted) setState(() => cancellingSettlement = false);
     }
   }
 
@@ -5066,7 +5261,11 @@ class _FinancesTabState extends State<FinancesTab> {
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Column(children: [
                           for (int i = 0; i < data.settlementPayments.take(4).length; i++) ...[
-                            SettlementHistoryRow(payment: data.settlementPayments[i], members: data.members),
+                            SettlementHistoryRow(
+                              payment: data.settlementPayments[i],
+                              members: data.members,
+                              onCancel: cancellingSettlement ? null : () => undoSettlementPayment(data.settlementPayments[i]),
+                            ),
                             if (i != data.settlementPayments.take(4).length - 1) const Divider(height: 1, indent: 76, color: AppColors.line),
                           ],
                         ]),
@@ -5113,7 +5312,11 @@ class _FinancesTabState extends State<FinancesTab> {
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Column(children: [
                           for (int i = 0; i < data.settlementPayments.take(6).length; i++) ...[
-                            SettlementHistoryRow(payment: data.settlementPayments[i], members: data.members),
+                            SettlementHistoryRow(
+                              payment: data.settlementPayments[i],
+                              members: data.members,
+                              onCancel: cancellingSettlement ? null : () => undoSettlementPayment(data.settlementPayments[i]),
+                            ),
                             if (i != data.settlementPayments.take(6).length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
                           ],
                         ]),
@@ -5939,7 +6142,8 @@ class SettlementPaymentRow extends StatelessWidget {
 class SettlementHistoryRow extends StatelessWidget {
   final Map<String, dynamic> payment;
   final List<Map<String, dynamic>> members;
-  const SettlementHistoryRow({super.key, required this.payment, required this.members});
+  final VoidCallback? onCancel;
+  const SettlementHistoryRow({super.key, required this.payment, required this.members, this.onCancel});
 
   @override
   Widget build(BuildContext context) {
@@ -5967,7 +6171,25 @@ class SettlementHistoryRow extends StatelessWidget {
           Text(dateText, style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
         ])),
         const SizedBox(width: 8),
-        Text(money(amount), style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900, fontSize: 14.5)),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(money(amount), style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900, fontSize: 14.5)),
+          if (onCancel != null) ...[
+            const SizedBox(height: 5),
+            SizedBox(
+              height: 30,
+              child: TextButton(
+                onPressed: onCancel,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  foregroundColor: AppColors.red,
+                  backgroundColor: AppColors.redSoft,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+                ),
+                child: const Text('Deshacer', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11)),
+              ),
+            ),
+          ],
+        ]),
       ]),
     );
   }
@@ -6062,7 +6284,7 @@ class FinanceSplitPreview extends StatelessWidget {
         ? 'Elige al menos un participante.'
         : customMode
             ? (ok ? 'Reparto manual equilibrado · total ${money(customTotal)}' : 'Faltan/sobran ${money(diff.abs())} para cuadrar el total')
-            : '$participants participantes · cada uno debe ${money(equalShare)} · se compensará con saldos anteriores';
+            : '$participants participantes · cada uno debe ${money(equalShare)} · luego se optimiza en Liquidar';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -9184,6 +9406,7 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
   }
 }
 
+
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -9193,6 +9416,7 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String filter = 'open';
+  int section = 0;
   late Future<_AdminDashboardData> future;
 
   @override
@@ -9207,16 +9431,65 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   void reload() => setState(load);
 
-  Future<void> changeStatus(Map<String, dynamic> ticket, String status) async {
+  Future<void> changeStatus(Map<String, dynamic> ticket, String status, {String? note}) async {
     final role = await AppData.currentAppAdminRole();
     if (role == 'viewer' || role.isEmpty) {
       if (mounted) await showToast(context, 'Tu rol puede ver métricas, pero no modificar reportes.', danger: true);
       return;
     }
     try {
-      await AppData.updateSupportTicketStatus(ticket['id'].toString(), status);
+      await AppData.updateSupportTicketStatus(ticket['id'].toString(), status, note: note);
       reload();
       if (mounted) await showToast(context, 'Reporte actualizado.');
+    } catch (e) {
+      if (mounted) await showToast(context, humanError(e), danger: true);
+    }
+  }
+
+  Future<void> replyToTicket(Map<String, dynamic> ticket) async {
+    final controller = TextEditingController(text: AppData.text(ticket['admin_note']));
+    final note = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Responder reporte'),
+        content: TextField(
+          controller: controller,
+          minLines: 4,
+          maxLines: 7,
+          decoration: const InputDecoration(
+            hintText: 'Escribe una respuesta visible para el usuario...',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Guardar respuesta')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (note == null) return;
+    await changeStatus(ticket, 'reviewing', note: note);
+  }
+
+  Future<void> setUserStatus(Map<String, dynamic> user, String status) async {
+    final email = AppData.text(user['email']);
+    if (email.isEmpty) return;
+    final label = status == 'blocked' ? 'bloquear' : 'activar';
+    final ok = await confirmAction(
+      context,
+      title: '¿${label[0].toUpperCase()}${label.substring(1)} usuario?',
+      body: status == 'blocked'
+          ? 'El usuario podrá seguir existiendo en base de datos, pero quedará marcado como bloqueado para soporte/admin.'
+          : 'El usuario volverá a aparecer como activo.',
+      danger: status == 'blocked',
+      confirmLabel: status == 'blocked' ? 'Bloquear' : 'Activar',
+    );
+    if (ok != true) return;
+    try {
+      await AppData.adminSetUserStatus(email, status);
+      reload();
+      if (mounted) await showToast(context, status == 'blocked' ? 'Usuario bloqueado.' : 'Usuario activado.');
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -9232,7 +9505,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final data = snapshot.data ?? _AdminDashboardData.empty();
         final overview = data.overview;
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          PageHeader(title: 'Panel admin', subtitle: 'Soporte, calidad y estado general de Grupli.', leading: true),
+          PageHeader(title: 'Panel admin', subtitle: 'Soporte, usuarios, grupos y calidad de Grupli.', leading: true),
           const SizedBox(height: 10),
           AdminRoleInfoCard(role: data.role),
           const SizedBox(height: 12),
@@ -9249,26 +9522,62 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             const SizedBox(width: 9),
             Expanded(child: AdminMetricCard(label: 'Críticos', value: '${AppData.intValue(overview['critical_tickets'])}', icon: Icons.warning_amber_rounded, color: AppColors.red)),
           ]),
-          const SizedBox(height: 18),
-          SectionHeader(
-            title: 'Reportes de usuarios',
-            action: data.isViewer ? 'Solo lectura' : filter == 'open' ? 'Ver todos' : 'Abiertos',
-            onTap: data.isViewer ? null : () { setState(() { filter = filter == 'open' ? 'all' : 'open'; load(); }); },
-          ),
-          const SizedBox(height: 8),
-          if (data.isViewer)
-            EmptySlim(icon: Icons.visibility_rounded, title: 'Modo viewer', body: 'Puedes ver métricas y estado general, pero no detalles sensibles ni acciones de soporte.')
-          else if (data.tickets.isEmpty)
-            EmptySlim(icon: Icons.verified_rounded, title: filter == 'open' ? 'No hay reportes abiertos' : 'No hay reportes', body: 'Cuando un usuario reporte algo aparecerá aquí.')
-          else
-            ...data.tickets.map((ticket) => AdminTicketCard(ticket: ticket, canHandle: data.canHandleSupport, onStatus: (status) => changeStatus(ticket, status))),
-          const SizedBox(height: 18),
-          SectionHeader(title: 'Eventos de calidad recientes'),
-          const SizedBox(height: 8),
-          if (data.qualityEvents.isEmpty)
-            EmptySlim(icon: Icons.insights_rounded, title: 'Sin eventos todavía', body: 'Se guardarán reportes y señales internas útiles.')
-          else
-            ...data.qualityEvents.take(6).map((event) => QualityEventCard(event: event)),
+          const SizedBox(height: 14),
+          AdminSectionTabs(index: section, role: data.role, onChanged: (i) => setState(() => section = i)),
+          const SizedBox(height: 14),
+          if (section == 0) ...[
+            SectionHeader(
+              title: 'Reportes de usuarios',
+              action: data.isViewer ? 'Solo lectura' : filter == 'open' ? 'Ver todos' : 'Abiertos',
+              onTap: data.isViewer ? null : () { setState(() { filter = filter == 'open' ? 'all' : 'open'; load(); }); },
+            ),
+            const SizedBox(height: 8),
+            if (data.isViewer)
+              EmptySlim(icon: Icons.visibility_rounded, title: 'Modo viewer', body: 'Puedes ver métricas y estado general, pero no detalles sensibles ni acciones de soporte.')
+            else if (data.tickets.isEmpty)
+              EmptySlim(icon: Icons.verified_rounded, title: filter == 'open' ? 'No hay reportes abiertos' : 'No hay reportes', body: 'Cuando un usuario reporte algo aparecerá aquí.')
+            else
+              ...data.tickets.map((ticket) => AdminTicketCard(
+                ticket: ticket,
+                canHandle: data.canHandleSupport,
+                onStatus: (status) => changeStatus(ticket, status),
+                onReply: data.canHandleSupport ? () => replyToTicket(ticket) : null,
+              )),
+          ] else if (section == 1) ...[
+            SectionHeader(title: 'Usuarios', action: data.isOwner ? '${data.users.length}' : 'Owner'),
+            const SizedBox(height: 8),
+            if (!data.isOwner)
+              EmptySlim(icon: Icons.lock_rounded, title: 'Solo owner', body: 'Los usuarios son información sensible. Support y viewer no pueden gestionarlos.')
+            else if (data.users.isEmpty)
+              EmptySlim(icon: Icons.people_alt_rounded, title: 'Sin usuarios visibles', body: 'Ejecuta el SQL v15.29 si esta lista aparece vacía.')
+            else
+              ...data.users.map((u) => AdminUserCard(user: u, onBlock: () => setUserStatus(u, 'blocked'), onActivate: () => setUserStatus(u, 'active'))),
+          ] else if (section == 2) ...[
+            SectionHeader(title: 'Grupos', action: data.isOwner ? '${data.groups.length}' : 'Owner'),
+            const SizedBox(height: 8),
+            if (!data.isOwner)
+              EmptySlim(icon: Icons.lock_rounded, title: 'Solo owner', body: 'La vista completa de grupos queda reservada al owner.')
+            else if (data.groups.isEmpty)
+              EmptySlim(icon: Icons.groups_rounded, title: 'Sin grupos visibles', body: 'Cuando se creen grupos aparecerán aquí.')
+            else
+              ...data.groups.map((g) => AdminGroupCard(group: g)),
+          ] else if (section == 3) ...[
+            SectionHeader(title: 'Dispositivos push', action: data.isOwner ? '${data.devices.length}' : 'Owner'),
+            const SizedBox(height: 8),
+            if (!data.isOwner)
+              EmptySlim(icon: Icons.lock_rounded, title: 'Solo owner', body: 'Los tokens/dispositivos son datos técnicos sensibles.')
+            else if (data.devices.isEmpty)
+              EmptySlim(icon: Icons.phone_android_rounded, title: 'Sin dispositivos', body: 'Aparecerán cuando los usuarios activen push en la APK.')
+            else
+              ...data.devices.map((d) => AdminDeviceCard(device: d)),
+          ] else ...[
+            SectionHeader(title: 'Actividad y calidad', action: '${data.qualityEvents.length}'),
+            const SizedBox(height: 8),
+            if (data.qualityEvents.isEmpty)
+              EmptySlim(icon: Icons.insights_rounded, title: 'Sin eventos todavía', body: 'Se guardarán reportes y señales internas útiles.')
+            else
+              ...data.qualityEvents.take(20).map((event) => QualityEventCard(event: event)),
+          ],
         ]);
       },
     ));
@@ -9279,23 +9588,41 @@ class _AdminDashboardData {
   final Map<String, dynamic> overview;
   final List<Map<String, dynamic>> tickets;
   final List<Map<String, dynamic>> qualityEvents;
+  final List<Map<String, dynamic>> users;
+  final List<Map<String, dynamic>> groups;
+  final List<Map<String, dynamic>> devices;
   final String role;
-  const _AdminDashboardData({required this.overview, required this.tickets, required this.qualityEvents, this.role = ''});
-  static _AdminDashboardData empty() => const _AdminDashboardData(overview: {}, tickets: [], qualityEvents: [], role: '');
+  const _AdminDashboardData({
+    required this.overview,
+    required this.tickets,
+    required this.qualityEvents,
+    required this.users,
+    required this.groups,
+    required this.devices,
+    this.role = '',
+  });
+  static _AdminDashboardData empty() => const _AdminDashboardData(overview: {}, tickets: [], qualityEvents: [], users: [], groups: [], devices: [], role: '');
   bool get isOwner => role == 'owner';
   bool get canHandleSupport => role == 'owner' || role == 'support';
   bool get isViewer => role == 'viewer';
   static Future<_AdminDashboardData> load({String status = 'open'}) async {
     final role = await AppData.currentAppAdminRole();
+    final isOwner = role == 'owner';
     final results = await Future.wait([
       AppData.adminOverview(),
       role == 'viewer' ? Future.value(<Map<String, dynamic>>[]) : AppData.adminSupportTickets(status: status),
       AppData.adminQualityEvents(),
+      isOwner ? AppData.adminUsersOverview() : Future.value(<Map<String, dynamic>>[]),
+      isOwner ? AppData.adminGroupsOverview() : Future.value(<Map<String, dynamic>>[]),
+      isOwner ? AppData.adminDevicesOverview() : Future.value(<Map<String, dynamic>>[]),
     ]);
     return _AdminDashboardData(
       overview: AppData.asMap(results[0]),
       tickets: AppData.asList(results[1]),
       qualityEvents: AppData.asList(results[2]),
+      users: AppData.asList(results[3]),
+      groups: AppData.asList(results[4]),
+      devices: AppData.asList(results[5]),
       role: role,
     );
   }
@@ -9311,15 +9638,26 @@ class SupportTicketCard extends StatelessWidget {
     final group = AppData.asMap(ticket['groups']);
     return Padding(
       padding: const EdgeInsets.only(bottom: 9),
-      child: AppCard(child: Row(children: [
-        Container(width: 40, height: 40, decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(14)), child: Icon(ticketTypeIcon(AppData.text(ticket['type'])), color: color)),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(AppData.text(ticket['title'], 'Reporte'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
-          const SizedBox(height: 3),
-          Text('${ticketStatusLabel(status)} · ${AppData.text(group['name'], 'Cuenta general')}', style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
-        ])),
-        _MiniChip(text: ticketPriorityLabel(AppData.text(ticket['priority'], 'normal')), color: ticketPriorityColor(AppData.text(ticket['priority'], 'normal'))),
+      child: AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(width: 40, height: 40, decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(14)), child: Icon(ticketTypeIcon(AppData.text(ticket['type'])), color: color)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AppData.text(ticket['title'], 'Reporte'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+            const SizedBox(height: 3),
+            Text('${ticketStatusLabel(status)} · ${AppData.text(group['name'], 'Cuenta general')}', style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+          ])),
+          _MiniChip(text: ticketPriorityLabel(AppData.text(ticket['priority'], 'normal')), color: ticketPriorityColor(AppData.text(ticket['priority'], 'normal'))),
+        ]),
+        if (AppData.text(ticket['admin_note']).isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.teal.withOpacity(.14))),
+            child: Text('Respuesta de soporte: ${AppData.text(ticket['admin_note'])}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.3)),
+          ),
+        ],
       ])),
     );
   }
@@ -9405,7 +9743,8 @@ class AdminTicketCard extends StatelessWidget {
   final Map<String, dynamic> ticket;
   final bool canHandle;
   final ValueChanged<String> onStatus;
-  const AdminTicketCard({super.key, required this.ticket, this.canHandle = true, required this.onStatus});
+  final VoidCallback? onReply;
+  const AdminTicketCard({super.key, required this.ticket, this.canHandle = true, required this.onStatus, this.onReply});
   @override
   Widget build(BuildContext context) {
     final profile = AppData.asMap(ticket['profiles']);
@@ -9432,16 +9771,26 @@ class AdminTicketCard extends StatelessWidget {
         Text(AppData.text(ticket['description'], 'Sin descripción'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, height: 1.35)),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8, children: [
-          _MiniChip(text: AppData.text(ticket['app_version'], 'v15.21'), color: AppColors.teal),
+          _MiniChip(text: AppData.text(ticket['app_version'], AppConfig.appVersion), color: AppColors.teal),
           _MiniChip(text: AppData.text(ticket['device_info'], 'dispositivo'), color: AppColors.violet),
           _MiniChip(text: AppData.text(ticket['screen'], 'app'), color: AppColors.muted),
         ]),
+        if (AppData.text(ticket['admin_note']).isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: AppColors.greenSoft, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.green.withOpacity(.15))),
+            child: Text('Respuesta admin: ${AppData.text(ticket['admin_note'])}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.3)),
+          ),
+        ],
         const SizedBox(height: 12),
         if (canHandle)
-          Row(children: [
-            Expanded(child: SecondaryButton(label: 'Revisando', icon: Icons.search_rounded, onTap: () => onStatus('reviewing'))),
-            const SizedBox(width: 8),
-            Expanded(child: PrimaryButton(label: 'Resolver', icon: Icons.check_rounded, onTap: () => onStatus('resolved'))),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            SizedBox(width: 130, child: SecondaryButton(label: 'Revisando', icon: Icons.search_rounded, onTap: () => onStatus('reviewing'))),
+            SizedBox(width: 130, child: PrimaryButton(label: 'Resolver', icon: Icons.check_rounded, onTap: () => onStatus('resolved'))),
+            SizedBox(width: 120, child: SecondaryButton(label: 'Cerrar', icon: Icons.archive_rounded, onTap: () => onStatus('closed'))),
+            if (onReply != null) SizedBox(width: 130, child: SecondaryButton(label: 'Responder', icon: Icons.reply_rounded, onTap: onReply)),
           ])
         else
           EmptySlim(icon: Icons.visibility_rounded, title: 'Solo lectura', body: 'Tu rol no permite modificar reportes.'),
@@ -9468,6 +9817,164 @@ class QualityEventCard extends StatelessWidget {
             Text(AppData.text(event['event_type'], 'evento'), style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
             const SizedBox(height: 2),
             Text('${AppData.text(profile['email'], 'usuario')} · ${AppData.text(group['name'], 'sin grupo')} · ${AppData.text(event['screen'], 'app')}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+          ])),
+        ]),
+      ),
+    );
+  }
+}
+
+
+class AdminSectionTabs extends StatelessWidget {
+  final int index;
+  final String role;
+  final ValueChanged<int> onChanged;
+  const AdminSectionTabs({super.key, required this.index, required this.role, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (Icons.support_agent_rounded, 'Reportes', AppColors.orange),
+      (Icons.people_alt_rounded, 'Usuarios', AppColors.teal),
+      (Icons.groups_rounded, 'Grupos', AppColors.violet),
+      (Icons.phone_android_rounded, 'Dispositivos', AppColors.blue),
+      (Icons.insights_rounded, 'Actividad', AppColors.green),
+    ];
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemBuilder: (context, i) {
+          final selected = index == i;
+          final item = items[i];
+          return InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => onChanged(i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+              decoration: BoxDecoration(
+                color: selected ? item.$3 : AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: selected ? item.$3 : AppColors.line),
+                boxShadow: selected ? [BoxShadow(color: item.$3.withOpacity(.22), blurRadius: 14, offset: const Offset(0, 7))] : null,
+              ),
+              child: Row(children: [
+                Icon(item.$1, size: 17, color: selected ? Colors.white : item.$3),
+                const SizedBox(width: 7),
+                Text(item.$2, style: TextStyle(color: selected ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12)),
+              ]),
+            ),
+          );
+        },
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemCount: items.length,
+      ),
+    );
+  }
+}
+
+class AdminUserCard extends StatelessWidget {
+  final Map<String, dynamic> user;
+  final VoidCallback onBlock;
+  final VoidCallback onActivate;
+  const AdminUserCard({super.key, required this.user, required this.onBlock, required this.onActivate});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = AppData.text(user['full_name'], AppData.text(user['email'], 'Usuario'));
+    final email = AppData.text(user['email'], 'sin email');
+    final status = AppData.text(user['status'], 'active');
+    final role = AppData.text(user['admin_role'], '');
+    final isBlocked = status == 'blocked';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AppCard(
+        padding: const EdgeInsets.all(13),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            ProfileAvatar(name: name, avatarUrl: AppData.text(user['avatar_url']), radius: 22),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 2),
+              Text(email, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+            ])),
+            _MiniChip(text: isBlocked ? 'BLOQUEADO' : 'ACTIVO', color: isBlocked ? AppColors.red : AppColors.green),
+          ]),
+          const SizedBox(height: 10),
+          Wrap(spacing: 7, runSpacing: 7, children: [
+            if (role.isNotEmpty) _MiniChip(text: role.toUpperCase(), color: role == 'owner' ? AppColors.orange : role == 'support' ? AppColors.teal : AppColors.violet),
+            _MiniChip(text: '${AppData.intValue(user['groups_count'])} grupos', color: AppColors.violet),
+            _MiniChip(text: '${AppData.intValue(user['devices_count'])} dispositivos', color: AppColors.blue),
+            _MiniChip(text: AppData.text(user['last_seen_at']).isEmpty ? 'sin actividad push' : 'push visto', color: AppColors.muted),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: SecondaryButton(label: isBlocked ? 'Activar' : 'Bloquear', icon: isBlocked ? Icons.lock_open_rounded : Icons.block_rounded, onTap: isBlocked ? onActivate : onBlock)),
+          ]),
+        ]),
+      ),
+    );
+  }
+}
+
+class AdminGroupCard extends StatelessWidget {
+  final Map<String, dynamic> group;
+  const AdminGroupCard({super.key, required this.group});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = AppData.text(group['name'], 'Grupo');
+    final ownerEmail = AppData.text(group['owner_email'], 'owner no disponible');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AppCard(
+        padding: const EdgeInsets.all(13),
+        child: Row(children: [
+          Container(width: 46, height: 46, decoration: BoxDecoration(color: AppColors.violetSoft, borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.groups_rounded, color: AppColors.violet)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 3),
+            Text('Owner: $ownerEmail', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 7, runSpacing: 7, children: [
+              _MiniChip(text: '${AppData.intValue(group['members_count'])} miembros', color: AppColors.teal),
+              _MiniChip(text: '${AppData.intValue(group['events_count'])} eventos', color: AppColors.orange),
+              _MiniChip(text: '${AppData.intValue(group['expenses_count'])} gastos', color: AppColors.green),
+              _MiniChip(text: '${AppData.intValue(group['tournaments_count'])} torneos', color: AppColors.red),
+            ]),
+          ])),
+        ]),
+      ),
+    );
+  }
+}
+
+class AdminDeviceCard extends StatelessWidget {
+  final Map<String, dynamic> device;
+  const AdminDeviceCard({super.key, required this.device});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = device['enabled'] != false;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: AppCard(
+        padding: const EdgeInsets.all(13),
+        child: Row(children: [
+          Container(width: 42, height: 42, decoration: BoxDecoration(color: enabled ? AppColors.blueSoft : AppColors.faint, borderRadius: BorderRadius.circular(14)), child: Icon(enabled ? Icons.notifications_active_rounded : Icons.notifications_off_rounded, color: enabled ? AppColors.blue : AppColors.muted)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AppData.text(device['email'], 'Usuario'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 3),
+            Text('${AppData.text(device['platform'], 'plataforma')} · ${AppData.text(device['app_version'], AppConfig.appVersion)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+            const SizedBox(height: 7),
+            Wrap(spacing: 7, runSpacing: 7, children: [
+              _MiniChip(text: enabled ? 'activo' : 'apagado', color: enabled ? AppColors.green : AppColors.muted),
+              _MiniChip(text: AppData.text(device['last_seen_at']).isEmpty ? 'sin last seen' : 'last seen', color: AppColors.blue),
+            ]),
           ])),
         ]),
       ),
@@ -12087,7 +12594,7 @@ String humanizeError(String raw) {
   if (text.contains('owner_protected') || text.contains('owner') || text.contains('creador del grupo')) return 'El creador del grupo está protegido. Transfiere o elimina el grupo antes de hacer esa acción.';
   if (text.contains('member_not_found') || text.contains('not_member')) return 'Ese miembro ya no está disponible en el grupo.';
   if (text.contains('invalid_role')) return 'Ese rol no es válido.';
-  if (text.contains('settlement_payments') || text.contains('create_settlement_payment_atomic')) return 'Falta actualizar la base de datos de finanzas. Ejecuta el parche SQL v15.22.3 y vuelve a probar.';
+  if (text.contains('settlement_payments') || text.contains('create_settlement_payment_atomic')) return 'Falta actualizar la base de datos de finanzas. Ejecuta el último parche SQL de finanzas/realtime y vuelve a probar.';
   if (text.contains('permission') || text.contains('policy') || text.contains('rls') || text.contains('not allowed') || text.contains('denied') || text.contains('violates row-level')) return 'No tienes permiso para hacer esa acción.';
   if (looksLikeNetworkError(original)) return 'No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.';
   if (text.contains('duplicate') || text.contains('already') || text.contains('unique constraint')) return 'Parece que esto ya existe o ya se había guardado.';
@@ -13095,7 +13602,7 @@ void copyInviteLink(BuildContext context, String code) {
 
 String inviteText(String groupName, String code) {
   final clean = InviteLinks.normalizeCode(code);
-  return 'Únete a $groupName en Grupli. Toca este enlace y entrarás directamente al grupo:\n\n${InviteLinks.joinUrl(clean)}\n\nCódigo: $clean';
+  return 'Únete a $groupName en Grupli. Toca este enlace y entrarás directamente al grupo:\n\n${InviteLinks.joinUrl(clean)}\n\nSi tienes la app instalada, se abrirá automáticamente. Código: $clean';
 }
 
 void showCodeSheet(BuildContext context, String code, String groupName) {

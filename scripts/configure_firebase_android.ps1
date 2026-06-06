@@ -73,6 +73,31 @@ if (Test-Path $manifestPath) {
   }
   $manifest = Add-ManifestPermission $manifest 'android.permission.POST_NOTIFICATIONS'
   $manifest = Add-ManifestPermission $manifest 'android.permission.INTERNET'
+
+  # Invitaciones reales móvil/web: Android App Links + esquema propio.
+  if ($manifest -notmatch 'android:host="grupli.vercel.app"') {
+    $inviteFilters = @'
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="grupli.vercel.app"
+                    android:pathPrefix="/join" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="grupli"
+                    android:host="join" />
+            </intent-filter>
+'@
+    $manifest = [regex]::Replace($manifest, '(</activity>)', "$inviteFilters`n            `$1", 1)
+  }
+
   if ($manifest -notmatch 'com.google.firebase.messaging.default_notification_channel_id') {
     $meta = @'
         <meta-data
