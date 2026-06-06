@@ -3248,11 +3248,18 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         await AppData.uploadGroupCoverBytes(groupId, coverBytes!, coverFileName ?? 'group-cover.png');
       }
       if (!mounted) return;
-      final goGroup = await Navigator.of(context).push<bool>(MaterialPageRoute(
+      final action = await Navigator.of(context).push<String>(MaterialPageRoute(
         builder: (_) => GroupCreatedScreen(groupId: groupId, groupName: name.text.trim(), groupType: type),
       ));
       if (!mounted) return;
-      Navigator.pop(context, goGroup == true);
+      if (action == 'open') {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)),
+          (route) => route.isFirst,
+        );
+        return;
+      }
+      Navigator.pop(context, true);
     } catch (e) {
       await showToast(context, humanError(e), danger: true);
     } finally {
@@ -3432,9 +3439,9 @@ class GroupCreatedScreen extends StatelessWidget {
       const SizedBox(height: 8),
       Text('$groupName ya está listo. Ahora invita gente o crea el primer plan.', style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
       const SizedBox(height: 18),
-      PrimaryButton(label: 'Entrar al grupo', icon: Icons.arrow_forward_rounded, onTap: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)))),
+      PrimaryButton(label: 'Entrar al grupo', icon: Icons.arrow_forward_rounded, onTap: () => Navigator.pop(context, 'open')),
       const SizedBox(height: 10),
-      SecondaryButton(label: 'Volver a mis grupos', icon: Icons.home_rounded, onTap: () => Navigator.pop(context, true)),
+      SecondaryButton(label: 'Volver a mis grupos', icon: Icons.home_rounded, onTap: () => Navigator.pop(context, 'home')),
     ]))),
   );
 }
@@ -3471,8 +3478,12 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
     }
     setState(() => loading = true);
     try {
-      await AppData.joinGroup(clean);
-      if (mounted) Navigator.pop(context, true);
+      final groupId = await AppData.joinGroup(clean);
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)),
+        (route) => route.isFirst,
+      );
     } catch (e) {
       await showToast(context, humanError(e), danger: true);
     } finally {
@@ -3542,7 +3553,10 @@ class _JoinInviteScreenState extends State<JoinInviteScreen> {
       });
       await Future.delayed(const Duration(milliseconds: 650));
       if (!mounted || groupId == null) return;
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId!)));
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId!)),
+        (route) => route.isFirst,
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -3586,7 +3600,7 @@ class _JoinInviteScreenState extends State<JoinInviteScreen> {
             if (loading)
               const CircularProgressIndicator(color: AppColors.teal)
             else if (joined && groupId != null)
-              PrimaryButton(label: 'Entrar al grupo', icon: Icons.arrow_forward_rounded, onTap: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId!))))
+              PrimaryButton(label: 'Entrar al grupo', icon: Icons.arrow_forward_rounded, onTap: () => Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId!)), (route) => route.isFirst))
             else ...[
               PrimaryButton(label: 'Intentar otra vez', icon: Icons.refresh_rounded, onTap: _joinFromLink),
               const SizedBox(height: 10),
