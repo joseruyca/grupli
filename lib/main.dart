@@ -86,7 +86,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v15.30';
+  static const appVersion = 'v15.30.1';
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
 
@@ -247,29 +247,29 @@ class AppColors {
   static const surface = Color(0xFFFCFEFF);
   static const line = Color(0xFFE2EAF3);
   static const lineSoft = Color(0xFFF0F5FA);
-  static const teal = Color(0xFF0B6B8F);
-  static const tealDark = Color(0xFF053A59);
-  static const tealSoft = Color(0xFFEAF6FB);
-  static const navy = Color(0xFF06283D);
-  static const navyDeep = Color(0xFF031F33);
-  static const blue = Color(0xFF2563EB);
-  static const blueSoft = Color(0xFFEFF6FF);
-  static const violet = Color(0xFF6D4CD8);
-  static const violetSoft = Color(0xFFF1F0FF);
-  static const orange = Color(0xFFF2A100);
-  static const orangeSoft = Color(0xFFFFF4E0);
-  static const green = Color(0xFF159447);
-  static const greenDark = Color(0xFF0D7E3A);
-  static const greenSoft = Color(0xFFE9F8EF);
-  static const red = Color(0xFFE64836);
-  static const redSoft = Color(0xFFFFEFEC);
-  static const amber = Color(0xFFE6A115);
-  static const amberSoft = Color(0xFFFFF7DD);
-  static const navHome = Color(0xFF053A59);
-  static const navAgenda = Color(0xFFF0A000);
-  static const navFinance = Color(0xFF159447);
-  static const navTournaments = Color(0xFFE64836);
-  static const navMore = Color(0xFF6D2A7B);
+  static const teal = Color(0xFF0E6B73);
+  static const tealDark = Color(0xFF073A4A);
+  static const tealSoft = Color(0xFFE8F4F2);
+  static const navy = Color(0xFF062C3B);
+  static const navyDeep = Color(0xFF051E2A);
+  static const blue = Color(0xFF315F8C);
+  static const blueSoft = Color(0xFFEAF2F8);
+  static const violet = Color(0xFF6D5A86);
+  static const violetSoft = Color(0xFFF1EEF6);
+  static const orange = Color(0xFFD69027);
+  static const orangeSoft = Color(0xFFFFF3DF);
+  static const green = Color(0xFF2F8B57);
+  static const greenDark = Color(0xFF276E48);
+  static const greenSoft = Color(0xFFEAF5EE);
+  static const red = Color(0xFFC75B4C);
+  static const redSoft = Color(0xFFFBEDEA);
+  static const amber = Color(0xFFD69A28);
+  static const amberSoft = Color(0xFFFFF4DC);
+  static const navHome = Color(0xFF073A4A);
+  static const navAgenda = Color(0xFFDFA22E);
+  static const navFinance = Color(0xFF2F8B57);
+  static const navTournaments = Color(0xFFC75B4C);
+  static const navMore = Color(0xFF6D5578);
 }
 
 class GrupliApp extends StatelessWidget {
@@ -5342,8 +5342,9 @@ class _CalendarTabState extends State<CalendarTab> {
             AgendaPremiumHero(
               events: visibleEvents,
               upcomingEvents: upcomingEvents,
+              group: group,
+              onChanged: reload,
               onCreate: () => createFor(selected),
-              onOpenNext: upcomingEvents.isEmpty ? null : () => openEvent(upcomingEvents.first),
             ),
             if (refreshing) ...[
               const SizedBox(height: 10),
@@ -13001,112 +13002,138 @@ class DateBadge extends StatelessWidget {
 
 
 
+
 class AgendaPremiumHero extends StatelessWidget {
   final List<Map<String, dynamic>> events;
   final List<Map<String, dynamic>> upcomingEvents;
+  final Map<String, dynamic> group;
   final VoidCallback onCreate;
-  final VoidCallback? onOpenNext;
+  final VoidCallback onChanged;
+
   const AgendaPremiumHero({
     super.key,
     required this.events,
     required this.upcomingEvents,
+    required this.group,
     required this.onCreate,
-    this.onOpenNext,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     final next = upcomingEvents.isNotEmpty ? upcomingEvents.first : null;
-    final nextDate = next == null ? null : DateTime.tryParse(next['starts_at']?.toString() ?? '')?.toLocal();
-    final color = next == null ? AppColors.navAgenda : eventKindColor(next);
     final totalYes = upcomingEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
     final totalMaybe = upcomingEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [BoxShadow(color: AppColors.navAgenda.withOpacity(.14), blurRadius: 24, offset: const Offset(0, 12))],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Material(
-          color: AppColors.navyDeep,
-          child: InkWell(
-            onTap: onOpenNext,
-            child: Stack(children: [
-              Positioned(
-                right: -46,
-                top: -48,
-                child: Container(width: 150, height: 150, decoration: BoxDecoration(color: color.withOpacity(.26), shape: BoxShape.circle)),
-              ),
-              Positioned(
-                left: -34,
-                bottom: -44,
-                child: Container(width: 130, height: 130, decoration: BoxDecoration(color: AppColors.navAgenda.withOpacity(.18), shape: BoxShape.circle)),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(17),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white.withOpacity(.10))),
-                      child: Icon(next == null ? Icons.auto_awesome_rounded : eventKindIcon(next), color: Colors.white),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(next == null ? 'Agenda lista' : 'Próximo plan', style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12, fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 4),
-                      Text(
-                        next == null ? 'Crea el primer plan del grupo' : AppData.text(next['title'], 'Evento'),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, height: 1.05, letterSpacing: -.35),
-                      ),
-                    ])),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      height: 42,
-                      child: TextButton.icon(
-                        onPressed: onCreate,
-                        style: TextButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: AppColors.navy,
-                          padding: const EdgeInsets.symmetric(horizontal: 13),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                        ),
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text('Crear', style: TextStyle(fontWeight: FontWeight.w900)),
-                      ),
-                    ),
-                  ]),
-                  const SizedBox(height: 14),
-                  if (next == null)
-                    const Text(
-                      'Elige un día, crea un evento y el grupo podrá confirmar asistencia sin perderse nada.',
-                      style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.32),
-                    )
-                  else
-                    Wrap(spacing: 8, runSpacing: 8, children: [
-                      _WhiteMetaPill(icon: Icons.schedule_rounded, text: nextDate == null ? 'Fecha pendiente' : longDateTime(nextDate)),
-                      _WhiteMetaPill(icon: Icons.place_outlined, text: AppData.text(next['location'], 'Sin ubicación')),
-                      _WhiteMetaPill(icon: Icons.people_alt_rounded, text: "${attendanceCount(next, 'yes')} van · mínimo ${AppData.intValue(next['min_people'], 2)}"),
-                    ]),
-                  const SizedBox(height: 14),
-                  Row(children: [
-                    Expanded(child: _DarkAgendaMetric(label: 'Eventos', value: '${events.length}')),
-                    const SizedBox(width: 8),
-                    Expanded(child: _DarkAgendaMetric(label: 'Próximos', value: '${upcomingEvents.length}')),
-                    const SizedBox(width: 8),
-                    Expanded(child: _DarkAgendaMetric(label: 'Van / duda', value: '$totalYes / $totalMaybe')),
-                  ]),
-                ]),
-              ),
+    if (next != null) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        DashboardEventCard(event: next, group: group, onChanged: onChanged),
+        const SizedBox(height: 10),
+        AgendaMatteStatsRow(
+          events: events.length,
+          upcoming: upcomingEvents.length,
+          attendance: '$totalYes / $totalMaybe',
+        ),
+      ]);
+    }
+
+    return AppCard(
+      color: AppColors.navy,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 58,
+            height: 62,
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white.withOpacity(.18))),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Text('SIN', style: TextStyle(color: AppColors.navAgenda, fontSize: 10, fontWeight: FontWeight.w900)),
+              const Text('+', style: TextStyle(color: AppColors.ink, fontSize: 25, fontWeight: FontWeight.w900, height: 1)),
+              Text(DateFormat('MMM', 'es_ES').format(DateTime.now()).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800)),
             ]),
           ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+            Text('Próximo plan', style: TextStyle(color: Color(0xDFFFFFFF), fontSize: 12, fontWeight: FontWeight.w800)),
+            SizedBox(height: 4),
+            Text(
+              'Crea el primer plan del grupo',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 21, height: 1.05, letterSpacing: -.25),
+            ),
+          ])),
+          const SizedBox(width: 8),
+          SizedBox(
+            height: 42,
+            child: TextButton.icon(
+              onPressed: onCreate,
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.navy,
+                padding: const EdgeInsets.symmetric(horizontal: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              ),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Crear', style: TextStyle(fontWeight: FontWeight.w900)),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        const Text(
+          'Elige un día, crea un evento y el grupo podrá confirmar asistencia desde la Agenda.',
+          style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.32),
         ),
-      ),
+        const SizedBox(height: 12),
+        AgendaMatteStatsRow(events: events.length, upcoming: upcomingEvents.length, attendance: '$totalYes / $totalMaybe'),
+      ]),
+    );
+  }
+}
+
+class AgendaMatteStatsRow extends StatelessWidget {
+  final int events;
+  final int upcoming;
+  final String attendance;
+  const AgendaMatteStatsRow({super.key, required this.events, required this.upcoming, required this.attendance});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Expanded(child: MatteStatTile(label: 'Eventos', value: '$events', icon: Icons.calendar_month_rounded, color: AppColors.navAgenda)),
+      const SizedBox(width: 8),
+      Expanded(child: MatteStatTile(label: 'Próximos', value: '$upcoming', icon: Icons.event_available_rounded, color: AppColors.teal)),
+      const SizedBox(width: 8),
+      Expanded(child: MatteStatTile(label: 'Van / duda', value: attendance, icon: Icons.groups_rounded, color: AppColors.green)),
+    ]);
+  }
+}
+
+class MatteStatTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  const MatteStatTile({super.key, required this.label, required this.value, required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      child: Row(children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(11)),
+          child: Icon(icon, color: color, size: 16),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 15)),
+          const SizedBox(height: 1),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 10.5)),
+        ])),
+      ]),
     );
   }
 }

@@ -187,3 +187,8 @@ Calendario y eventos: rutinas conectadas, edición/cancelación por alcance, age
 - Resultados por sets/rondas con parciales y desempates secundarios.
 - Cuadro de eliminatoria más visual por rondas.
 - Perfil, miembros, permisos, invitaciones y notificaciones revisados.
+
+
+## v15.30.1 — Cohesión visual final de Agenda
+
+Tarjeta de próximo plan de Agenda alineada con Inicio, sin círculos decorativos y con paleta mate.
