@@ -210,3 +210,8 @@ El reset global canónico está en `supabase/all_in_one.sql`. El archivo antiguo
 ## v15.32 Estabilidad
 
 Usar solo `supabase/all_in_one.sql` para reset global. No hay parches SQL incrementales en esta versión. Realtime automático está desactivado temporalmente para evitar bucles de refresco/parpadeo.
+
+
+## v15.32.2
+
+Fix de Torneos: corregido `setState` que devolvía `Future` al crear/abrir una competición. No requiere SQL nuevo.

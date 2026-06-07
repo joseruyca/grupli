@@ -86,7 +86,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v15.32';
+  static const appVersion = 'v15.32.2';
   static const enableRealtimeSubscriptions = false;
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
@@ -2956,13 +2956,33 @@ class _AuthedShellState extends State<AuthedShell> {
     if (code == null || code.length < 4) return;
     await PendingInviteStore.clear();
     if (!mounted) return;
-    final joined = await Navigator.of(context).push<bool>(
+    final result = await Navigator.of(context).push<dynamic>(
       MaterialPageRoute(builder: (_) => JoinInviteScreen(inviteCode: code)),
     );
-    if (joined == true && mounted) refresh();
+    if (!mounted) return;
+    await _handleGroupNavigationResult(result);
   }
 
   void refresh() => setState(() => refreshKey++);
+
+  Future<void> _handleGroupNavigationResult(dynamic result) async {
+    if (!mounted || result == null) return;
+    final shouldRefresh = result == true || result is Map;
+    if (shouldRefresh) {
+      setState(() {
+        tab = 0;
+        refreshKey++;
+      });
+    }
+    if (result is Map && result['action'] == 'open' && result['groupId'] != null) {
+      final groupId = result['groupId'].toString();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      if (!mounted) return;
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)));
+      if (mounted) refresh();
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -3009,7 +3029,45 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void reload() => setState(() => future = AppData.myGroups());
+  void reload() {
+    if (!mounted) return;
+    setState(() { future = AppData.myGroups(); });
+  }
+
+  Future<void> _handleGroupNavigationResult(dynamic result) async {
+    if (!mounted || result == null) return;
+    if (result is Map && result['action'] == 'open' && result['groupId'] != null) {
+      final groupId = result['groupId'].toString();
+      reload();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      if (!mounted) return;
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)));
+      if (mounted) {
+        reload();
+        widget.onChanged();
+      }
+      return;
+    }
+    if (result == true || result is Map) {
+      reload();
+      widget.onChanged();
+    }
+  }
+
+  Future<void> _openCreateJoin() async {
+    final result = await Navigator.of(context).push<dynamic>(MaterialPageRoute(builder: (_) => const CreateJoinScreen()));
+    await _handleGroupNavigationResult(result);
+  }
+
+  Future<void> _openCreateGroup() async {
+    final result = await Navigator.of(context).push<dynamic>(MaterialPageRoute(builder: (_) => const CreateGroupScreen()));
+    await _handleGroupNavigationResult(result);
+  }
+
+  Future<void> _openJoinGroup() async {
+    final result = await Navigator.of(context).push<dynamic>(MaterialPageRoute(builder: (_) => const JoinGroupScreen()));
+    await _handleGroupNavigationResult(result);
+  }
 
   void _scheduleHomeRealtimeReload() {
     _homeRealtimeDebounce?.cancel();
@@ -3048,10 +3106,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
             Expanded(child: PageHeader(title: 'Mis grupos 👋', subtitle: 'Hola, $name. Organiza planes, gastos y torneos en un solo lugar.')),
             const SizedBox(width: 12),
-            CircleIconButton(icon: Icons.add_rounded, filled: true, onTap: () async {
-              final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const CreateJoinScreen()));
-              if (ok == true) { reload(); widget.onChanged(); }
-            }),
+            CircleIconButton(icon: Icons.add_rounded, filled: true, onTap: _openCreateJoin),
           ]),
           const SizedBox(height: 20),
           FutureBuilder<List<Map<String, dynamic>>>(
@@ -3070,22 +3125,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (groups.isEmpty) ...[
                   EmptyBlock(icon: Icons.groups_rounded, title: 'Aún no tienes grupos', body: 'Crea un grupo privado o únete con un código de invitación.'),
                   const SizedBox(height: 14),
-                  PrimaryButton(label: 'Crear grupo', icon: Icons.add_rounded, onTap: () async {
-                    final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const CreateGroupScreen()));
-                    if (ok == true) reload();
-                  }),
+                  PrimaryButton(label: 'Crear grupo', icon: Icons.add_rounded, onTap: _openCreateGroup),
                   const SizedBox(height: 10),
-                  SecondaryButton(label: 'Unirme con código', icon: Icons.qr_code_rounded, onTap: () async {
-                    final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const JoinGroupScreen()));
-                    if (ok == true) reload();
-                  }),
+                  SecondaryButton(label: 'Unirme con código', icon: Icons.qr_code_rounded, onTap: _openJoinGroup),
                 ] else ...[
                   ...groups.map((g) => GroupHomeCard(group: g, onTap: () async {
                     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupShell(groupId: g['id'].toString())));
                     reload();
                   })),
                   const SizedBox(height: 14),
-                  EmptySlim(icon: Icons.add_circle_outline_rounded, title: 'Crear o unirte a otro grupo', body: 'Usa el botón + de arriba para añadir otro grupo cuando lo necesites.'),
+                  ChoiceBigCard(
+                    icon: Icons.add_circle_outline_rounded,
+                    title: 'Crear o unirte a otro grupo',
+                    body: 'Añade otro grupo privado o entra con un código de invitación.',
+                    onTap: _openCreateJoin,
+                  ),
                 ],
               ]);
             },
@@ -3106,13 +3160,13 @@ class CreateJoinScreen extends StatelessWidget {
         PageHeader(title: 'Añadir grupo', subtitle: 'Crea un grupo nuevo o entra con invitación.', leading: true),
         const SizedBox(height: 20),
         ChoiceBigCard(icon: Icons.groups_rounded, title: 'Crear un grupo', body: 'Crea tu grupo privado y empieza a organizar.', onTap: () async {
-          final ok = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const CreateGroupScreen()));
-          if (context.mounted && ok == true) Navigator.pop(context, true);
+          final result = await Navigator.push<dynamic>(context, MaterialPageRoute(builder: (_) => const CreateGroupScreen()));
+          if (context.mounted && result != null) Navigator.pop(context, result);
         }),
         const SizedBox(height: 12),
         ChoiceBigCard(icon: Icons.group_add_rounded, title: 'Unirse a un grupo', body: 'Únete a un grupo con código o enlace.', onTap: () async {
-          final ok = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const JoinGroupScreen()));
-          if (context.mounted && ok == true) Navigator.pop(context, true);
+          final result = await Navigator.push<dynamic>(context, MaterialPageRoute(builder: (_) => const JoinGroupScreen()));
+          if (context.mounted && result != null) Navigator.pop(context, result);
         }),
       ]),
     );
@@ -3599,14 +3653,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         builder: (_) => GroupCreatedScreen(groupId: groupId, groupName: name.text.trim(), groupType: type),
       ));
       if (!mounted) return;
-      if (action == 'open') {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)),
-          (route) => route.isFirst,
-        );
-        return;
-      }
-      Navigator.pop(context, true);
+      Navigator.pop(context, {
+        'action': action == 'open' ? 'open' : 'home',
+        'groupId': groupId,
+      });
     } catch (e) {
       await showToast(context, humanError(e), danger: true);
     } finally {
@@ -3827,10 +3877,10 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
     try {
       final groupId = await AppData.joinGroup(clean);
       if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)),
-        (route) => route.isFirst,
-      );
+      Navigator.pop(context, {
+        'action': 'open',
+        'groupId': groupId,
+      });
     } catch (e) {
       await showToast(context, humanError(e), danger: true);
     } finally {
@@ -3900,10 +3950,10 @@ class _JoinInviteScreenState extends State<JoinInviteScreen> {
       });
       await Future.delayed(const Duration(milliseconds: 650));
       if (!mounted || groupId == null) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId!)),
-        (route) => route.isFirst,
-      );
+      Navigator.pop(context, {
+        'action': 'open',
+        'groupId': groupId!,
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -3947,13 +3997,16 @@ class _JoinInviteScreenState extends State<JoinInviteScreen> {
             if (loading)
               const CircularProgressIndicator(color: AppColors.teal)
             else if (joined && groupId != null)
-              PrimaryButton(label: 'Entrar al grupo', icon: Icons.arrow_forward_rounded, onTap: () => Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId!)), (route) => route.isFirst))
+              PrimaryButton(label: 'Entrar al grupo', icon: Icons.arrow_forward_rounded, onTap: () => Navigator.pop(context, {
+                'action': 'open',
+                'groupId': groupId!,
+              }))
             else ...[
               PrimaryButton(label: 'Intentar otra vez', icon: Icons.refresh_rounded, onTap: _joinFromLink),
               const SizedBox(height: 10),
               SecondaryButton(label: 'Escribir código', icon: Icons.qr_code_rounded, onTap: () async {
-                final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => JoinGroupScreen(initialCode: widget.inviteCode)));
-                if (ok == true && mounted) Navigator.pop(context, true);
+                final result = await Navigator.of(context).push<dynamic>(MaterialPageRoute(builder: (_) => JoinGroupScreen(initialCode: widget.inviteCode)));
+                if (result != null && mounted) Navigator.pop(context, result);
               }),
             ],
           ]),
@@ -5970,7 +6023,7 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
           final custom = customTotal();
           final diff = value - custom;
           if (snapshot.connectionState == ConnectionState.waiting) return const CenterLoader(label: 'Cargando miembros...');
-          if (snapshot.hasError) return ErrorBlock(message: snapshot.error.toString(), onRetry: () => setState(() => membersFuture = AppData.members(widget.groupId)));
+          if (snapshot.hasError) return ErrorBlock(message: snapshot.error.toString(), onRetry: () => setState(() { membersFuture = AppData.members(widget.groupId); }));
           if (members.isEmpty) return EmptyBlock(icon: Icons.groups_rounded, title: 'No hay miembros', body: 'Añade miembros al grupo para poder repartir gastos.');
           return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -7533,10 +7586,13 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   @override
   void initState() {
     super.initState();
-    reload();
+    future = AppData.tournament(widget.tournamentId);
   }
 
-  void reload() => setState(() => future = AppData.tournament(widget.tournamentId));
+  void reload() {
+    if (!mounted) return;
+    setState(() { future = AppData.tournament(widget.tournamentId); });
+  }
 
   Future<void> addParticipant() async {
     final controller = TextEditingController();
@@ -8851,7 +8907,7 @@ class _MembersScreenState extends State<MembersScreen> {
     future = AppData.members(widget.group['id'].toString());
   }
 
-  void reload() => setState(() => future = AppData.members(widget.group['id'].toString()));
+  void reload() => setState(() { future = AppData.members(widget.group['id'].toString()); });
 
   Map<String, dynamic>? _me(List<Map<String, dynamic>> members) {
     final uid = AppData.user?.id;
@@ -9828,7 +9884,7 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
       );
       title.clear();
       description.clear();
-      setState(() => myTicketsFuture = AppData.mySupportTickets());
+      setState(() { myTicketsFuture = AppData.mySupportTickets(); });
       if (mounted) await showToast(context, 'Reporte enviado. Gracias, lo revisarás desde el panel admin.');
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
