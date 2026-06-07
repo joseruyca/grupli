@@ -86,7 +86,8 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v15.31.2';
+  static const appVersion = 'v15.32';
+  static const enableRealtimeSubscriptions = false;
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
 
@@ -3018,14 +3019,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _subscribeHomeRealtime() {
+    // v15.32: Realtime automático desactivado temporalmente.
+    // Motivo: varios listeners reconstruían pantallas completas y podían crear bucles de refresco/parpadeo en web/APK.
+    // La app refresca de forma explícita tras crear/editar/borrar. Reactivarlo solo con streams por pantalla y QA.
+    if (!AppConfig.enableRealtimeSubscriptions) return;
     final userId = AppData.user?.id ?? 'anon';
     final channel = AppData.sb.channel('grupli-home-$userId-live')
-      ..onPostgresChanges(
-        event: PostgresChangeEvent.all,
-        schema: 'public',
-        table: 'groups',
-        callback: (_) => _scheduleHomeRealtimeReload(),
-      )
       ..onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
@@ -3981,6 +3980,7 @@ class _GroupShellState extends State<GroupShell> {
   int financeRefreshKey = 0;
   int tournamentsRefreshKey = 0;
   late Future<Map<String, dynamic>> groupFuture;
+  Map<String, dynamic>? _cachedGroup;
   RealtimeChannel? _groupRealtimeChannel;
   Timer? _realtimeDebounce;
   final Set<String> _pendingRealtimeScopes = <String>{};
@@ -4048,6 +4048,9 @@ class _GroupShellState extends State<GroupShell> {
   }
 
   void _subscribeGroupRealtime() {
+    // v15.32: Realtime automático desactivado temporalmente.
+    // Evita parpadeos por setState global + refreshKey + FutureBuilder mientras estabilizamos navegación/estado.
+    if (!AppConfig.enableRealtimeSubscriptions) return;
     final groupId = widget.groupId;
     final channel = AppData.sb.channel('grupli-group-$groupId-live')
       ..onPostgresChanges(
@@ -4062,12 +4065,6 @@ class _GroupShellState extends State<GroupShell> {
         schema: 'public',
         table: 'group_members',
         filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
-        callback: (_) => _scheduleRealtimeRefresh('group'),
-      )
-      ..onPostgresChanges(
-        event: PostgresChangeEvent.update,
-        schema: 'public',
-        table: 'profiles',
         callback: (_) => _scheduleRealtimeRefresh('group'),
       )
       ..onPostgresChanges(
@@ -4136,13 +4133,16 @@ class _GroupShellState extends State<GroupShell> {
     return FutureBuilder<Map<String, dynamic>>(
       future: groupFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.hasData && snapshot.data != null && snapshot.data!.isNotEmpty) {
+          _cachedGroup = snapshot.data;
+        }
+        if (snapshot.connectionState == ConnectionState.waiting && _cachedGroup == null) {
           return const DirectPage(child: CenterLoader(label: 'Cargando grupo...'));
         }
-        if (snapshot.hasError) {
+        if (snapshot.hasError && _cachedGroup == null) {
           return DirectPage(child: ErrorBlock(message: snapshot.error.toString(), onRetry: refresh));
         }
-        final group = snapshot.data ?? {};
+        final group = snapshot.data ?? _cachedGroup ?? <String, dynamic>{'id': widget.groupId, 'name': 'Grupo'};
         final name = AppData.text(group['name'], 'Grupo');
         final pages = [
           GroupDashboardTab(group: group, refreshSeed: dashboardRefreshKey, onNavigateTab: (i) => setState(() => tab = i), onGroupChanged: refresh),

@@ -205,3 +205,8 @@ Tarjeta de próximo plan de Agenda alineada con Inicio, sin círculos decorativo
 ## SQL global
 
 El reset global canónico está en `supabase/all_in_one.sql`. El archivo antiguo `reset_global_v15_29.sql` se ha eliminado para evitar ejecutar un reset desactualizado.
+
+
+## v15.32 Estabilidad
+
+Usar solo `supabase/all_in_one.sql` para reset global. No hay parches SQL incrementales en esta versión. Realtime automático está desactivado temporalmente para evitar bucles de refresco/parpadeo.

@@ -1,10 +1,14 @@
--- Grupli v15.31.1 reset global CANÓNICO
+-- Grupli v15.32 reset global CANÓNICO Y ÚNICO
 -- Ejecutar en Supabase SQL Editor cuando quieras hacer reset completo de Grupli.
 -- Borra y recrea SOLO las tablas/funciones propias de Grupli.
 -- No borra auth.users ni storage.objects directamente.
--- Archivo único para reset global: usar este all_in_one.sql. No usar reset_global_v15_29.sql.
+-- Archivo único para reset global: usar SOLO este all_in_one.sql.
 
 create extension if not exists "pgcrypto";
+
+-- v15.32 stability note:
+-- No hay SQL incremental separado. Este archivo es la verdad completa para un reset global.
+-- Realtime queda preparado en SQL, pero la app no abre suscripciones automáticas hasta superar QA de estabilidad.
 
 begin;
 
@@ -300,8 +304,20 @@ BEGIN
   VALUES (auth.uid(), clean_email, clean_name)
   ON CONFLICT (id) DO UPDATE SET
     email = COALESCE(EXCLUDED.email, profiles.email),
-    full_name = COALESCE(NULLIF(profiles.full_name, ''), EXCLUDED.full_name, 'Usuario'),
-    updated_at = now();
+    full_name = CASE
+      WHEN profiles.full_name IS NULL OR trim(profiles.full_name) = '' THEN EXCLUDED.full_name
+      ELSE profiles.full_name
+    END,
+    updated_at = CASE
+      WHEN profiles.email IS DISTINCT FROM COALESCE(EXCLUDED.email, profiles.email)
+        OR profiles.full_name IS NULL
+        OR trim(profiles.full_name) = ''
+      THEN now()
+      ELSE profiles.updated_at
+    END
+  WHERE profiles.email IS DISTINCT FROM COALESCE(EXCLUDED.email, profiles.email)
+     OR profiles.full_name IS NULL
+     OR trim(profiles.full_name) = '';
 
   INSERT INTO public.user_settings (user_id)
   VALUES (auth.uid())
@@ -2488,8 +2504,7 @@ commit;
 
 
 -- Grupli v15.31 — Estado, notificaciones, agenda y finanzas
--- No resetea nada.
--- Refuerza Realtime para cambios de perfil/avatar y deja la estructura lista para navegación real de notificaciones.
+-- Consolidado dentro del reset global.
 
 begin;
 
