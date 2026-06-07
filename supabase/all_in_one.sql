@@ -1,12 +1,17 @@
--- Grupli v14 clean rebuild
--- Ejecutar en Supabase SQL Editor para resetear la base de datos de Grupli.
--- Borra SOLO las tablas propias de Grupli y las recrea con RLS.
+-- Grupli v15.31.1 reset global CANÓNICO
+-- Ejecutar en Supabase SQL Editor cuando quieras hacer reset completo de Grupli.
+-- Borra y recrea SOLO las tablas/funciones propias de Grupli.
+-- No borra auth.users ni storage.objects directamente.
+-- Archivo único para reset global: usar este all_in_one.sql. No usar reset_global_v15_29.sql.
 
 create extension if not exists "pgcrypto";
 
 begin;
 
--- Drop any old overloaded RPC signatures that may exist from previous versions.
+-- 1) Quitar trigger de auth antes de eliminar funciones.
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+-- 2) Borrar todas las funciones propias de Grupli, incluyendo overloads antiguos.
 do $$
 declare
   f record;
@@ -19,7 +24,54 @@ begin
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
-      and p.proname in ('create_group_atomic', 'join_group_with_code')
+      and p.proname in (
+        '_grupli_current_member_role',
+        'admin_delete_user_by_email',
+        'admin_devices_overview',
+        'admin_groups_overview',
+        'admin_overview',
+        'admin_remove_app_admin_by_email',
+        'admin_set_app_admin_by_email',
+        'admin_set_user_status_by_email',
+        'admin_users_overview',
+        'app_admin_role',
+        'can_handle_support',
+        'cancel_settlement_payment_atomic',
+        'create_group_atomic',
+        'create_group_atomic_v2',
+        'create_group_notifications',
+        'create_settlement_payment_atomic',
+        'create_test_notification',
+        'delete_my_account',
+        'ensure_current_profile',
+        'ensure_owner_admin',
+        'get_my_groups',
+        'group_events_with_attendance',
+        'handle_new_user',
+        'is_app_admin',
+        'is_app_owner',
+        'is_app_support_or_owner',
+        'is_group_admin',
+        'is_group_member',
+        'is_group_owner',
+        'join_group_with_code',
+        'leave_group_safe',
+        'notify_event_insert',
+        'notify_event_update',
+        'notify_expense_insert',
+        'notify_match_played',
+        'notify_member_join',
+        'notify_tournament_insert',
+        'protect_owner_role',
+        'random_invite_code',
+        'regenerate_group_invite_code',
+        'remove_group_member',
+        'set_event_attendance_group_id',
+        'set_expense_participant_group_id',
+        'set_group_member_role',
+        'set_match_group_id',
+        'set_tournament_team_group_id'
+      )
   loop
     execute format(
       'drop function if exists %I.%I(%s) cascade',
@@ -30,30 +82,11 @@ begin
   end loop;
 end $$;
 
--- Drop policies/functions/tables safely
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
-DROP FUNCTION IF EXISTS public.random_invite_code() CASCADE;
-DROP FUNCTION IF EXISTS public.ensure_current_profile() CASCADE;
-DROP FUNCTION IF EXISTS public.is_group_member(uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.is_group_admin(uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.is_group_owner(uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.create_group_atomic(text) CASCADE;
-DROP FUNCTION IF EXISTS public.create_group_atomic_v2(text,text,text,text,text,text) CASCADE;
-DROP FUNCTION IF EXISTS public.regenerate_group_invite_code(uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.join_group_with_code(text) CASCADE;
-DROP FUNCTION IF EXISTS public.get_my_groups() CASCADE;
-DROP FUNCTION IF EXISTS public.protect_owner_role() CASCADE;
-DROP FUNCTION IF EXISTS public.create_group_notifications(uuid, uuid, text, text, text, text, uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.notify_event_insert() CASCADE;
-DROP FUNCTION IF EXISTS public.notify_event_update() CASCADE;
-DROP FUNCTION IF EXISTS public.notify_expense_insert() CASCADE;
-DROP FUNCTION IF EXISTS public.notify_tournament_insert() CASCADE;
-DROP FUNCTION IF EXISTS public.notify_match_played() CASCADE;
-DROP FUNCTION IF EXISTS public.notify_member_join() CASCADE;
-DROP FUNCTION IF EXISTS public.delete_my_account(text) CASCADE;
-DROP FUNCTION IF EXISTS public.create_settlement_payment_atomic(uuid, uuid, uuid, numeric) CASCADE;
-
+-- 3) Borrar tablas propias de Grupli en orden seguro.
+DROP TABLE IF EXISTS public.app_user_flags CASCADE;
+DROP TABLE IF EXISTS public.app_quality_events CASCADE;
+DROP TABLE IF EXISTS public.support_tickets CASCADE;
+DROP TABLE IF EXISTS public.app_admins CASCADE;
 DROP TABLE IF EXISTS public.notifications CASCADE;
 DROP TABLE IF EXISTS public.user_devices CASCADE;
 DROP TABLE IF EXISTS public.matches CASCADE;
@@ -2450,5 +2483,73 @@ $$;
 
 revoke all on function public.group_events_with_attendance(uuid) from public;
 grant execute on function public.group_events_with_attendance(uuid) to authenticated;
+
+commit;
+
+
+-- Grupli v15.31 — Estado, notificaciones, agenda y finanzas
+-- No resetea nada.
+-- Refuerza Realtime para cambios de perfil/avatar y deja la estructura lista para navegación real de notificaciones.
+
+begin;
+
+alter table public.notifications add column if not exists route_type text;
+alter table public.notifications add column if not exists route_id uuid;
+
+create index if not exists idx_notifications_group_created on public.notifications(group_id, created_at desc);
+create index if not exists idx_notifications_route on public.notifications(route_type, route_id);
+
+-- Realtime: necesario para que cambios de foto/avatar/perfil se reflejen sin cerrar y abrir.
+do $$
+begin
+  alter publication supabase_realtime add table public.profiles;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.notifications;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end $$;
+
+commit;
+
+
+-- Grupli v15.31.1 — Realtime global consolidado para reset
+begin;
+
+do $$
+declare
+  table_name text;
+begin
+  foreach table_name in array array[
+    'profiles',
+    'groups',
+    'group_members',
+    'events',
+    'event_attendance',
+    'expenses',
+    'expense_participants',
+    'settlement_payments',
+    'tournaments',
+    'tournament_teams',
+    'matches',
+    'notifications',
+    'support_tickets',
+    'app_quality_events'
+  ]
+  loop
+    begin
+      execute format('alter publication supabase_realtime add table public.%I', table_name);
+    exception
+      when duplicate_object then null;
+      when undefined_object then null;
+    end;
+  end loop;
+end $$;
 
 commit;

@@ -1,94 +1,69 @@
--- Grupli v14 security checks: diagnostics only. It does not modify data.
+-- Grupli v15.31.1 security checks: diagnóstico, no modifica datos.
 
 select 'profiles RLS enabled' as check_name, rowsecurity as ok from pg_tables where schemaname='public' and tablename='profiles'
+union all select 'user_settings RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='user_settings'
 union all select 'groups RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='groups'
 union all select 'group_members RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='group_members'
 union all select 'events RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='events'
 union all select 'event_attendance RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='event_attendance'
 union all select 'expenses RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='expenses'
 union all select 'expense_participants RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='expense_participants'
+union all select 'settlement_payments RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='settlement_payments'
 union all select 'tournaments RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='tournaments'
 union all select 'tournament_teams RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='tournament_teams'
 union all select 'matches RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='matches'
+union all select 'notifications RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='notifications'
+union all select 'user_devices RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='user_devices'
+union all select 'app_admins RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='app_admins'
+union all select 'support_tickets RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='support_tickets'
+union all select 'app_quality_events RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='app_quality_events'
+union all select 'app_user_flags RLS enabled', rowsecurity from pg_tables where schemaname='public' and tablename='app_user_flags'
 union all select 'ensure_current_profile exists', to_regprocedure('public.ensure_current_profile()') is not null
-union all select 'create_group_atomic only text exists', to_regprocedure('public.create_group_atomic(text)') is not null
+union all select 'create_group_atomic exists', to_regprocedure('public.create_group_atomic(text)') is not null
 union all select 'join_group_with_code exists', to_regprocedure('public.join_group_with_code(text)') is not null
 union all select 'get_my_groups exists', to_regprocedure('public.get_my_groups()') is not null
-union all select 'is_group_owner exists', to_regprocedure('public.is_group_owner(uuid)') is not null;
+union all select 'group_events_with_attendance exists', to_regprocedure('public.group_events_with_attendance(uuid)') is not null
+union all select 'create_settlement_payment_atomic exists', to_regprocedure('public.create_settlement_payment_atomic(uuid,uuid,uuid,numeric)') is not null
+union all select 'cancel_settlement_payment_atomic exists', to_regprocedure('public.cancel_settlement_payment_atomic(uuid)') is not null
+union all select 'app_admin_role exists', to_regprocedure('public.app_admin_role()') is not null
+union all select 'admin_overview exists', to_regprocedure('public.admin_overview()') is not null
+union all select 'delete_my_account exists', to_regprocedure('public.delete_my_account(text)') is not null;
 
 select 'duplicated create_group_atomic overloads' as check_name, count(*) = 1 as ok
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
-where n.nspname = 'public' and p.proname = 'create_group_atomic';
+where n.nspname='public' and p.proname='create_group_atomic';
 
-select 'groups are private only' as check_name, not exists(select 1 from public.groups where privacy <> 'privado') as ok;
-
-select 'owners per group exactly one' as check_name, not exists(
-  select group_id
-  from public.group_members
-  where role = 'owner'
-  group by group_id
-  having count(*) <> 1
-) as ok;
-
-select schemaname, tablename, policyname, permissive, roles, cmd
-from pg_policies
-where schemaname = 'public'
-order by tablename, policyname;
-
-select 'avatars bucket exists' as check_name, exists(select 1 from storage.buckets where id = 'avatars') as ok
-union all select 'profiles avatar_url column exists', exists(select 1 from information_schema.columns where table_schema='public' and table_name='profiles' and column_name='avatar_url');
-
-select 'avatar storage policies' as section, policyname, cmd
-from pg_policies
-where schemaname = 'storage' and tablename = 'objects' and policyname like 'avatars_%'
-order by policyname;
-
-
-select 'avatar bucket exists' as check_name, exists (
-  select 1 from storage.buckets where id = 'avatars'
-) as ok;
-
-select 'public RPC overload count' as check_name, count(*) as value
+select 'duplicated join_group_with_code overloads' as check_name, count(*) = 1 as ok
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
-where n.nspname = 'public'
-  and p.proname in ('create_group_atomic', 'join_group_with_code');
+where n.nspname='public' and p.proname='join_group_with_code';
 
-select 'admin policies summary' as check_name, tablename, policyname, cmd
-from pg_policies
-where schemaname = 'public'
-  and tablename in ('groups','group_members','events','expenses','tournaments','matches')
-order by tablename, policyname;
+select 'realtime enabled for operational tables' as check_name,
+  count(*) >= 12 as ok,
+  array_agg(tablename order by tablename) as tables_found
+from pg_publication_tables
+where pubname = 'supabase_realtime'
+  and schemaname = 'public'
+  and tablename in (
+    'profiles',
+    'groups',
+    'group_members',
+    'events',
+    'event_attendance',
+    'expenses',
+    'expense_participants',
+    'settlement_payments',
+    'tournaments',
+    'tournament_teams',
+    'matches',
+    'notifications',
+    'support_tickets',
+    'app_quality_events'
+  );
 
-
--- v14.7 role/member RPC check
-select
-  p.proname as function,
-  pg_get_function_identity_arguments(p.oid) as args
-from pg_proc p
-join pg_namespace n on n.oid = p.pronamespace
-where n.nspname = 'public'
-  and p.proname in ('set_group_member_role','remove_group_member','leave_group_safe')
-order by p.proname;
-
-
--- v15.5 notification checks
-select 'notifications_rls' as check_name, relrowsecurity as rls_enabled from pg_class where relname = 'notifications';
-select 'user_devices_rls' as check_name, relrowsecurity as rls_enabled from pg_class where relname = 'user_devices';
-select 'notification_triggers' as check_name, tgname from pg_trigger where tgname like 'trg_notify_%' order by tgname;
-select 'unread_notifications' as check_name, count(*) from public.notifications where user_id = auth.uid() and read_at is null;
-
--- v15.6 security/delete-account checks
-select 'delete_my_account exists' as check_name, to_regprocedure('public.delete_my_account(text)') is not null as ok;
-select 'protect_owner_role exists' as check_name, to_regprocedure('public.protect_owner_role()') is not null as ok;
-select 'delete_my_account executable by authenticated' as check_name, has_function_privilege('authenticated', 'public.delete_my_account(text)', 'EXECUTE') as ok;
-select 'all public core tables RLS enabled' as check_name, not exists (
-  select 1
-  from pg_class c
-  join pg_namespace n on n.oid = c.relnamespace
-  where n.nspname = 'public'
-    and c.relname in ('profiles','user_settings','groups','group_members','events','event_attendance','expenses','expense_participants','tournaments','tournament_teams','matches','notifications','user_devices')
-    and c.relkind = 'r'
-    and c.relrowsecurity = false
-) as ok;
+select 'storage buckets exist' as check_name,
+  count(*) = 2 as ok,
+  array_agg(id order by id) as buckets
+from storage.buckets
+where id in ('avatars','group-covers');

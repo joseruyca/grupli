@@ -192,3 +192,16 @@ Calendario y eventos: rutinas conectadas, edición/cancelación por alcance, age
 ## v15.30.1 — Cohesión visual final de Agenda
 
 Tarjeta de próximo plan de Agenda alineada con Inicio, sin círculos decorativos y con paleta mate.
+
+
+## v15.31
+
+- Corrección de estado/refresco en APK.
+- Notificaciones abren la sección correcta del grupo.
+- Agenda: semana desde hoy + 7 días.
+- Finanzas simplificadas a Movimientos/Saldos con detalle de saldos.
+
+
+## SQL global
+
+El reset global canónico está en `supabase/all_in_one.sql`. El archivo antiguo `reset_global_v15_29.sql` se ha eliminado para evitar ejecutar un reset desactualizado.

@@ -86,7 +86,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v15.30.2';
+  static const appVersion = 'v15.31';
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
 
@@ -1771,7 +1771,14 @@ class PushNotificationService {
     final nav = appNavigatorKey.currentState;
     if (nav == null) return;
     if (groupId.isNotEmpty) {
-      await nav.push(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)));
+      final tab = notificationGroupTabFromValues(
+        AppData.text(message.data['route_type']),
+        AppData.text(message.data['type']),
+      );
+      await nav.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId, initialTab: tab)),
+        (route) => route.isFirst,
+      );
     } else {
       await nav.push(MaterialPageRoute(builder: (_) => NotificationsScreen(onChanged: () {})));
     }
@@ -2928,7 +2935,7 @@ class AuthedShell extends StatefulWidget {
 }
 
 class _AuthedShellState extends State<AuthedShell> {
-  int tab = 0;
+  late int tab;
   int refreshKey = 0;
   bool handledInitialInvite = false;
 
@@ -3959,7 +3966,8 @@ class _JoinInviteScreenState extends State<JoinInviteScreen> {
 
 class GroupShell extends StatefulWidget {
   final String groupId;
-  const GroupShell({super.key, required this.groupId});
+  final int initialTab;
+  const GroupShell({super.key, required this.groupId, this.initialTab = 0});
 
   @override
   State<GroupShell> createState() => _GroupShellState();
@@ -3980,6 +3988,7 @@ class _GroupShellState extends State<GroupShell> {
   @override
   void initState() {
     super.initState();
+    tab = widget.initialTab.clamp(0, 4).toInt();
     groupFuture = AppData.group(widget.groupId);
     _subscribeGroupRealtime();
   }
@@ -4053,6 +4062,12 @@ class _GroupShellState extends State<GroupShell> {
         schema: 'public',
         table: 'group_members',
         filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'group_id', value: groupId),
+        callback: (_) => _scheduleRealtimeRefresh('group'),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'profiles',
         callback: (_) => _scheduleRealtimeRefresh('group'),
       )
       ..onPostgresChanges(
@@ -5316,7 +5331,7 @@ class _CalendarTabState extends State<CalendarTab> {
     final selectedYes = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
     final selectedMaybe = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
 
-    final weekStart = selected.subtract(Duration(days: (selected.weekday + 6) % 7));
+    final weekStart = today;
     final weekDays = List<DateTime>.generate(7, (i) => DateTime(weekStart.year, weekStart.month, weekStart.day).add(Duration(days: i)));
     final weekEventsCount = weekDays.fold<int>(0, (sum, day) => sum + _eventsForDay(byDay, day).length);
 
@@ -5530,6 +5545,104 @@ class _FinancesTabState extends State<FinancesTab> {
     }
   }
 
+
+  void openBalanceDetail(String userId, _FinanceData data) {
+    final summary = data.summary;
+    final name = summary.names[userId] ?? financeMemberName(userId, data.members);
+    final avatar = summary.avatars[userId] ?? financeMemberAvatarUrl(userId, data.members);
+    final balance = summary.balances[userId] ?? 0;
+    final toPay = summary.settlements.where((d) => d.fromId == userId).toList();
+    final toReceive = summary.settlements.where((d) => d.toId == userId).toList();
+    final relatedExpenses = data.expenses.where((expense) {
+      final paidBy = AppData.text(expense['paid_by']);
+      if (paidBy == userId) return true;
+      return expenseParticipants(expense).any((p) => AppData.text(p['user_id']) == userId);
+    }).toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: .82,
+        minChildSize: .45,
+        maxChildSize: .94,
+        builder: (context, controller) => ListView(
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+          children: [
+            Row(children: [
+              ProfileAvatar(name: name, avatarUrl: avatar, radius: 25),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(name, style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 3),
+                Text(
+                  balance > .01 ? 'Le deben ${money(balance)}' : balance < -.01 ? 'Debe ${money(balance.abs())}' : 'Está a cero',
+                  style: TextStyle(color: balance > .01 ? AppColors.green : balance < -.01 ? AppColors.red : AppColors.muted, fontWeight: FontWeight.w900),
+                ),
+              ])),
+            ]),
+            const SizedBox(height: 18),
+            if (toPay.isEmpty && toReceive.isEmpty)
+              EmptySlim(icon: Icons.verified_rounded, title: 'Sin pagos pendientes', body: 'Esta persona no tiene que mover dinero ahora mismo.')
+            else ...[
+              if (toPay.isNotEmpty) ...[
+                SectionHeader(title: 'Tiene que pagar', action: '${toPay.length}'),
+                const SizedBox(height: 8),
+                AppCard(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(children: [
+                    for (int i = 0; i < toPay.length; i++) ...[
+                      SettlementPaymentRow(debt: toPay[i], onPaid: savingSettlement ? null : () {
+                        Navigator.pop(context);
+                        markSettlementPaid(toPay[i]);
+                      }),
+                      if (i != toPay.length - 1) const Divider(height: 1, indent: 76, color: AppColors.line),
+                    ],
+                  ]),
+                ),
+                const SizedBox(height: 14),
+              ],
+              if (toReceive.isNotEmpty) ...[
+                SectionHeader(title: 'Tiene que recibir', action: '${toReceive.length}'),
+                const SizedBox(height: 8),
+                AppCard(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(children: [
+                    for (int i = 0; i < toReceive.length; i++) ...[
+                      SettlementPaymentRow(debt: toReceive[i], onPaid: savingSettlement ? null : () {
+                        Navigator.pop(context);
+                        markSettlementPaid(toReceive[i]);
+                      }),
+                      if (i != toReceive.length - 1) const Divider(height: 1, indent: 76, color: AppColors.line),
+                    ],
+                  ]),
+                ),
+                const SizedBox(height: 14),
+              ],
+            ],
+            SectionHeader(title: 'Movimientos relacionados', action: '${relatedExpenses.length}'),
+            const SizedBox(height: 8),
+            if (relatedExpenses.isEmpty)
+              EmptySlim(icon: Icons.receipt_long_rounded, title: 'Sin gastos relacionados', body: 'No aparece en ningún gasto del grupo.')
+            else
+              ...relatedExpenses.take(8).map((expense) => ExpenseCard(
+                expense: expense,
+                members: data.members,
+                onTap: () async {
+                  Navigator.pop(context);
+                  final ok = await Navigator.of(this.context).push<bool>(MaterialPageRoute(builder: (_) => ExpenseDetailScreen(expense: expense, members: data.members)));
+                  if (ok == true) reload();
+                },
+              )),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -5550,47 +5663,88 @@ class _FinancesTabState extends State<FinancesTab> {
 
             final data = snapshot.data ?? _FinanceData.empty();
             final summary = data.summary;
-            final sortedBalances = summary.sortedBalances;
-            final pendingExpenses = data.expenses.where((e) => AppData.text(e['status'], 'pending') != 'paid').toList();
-            final settledExpenses = data.expenses.where((e) => AppData.text(e['status'], 'pending') == 'paid').toList();
-            final myId = AppData.user?.id ?? '';
-            final mySettlements = summary.settlements.where((d) => d.fromId == myId || d.toId == myId).toList();
+            final hasMovements = data.expenses.isNotEmpty || data.settlementPayments.isNotEmpty;
+            final balanceEntries = summary.sortedBalances;
 
             return RefreshIndicator(
-              color: AppColors.teal,
+              color: AppColors.green,
               onRefresh: () async => reload(),
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
                 children: [
-                  PageHeader(title: 'Finanzas', subtitle: 'Gastos, saldos y liquidaciones del grupo.', leading: false),
+                  PageHeader(title: 'Finanzas', subtitle: 'Movimientos y saldos claros, sin pestañas de más.', leading: false),
                   const SizedBox(height: 14),
                   FinanceHeroCard(summary: summary, onCreate: openCreate),
                   const SizedBox(height: 12),
-                  FinanceSegmentedTabs(index: financeSection, onChanged: (i) => setState(() => financeSection = i)),
+                  FinanceSegmentedTabs(index: financeSection, onChanged: (i) => setState(() => financeSection = i > 1 ? 1 : i)),
                   const SizedBox(height: 14),
                   if (financeSection == 0) ...[
-                    SectionHeader(title: 'Gastos', action: 'Total ${money(summary.totalExpenses)}'),
+                    SectionHeader(title: 'Movimientos', action: hasMovements ? '${data.expenses.length + data.settlementPayments.length}' : '0'),
                     const SizedBox(height: 8),
-                    if (data.expenses.isEmpty)
-                      EmptyBlock(icon: Icons.receipt_long_rounded, title: 'Aún no hay gastos', body: 'Añade el primer gasto y Grupli calculará los saldos automáticamente.')
-                    else
-                      ...data.expenses.map((e) => ExpenseCard(
-                        expense: e,
-                        members: data.members,
-                        onTap: () async {
-                          final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ExpenseDetailScreen(expense: e, members: data.members)));
-                          if (ok == true) reload();
-                        },
-                      )),
-                  ] else if (financeSection == 1) ...[
-                    FinanceOptimizerInfoCard(summary: summary),
+                    if (!hasMovements)
+                      EmptyBlock(icon: Icons.receipt_long_rounded, title: 'Aún no hay movimientos', body: 'Añade el primer gasto. Aquí verás gastos y pagos registrados, como en Tricount.')
+                    else ...[
+                      if (data.expenses.isNotEmpty) ...[
+                        SectionHeader(title: 'Gastos pagados', action: 'Total ${money(summary.totalExpenses)}'),
+                        const SizedBox(height: 8),
+                        ...data.expenses.map((e) => ExpenseCard(
+                          expense: e,
+                          members: data.members,
+                          onTap: () async {
+                            final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ExpenseDetailScreen(expense: e, members: data.members)));
+                            if (ok == true) reload();
+                          },
+                        )),
+                      ],
+                      if (data.settlementPayments.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        SectionHeader(title: 'Pagos registrados', action: '${data.settlementPayments.length}'),
+                        const SizedBox(height: 8),
+                        AppCard(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Column(children: [
+                            for (int i = 0; i < data.settlementPayments.length; i++) ...[
+                              SettlementHistoryRow(
+                                payment: data.settlementPayments[i],
+                                members: data.members,
+                                onCancel: cancellingSettlement ? null : () => undoSettlementPayment(data.settlementPayments[i]),
+                              ),
+                              if (i != data.settlementPayments.length - 1) const Divider(height: 1, indent: 76, color: AppColors.line),
+                            ],
+                          ]),
+                        ),
+                      ],
+                    ],
+                  ] else ...[
+                    FinanceAutoBalanceCard(summary: summary, openCount: data.expenses.length, settledCount: data.settlementPayments.length),
                     const SizedBox(height: 12),
                     FinanceBalanceBarsCard(summary: summary),
                     const SizedBox(height: 16),
-                    SectionHeader(title: 'Quién debe a quién', action: summary.settlements.isEmpty ? '0 pagos' : '${summary.settlements.length} pagos mínimos'),
+                    SectionHeader(title: 'Saldos', action: balanceEntries.isEmpty ? 'Todo a cero' : '${balanceEntries.length} personas'),
+                    const SizedBox(height: 8),
+                    if (balanceEntries.isEmpty)
+                      EmptyBlock(icon: Icons.verified_rounded, title: 'Todo queda a cero', body: 'No hay deudas pendientes entre miembros.')
+                    else
+                      AppCard(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Column(children: [
+                          for (int i = 0; i < balanceEntries.length; i++) ...[
+                            FinanceBalanceMemberRow(
+                              userId: balanceEntries[i].key,
+                              name: summary.names[balanceEntries[i].key] ?? 'Miembro',
+                              avatarUrl: summary.avatars[balanceEntries[i].key] ?? '',
+                              balance: balanceEntries[i].value,
+                              onTap: () => openBalanceDetail(balanceEntries[i].key, data),
+                            ),
+                            if (i != balanceEntries.length - 1) const Divider(height: 1, indent: 76, color: AppColors.line),
+                          ],
+                        ]),
+                      ),
+                    const SizedBox(height: 14),
+                    SectionHeader(title: 'Pagos recomendados', action: summary.settlements.isEmpty ? '0' : '${summary.settlements.length}'),
                     const SizedBox(height: 8),
                     if (summary.settlements.isEmpty)
-                      EmptySlim(icon: Icons.verified_rounded, title: 'Todo queda a cero', body: 'No hay pagos pendientes entre miembros.')
+                      EmptySlim(icon: Icons.verified_rounded, title: 'No hay nada que pagar', body: 'Los saldos del grupo están compensados.')
                     else
                       AppCard(
                         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -5604,75 +5758,6 @@ class _FinancesTabState extends State<FinancesTab> {
                           ],
                         ]),
                       ),
-                    if (data.settlementPayments.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      SectionHeader(title: 'Pagos registrados', action: '${data.settlementPayments.length}'),
-                      const SizedBox(height: 8),
-                      AppCard(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Column(children: [
-                          for (int i = 0; i < data.settlementPayments.take(4).length; i++) ...[
-                            SettlementHistoryRow(
-                              payment: data.settlementPayments[i],
-                              members: data.members,
-                              onCancel: cancellingSettlement ? null : () => undoSettlementPayment(data.settlementPayments[i]),
-                            ),
-                            if (i != data.settlementPayments.take(4).length - 1) const Divider(height: 1, indent: 76, color: AppColors.line),
-                          ],
-                        ]),
-                      ),
-                    ],
-                  ] else ...[
-                    FinanceOptimizerInfoCard(summary: summary),
-                    const SizedBox(height: 14),
-                    SectionHeader(title: 'Liquidar ahora', action: summary.settlements.isEmpty ? '' : '${summary.settlements.length} pagos mínimos'),
-                    const SizedBox(height: 8),
-                    if (summary.settlements.isEmpty)
-                      EmptyBlock(icon: Icons.verified_rounded, title: 'Todo queda a cero', body: 'No hace falta mover dinero ahora mismo.')
-                    else
-                      AppCard(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Column(children: [
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.fromLTRB(14, 13, 14, 10),
-                            decoration: const BoxDecoration(color: AppColors.greenSoft, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-                            child: Row(children: const [
-                              Icon(Icons.check_circle_rounded, color: AppColors.green),
-                              SizedBox(width: 10),
-                              Expanded(child: Text('Con estos pagos, todo queda a cero', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
-                            ]),
-                          ),
-                          for (int i = 0; i < summary.settlements.length; i++) ...[
-                            SettlementPaymentRow(
-                              debt: summary.settlements[i],
-                              large: true,
-                              onPaid: savingSettlement ? null : () => markSettlementPaid(summary.settlements[i]),
-                            ),
-                            if (i != summary.settlements.length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
-                          ],
-                        ]),
-                      ),
-                    const SizedBox(height: 12),
-                    FinanceAutoBalanceCard(summary: summary, openCount: pendingExpenses.length, settledCount: settledExpenses.length),
-                    if (data.settlementPayments.isNotEmpty) ...[
-                      const SizedBox(height: 18),
-                      SectionHeader(title: 'Pagos ya registrados', action: '${data.settlementPayments.length}'),
-                      const SizedBox(height: 8),
-                      AppCard(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Column(children: [
-                          for (int i = 0; i < data.settlementPayments.take(6).length; i++) ...[
-                            SettlementHistoryRow(
-                              payment: data.settlementPayments[i],
-                              members: data.members,
-                              onCancel: cancellingSettlement ? null : () => undoSettlementPayment(data.settlementPayments[i]),
-                            ),
-                            if (i != data.settlementPayments.take(6).length - 1) const Divider(height: 1, indent: 58, color: AppColors.line),
-                          ],
-                        ]),
-                      ),
-                    ],
                   ],
                 ],
               ),
@@ -6108,8 +6193,8 @@ class FinanceSegmentedTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const icons = [Icons.receipt_long_rounded, Icons.groups_rounded, Icons.swap_horiz_rounded];
-    const labels = ['Gastos', 'Saldos', 'Liquidar'];
+    const icons = [Icons.receipt_long_rounded, Icons.account_balance_wallet_rounded];
+    const labels = ['Movimientos', 'Saldos'];
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(18), border: Border.all(color: AppColors.line)),
@@ -6303,6 +6388,55 @@ class FinanceOptimizerInfoCard extends StatelessWidget {
           Text(body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12.5)),
         ])),
       ]),
+    );
+  }
+}
+
+
+class FinanceBalanceMemberRow extends StatelessWidget {
+  final String userId;
+  final String name;
+  final String avatarUrl;
+  final double balance;
+  final VoidCallback onTap;
+  const FinanceBalanceMemberRow({
+    super.key,
+    required this.userId,
+    required this.name,
+    required this.avatarUrl,
+    required this.balance,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final positive = balance > .01;
+    final negative = balance < -.01;
+    final color = positive ? AppColors.green : negative ? AppColors.red : AppColors.muted;
+    final title = positive ? 'Le deben' : negative ? 'Debe' : 'A cero';
+    final amount = money(balance.abs());
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(children: [
+          ProfileAvatar(name: name, avatarUrl: avatarUrl, radius: 22),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 3),
+            Text('Toca para ver quién debe y por qué', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+          ])),
+          const SizedBox(width: 8),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12)),
+            const SizedBox(height: 2),
+            Text(amount, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 15)),
+          ]),
+          const SizedBox(width: 4),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        ]),
+      ),
     );
   }
 }
@@ -6635,7 +6769,7 @@ class FinanceSplitPreview extends StatelessWidget {
         ? 'Elige al menos un participante.'
         : customMode
             ? (ok ? 'Reparto manual equilibrado · total ${money(customTotal)}' : 'Faltan/sobran ${money(diff.abs())} para cuadrar el total')
-            : '$participants participantes · cada uno debe ${money(equalShare)} · luego se optimiza en Liquidar';
+            : '$participants participantes · cada uno debe ${money(equalShare)} · luego se optimiza en Saldos';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -9453,9 +9587,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (id != null && id.isNotEmpty) await AppData.markNotificationRead(id);
     final groupId = notification['group_id']?.toString();
     reload();
+    widget.onChanged();
     if (!mounted) return;
     if (groupId != null && groupId.isNotEmpty) {
-      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)));
+      final tab = notificationGroupTab(notification);
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId, initialTab: tab)));
       widget.onChanged();
       reload();
     }
@@ -9599,6 +9735,23 @@ class NotificationListRow extends StatelessWidget {
       ),
     );
   }
+}
+
+
+int notificationGroupTabFromValues(String routeType, String type) {
+  final value = AppData.text(routeType, AppData.text(type)).toLowerCase();
+  if (value.contains('event') || value.contains('agenda') || value.contains('attendance') || value.contains('calendar')) return 1;
+  if (value.contains('finance') || value.contains('expense') || value.contains('settlement') || value.contains('payment') || value.contains('gasto')) return 2;
+  if (value.contains('tournament') || value.contains('match') || value.contains('torneo') || value.contains('resultado')) return 3;
+  if (value.contains('member') || value.contains('grupo') || value.contains('group') || value.contains('invite')) return 4;
+  return 0;
+}
+
+int notificationGroupTab(Map<String, dynamic> notification) {
+  return notificationGroupTabFromValues(
+    AppData.text(notification['route_type']),
+    AppData.text(notification['type']),
+  );
 }
 
 IconData notificationIcon(String type) {
@@ -11412,11 +11565,14 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
                 const SizedBox(width: 4),
                 Text(DateFormat('HH:mm', 'es_ES').format(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
               ]),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.place_outlined, size: 15, color: color),
-                const SizedBox(width: 4),
-                Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xDFFFFFFF))),
-              ]),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 210),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.place_outlined, size: 15, color: color),
+                  const SizedBox(width: 4),
+                  Flexible(child: Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xDFFFFFFF)))),
+                ]),
+              ),
             ]),
           ])),
         ]),
@@ -11502,13 +11658,16 @@ class GlassAttendanceButton extends StatelessWidget {
         border: Border.all(color: selected ? color : color.withOpacity(.28), width: 1.2),
         boxShadow: selected ? [BoxShadow(color: color.withOpacity(.20), blurRadius: 14, offset: const Offset(0, 6))] : const [],
       ),
-      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: selected ? Colors.white : color, size: 15),
-        const SizedBox(width: 5),
-        Text(label, style: TextStyle(color: selected ? Colors.white : color, fontSize: 12.5, fontWeight: FontWeight.w900)),
-        const SizedBox(width: 4),
-        Text(count.toString(), style: TextStyle(color: selected ? Colors.white : color, fontSize: 12.5, fontWeight: FontWeight.w900)),
-      ]),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: selected ? Colors.white : color, size: 15),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(color: selected ? Colors.white : color, fontSize: 12.5, fontWeight: FontWeight.w900)),
+          const SizedBox(width: 4),
+          Text(count.toString(), style: TextStyle(color: selected ? Colors.white : color, fontSize: 12.5, fontWeight: FontWeight.w900)),
+        ]),
+      ),
     ),
   );
 }
@@ -13197,18 +13356,16 @@ class AgendaWeekHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final start = selected.subtract(Duration(days: (selected.weekday + 6) % 7));
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
     final end = start.add(const Duration(days: 6));
     return Row(children: [
-      _RoundIconButton(icon: Icons.chevron_left_rounded, onTap: onPrevious),
-      const SizedBox(width: 8),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('${DateFormat('d MMM', 'es_ES').format(start)} — ${DateFormat('d MMM', 'es_ES').format(end)}', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 2),
-        Text('$weekEvents planes esta semana', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+        Text('$weekEvents planes en los próximos 7 días', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
       ])),
-      TextButton(onPressed: onToday, child: const Text('Hoy')),
-      _RoundIconButton(icon: Icons.chevron_right_rounded, onTap: onNext),
+      TextButton.icon(onPressed: onToday, icon: const Icon(Icons.today_rounded, size: 17), label: const Text('Hoy')),
     ]);
   }
 }
