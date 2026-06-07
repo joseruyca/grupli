@@ -86,7 +86,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v15.31';
+  static const appVersion = 'v15.31.2';
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
 
@@ -344,7 +344,7 @@ class AppRoot extends StatefulWidget {
 
 class _AppRootState extends State<AppRoot> {
   Session? _session;
-  late final StreamSubscription<AuthState> _authSub;
+  StreamSubscription<AuthState>? _authSub;
   StreamSubscription<Uri>? _appLinksSub;
   AppLinks? _appLinks;
   String? _lastHandledInviteCode;
@@ -357,7 +357,7 @@ class _AppRootState extends State<AppRoot> {
     super.initState();
     _session = Supabase.instance.client.auth.currentSession;
     _loadFirstRunState();
-    _startAppLinkListener();
+    unawaited(_startAppLinkListener());
     _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
       if (!mounted) return;
       setState(() {
@@ -448,7 +448,7 @@ class _AppRootState extends State<AppRoot> {
   @override
   void dispose() {
     _appLinksSub?.cancel();
-    _authSub.cancel();
+    _authSub?.cancel();
     super.dispose();
   }
 
@@ -2935,7 +2935,7 @@ class AuthedShell extends StatefulWidget {
 }
 
 class _AuthedShellState extends State<AuthedShell> {
-  late int tab;
+  int tab = 0;
   int refreshKey = 0;
   bool handledInitialInvite = false;
 
