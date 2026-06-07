@@ -86,7 +86,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v15.30.1';
+  static const appVersion = 'v15.30.2';
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
 
@@ -5342,7 +5342,7 @@ class _CalendarTabState extends State<CalendarTab> {
             AgendaPremiumHero(
               events: visibleEvents,
               upcomingEvents: upcomingEvents,
-              group: group,
+              group: widget.group,
               onChanged: reload,
               onCreate: () => createFor(selected),
             ),
