@@ -86,7 +86,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v15.32.2';
+  static const appVersion = 'v15.33';
   static const enableRealtimeSubscriptions = false;
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
@@ -1307,13 +1307,21 @@ class AppData {
   }
 
   static Future<int> addTournamentTeams(String tournamentId, List<String> names) async {
-    final clean = names.map((n) => n.trim()).where((n) => n.length >= 2).toSet().toList();
+    final clean = parseTournamentParticipantNames(names.join('\n'));
     if (clean.isEmpty) return 0;
     await sb.from('tournament_teams').insert(clean.map((name) => {
       'tournament_id': tournamentId,
       'name': name,
     }).toList());
     return clean.length;
+  }
+
+  static Future<void> renameTournamentTeam(String teamId, String name) async {
+    final clean = name.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (clean.length < 2) throw Exception('El nombre debe tener al menos 2 caracteres.');
+    await sb.from('tournament_teams').update({
+      'name': clean,
+    }).eq('id', teamId);
   }
 
   static Future<void> deleteTournamentTeam(String teamId) async {
@@ -1332,33 +1340,76 @@ class AppData {
     await clearTournamentMatches(tournamentId);
 
     final rows = <Map<String, dynamic>>[];
+    final ordered = teams.map((t) => Map<String, dynamic>.from(t)).toList();
+
     if (format == 'eliminatoria') {
-      if (teams.length < 2) throw Exception('Añade al menos 2 participantes.');
-      if (!isPowerOfTwo(teams.length)) {
-        throw Exception('Para una eliminatoria limpia usa 2, 4, 8 o 16 participantes. Así no hay rondas incompletas ni ganadores sueltos.');
-      }
-      for (var i = 0; i < teams.length; i += 2) {
-        rows.add({
-          'tournament_id': tournamentId,
-          'team_a': teams[i]['id'],
-          'team_b': teams[i + 1]['id'],
-          'round': 1,
-          'status': 'pending',
-        });
-      }
-    } else {
-      var round = 1;
-      for (var i = 0; i < teams.length; i++) {
-        for (var j = i + 1; j < teams.length; j++) {
+      if (isPowerOfTwo(ordered.length)) {
+        for (var i = 0; i < ordered.length; i += 2) {
           rows.add({
             'tournament_id': tournamentId,
-            'team_a': teams[i]['id'],
-            'team_b': teams[j]['id'],
+            'team_a': ordered[i]['id'],
+            'team_b': ordered[i + 1]['id'],
+            'round': 1,
+            'status': 'pending',
+          });
+        }
+      } else {
+        final target = highestPowerOfTwoAtMost(ordered.length);
+        final preliminaryMatches = ordered.length - target;
+        var index = 0;
+
+        for (var i = 0; i < preliminaryMatches; i++) {
+          rows.add({
+            'tournament_id': tournamentId,
+            'team_a': ordered[index]['id'],
+            'team_b': ordered[index + 1]['id'],
+            'round': 1,
+            'status': 'pending',
+            'result_details': {'stage': 'preliminary'},
+          });
+          index += 2;
+        }
+
+        while (index < ordered.length) {
+          rows.add({
+            'tournament_id': tournamentId,
+            'team_a': ordered[index]['id'],
+            'team_b': null,
+            'score_a': 1,
+            'score_b': 0,
+            'round': 1,
+            'status': 'played',
+            'played_at': DateTime.now().toUtc().toIso8601String(),
+            'result_details': {'bye': true, 'stage': 'bye'},
+          });
+          index++;
+        }
+      }
+    } else {
+      final rotation = <Map<String, dynamic>?>[...ordered];
+      if (rotation.length.isOdd) rotation.add(null);
+      final n = rotation.length;
+      for (var round = 1; round < n; round++) {
+        for (var i = 0; i < n ~/ 2; i++) {
+          final a = rotation[i];
+          final b = rotation[n - 1 - i];
+          if (a == null || b == null) continue;
+          final swap = round.isEven;
+          rows.add({
+            'tournament_id': tournamentId,
+            'team_a': swap ? b['id'] : a['id'],
+            'team_b': swap ? a['id'] : b['id'],
             'round': round,
             'status': 'pending',
           });
-          round++;
         }
+        final fixed = rotation.first;
+        final rest = rotation.sublist(1);
+        rest.insert(0, rest.removeLast());
+        rotation
+          ..clear()
+          ..add(fixed)
+          ..addAll(rest);
       }
     }
 
@@ -1367,10 +1418,12 @@ class AppData {
   }
 
   static Future<void> generateNextEliminationRound(String tournamentId, List<Map<String, dynamic>> matches) async {
-    final played = matches.where((m) => text(m['status']) == 'played').toList();
     final latestRound = matches.fold<int>(0, (maxRound, m) => max(maxRound, intValue(m['round'])));
-    final latestMatches = played.where((m) => intValue(m['round']) == latestRound).toList();
-    if (latestMatches.isEmpty) throw Exception('No hay resultados cerrados para generar la siguiente ronda.');
+    final latestMatches = matches.where((m) => intValue(m['round']) == latestRound).toList();
+    if (latestMatches.isEmpty) throw Exception('No hay partidos para generar la siguiente ronda.');
+    if (latestMatches.any((m) => text(m['status']) != 'played')) {
+      throw Exception('Cierra todos los resultados de la ronda actual antes de avanzar.');
+    }
     if (latestMatches.length == 1) throw Exception('La eliminatoria ya tiene final registrada.');
 
     final winners = <String>[];
@@ -1378,7 +1431,9 @@ class AppData {
       final a = intValue(match['score_a']);
       final b = intValue(match['score_b']);
       if (a == b) throw Exception('No puede haber empates en eliminatoria.');
-      winners.add((a > b ? match['team_a'] : match['team_b']).toString());
+      final winner = (a > b ? match['team_a'] : match['team_b'])?.toString() ?? '';
+      if (winner.isEmpty || winner == 'null') throw Exception('Hay un partido sin ganador válido.');
+      winners.add(winner);
     }
     if (winners.length % 2 != 0) throw Exception('Número impar de ganadores. Revisa resultados.');
     final rows = <Map<String, dynamic>>[];
@@ -1964,6 +2019,26 @@ bool sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month &
 String calendarDayKey(DateTime day) => '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
 
 bool isPowerOfTwo(int value) => value > 0 && (value & (value - 1)) == 0;
+
+int highestPowerOfTwoAtMost(int value) {
+  var power = 1;
+  while (power * 2 <= value) {
+    power *= 2;
+  }
+  return power;
+}
+
+List<String> parseTournamentParticipantNames(String raw) {
+  final seen = <String>{};
+  final names = <String>[];
+  for (final part in raw.split(RegExp(r'[\n;,]+'))) {
+    final name = part.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (name.length < 2) continue;
+    final key = name.toLowerCase();
+    if (seen.add(key)) names.add(name);
+  }
+  return names;
+}
 
 int eventsInMonth(List<Map<String, dynamic>> events, DateTime month) {
   return events.where((e) {
@@ -7284,6 +7359,7 @@ class CreateTournamentScreen extends StatefulWidget {
 class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   final name = TextEditingController();
   final customUnit = TextEditingController(text: 'puntos');
+  final participants = TextEditingController();
   String format = 'liga';
   String teamType = 'pareja';
   String scoringType = 'general';
@@ -7306,6 +7382,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   void dispose() {
     name.dispose();
     customUnit.dispose();
+    participants.dispose();
     super.dispose();
   }
 
@@ -7343,6 +7420,20 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
     setState(() => step = min(4, step + 1));
   }
 
+  Future<void> loadGroupMembers() async {
+    try {
+      final members = await AppData.members(widget.group['id'].toString());
+      final names = members.map(memberDisplayName).where((n) => n.trim().length >= 2).toList();
+      if (names.isEmpty) {
+        if (mounted) await showToast(context, 'No hay miembros para cargar todavía.');
+        return;
+      }
+      setState(() => participants.text = names.join('\n'));
+    } catch (e) {
+      if (mounted) await showToast(context, humanError(e), danger: true);
+    }
+  }
+
   Future<void> create() async {
     final cleanName = name.text.trim().isEmpty ? defaultName : name.text.trim();
     if (cleanName.length < 2) {
@@ -7360,12 +7451,20 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
         scoringType: scoringType,
         scoringConfig: currentScoringConfig,
       );
+      final names = parseTournamentParticipantNames(participants.text);
+      if (names.isNotEmpty) {
+        await AppData.addTournamentTeams(id, names);
+        if (names.length >= 2) {
+          final created = await AppData.tournament(id);
+          await AppData.generateMatches(id, format, tournamentTeams(created));
+        }
+      }
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(MaterialPageRoute(
         builder: (_) => TournamentDetailScreen(tournamentId: id, group: widget.group),
       ));
     } catch (e) {
-      await showToast(context, e.toString(), danger: true);
+      await showToast(context, humanError(e), danger: true);
       if (mounted) setState(() => loading = false);
     }
   }
@@ -7528,6 +7627,28 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
             const SizedBox(width: 8),
             Expanded(child: PickPill(label: 'Equipos', selected: teamType == 'equipo', onTap: () => setState(() => teamType = 'equipo'))),
           ]),
+          const SizedBox(height: 12),
+          AppCard(
+            padding: const EdgeInsets.all(14),
+            color: AppColors.surface,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(child: Text(teamType == 'equipo' ? 'Nombres de equipos' : teamType == 'pareja' ? 'Nombres de parejas' : 'Jugadores', style: Theme.of(context).textTheme.titleMedium)),
+                TextButton.icon(onPressed: loadGroupMembers, icon: const Icon(Icons.groups_rounded), label: const Text('Miembros')),
+              ]),
+              const SizedBox(height: 8),
+              TextField(
+                controller: participants,
+                minLines: 5,
+                maxLines: 9,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
+                  hintText: teamType == 'equipo' ? 'Equipo azul\nEquipo rojo\nLos cracks' : teamType == 'pareja' ? 'Ana / Javi\nMarta / Luis' : 'Ana\nJavi\nMarta',
+                  helperText: 'Un participante por línea. Si pones 2 o más, Grupli genera el calendario automáticamente.',
+                ),
+              ),
+            ]),
+          ),
           const SizedBox(height: 16),
           TournamentPreviewCard(
             name: previewName,
@@ -7599,14 +7720,19 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Añadir participante'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(
-            hintText: 'Ej. Ana y Javi / Equipo azul',
-            helperText: 'Puede ser jugador, pareja o equipo.',
+        title: const Text('Añadir participantes'),
+        content: SizedBox(
+          width: 360,
+          child: TextField(
+            controller: controller,
+            autofocus: true,
+            minLines: 5,
+            maxLines: 8,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              hintText: 'Equipo azul\nEquipo rojo\nAna / Javi',
+              helperText: 'Un jugador, pareja o equipo por línea.',
+            ),
           ),
         ),
         actions: [
@@ -7616,12 +7742,14 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       ),
     );
     controller.dispose();
-    if (result == null || result.trim().length < 2) return;
+    final names = parseTournamentParticipantNames(result ?? '');
+    if (names.isEmpty) return;
     try {
-      await AppData.addTournamentTeam(widget.tournamentId, result);
+      final added = await AppData.addTournamentTeams(widget.tournamentId, names);
       reload();
+      if (mounted) await showToast(context, '$added participantes añadidos.');
     } catch (e) {
-      await showToast(context, e.toString(), danger: true);
+      await showToast(context, humanError(e), danger: true);
     }
   }
 
@@ -8183,9 +8311,38 @@ class _TournamentTeamsSection extends StatelessWidget {
   final VoidCallback onDeleted;
   const _TournamentTeamsSection({required this.teams, required this.matches, required this.onAddTeam, required this.onAddGroupMembers, required this.onDeleted});
 
+  Future<void> editTeam(BuildContext context, Map<String, dynamic> team) async {
+    final controller = TextEditingController(text: AppData.text(team['name']));
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Editar nombre'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(hintText: 'Nombre del equipo, pareja o jugador'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Guardar')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result.trim().length < 2) return;
+    try {
+      await AppData.renameTournamentTeam(team['id'].toString(), result);
+      onDeleted();
+      if (context.mounted) await showToast(context, 'Nombre actualizado.');
+    } catch (e) {
+      if (context.mounted) await showToast(context, humanError(e), danger: true);
+    }
+  }
+
   Future<void> deleteTeam(BuildContext context, Map<String, dynamic> team) async {
     if (matches.isNotEmpty) {
-      await showToast(context, 'No puedes borrar participantes cuando ya hay partidos generados. Borra/recrea la competición para empezar de cero.', danger: true);
+      await showToast(context, 'No puedes borrar participantes cuando ya hay partidos generados. Regenera la competición si cambias los equipos.', danger: true);
       return;
     }
     final ok = await showDialog<bool>(
@@ -8204,7 +8361,7 @@ class _TournamentTeamsSection extends StatelessWidget {
       await AppData.deleteTournamentTeam(team['id'].toString());
       onDeleted();
     } catch (e) {
-      await showToast(context, e.toString(), danger: true);
+      await showToast(context, humanError(e), danger: true);
     }
   }
 
@@ -8212,23 +8369,29 @@ class _TournamentTeamsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Expanded(child: Text('Participantes', style: Theme.of(context).textTheme.titleLarge)),
+        Expanded(child: Text('Participantes / equipos', style: Theme.of(context).textTheme.titleLarge)),
         TextButton.icon(onPressed: onAddGroupMembers, icon: const Icon(Icons.groups_rounded), label: const Text('Miembros')),
         TextButton.icon(onPressed: onAddTeam, icon: const Icon(Icons.add_rounded), label: const Text('Añadir')),
       ]),
       const SizedBox(height: 8),
       if (teams.isEmpty)
-        EmptyBlock(icon: Icons.group_add_rounded, title: 'Añade participantes', body: 'Pueden ser jugadores, parejas o equipos según el formato.')
+        EmptyBlock(icon: Icons.group_add_rounded, title: 'Añade participantes', body: 'Pueden ser jugadores, parejas o equipos. Puedes escribir varios nombres de golpe, uno por línea.')
       else
         ...teams.asMap().entries.map((entry) {
           final team = entry.value;
           return Padding(
             padding: const EdgeInsets.only(bottom: 9),
             child: AppCard(
+              onTap: () => editTeam(context, team),
               child: Row(children: [
-                Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14)), child: Center(child: Text('${entry.key + 1}', style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900)))),
+                Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.redSoft, borderRadius: BorderRadius.circular(14)), child: Center(child: Text('${entry.key + 1}', style: const TextStyle(color: AppColors.red, fontWeight: FontWeight.w900)))),
                 const SizedBox(width: 12),
-                Expanded(child: Text(AppData.text(team['name'], 'Participante'), style: const TextStyle(fontWeight: FontWeight.w900))),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(AppData.text(team['name'], 'Participante'), style: const TextStyle(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 2),
+                  const Text('Toca para renombrar', style: TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+                ])),
+                IconButton(onPressed: () => editTeam(context, team), icon: const Icon(Icons.edit_rounded, color: AppColors.muted)),
                 IconButton(onPressed: () => deleteTeam(context, team), icon: const Icon(Icons.delete_outline_rounded, color: AppColors.muted)),
               ]),
             ),
@@ -8237,7 +8400,6 @@ class _TournamentTeamsSection extends StatelessWidget {
     ]);
   }
 }
-
 
 class TournamentHubHero extends StatelessWidget {
   final int active;
@@ -8823,10 +8985,12 @@ class MatchResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final played = AppData.text(match['status']) == 'played';
+    final details = AppData.asMap(match['result_details']);
+    final bye = details['bye'] == true;
     final a = teamName(AppData.text(match['team_a']), names);
-    final b = teamName(AppData.text(match['team_b']), names);
-    final score = played ? '${AppData.intValue(match['score_a'])} - ${AppData.intValue(match['score_b'])}' : 'Pendiente';
-    final detailText = played ? matchDetailScoreText(match, scoringType, scoringConfig) : null;
+    final b = bye ? 'Pasa directo' : teamName(AppData.text(match['team_b']), names);
+    final score = bye ? 'BYE' : played ? '${AppData.intValue(match['score_a'])} - ${AppData.intValue(match['score_b'])}' : 'Pendiente';
+    final detailText = bye ? 'Clasificado automáticamente por número impar de participantes.' : played ? matchDetailScoreText(match, scoringType, scoringConfig) : null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 9),
@@ -8849,7 +9013,9 @@ class MatchResultCard extends StatelessWidget {
           Row(children: [
             Text('Ronda ${AppData.intValue(match['round'], 1)}', style: Theme.of(context).textTheme.bodyMedium),
             const Spacer(),
-            if (played)
+            if (bye)
+              const Text('Sin resultado', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800))
+            else if (played)
               TextButton(onPressed: () => reopen(context), child: const Text('Reabrir'))
             else
               TextButton.icon(onPressed: () => editResult(context), icon: const Icon(Icons.edit_rounded, size: 18), label: const Text('Resultado')),

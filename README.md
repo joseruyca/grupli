@@ -215,3 +215,8 @@ Usar solo `supabase/all_in_one.sql` para reset global. No hay parches SQL increm
 ## v15.32.2
 
 Fix de Torneos: corregido `setState` que devolvía `Future` al crear/abrir una competición. No requiere SQL nuevo.
+
+
+## v15.33
+
+Torneos/Ligas reconstruidos: participantes por nombres, equipos/parejas, round-robin real por jornadas, eliminatoria con BYE y puntuación por deporte.
