@@ -86,7 +86,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v15.29.3';
+  static const appVersion = 'v15.30';
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
 
@@ -1953,6 +1953,7 @@ String eventStatusForUser(Map<String, dynamic> event, String userId) {
 }
 
 bool sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+String calendarDayKey(DateTime day) => '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
 
 bool isPowerOfTwo(int value) => value > 0 && (value & (value - 1)) == 0;
 
@@ -5151,6 +5152,7 @@ class _EventDetailData {
 
 
 
+
 class CalendarTab extends StatefulWidget {
   final String groupId;
   final Map<String, dynamic> group;
@@ -5162,9 +5164,13 @@ class CalendarTab extends StatefulWidget {
 class _CalendarTabState extends State<CalendarTab> {
   DateTime month = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime selected = DateTime.now();
+  int viewMode = 0; // 0 semana, 1 mes
   bool loading = true;
+  bool refreshing = false;
   String? errorMessage;
   List<Map<String, dynamic>> events = <Map<String, dynamic>>[];
+  int _loadToken = 0;
+  Timer? _reloadDebounce;
 
   String get groupId => widget.groupId.trim().isNotEmpty ? widget.groupId.trim() : AppData.text(widget.group['id']);
 
@@ -5175,19 +5181,67 @@ class _CalendarTabState extends State<CalendarTab> {
   }
 
   @override
+  void dispose() {
+    _reloadDebounce?.cancel();
+    super.dispose();
+  }
+
+  @override
   void didUpdateWidget(covariant CalendarTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshSeed != widget.refreshSeed || oldWidget.groupId != widget.groupId) {
-      load();
+      _scheduleSoftReload();
     }
   }
 
-  Future<void> load() async {
+  void _scheduleSoftReload() {
+    _reloadDebounce?.cancel();
+    _reloadDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) load(silent: true);
+    });
+  }
+
+  Map<String, List<Map<String, dynamic>>> _eventsByDay(List<Map<String, dynamic>> source) {
+    final map = <String, List<Map<String, dynamic>>>{};
+    for (final event in source) {
+      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
+      if (date == null) continue;
+      final key = calendarDayKey(date);
+      (map[key] ??= <Map<String, dynamic>>[]).add(event);
+    }
+    for (final list in map.values) {
+      list.sort((a, b) {
+        final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return da.compareTo(db);
+      });
+    }
+    return map;
+  }
+
+  List<Map<String, dynamic>> _eventsForDay(Map<String, List<Map<String, dynamic>>> index, DateTime day) {
+    return List<Map<String, dynamic>>.from(index[calendarDayKey(day)] ?? const <Map<String, dynamic>>[]);
+  }
+
+  int _eventsInMonthFromIndex(Map<String, List<Map<String, dynamic>>> index, DateTime targetMonth) {
+    var count = 0;
+    for (final entry in index.entries) {
+      final date = DateTime.tryParse(entry.key);
+      if (date != null && date.year == targetMonth.year && date.month == targetMonth.month) {
+        count += entry.value.length;
+      }
+    }
+    return count;
+  }
+
+  Future<void> load({bool silent = false}) async {
     final id = groupId;
+    final token = ++_loadToken;
     if (id.isEmpty) {
       if (!mounted) return;
       setState(() {
         loading = false;
+        refreshing = false;
         errorMessage = 'No se ha podido identificar este grupo. Vuelve a Mis grupos y entra otra vez.';
         events = <Map<String, dynamic>>[];
       });
@@ -5196,53 +5250,46 @@ class _CalendarTabState extends State<CalendarTab> {
 
     if (mounted) {
       setState(() {
-        loading = true;
+        if (!silent && events.isEmpty) {
+          loading = true;
+        } else {
+          refreshing = true;
+        }
         errorMessage = null;
       });
     }
 
     try {
-      final rows = await AppData.events(id);
-      if (!mounted) return;
+      final rows = await AppData.events(id).timeout(const Duration(seconds: 12));
+      if (!mounted || token != _loadToken) return;
       setState(() {
         events = rows;
         loading = false;
+        refreshing = false;
         errorMessage = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || token != _loadToken) return;
       setState(() {
         loading = false;
+        refreshing = false;
         errorMessage = humanError(e);
       });
     }
   }
 
-  Future<void> reload() async => load();
+  Future<void> reload() async => load(silent: events.isNotEmpty);
 
   Future<void> createFor(DateTime day) async {
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => CreateEventScreen(group: widget.group, initialDate: day)),
     );
-    if (ok == true) await reload();
+    if (ok == true) await load(silent: true);
   }
 
   Future<void> openEvent(Map<String, dynamic> event) async {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: widget.group)));
-    await reload();
-  }
-
-  List<Map<String, dynamic>> _eventsForDay(List<Map<String, dynamic>> source, DateTime day) {
-    final list = source.where((event) {
-      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
-      return date != null && sameDay(date, day);
-    }).toList();
-    list.sort((a, b) {
-      final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
-      final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now();
-      return da.compareTo(db);
-    });
-    return list;
+    await load(silent: true);
   }
 
   @override
@@ -5256,6 +5303,7 @@ class _CalendarTabState extends State<CalendarTab> {
       return da.compareTo(db);
     });
 
+    final byDay = _eventsByDay(visibleEvents);
     final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     final upcomingEvents = visibleEvents.where((event) {
       final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
@@ -5264,119 +5312,141 @@ class _CalendarTabState extends State<CalendarTab> {
       return !eventDay.isBefore(today);
     }).toList();
 
-    final selectedEvents = _eventsForDay(visibleEvents, selected);
+    final selectedEvents = _eventsForDay(byDay, selected);
     final selectedYes = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
     final selectedMaybe = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
 
-    final weekDays = List<DateTime>.generate(7, (i) {
-      final start = DateTime.now();
-      return DateTime(start.year, start.month, start.day).add(Duration(days: i));
-    });
+    final weekStart = selected.subtract(Duration(days: (selected.weekday + 6) % 7));
+    final weekDays = List<DateTime>.generate(7, (i) => DateTime(weekStart.year, weekStart.month, weekStart.day).add(Duration(days: i)));
+    final weekEventsCount = weekDays.fold<int>(0, (sum, day) => sum + _eventsForDay(byDay, day).length);
 
     return SafeArea(
       bottom: false,
-      child: Stack(children: [
-        RefreshIndicator(
-          color: AppColors.teal,
-          onRefresh: reload,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 112),
-            children: [
-              PageHeader(title: 'Agenda', subtitle: 'Planes, rutinas y asistencia del grupo.', leading: false),
+      child: RefreshIndicator(
+        color: AppColors.navAgenda,
+        onRefresh: reload,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 112),
+          children: [
+            PageHeader(title: 'Agenda', subtitle: 'Planes, rutinas y asistencia del grupo.', leading: false),
+            const SizedBox(height: 12),
+            if (loading && events.isEmpty) ...[
+              const CenterLoader(label: 'Cargando agenda...'),
+              const SizedBox(height: 12),
+            ],
+            if (errorMessage != null) ...[
+              ErrorBlock(message: errorMessage!, onRetry: () { reload(); }),
+              const SizedBox(height: 12),
+            ],
+            AgendaPremiumHero(
+              events: visibleEvents,
+              upcomingEvents: upcomingEvents,
+              onCreate: () => createFor(selected),
+              onOpenNext: upcomingEvents.isEmpty ? null : () => openEvent(upcomingEvents.first),
+            ),
+            if (refreshing) ...[
               const SizedBox(height: 10),
-              if (loading) ...[
-                const CenterLoader(label: 'Cargando agenda...'),
-                const SizedBox(height: 12),
-              ],
-              if (errorMessage != null) ...[
-                ErrorBlock(message: errorMessage!, onRetry: () { reload(); }),
-                const SizedBox(height: 12),
-                AgendaRecoveryCard(onCreate: () => createFor(selected), onRetry: () { reload(); }),
-                const SizedBox(height: 12),
-              ],
-              CalendarOverviewCard(
-                events: visibleEvents,
-                upcomingEvents: upcomingEvents,
-                onCreate: () => createFor(selected),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: const LinearProgressIndicator(minHeight: 3, color: AppColors.navAgenda, backgroundColor: AppColors.line),
+              ),
+            ],
+            const SizedBox(height: 14),
+            AgendaViewSwitch(
+              index: viewMode,
+              onChanged: (i) => setState(() => viewMode = i),
+            ),
+            const SizedBox(height: 12),
+            if (viewMode == 0) ...[
+              AgendaWeekHeader(
+                selected: selected,
+                weekEvents: weekEventsCount,
+                onPrevious: () {
+                  final next = selected.subtract(const Duration(days: 7));
+                  setState(() {
+                    selected = next;
+                    month = DateTime(next.year, next.month);
+                  });
+                },
+                onNext: () {
+                  final next = selected.add(const Duration(days: 7));
+                  setState(() {
+                    selected = next;
+                    month = DateTime(next.year, next.month);
+                  });
+                },
+                onToday: () {
+                  final now = DateTime.now();
+                  setState(() {
+                    selected = DateTime(now.year, now.month, now.day);
+                    month = DateTime(now.year, now.month);
+                  });
+                },
               ),
               const SizedBox(height: 10),
-              WeekStrip(
+              PremiumWeekStrip(
                 days: weekDays,
                 selected: selected,
-                events: visibleEvents,
+                eventsByDay: byDay,
                 onSelect: (day) => setState(() {
                   selected = day;
                   month = DateTime(day.year, day.month);
                 }),
               ),
+            ] else ...[
+              AgendaMonthHeader(
+                month: month,
+                eventsCount: _eventsInMonthFromIndex(byDay, month),
+                onPrevious: () => setState(() => month = DateTime(month.year, month.month - 1)),
+                onNext: () => setState(() => month = DateTime(month.year, month.month + 1)),
+                onToday: () {
+                  final now = DateTime.now();
+                  setState(() {
+                    selected = DateTime(now.year, now.month, now.day);
+                    month = DateTime(now.year, now.month);
+                  });
+                },
+              ),
               const SizedBox(height: 10),
-              AppCard(child: Column(children: [
-                Row(children: [
-                  IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month - 1)), icon: const Icon(Icons.chevron_left_rounded)),
-                  Expanded(child: Column(children: [
-                    Text(monthTitle(month), style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 2),
-                    Text('${eventsInMonth(visibleEvents, month)} eventos este mes', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
-                  ])),
-                  IconButton(onPressed: () => setState(() => month = DateTime(month.year, month.month + 1)), icon: const Icon(Icons.chevron_right_rounded)),
-                ]),
-                const SizedBox(height: 8),
-                MonthGrid(
+              RepaintBoundary(
+                child: PremiumMonthCalendar(
                   month: month,
                   selected: selected,
-                  events: visibleEvents,
+                  eventsByDay: byDay,
                   onSelect: (d) => setState(() {
                     selected = d;
                     month = DateTime(d.year, d.month);
                   }),
                 ),
-              ])),
-              const SizedBox(height: 14),
-              CalendarDaySummary(
-                day: selected,
-                events: selectedEvents,
-                confirmed: selectedYes,
-                maybe: selectedMaybe,
-                onCreate: () => createFor(selected),
               ),
-              const SizedBox(height: 18),
-              SectionHeader(title: DateFormat('d MMM', 'es_ES').format(selected), action: 'Crear plan', onTap: () => createFor(selected)),
-              const SizedBox(height: 10),
-              if (loading)
-                EmptySlim(icon: Icons.hourglass_empty_rounded, title: 'Actualizando agenda', body: 'Estoy cargando los planes del grupo.')
-              else if (selectedEvents.isEmpty)
-                EmptySlim(
-                  icon: Icons.calendar_month_rounded,
-                  title: visibleEvents.isEmpty ? 'Agenda vacía' : 'No hay planes este día',
-                  body: visibleEvents.isEmpty
-                      ? 'Crea el primer evento del grupo y aparecerá aquí al momento.'
-                      : 'Este día no tiene planes. Abajo puedes ver los próximos eventos del grupo.',
-                )
-              else
-                ...selectedEvents.map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
-              if (!loading && selectedEvents.isEmpty && upcomingEvents.isNotEmpty) ...[
-                const SizedBox(height: 18),
-                SectionHeader(title: 'Próximos planes', action: '${upcomingEvents.length}'),
-                const SizedBox(height: 10),
-                ...upcomingEvents.take(5).map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
-              ],
             ],
-          ),
+            const SizedBox(height: 16),
+            AgendaSelectedDayCard(
+              day: selected,
+              events: selectedEvents,
+              confirmed: selectedYes,
+              maybe: selectedMaybe,
+              onCreate: () => createFor(selected),
+            ),
+            const SizedBox(height: 12),
+            if (selectedEvents.isEmpty)
+              PremiumAgendaEmptyState(
+                hasAnyEvents: visibleEvents.isNotEmpty,
+                selected: selected,
+                onCreate: () => createFor(selected),
+              )
+            else
+              ...selectedEvents.map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
+            if (!loading && selectedEvents.isEmpty && upcomingEvents.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              SectionHeader(title: 'Próximos planes', action: '${upcomingEvents.length}'),
+              const SizedBox(height: 10),
+              ...upcomingEvents.take(4).map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
+            ],
+          ],
         ),
-        Positioned(
-          right: 20,
-          bottom: 20,
-          child: FloatingActionButton.extended(
-            heroTag: 'calendar-create-event-${groupId.isEmpty ? 'unknown' : groupId}',
-            backgroundColor: AppColors.teal,
-            foregroundColor: Colors.white,
-            onPressed: () => createFor(selected),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Evento', style: TextStyle(fontWeight: FontWeight.w900)),
-          ),
-        ),
-      ]),
+      ),
     );
   }
 }
@@ -11732,41 +11802,35 @@ class CalendarSmartHeader extends StatelessWidget {
   }
 }
 
+
 class WeekStrip extends StatelessWidget {
   final List<DateTime> days;
   final DateTime selected;
-  final List<Map<String, dynamic>> events;
+  final Map<String, List<Map<String, dynamic>>> eventsByDay;
   final ValueChanged<DateTime> onSelect;
 
   const WeekStrip({
     super.key,
     required this.days,
     required this.selected,
-    required this.events,
+    required this.eventsByDay,
     required this.onSelect,
   });
 
   List<Map<String, dynamic>> eventsFor(DateTime day) {
-    final list = events.where((event) {
-      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
-      return date != null && sameDay(date, day);
-    }).toList();
-    list.sort((a, b) {
-      final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
-      final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now();
-      return da.compareTo(db);
-    });
-    return list;
+    return eventsByDay[calendarDayKey(day)] ?? const <Map<String, dynamic>>[];
   }
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 76,
+      height: 68,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        clipBehavior: Clip.none,
         itemCount: days.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, __) => const SizedBox(width: 7),
         itemBuilder: (context, index) {
           final day = days[index];
           final active = sameDay(day, selected);
@@ -11776,48 +11840,55 @@ class WeekStrip extends StatelessWidget {
           final today = sameDay(day, DateTime.now());
           return InkWell(
             onTap: () => onSelect(day),
-            borderRadius: BorderRadius.circular(18),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 58,
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
+            borderRadius: BorderRadius.circular(17),
+            child: Container(
+              width: 52,
+              padding: const EdgeInsets.fromLTRB(5, 7, 5, 7),
               decoration: BoxDecoration(
                 color: active ? AppColors.teal : hasEvents ? eventKindSoftColor(dayEvents.first) : AppColors.surface,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(17),
                 border: Border.all(
                   color: active ? AppColors.teal : today ? AppColors.teal.withOpacity(.45) : hasEvents ? mainColor.withOpacity(.38) : AppColors.line,
-                  width: active || today || hasEvents ? 1.4 : 1,
+                  width: active || today || hasEvents ? 1.3 : 1,
                 ),
-                boxShadow: active ? const [BoxShadow(color: Color(0x18008F86), blurRadius: 16, offset: Offset(0, 8))] : null,
+                boxShadow: active ? const [BoxShadow(color: Color(0x15008F86), blurRadius: 12, offset: Offset(0, 6))] : null,
               ),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Text(shortWeekday(day).toUpperCase(), style: TextStyle(color: active ? Colors.white : AppColors.muted, fontWeight: FontWeight.w900, fontSize: 11)),
+              child: Column(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(shortWeekday(day).toUpperCase(), maxLines: 1, style: TextStyle(color: active ? Colors.white : AppColors.muted, fontWeight: FontWeight.w900, fontSize: 10.5)),
+                ),
+                const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(day.day.toString(), maxLines: 1, style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 19)),
+                ),
                 const SizedBox(height: 4),
-                Text(day.day.toString(), style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 21)),
-                const SizedBox(height: 6),
-                if (hasEvents)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      for (final event in dayEvents.take(3))
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                          width: active ? 7 : 8,
-                          height: active ? 7 : 8,
-                          decoration: BoxDecoration(
-                            color: active ? Colors.white : eventKindColor(event),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      if (dayEvents.length > 3)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 2),
-                          child: Text('+', style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 11)),
-                        ),
-                    ],
-                  )
-                else
-                  Container(width: today ? 18 : 6, height: 5, decoration: BoxDecoration(color: active ? Colors.white : AppColors.line, borderRadius: BorderRadius.circular(99))),
+                SizedBox(
+                  height: 8,
+                  child: Center(
+                    child: hasEvents
+                        ? Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 2,
+                            runSpacing: 0,
+                            children: [
+                              for (final event in dayEvents.take(3))
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: active ? Colors.white : eventKindColor(event),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              if (dayEvents.length > 3)
+                                Text('+', style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 9, height: .8)),
+                            ],
+                          )
+                        : Container(width: today ? 16 : 6, height: 4, decoration: BoxDecoration(color: active ? Colors.white : AppColors.line, borderRadius: BorderRadius.circular(99))),
+                  ),
+                ),
               ]),
             ),
           );
@@ -12929,6 +13000,463 @@ class DateBadge extends StatelessWidget {
 
 
 
+
+class AgendaPremiumHero extends StatelessWidget {
+  final List<Map<String, dynamic>> events;
+  final List<Map<String, dynamic>> upcomingEvents;
+  final VoidCallback onCreate;
+  final VoidCallback? onOpenNext;
+  const AgendaPremiumHero({
+    super.key,
+    required this.events,
+    required this.upcomingEvents,
+    required this.onCreate,
+    this.onOpenNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final next = upcomingEvents.isNotEmpty ? upcomingEvents.first : null;
+    final nextDate = next == null ? null : DateTime.tryParse(next['starts_at']?.toString() ?? '')?.toLocal();
+    final color = next == null ? AppColors.navAgenda : eventKindColor(next);
+    final totalYes = upcomingEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
+    final totalMaybe = upcomingEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [BoxShadow(color: AppColors.navAgenda.withOpacity(.14), blurRadius: 24, offset: const Offset(0, 12))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Material(
+          color: AppColors.navyDeep,
+          child: InkWell(
+            onTap: onOpenNext,
+            child: Stack(children: [
+              Positioned(
+                right: -46,
+                top: -48,
+                child: Container(width: 150, height: 150, decoration: BoxDecoration(color: color.withOpacity(.26), shape: BoxShape.circle)),
+              ),
+              Positioned(
+                left: -34,
+                bottom: -44,
+                child: Container(width: 130, height: 130, decoration: BoxDecoration(color: AppColors.navAgenda.withOpacity(.18), shape: BoxShape.circle)),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(17),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white.withOpacity(.10))),
+                      child: Icon(next == null ? Icons.auto_awesome_rounded : eventKindIcon(next), color: Colors.white),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(next == null ? 'Agenda lista' : 'Próximo plan', style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 4),
+                      Text(
+                        next == null ? 'Crea el primer plan del grupo' : AppData.text(next['title'], 'Evento'),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, height: 1.05, letterSpacing: -.35),
+                      ),
+                    ])),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 42,
+                      child: TextButton.icon(
+                        onPressed: onCreate,
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.navy,
+                          padding: const EdgeInsets.symmetric(horizontal: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        ),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('Crear', style: TextStyle(fontWeight: FontWeight.w900)),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 14),
+                  if (next == null)
+                    const Text(
+                      'Elige un día, crea un evento y el grupo podrá confirmar asistencia sin perderse nada.',
+                      style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.32),
+                    )
+                  else
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      _WhiteMetaPill(icon: Icons.schedule_rounded, text: nextDate == null ? 'Fecha pendiente' : longDateTime(nextDate)),
+                      _WhiteMetaPill(icon: Icons.place_outlined, text: AppData.text(next['location'], 'Sin ubicación')),
+                      _WhiteMetaPill(icon: Icons.people_alt_rounded, text: "${attendanceCount(next, 'yes')} van · mínimo ${AppData.intValue(next['min_people'], 2)}"),
+                    ]),
+                  const SizedBox(height: 14),
+                  Row(children: [
+                    Expanded(child: _DarkAgendaMetric(label: 'Eventos', value: '${events.length}')),
+                    const SizedBox(width: 8),
+                    Expanded(child: _DarkAgendaMetric(label: 'Próximos', value: '${upcomingEvents.length}')),
+                    const SizedBox(width: 8),
+                    Expanded(child: _DarkAgendaMetric(label: 'Van / duda', value: '$totalYes / $totalMaybe')),
+                  ]),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class AgendaViewSwitch extends StatelessWidget {
+  final int index;
+  final ValueChanged<int> onChanged;
+  const AgendaViewSwitch({super.key, required this.index, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.all(5),
+      color: AppColors.orangeSoft,
+      child: Row(children: [
+        Expanded(child: _AgendaSwitchItem(label: 'Semana', icon: Icons.view_week_rounded, selected: index == 0, onTap: () => onChanged(0))),
+        const SizedBox(width: 5),
+        Expanded(child: _AgendaSwitchItem(label: 'Mes', icon: Icons.calendar_month_rounded, selected: index == 1, onTap: () => onChanged(1))),
+      ]),
+    );
+  }
+}
+
+class _AgendaSwitchItem extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+  const _AgendaSwitchItem({required this.label, required this.icon, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 42,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: selected ? [BoxShadow(color: AppColors.navAgenda.withOpacity(.13), blurRadius: 12, offset: const Offset(0, 6))] : null,
+        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, color: selected ? AppColors.navAgenda : AppColors.muted, size: 18),
+          const SizedBox(width: 7),
+          Text(label, style: TextStyle(color: selected ? AppColors.ink : AppColors.muted, fontWeight: FontWeight.w900)),
+        ]),
+      ),
+    );
+  }
+}
+
+class AgendaWeekHeader extends StatelessWidget {
+  final DateTime selected;
+  final int weekEvents;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+  final VoidCallback onToday;
+  const AgendaWeekHeader({super.key, required this.selected, required this.weekEvents, required this.onPrevious, required this.onNext, required this.onToday});
+
+  @override
+  Widget build(BuildContext context) {
+    final start = selected.subtract(Duration(days: (selected.weekday + 6) % 7));
+    final end = start.add(const Duration(days: 6));
+    return Row(children: [
+      _RoundIconButton(icon: Icons.chevron_left_rounded, onTap: onPrevious),
+      const SizedBox(width: 8),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${DateFormat('d MMM', 'es_ES').format(start)} — ${DateFormat('d MMM', 'es_ES').format(end)}', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 2),
+        Text('$weekEvents planes esta semana', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+      ])),
+      TextButton(onPressed: onToday, child: const Text('Hoy')),
+      _RoundIconButton(icon: Icons.chevron_right_rounded, onTap: onNext),
+    ]);
+  }
+}
+
+class AgendaMonthHeader extends StatelessWidget {
+  final DateTime month;
+  final int eventsCount;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+  final VoidCallback onToday;
+  const AgendaMonthHeader({super.key, required this.month, required this.eventsCount, required this.onPrevious, required this.onNext, required this.onToday});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      _RoundIconButton(icon: Icons.chevron_left_rounded, onTap: onPrevious),
+      const SizedBox(width: 8),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(monthTitle(month), style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 2),
+        Text('$eventsCount eventos este mes', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+      ])),
+      TextButton(onPressed: onToday, child: const Text('Hoy')),
+      _RoundIconButton(icon: Icons.chevron_right_rounded, onTap: onNext),
+    ]);
+  }
+}
+
+class _RoundIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _RoundIconButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(15),
+    child: Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(15), border: Border.all(color: AppColors.line)),
+      child: Icon(icon, color: AppColors.ink),
+    ),
+  );
+}
+
+class PremiumWeekStrip extends StatelessWidget {
+  final List<DateTime> days;
+  final DateTime selected;
+  final Map<String, List<Map<String, dynamic>>> eventsByDay;
+  final ValueChanged<DateTime> onSelect;
+
+  const PremiumWeekStrip({super.key, required this.days, required this.selected, required this.eventsByDay, required this.onSelect});
+
+  List<Map<String, dynamic>> eventsFor(DateTime day) => eventsByDay[calendarDayKey(day)] ?? const <Map<String, dynamic>>[];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: days.map((day) {
+      final active = sameDay(day, selected);
+      final today = sameDay(day, DateTime.now());
+      final dayEvents = eventsFor(day);
+      final hasEvents = dayEvents.isNotEmpty;
+      final color = hasEvents ? eventKindColor(dayEvents.first) : AppColors.navAgenda;
+      return Expanded(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: InkWell(
+            onTap: () => onSelect(day),
+            borderRadius: BorderRadius.circular(18),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              height: 82,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              decoration: BoxDecoration(
+                color: active ? AppColors.navAgenda : hasEvents ? color.withOpacity(.10) : AppColors.surface,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: active ? AppColors.navAgenda : today ? AppColors.navAgenda.withOpacity(.45) : hasEvents ? color.withOpacity(.25) : AppColors.line),
+              ),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Text(shortWeekday(day).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? Colors.white : AppColors.muted, fontSize: 10, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 4),
+                Text(day.day.toString(), style: TextStyle(color: active ? Colors.white : AppColors.ink, fontSize: 20, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 6),
+                SizedBox(
+                  height: 11,
+                  child: hasEvents
+                      ? Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 2,
+                          children: [
+                            for (final event in dayEvents.take(3))
+                              Container(width: 6, height: 6, decoration: BoxDecoration(color: active ? Colors.white : eventKindColor(event), shape: BoxShape.circle)),
+                            if (dayEvents.length > 3)
+                              Text('+', style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 10, height: .8)),
+                          ],
+                        )
+                      : Container(width: today ? 18 : 7, height: 4, decoration: BoxDecoration(color: active ? Colors.white : AppColors.line, borderRadius: BorderRadius.circular(99))),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }).toList());
+  }
+}
+
+class PremiumMonthCalendar extends StatelessWidget {
+  final DateTime month;
+  final DateTime selected;
+  final Map<String, List<Map<String, dynamic>>> eventsByDay;
+  final ValueChanged<DateTime> onSelect;
+  const PremiumMonthCalendar({super.key, required this.month, required this.selected, required this.eventsByDay, required this.onSelect});
+
+  List<Map<String, dynamic>> eventsFor(DateTime day) => eventsByDay[calendarDayKey(day)] ?? const <Map<String, dynamic>>[];
+
+  @override
+  Widget build(BuildContext context) {
+    final first = DateTime(month.year, month.month, 1);
+    final startOffset = (first.weekday + 6) % 7;
+    final days = DateTime(month.year, month.month + 1, 0).day;
+    final cells = <DateTime?>[];
+    for (int i = 0; i < startOffset; i++) { cells.add(null); }
+    for (int d = 1; d <= days; d++) { cells.add(DateTime(month.year, month.month, d)); }
+    while (cells.length % 7 != 0) { cells.add(null); }
+
+    final rows = <List<DateTime?>>[];
+    for (int i = 0; i < cells.length; i += 7) {
+      rows.add(cells.sublist(i, min(i + 7, cells.length)));
+    }
+
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
+      color: AppColors.surface,
+      child: Column(children: [
+        Row(children: ['L','M','X','J','V','S','D'].map((d) => Expanded(child: Center(child: Text(d, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.muted, fontSize: 12))))).toList()),
+        const SizedBox(height: 10),
+        ...rows.map((row) => Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(children: row.map((day) {
+            if (day == null) return const Expanded(child: SizedBox(height: 46));
+            final active = sameDay(day, selected);
+            final today = sameDay(day, DateTime.now());
+            final dayEvents = eventsFor(day);
+            final hasEvents = dayEvents.isNotEmpty;
+            final mainColor = hasEvents ? eventKindColor(dayEvents.first) : AppColors.navAgenda;
+            return Expanded(
+              child: SizedBox(
+                height: 46,
+                child: InkWell(
+                  onTap: () => onSelect(day),
+                  borderRadius: BorderRadius.circular(15),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: active ? AppColors.navAgenda : hasEvents ? mainColor.withOpacity(.10) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: active ? AppColors.navAgenda : today ? AppColors.navAgenda.withOpacity(.45) : hasEvents ? mainColor.withOpacity(.26) : Colors.transparent),
+                    ),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Text(day.day.toString(), maxLines: 1, style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: active || hasEvents || today ? FontWeight.w900 : FontWeight.w700, fontSize: 14)),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        height: 7,
+                        child: hasEvents
+                            ? Wrap(
+                                alignment: WrapAlignment.center,
+                                spacing: 1.8,
+                                children: [
+                                  for (final event in dayEvents.take(3))
+                                    Container(width: 5.5, height: 5.5, decoration: BoxDecoration(color: active ? Colors.white : eventKindColor(event), shape: BoxShape.circle)),
+                                ],
+                              )
+                            : today
+                                ? Container(width: 14, height: 4, decoration: BoxDecoration(color: active ? Colors.white : AppColors.navAgenda, borderRadius: BorderRadius.circular(99)))
+                                : const SizedBox.shrink(),
+                      ),
+                    ]),
+                  ),
+                ),
+              ),
+            );
+          }).toList()),
+        )),
+      ]),
+    );
+  }
+}
+
+class AgendaSelectedDayCard extends StatelessWidget {
+  final DateTime day;
+  final List<Map<String, dynamic>> events;
+  final int confirmed;
+  final int maybe;
+  final VoidCallback onCreate;
+  const AgendaSelectedDayCard({super.key, required this.day, required this.events, required this.confirmed, required this.maybe, required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasEvents = events.isNotEmpty;
+    final color = hasEvents ? eventKindColor(events.first) : AppColors.navAgenda;
+    return AppCard(
+      padding: const EdgeInsets.all(14),
+      color: hasEvents ? eventKindSoftColor(events.first) : AppColors.orangeSoft,
+      child: Row(children: [
+        Container(
+          width: 58,
+          height: 64,
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: color.withOpacity(.16))),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Text(shortWeekday(day).toUpperCase(), style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w900)),
+            Text(day.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 23, fontWeight: FontWeight.w900)),
+          ]),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(longDay(day), maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            hasEvents ? '${events.length} plan${events.length == 1 ? '' : 'es'} · $confirmed van · $maybe duda' : 'Día libre para crear un nuevo plan',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12.5, height: 1.25),
+          ),
+        ])),
+        const SizedBox(width: 8),
+        SizedBox(
+          height: 40,
+          child: TextButton.icon(
+            onPressed: onCreate,
+            style: TextButton.styleFrom(backgroundColor: AppColors.white, foregroundColor: color, padding: const EdgeInsets.symmetric(horizontal: 11), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Crear', style: TextStyle(fontWeight: FontWeight.w900)),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+class PremiumAgendaEmptyState extends StatelessWidget {
+  final bool hasAnyEvents;
+  final DateTime selected;
+  final VoidCallback onCreate;
+  const PremiumAgendaEmptyState({super.key, required this.hasAnyEvents, required this.selected, required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.all(18),
+      color: AppColors.surface,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.orangeSoft, borderRadius: BorderRadius.circular(17)), child: const Icon(Icons.event_available_rounded, color: AppColors.navAgenda)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(hasAnyEvents ? 'No hay planes este día' : 'Empieza la agenda del grupo', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 16)),
+            const SizedBox(height: 4),
+            Text(
+              hasAnyEvents
+                  ? 'El ${DateFormat('d MMM', 'es_ES').format(selected)} está libre. Puedes crear un plan o revisar los próximos eventos.'
+                  : 'Crea el primer evento y los miembros podrán confirmar asistencia desde aquí.',
+              style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.32),
+            ),
+          ])),
+        ]),
+        const SizedBox(height: 14),
+        SizedBox(width: double.infinity, child: PrimaryButton(label: 'Crear plan para este día', icon: Icons.add_rounded, onTap: onCreate)),
+      ]),
+    );
+  }
+}
+
 class AgendaRecoveryCard extends StatelessWidget {
   final VoidCallback onCreate;
   final VoidCallback onRetry;
@@ -13899,24 +14427,16 @@ class SmallPick extends StatelessWidget { final String label; final String value
 
 class StepperRow extends StatelessWidget { final int value; final VoidCallback onMinus; final VoidCallback onPlus; const StepperRow({super.key, required this.value, required this.onMinus, required this.onPlus}); @override Widget build(BuildContext context) => AppCard(child: Row(children: [const Icon(Icons.groups_rounded, color: AppColors.muted), const SizedBox(width: 12), Text(value.toString(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const Spacer(), IconButton(onPressed: onMinus, icon: const Icon(Icons.remove_rounded)), IconButton(onPressed: onPlus, icon: const Icon(Icons.add_rounded))])); }
 
+
 class MonthGrid extends StatelessWidget {
   final DateTime month;
   final DateTime selected;
-  final List<Map<String, dynamic>> events;
+  final Map<String, List<Map<String, dynamic>>> eventsByDay;
   final ValueChanged<DateTime> onSelect;
-  const MonthGrid({super.key, required this.month, required this.selected, required this.events, required this.onSelect});
+  const MonthGrid({super.key, required this.month, required this.selected, required this.eventsByDay, required this.onSelect});
 
   List<Map<String, dynamic>> eventsFor(DateTime day) {
-    final list = events.where((event) {
-      final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal();
-      return date != null && sameDay(date, day);
-    }).toList();
-    list.sort((a, b) {
-      final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.now();
-      final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.now();
-      return da.compareTo(db);
-    });
-    return list;
+    return eventsByDay[calendarDayKey(day)] ?? const <Map<String, dynamic>>[];
   }
 
   @override
@@ -13929,80 +14449,80 @@ class MonthGrid extends StatelessWidget {
     for (int d = 1; d <= days; d++) { cells.add(DateTime(month.year, month.month, d)); }
     while (cells.length % 7 != 0) { cells.add(null); }
 
+    final rows = <List<DateTime?>>[];
+    for (int i = 0; i < cells.length; i += 7) {
+      rows.add(cells.sublist(i, min(i + 7, cells.length)));
+    }
+
     return Column(children: [
       Row(children: ['L','M','X','J','V','S','D'].map((d) => Expanded(child: Center(child: Text(d, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.muted, fontSize: 12))))).toList()),
       const SizedBox(height: 8),
-      GridView.count(
-        crossAxisCount: 7,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        childAspectRatio: 1.08,
-        children: cells.map((day) {
-          if (day == null) return const SizedBox();
+      ...rows.map((row) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(children: row.map((day) {
+          if (day == null) return const Expanded(child: SizedBox(height: 42));
           final active = sameDay(day, selected);
           final today = sameDay(day, DateTime.now());
           final dayEvents = eventsFor(day);
           final hasEvents = dayEvents.isNotEmpty;
           final mainColor = hasEvents ? eventKindColor(dayEvents.first) : AppColors.line;
-          return InkWell(
-            onTap: () => onSelect(day),
-            borderRadius: BorderRadius.circular(16),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              margin: const EdgeInsets.all(2.5),
-              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 3),
-              decoration: BoxDecoration(
-                color: active ? AppColors.teal : hasEvents ? eventKindSoftColor(dayEvents.first) : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: active ? AppColors.teal : today ? AppColors.teal.withOpacity(.55) : hasEvents ? mainColor.withOpacity(.32) : Colors.transparent,
-                  width: active || today || hasEvents ? 1.3 : 1,
-                ),
-                boxShadow: active ? const [BoxShadow(color: Color(0x16008F86), blurRadius: 10, offset: Offset(0, 5))] : null,
-              ),
-              child: Stack(children: [
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: Text(
-                    day.day.toString(),
-                    style: TextStyle(
-                      color: active ? Colors.white : AppColors.ink,
-                      fontWeight: active || hasEvents || today ? FontWeight.w900 : FontWeight.w700,
-                      fontSize: 14,
+          return Expanded(
+            child: SizedBox(
+              height: 42,
+              child: InkWell(
+                onTap: () => onSelect(day),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.teal : hasEvents ? eventKindSoftColor(dayEvents.first) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: active ? AppColors.teal : today ? AppColors.teal.withOpacity(.55) : hasEvents ? mainColor.withOpacity(.32) : Colors.transparent,
+                      width: active || today || hasEvents ? 1.2 : 1,
                     ),
                   ),
-                ),
-                if (hasEvents)
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          for (final event in dayEvents.take(3))
-                            Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 1),
-                              width: active ? 5.5 : 6.5,
-                              height: active ? 5.5 : 6.5,
-                              decoration: BoxDecoration(color: active ? Colors.white : eventKindColor(event), shape: BoxShape.circle),
-                            ),
-                        ],
-                      ),
-                      if (dayEvents.length > 1) ...[
-                        const SizedBox(height: 2),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(color: active ? Colors.white.withOpacity(.18) : Colors.white.withOpacity(.75), borderRadius: BorderRadius.circular(99)),
-                          child: Text('${dayEvents.length}', style: TextStyle(color: active ? Colors.white : mainColor, fontSize: 9, fontWeight: FontWeight.w900)),
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        day.day.toString(),
+                        maxLines: 1,
+                        style: TextStyle(
+                          color: active ? Colors.white : AppColors.ink,
+                          fontWeight: active || hasEvents || today ? FontWeight.w900 : FontWeight.w700,
+                          fontSize: 13.5,
                         ),
-                      ],
-                    ]),
-                  ),
-              ]),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    SizedBox(
+                      height: 7,
+                      child: Center(
+                        child: hasEvents
+                            ? Wrap(
+                                alignment: WrapAlignment.center,
+                                spacing: 1.5,
+                                children: [
+                                  for (final event in dayEvents.take(3))
+                                    Container(
+                                      width: 5.5,
+                                      height: 5.5,
+                                      decoration: BoxDecoration(color: active ? Colors.white : eventKindColor(event), shape: BoxShape.circle),
+                                    ),
+                                ],
+                              )
+                            : const SizedBox(height: 5),
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
             ),
           );
-        }).toList(),
-      ),
+        }).toList()),
+      )),
     ]);
   }
 }
