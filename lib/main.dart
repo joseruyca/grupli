@@ -86,7 +86,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v15.34';
+  static const appVersion = 'v15.34.1';
   static const enableRealtimeSubscriptions = false;
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
@@ -8165,7 +8165,7 @@ class TournamentStandingTile extends StatelessWidget {
           Text(standingDetailText(standing, scoringType, scoringConfig), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11)),
         ])),
         SizedBox(width: 34, child: Text('${standing.played}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900))),
-        SizedBox(width: 42, child: Text('${standing.diff}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900))),
+        SizedBox(width: 42, child: Text('${standing.goalDifference}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900))),
         SizedBox(width: 42, child: Text('${standing.points}', textAlign: TextAlign.right, style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900))),
       ]),
     ),

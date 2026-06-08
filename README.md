@@ -225,3 +225,8 @@ Torneos/Ligas reconstruidos: participantes por nombres, equipos/parejas, round-r
 ## v15.34
 
 Torneos/Ligas reconstruidos de raíz con flujo más simple, equipos, partidos, resultados y clasificación.
+
+
+## v15.34.1
+
+Fix de compilación de Torneos: tabla usa `goalDifference` en lugar de `diff`.
