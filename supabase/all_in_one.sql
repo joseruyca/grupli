@@ -232,7 +232,7 @@ CREATE TABLE public.tournaments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   group_id uuid NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
   name text NOT NULL CHECK (char_length(trim(name)) >= 2),
-  format text NOT NULL DEFAULT 'liga' CHECK (format IN ('liga','eliminatoria','americano')),
+  format text NOT NULL DEFAULT 'liga' CHECK (format IN ('liga','eliminatoria','americano','manual')),
   team_type text NOT NULL DEFAULT 'equipo' CHECK (team_type IN ('individual','pareja','equipo')),
   scoring_type text NOT NULL DEFAULT 'general' CHECK (scoring_type IN ('general','football','tennis_padel','basketball','cards_mus','custom')),
   scoring_config jsonb NOT NULL DEFAULT '{"win":3,"draw":1,"loss":0,"unit":"puntos","allowDraw":true}'::jsonb,

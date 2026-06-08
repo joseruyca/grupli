@@ -1364,9 +1364,59 @@ class AppData {
     await sb.from('matches').delete().eq('tournament_id', tournamentId);
   }
 
+  static Future<void> createManualMatches(String tournamentId, List<Map<String, dynamic>> teams, List<TournamentDraftMatch> pairings) async {
+    if (pairings.isEmpty) throw Exception('Añade al menos un emparejamiento manual.');
+    await clearTournamentMatches(tournamentId);
+    await addManualMatches(tournamentId, teams, pairings);
+  }
+
+  static Future<void> addManualMatches(String tournamentId, List<Map<String, dynamic>> teams, List<TournamentDraftMatch> pairings) async {
+    if (pairings.isEmpty) throw Exception('Añade al menos un emparejamiento manual.');
+    final byName = <String, String>{
+      for (final team in teams) AppData.text(team['name']).trim().toLowerCase(): team['id'].toString(),
+    };
+    final rows = <Map<String, dynamic>>[];
+    for (final pair in pairings) {
+      final aId = byName[pair.teamAName.trim().toLowerCase()];
+      final bId = byName[pair.teamBName.trim().toLowerCase()];
+      if (aId == null || bId == null) {
+        throw Exception('No encuentro en participantes: ${aId == null ? pair.teamAName : pair.teamBName}.');
+      }
+      if (aId == bId) throw Exception('Un equipo no puede jugar contra sí mismo.');
+      rows.add({
+        'tournament_id': tournamentId,
+        'team_a': aId,
+        'team_b': bId,
+        'round': max(1, pair.round),
+        'status': 'pending',
+      });
+    }
+    await sb.from('matches').insert(rows);
+  }
+
+  static Future<void> createTournamentAgendaEvents(String groupId, String tournamentName, List<TournamentDraftMatch> pairings, DateTime firstStart) async {
+    if (pairings.isEmpty) return;
+    var index = 0;
+    for (final pair in pairings.take(60)) {
+      final start = firstStart.add(Duration(minutes: 60 * index));
+      await createEvent(
+        groupId,
+        '$tournamentName: ${pair.teamAName} vs ${pair.teamBName}',
+        start,
+        '',
+        'Partido de torneo · Jornada ${pair.round}',
+        2,
+      );
+      index++;
+    }
+  }
+
   static Future<void> generateMatches(String tournamentId, String format, List<Map<String, dynamic>> teams) async {
     if (teams.length < 2) {
       throw Exception('Añade al menos 2 participantes.');
+    }
+    if (format == 'manual') {
+      throw Exception('Este torneo usa emparejamientos manuales. Añade los partidos desde el panel del torneo.');
     }
 
     await clearTournamentMatches(tournamentId);
@@ -2181,6 +2231,8 @@ String tournamentFormatLabel(String format) {
       return 'Eliminatoria';
     case 'americano':
       return 'Americano';
+    case 'manual':
+      return 'Manual';
     default:
       return 'Liga';
   }
@@ -2192,6 +2244,8 @@ String tournamentFormatSubtitle(String format) {
       return 'Cuadro directo: quien gana avanza y quien pierde queda fuera.';
     case 'americano':
       return 'Rondas rápidas para rotar participantes y mantener ranking.';
+    case 'manual':
+      return 'Emparejamientos decididos a mano, con máximo control.';
     default:
       return 'Todos contra todos con clasificación automática.';
   }
@@ -7251,6 +7305,7 @@ class ChoicePill extends StatelessWidget {
   );
 }
 
+
 class TournamentsTab extends StatefulWidget {
   final Map<String, dynamic> group;
   final int refreshSeed;
@@ -7318,70 +7373,92 @@ class _TournamentsTabState extends State<TournamentsTab> {
     await load(soft: true);
   }
 
+  List<TournamentDashboardMatch> _allMatches({bool played = false}) {
+    final output = <TournamentDashboardMatch>[];
+    for (final tournament in tournaments) {
+      final teams = tournamentTeams(tournament);
+      final names = teamNameMap(teams);
+      for (final match in tournamentMatches(tournament)) {
+        final isPlayed = AppData.text(match['status']) == 'played';
+        if (played != isPlayed) continue;
+        final a = names[AppData.text(match['team_a'])] ?? 'Pendiente';
+        final rawB = AppData.text(match['team_b']);
+        final b = rawB.isEmpty || rawB == 'null' ? 'Pase directo' : names[rawB] ?? 'Pendiente';
+        output.add(TournamentDashboardMatch(
+          tournament: tournament,
+          match: match,
+          teamA: a,
+          teamB: b,
+          played: isPlayed,
+        ));
+      }
+    }
+    output.sort((a, b) {
+      final round = AppData.intValue(a.match['round']).compareTo(AppData.intValue(b.match['round']));
+      if (round != 0) return round;
+      return AppData.text(a.match['created_at']).compareTo(AppData.text(b.match['created_at']));
+    });
+    return output;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final active = tournaments.where((t) => AppData.text(t['status'], 'active') != 'finished').length;
-    final matches = tournaments.fold<int>(0, (sum, t) => sum + tournamentMatches(t).length);
-    final played = tournaments.fold<int>(0, (sum, t) => sum + tournamentMatches(t).where((m) => AppData.text(m['status']) == 'played').length);
-    final next = _nextTournament(tournaments);
+    final active = tournaments.where((t) => AppData.text(t['status'], 'active') != 'finished').toList();
+    final finished = tournaments.where((t) => AppData.text(t['status'], 'active') == 'finished').toList();
+    final upcoming = _allMatches().take(4).toList();
+    final results = _allMatches(played: true).reversed.take(4).toList();
 
     return SafeArea(
       bottom: false,
       child: RefreshIndicator(
-        color: AppColors.teal,
+        color: AppColors.red,
         onRefresh: () => load(soft: true),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 104),
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 104),
           children: [
-            PageHeader(
-              title: 'Torneos',
-              subtitle: 'Ligas, copas, partidos, resultados y clasificación.',
-              leading: false,
+            TournamentGroupHeader(
+              subtitle: AppData.text(widget.group['name'], 'Grupo'),
+              onCreate: openCreate,
             ),
             const SizedBox(height: 14),
-            TournamentManagerHero(
-              active: active,
-              played: played,
-              totalMatches: matches,
-              nextName: next == null ? '' : AppData.text(next['name'], 'Competición'),
-              onCreate: openCreate,
-              onOpenNext: next == null ? null : () => openTournament(next),
-            ),
-            const SizedBox(height: 16),
-            Row(children: [
-              Expanded(child: TournamentMiniAction(icon: Icons.table_chart_rounded, title: 'Liga', body: 'Todos contra todos', onTap: openCreate)),
-              const SizedBox(width: 10),
-              Expanded(child: TournamentMiniAction(icon: Icons.account_tree_rounded, title: 'Copa', body: 'Eliminatoria', onTap: openCreate)),
-            ]),
-            const SizedBox(height: 18),
-            SectionHeader(title: 'Competiciones', action: 'Crear', onTap: openCreate),
-            const SizedBox(height: 10),
-            if (loading && tournaments.isEmpty)
+            if (loading)
               const CenterLoader(label: 'Cargando torneos...')
-            else if (error != null && tournaments.isEmpty)
+            else if (error != null)
               ErrorBlock(message: error!, onRetry: () => load())
-            else if (tournaments.isEmpty)
-              TournamentEmptyState(onCreate: openCreate)
             else ...[
-              if (loading) const Padding(padding: EdgeInsets.only(bottom: 10), child: LinearProgressIndicator(minHeight: 3, color: AppColors.teal)),
-              ...tournaments.map((t) => TournamentListCard(tournament: t, onTap: () => openTournament(t))),
+              TournamentSectionHeader(title: 'Torneos activos', action: active.isEmpty ? null : 'Ver todos'),
+              const SizedBox(height: 8),
+              if (active.isEmpty)
+                TournamentEmptyState(onCreate: openCreate)
+              else
+                ...active.take(4).map((t) => TournamentActiveCard(tournament: t, onTap: () => openTournament(t))),
+              const SizedBox(height: 16),
+              TournamentSectionHeader(title: 'Próximos partidos', action: upcoming.isEmpty ? null : 'Ver agenda'),
+              const SizedBox(height: 8),
+              if (upcoming.isEmpty)
+                EmptySlim(icon: Icons.calendar_month_rounded, title: 'Sin partidos pendientes', body: 'Crea un torneo o genera emparejamientos para llenar la agenda.')
+              else
+                ...upcoming.map((m) => TournamentDashboardMatchCard(item: m, onTap: () => openTournament(m.tournament))),
+              const SizedBox(height: 16),
+              TournamentSectionHeader(title: 'Últimos resultados'),
+              const SizedBox(height: 8),
+              if (results.isEmpty)
+                EmptySlim(icon: Icons.sports_score_rounded, title: 'Aún no hay resultados', body: 'Cuando registres marcadores aparecerán aquí.')
+              else
+                ...results.map((m) => TournamentDashboardMatchCard(item: m, onTap: () => openTournament(m.tournament))),
+              if (finished.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                TournamentSectionHeader(title: 'Finalizados'),
+                const SizedBox(height: 8),
+                ...finished.take(3).map((t) => TournamentActiveCard(tournament: t, onTap: () => openTournament(t), compact: true)),
+              ],
+              const SizedBox(height: 18),
+              PrimaryButton(label: 'Crear torneo', icon: Icons.add_rounded, onTap: openCreate),
             ],
           ],
         ),
       ),
     );
-  }
-
-  Map<String, dynamic>? _nextTournament(List<Map<String, dynamic>> data) {
-    for (final tournament in data) {
-      if (AppData.text(tournament['status'], 'active') == 'finished') continue;
-      final pending = tournamentMatches(tournament).where((m) => AppData.text(m['status']) != 'played').length;
-      if (pending > 0) return tournament;
-    }
-    for (final tournament in data) {
-      if (AppData.text(tournament['status'], 'active') != 'finished') return tournament;
-    }
-    return null;
   }
 }
 
@@ -7396,15 +7473,21 @@ class TournamentCreateSimpleScreen extends StatefulWidget {
 class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScreen> {
   final name = TextEditingController();
   final participants = TextEditingController();
+  final pairings = TextEditingController();
   String format = 'liga';
   String teamType = 'equipo';
-  String scoringType = 'general';
+  String scoringType = 'football';
+  bool addToAgenda = true;
   bool loading = false;
+  int step = 0;
+  DateTime firstMatchDate = DateTime.now().add(const Duration(days: 1));
+  TimeOfDay firstMatchTime = const TimeOfDay(hour: 20, minute: 0);
 
   @override
   void dispose() {
     name.dispose();
     participants.dispose();
+    pairings.dispose();
     super.dispose();
   }
 
@@ -7416,21 +7499,71 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         if (mounted) await showToast(context, 'Todavía no hay miembros para cargar.', danger: true);
         return;
       }
-      participants.text = names.join('\n');
+      setState(() => participants.text = names.join('\n'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
   }
 
+  List<String> get participantNames {
+    final fromList = parseTournamentParticipantNames(participants.text);
+    final fromPairs = tournamentNamesFromManualPairings(parseTournamentPairings(pairings.text));
+    return mergeTournamentNames([...fromList, ...fromPairs]);
+  }
+
+  List<TournamentDraftMatch> get draftMatches {
+    final manual = parseTournamentPairings(pairings.text);
+    if (format == 'manual' || manual.isNotEmpty) return manual;
+    return previewPairingsForFormat(format, participantNames);
+  }
+
+  bool validateStep(int value) {
+    if (value == 0) return true;
+    if (value == 1) return true;
+    if (value == 2) {
+      if (participantNames.length < 2) {
+        showToast(context, 'Añade al menos 2 participantes/equipos.', danger: true);
+        return false;
+      }
+      return true;
+    }
+    if (value == 3) {
+      if ((format == 'manual' || pairings.text.trim().isNotEmpty) && draftMatches.isEmpty) {
+        showToast(context, 'Escribe emparejamientos tipo: Jornada 1: Equipo Azul vs Equipo Rojo', danger: true);
+        return false;
+      }
+      if (participantNames.length < 2) {
+        showToast(context, 'Añade participantes antes de revisar emparejamientos.', danger: true);
+        return false;
+      }
+      return true;
+    }
+    return true;
+  }
+
+  Future<void> next() async {
+    if (!validateStep(step)) return;
+    if (step < 4) {
+      setState(() => step++);
+    } else {
+      await create();
+    }
+  }
+
   Future<void> create() async {
     final title = name.text.trim().isEmpty ? defaultTournamentName(format) : name.text.trim();
-    final names = parseTournamentParticipantNames(participants.text);
+    final names = participantNames;
+    final matches = draftMatches;
     if (title.length < 2) {
       await showToast(context, 'Pon un nombre a la competición.', danger: true);
       return;
     }
     if (names.length < 2) {
       await showToast(context, 'Añade al menos 2 participantes/equipos.', danger: true);
+      return;
+    }
+    if ((format == 'manual' || pairings.text.trim().isNotEmpty) && matches.isEmpty) {
+      await showToast(context, 'Faltan emparejamientos manuales válidos.', danger: true);
       return;
     }
 
@@ -7447,8 +7580,19 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
       await AppData.addTournamentTeams(tournamentId, names);
       final created = await AppData.tournament(tournamentId);
       final teams = tournamentTeams(created);
-      if (teams.length >= 2) {
+      if (format == 'manual' || pairings.text.trim().isNotEmpty) {
+        await AppData.createManualMatches(tournamentId, teams, matches);
+      } else {
         await AppData.generateMatches(tournamentId, format, teams);
+      }
+      if (addToAgenda) {
+        final agendaMatches = matches.isNotEmpty ? matches : previewPairingsForFormat(format, names);
+        await AppData.createTournamentAgendaEvents(
+          widget.group['id'].toString(),
+          title,
+          agendaMatches,
+          DateTime(firstMatchDate.year, firstMatchDate.month, firstMatchDate.day, firstMatchTime.hour, firstMatchTime.minute),
+        );
       }
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -7459,74 +7603,235 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
     }
   }
 
+  Future<void> pickDate() async {
+    final value = await showDatePicker(
+      context: context,
+      initialDate: firstMatchDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      locale: const Locale('es', 'ES'),
+    );
+    if (value != null) setState(() => firstMatchDate = value);
+  }
+
+  Future<void> pickTime() async {
+    final value = await showTimePicker(context: context, initialTime: firstMatchTime);
+    if (value != null) setState(() => firstMatchTime = value);
+  }
+
   @override
   Widget build(BuildContext context) {
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: 'Crear torneo', subtitle: 'Nombre, formato, puntuación y equipos. Todo en una pantalla.', leading: true),
+      PageHeader(title: 'Crear torneo', subtitle: stepSubtitle(step), leading: true),
+      const SizedBox(height: 10),
+      TournamentStepIndicator(step: step),
       const SizedBox(height: 16),
-      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        FieldLabel('Nombre'),
-        TextField(controller: name, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(hintText: 'Ej. Liga de pádel de los jueves')),
-        const SizedBox(height: 14),
-        FieldLabel('Formato'),
-        const SizedBox(height: 8),
-        TournamentChoiceGrid(
-          value: format,
-          options: const [
-            TournamentChoice('liga', 'Liga', 'Todos contra todos', Icons.table_chart_rounded),
-            TournamentChoice('eliminatoria', 'Copa', 'Pierdes y sales', Icons.account_tree_rounded),
-            TournamentChoice('americano', 'Americano', 'Rotación/ranking', Icons.sync_alt_rounded),
-          ],
-          onChanged: (v) => setState(() => format = v),
-        ),
-        const SizedBox(height: 14),
-        FieldLabel('Participantes'),
-        const SizedBox(height: 8),
-        TournamentChoiceGrid(
-          value: teamType,
-          options: const [
-            TournamentChoice('individual', 'Jugadores', 'Uno contra uno', Icons.person_rounded),
-            TournamentChoice('pareja', 'Parejas', 'Equipo de 2', Icons.people_rounded),
-            TournamentChoice('equipo', 'Equipos', 'Nombres libres', Icons.groups_rounded),
-          ],
-          onChanged: (v) => setState(() => teamType = v),
-        ),
-        const SizedBox(height: 14),
-        FieldLabel('Puntuación'),
-        const SizedBox(height: 8),
-        TournamentChoiceGrid(
-          value: scoringType,
-          options: const [
-            TournamentChoice('general', 'General', '3/1/0', Icons.sports_score_rounded),
-            TournamentChoice('football', 'Fútbol', 'Goles + empate', Icons.sports_soccer_rounded),
-            TournamentChoice('tennis_padel', 'Tenis/Pádel', 'Sets/juegos', Icons.sports_tennis_rounded),
-            TournamentChoice('basketball', 'Basket', 'Puntos', Icons.sports_basketball_rounded),
-            TournamentChoice('cards_mus', 'Cartas/Mus', 'Tantos/rondas', Icons.style_rounded),
-            TournamentChoice('custom', 'Libre', 'Personalizado', Icons.tune_rounded),
-          ],
-          onChanged: (v) => setState(() => scoringType = v),
-        ),
-      ])),
+      if (step == 0) _buildTypeStep()
+      else if (step == 1) _buildScoringStep()
+      else if (step == 2) _buildParticipantsStep()
+      else if (step == 3) _buildPairingsStep()
+      else _buildReviewStep(),
+      const SizedBox(height: 18),
+      Row(children: [
+        if (step > 0) ...[
+          Expanded(child: SecondaryButton(label: 'Volver', icon: Icons.arrow_back_rounded, onTap: () => setState(() => step--))),
+          const SizedBox(width: 10),
+        ],
+        Expanded(child: PrimaryButton(label: step == 4 ? 'Crear torneo' : 'Siguiente', icon: step == 4 ? Icons.emoji_events_rounded : Icons.arrow_forward_rounded, loading: loading, onTap: next)),
+      ]),
+    ]));
+  }
+
+  Widget _buildTypeStep() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      FieldLabel('Elige el tipo de torneo'),
+      const SizedBox(height: 8),
+      TournamentBigChoice(
+        selected: format == 'liga',
+        icon: Icons.emoji_events_rounded,
+        title: 'Liga',
+        body: 'Todos contra todos por jornadas. Ideal para ligas largas.',
+        onTap: () => setState(() => format = 'liga'),
+      ),
+      TournamentBigChoice(
+        selected: format == 'eliminatoria',
+        icon: Icons.account_tree_rounded,
+        title: 'Eliminatoria',
+        body: 'Partidos de eliminación directa. Ideal para copas y playoffs.',
+        onTap: () => setState(() => format = 'eliminatoria'),
+      ),
+      TournamentBigChoice(
+        selected: format == 'americano',
+        icon: Icons.groups_rounded,
+        title: 'Americano',
+        body: 'Todos juegan varias rondas y se mantiene ranking. Ideal para grupos grandes.',
+        onTap: () => setState(() => format = 'americano'),
+      ),
+      TournamentBigChoice(
+        selected: format == 'manual',
+        icon: Icons.tune_rounded,
+        title: 'Manual',
+        badge: 'Recomendado',
+        body: 'Tú decides los emparejamientos. Máximo control para casos reales.',
+        onTap: () => setState(() => format = 'manual'),
+      ),
+    ]);
+  }
+
+  Widget _buildScoringStep() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      FieldLabel('Elige deporte y puntuación'),
+      const SizedBox(height: 8),
+      TournamentChoiceGrid(
+        value: scoringType,
+        options: const [
+          TournamentChoice('football', 'Fútbol', 'Goles · empate', Icons.sports_soccer_rounded),
+          TournamentChoice('tennis_padel', 'Pádel / Tenis', 'Sets y juegos', Icons.sports_tennis_rounded),
+          TournamentChoice('basketball', 'Basket', 'Puntos', Icons.sports_basketball_rounded),
+          TournamentChoice('cards_mus', 'Cartas / Mus', 'Tantos', Icons.style_rounded),
+          TournamentChoice('general', 'Libre', 'Simple 3/1/0', Icons.star_rounded),
+        ],
+        onChanged: (v) => setState(() => scoringType = v),
+      ),
+      const SizedBox(height: 14),
+      AppCard(
+        color: AppColors.redSoft,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.rule_rounded, color: AppColors.red),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Puntuación seleccionada: ${scoringTypeLabel(scoringType)}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+          ]),
+          const SizedBox(height: 8),
+          Text(scoringConfigFullText(scoringType, scoringConfigForType(scoringType)), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            TournamentRuleChip(label: scoringUsesSetMode(scoringType) ? 'Resultado por sets' : 'Marcador simple'),
+            TournamentRuleChip(label: scoringAllowDraw(scoringType) ? 'Permite empate' : 'Sin empate'),
+            TournamentRuleChip(label: 'Victoria ${scoringWinPoints(scoringType)} pts'),
+          ]),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _buildParticipantsStep() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      FieldLabel('Tipo de participantes'),
+      const SizedBox(height: 8),
+      TournamentChoiceGrid(
+        value: teamType,
+        options: const [
+          TournamentChoice('individual', 'Jugadores', 'Uno contra uno', Icons.person_rounded),
+          TournamentChoice('pareja', 'Parejas', 'Ana / Javi', Icons.people_rounded),
+          TournamentChoice('equipo', 'Equipos', 'Nombres libres', Icons.groups_rounded),
+        ],
+        onChanged: (v) => setState(() => teamType = v),
+      ),
       const SizedBox(height: 14),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Expanded(child: FieldLabel('Equipos / jugadores / parejas')),
-          TextButton.icon(onPressed: fillMembers, icon: const Icon(Icons.group_add_rounded, size: 18), label: const Text('Usar miembros')),
+          const Expanded(child: FieldLabel('Añade participantes')),
+          TextButton.icon(onPressed: fillMembers, icon: const Icon(Icons.group_add_rounded, size: 18), label: const Text('Miembros')),
         ]),
         TextField(
           controller: participants,
-          minLines: 7,
+          minLines: 8,
           maxLines: 12,
           textCapitalization: TextCapitalization.words,
+          onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
-            hintText: teamType == 'pareja' ? 'Ana / Javi\nMarta / Luis\nEquipo azul' : 'Equipo azul\nEquipo rojo\nLos invencibles',
-            helperText: 'Un participante por línea. Luego podrás renombrarlos.',
+            hintText: teamType == 'pareja' ? 'Ana / Javi\nMarta / Luis\nPádel Salvaje' : 'Los Invencibles del Viernes\nEquipo Azul\nPádel Salvaje',
+            helperText: 'Un participante por línea. Los nombres largos se mostrarán en dos líneas.',
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text('${participantNames.length} seleccionados', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+      ])),
+    ]);
+  }
+
+  Widget _buildPairingsStep() {
+    final preview = draftMatches.take(12).toList();
+    final auto = format != 'manual' && pairings.text.trim().isEmpty;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      FieldLabel('Emparejamientos · Jornada 1'),
+      const SizedBox(height: 8),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text(auto ? 'Generados automáticamente' : 'Manual activado', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+          TournamentRuleChip(label: '${draftMatches.length} partidos'),
+        ]),
+        const SizedBox(height: 8),
+        Text(auto ? 'Puedes dejarlo así o escribir tus cruces manuales.' : 'Se usarán exactamente los cruces que escribas.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        TextField(
+          controller: pairings,
+          minLines: format == 'manual' ? 7 : 4,
+          maxLines: 10,
+          textCapitalization: TextCapitalization.words,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            hintText: 'Jornada 1: Equipo Azul vs Los Invencibles\nJornada 1: Ana / Javi vs Marta / Luis\nJornada 2: Pádel Salvaje vs Anónimos FC',
+            helperText: 'Formato: Jornada X: Equipo A vs Equipo B',
           ),
         ),
       ])),
-      const SizedBox(height: 16),
-      PrimaryButton(label: 'Crear y generar partidos', icon: Icons.auto_awesome_motion_rounded, loading: loading, onTap: create),
-    ]));
+      const SizedBox(height: 12),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Expanded(child: FieldLabel('Añadir todos los partidos a Agenda')),
+          Switch(value: addToAgenda, activeColor: AppColors.red, onChanged: (v) => setState(() => addToAgenda = v)),
+        ]),
+        if (addToAgenda) ...[
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: SecondaryButton(label: DateFormat('d MMM', 'es_ES').format(firstMatchDate), icon: Icons.calendar_today_rounded, onTap: pickDate)),
+            const SizedBox(width: 10),
+            Expanded(child: SecondaryButton(label: firstMatchTime.format(context), icon: Icons.schedule_rounded, onTap: pickTime)),
+          ]),
+          const SizedBox(height: 8),
+          const Text('Se creará un evento por partido, separados por una hora.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+        ],
+      ])),
+      const SizedBox(height: 14),
+      SectionHeader(title: 'Vista previa'),
+      const SizedBox(height: 8),
+      if (preview.isEmpty)
+        EmptySlim(icon: Icons.sports_score_rounded, title: 'Sin cruces todavía', body: 'Añade participantes o escribe emparejamientos manuales.')
+      else
+        ...preview.map((m) => TournamentDraftMatchTile(match: m)),
+    ]);
+  }
+
+  Widget _buildReviewStep() {
+    final title = name.text.trim().isEmpty ? defaultTournamentName(format) : name.text.trim();
+    final names = participantNames;
+    final matches = draftMatches;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const FieldLabel('Nombre del torneo'),
+        TextField(controller: name, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(hintText: title)),
+      ])),
+      const SizedBox(height: 12),
+      AppCard(
+        color: AppColors.faint,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          TournamentReviewRow(label: 'Formato', value: tournamentFormatLabel(format)),
+          TournamentReviewRow(label: 'Puntuación', value: scoringTypeLabel(scoringType)),
+          TournamentReviewRow(label: 'Participantes', value: '${names.length}'),
+          TournamentReviewRow(label: 'Partidos', value: '${matches.length}'),
+          TournamentReviewRow(label: 'Agenda', value: addToAgenda ? 'Sí · ${DateFormat('d MMM', 'es_ES').format(firstMatchDate)} ${firstMatchTime.format(context)}' : 'No'),
+        ]),
+      ),
+      const SizedBox(height: 12),
+      SectionHeader(title: 'Primeros partidos'),
+      const SizedBox(height: 8),
+      if (matches.isEmpty)
+        EmptySlim(icon: Icons.info_outline_rounded, title: 'Se generarán al crear', body: 'La liga o copa generará cruces con los participantes añadidos.')
+      else
+        ...matches.take(5).map((m) => TournamentDraftMatchTile(match: m)),
+    ]);
   }
 }
 
@@ -7597,7 +7902,41 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
     try {
       await AppData.addTournamentTeams(widget.tournamentId, names);
       await load(soft: true);
-      if (mounted) await showToast(context, 'Participantes añadidos. Regenera partidos si lo necesitas.');
+      if (mounted) await showToast(context, 'Participantes añadidos. Regenera o añade partidos si lo necesitas.');
+    } catch (e) {
+      if (mounted) await showToast(context, humanError(e), danger: true);
+    }
+  }
+
+  Future<void> addManualMatches() async {
+    final t = tournament;
+    if (t == null) return;
+    final controller = TextEditingController();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Añadir partidos manuales'),
+        content: TextField(
+          controller: controller,
+          minLines: 6,
+          maxLines: 10,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(hintText: 'Jornada 2: Equipo Azul vs Equipo Rojo\nJornada 2: Ana / Javi vs Marta / Luis'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Añadir')),
+        ],
+      ),
+    );
+    controller.dispose();
+    final pairs = parseTournamentPairings(value ?? '');
+    if (pairs.isEmpty) return;
+    try {
+      await AppData.addManualMatches(widget.tournamentId, tournamentTeams(t), pairs);
+      await load(soft: true);
+      if (mounted) await showToast(context, 'Partidos añadidos.');
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -7606,6 +7945,11 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
   Future<void> regenerate() async {
     final t = tournament;
     if (t == null) return;
+    final format = AppData.text(t['format'], 'liga');
+    if (format == 'manual') {
+      await addManualMatches();
+      return;
+    }
     final teams = tournamentTeams(t);
     if (teams.length < 2) {
       await showToast(context, 'Añade al menos 2 participantes.', danger: true);
@@ -7623,7 +7967,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
       if (ok != true) return;
     }
     try {
-      await AppData.generateMatches(widget.tournamentId, AppData.text(t['format'], 'liga'), teams);
+      await AppData.generateMatches(widget.tournamentId, format, teams);
       await load(soft: true);
       if (mounted) await showToast(context, 'Calendario generado.');
     } catch (e) {
@@ -7682,7 +8026,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
     final pending = matches.length - played;
 
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: t == null ? 'Competición' : AppData.text(t['name'], 'Competición'), subtitle: t == null ? 'Cargando...' : '${tournamentFormatLabel(format)} · ${teamTypeLabel(AppData.text(t['team_type'], 'equipo'))} · ${scoringTypeLabel(scoringType)}', leading: true),
+      PageHeader(title: t == null ? 'Competición' : AppData.text(t['name'], 'Competición'), subtitle: t == null ? 'Cargando...' : '${tournamentFormatLabel(format)} · ${teamTypeLabel(AppData.text(t['team_type'], 'equipo'))} · Jornada ${currentTournamentRound(matches)}', leading: true),
       const SizedBox(height: 14),
       if (loading && t == null)
         const CenterLoader(label: 'Cargando competición...')
@@ -7691,6 +8035,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
       else ...[
         TournamentDetailHero(
           tournament: t ?? {},
+          leader: standings.isEmpty ? null : standings.first,
           teams: teams.length,
           played: played,
           total: matches.length,
@@ -7709,6 +8054,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
             standings: standings,
             onAddParticipants: addParticipants,
             onGenerate: regenerate,
+            onManualMatches: addManualMatches,
             onNextRound: format == 'eliminatoria' ? nextRound : null,
           )
         else if (tab == 1)
@@ -7721,11 +8067,13 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
           )
         else if (tab == 2)
           TournamentStandingsPanel(standings: standings, scoringType: scoringType, scoringConfig: scoringConfig)
+        else if (tab == 3)
+          TournamentStatsPanel(standings: standings, matches: matches, teams: teams, scoringType: scoringType, scoringConfig: scoringConfig)
         else
           TournamentTeamsPanel(teams: teams, matches: matches, onChanged: () => load(soft: true), onAdd: addParticipants),
         const SizedBox(height: 16),
         AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          SecondaryButton(label: 'Regenerar calendario', icon: Icons.refresh_rounded, onTap: regenerate),
+          SecondaryButton(label: format == 'manual' ? 'Añadir partidos manuales' : 'Regenerar calendario', icon: format == 'manual' ? Icons.add_link_rounded : Icons.refresh_rounded, onTap: regenerate),
           const SizedBox(height: 8),
           if (AppData.text(t?['status'], 'active') == 'finished')
             SecondaryButton(label: 'Reabrir competición', icon: Icons.lock_open_rounded, onTap: () => setStatus('active'))
@@ -7739,111 +8087,68 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
   }
 }
 
-class TournamentManagerHero extends StatelessWidget {
-  final int active;
-  final int played;
-  final int totalMatches;
-  final String nextName;
+class TournamentDashboardMatch {
+  final Map<String, dynamic> tournament;
+  final Map<String, dynamic> match;
+  final String teamA;
+  final String teamB;
+  final bool played;
+  const TournamentDashboardMatch({required this.tournament, required this.match, required this.teamA, required this.teamB, required this.played});
+}
+
+class TournamentDraftMatch {
+  final int round;
+  final String teamAName;
+  final String teamBName;
+  const TournamentDraftMatch({required this.round, required this.teamAName, required this.teamBName});
+}
+
+class TournamentGroupHeader extends StatelessWidget {
+  final String subtitle;
   final VoidCallback onCreate;
-  final VoidCallback? onOpenNext;
-  const TournamentManagerHero({super.key, required this.active, required this.played, required this.totalMatches, required this.nextName, required this.onCreate, this.onOpenNext});
+  const TournamentGroupHeader({super.key, required this.subtitle, required this.onCreate});
 
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      color: AppColors.tealDark,
-      padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(width: 48, height: 48, decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.emoji_events_rounded, color: Colors.white)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Centro de competiciones', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 3),
-            Text(nextName.isEmpty ? 'Crea una liga, copa o torneo americano.' : 'Siguiente: $nextName', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700)),
-          ])),
-          FilledButton.icon(onPressed: onCreate, icon: const Icon(Icons.add_rounded), label: const Text('Crear'), style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.tealDark)),
-        ]),
-        const SizedBox(height: 14),
-        Row(children: [
-          Expanded(child: _TournamentHeroStat(value: '$active', label: 'Activas')),
-          const SizedBox(width: 8),
-          Expanded(child: _TournamentHeroStat(value: totalMatches == 0 ? '0' : '$played/$totalMatches', label: 'Resultados')),
-          const SizedBox(width: 8),
-          Expanded(child: _TournamentHeroStat(value: nextName.isEmpty ? '—' : 'Ver', label: 'Próximo', onTap: onOpenNext)),
-        ]),
-      ]),
-    );
-  }
-}
-
-class _TournamentHeroStat extends StatelessWidget {
-  final String value;
-  final String label;
-  final VoidCallback? onTap;
-  const _TournamentHeroStat({required this.value, required this.label, this.onTap});
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(15),
-    child: Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(.11), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white.withOpacity(.12))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-        const SizedBox(height: 3),
-        Text(label, style: const TextStyle(color: Color(0xCFFFFFFF), fontWeight: FontWeight.w700, fontSize: 11)),
-      ]),
-    ),
-  );
-}
-
-class TournamentMiniAction extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String body;
-  final VoidCallback onTap;
-  const TournamentMiniAction({super.key, required this.icon, required this.title, required this.body, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(20),
-    child: AppCard(
-      padding: const EdgeInsets.all(14),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(icon, color: AppColors.teal),
-        const SizedBox(height: 10),
-        Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 3),
-        Text(body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
-      ]),
-    ),
-  );
-}
-
-class TournamentEmptyState extends StatelessWidget {
-  final VoidCallback onCreate;
-  const TournamentEmptyState({super.key, required this.onCreate});
   @override
   Widget build(BuildContext context) => AppCard(
-    padding: const EdgeInsets.all(18),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Container(width: 54, height: 54, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(18)), child: const Icon(Icons.emoji_events_rounded, color: AppColors.teal)),
-      const SizedBox(height: 12),
-      const Text('Crea tu primera competición', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
-      const SizedBox(height: 5),
-      const Text('Añade equipos, genera el calendario, mete resultados y mira la clasificación sin líos.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
-      const SizedBox(height: 14),
-      PrimaryButton(label: 'Crear competición', icon: Icons.add_rounded, onTap: onCreate),
+    color: AppColors.navyDeep,
+    padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+    child: Row(children: [
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Torneos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 23, letterSpacing: -.5)),
+        const SizedBox(height: 2),
+        Row(children: [
+          Flexible(child: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700))),
+          const SizedBox(width: 4),
+          const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 18),
+        ]),
+      ])),
+      Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white.withOpacity(.10), shape: BoxShape.circle), child: const Icon(Icons.notifications_rounded, color: Colors.white, size: 20)),
+      const SizedBox(width: 8),
+      InkWell(
+        onTap: onCreate,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(width: 44, height: 44, decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle), child: const Icon(Icons.add_rounded, color: Colors.white)),
+      ),
     ]),
   );
 }
 
-class TournamentListCard extends StatelessWidget {
+class TournamentSectionHeader extends StatelessWidget {
+  final String title;
+  final String? action;
+  const TournamentSectionHeader({super.key, required this.title, this.action});
+  @override
+  Widget build(BuildContext context) => Row(children: [
+    Expanded(child: Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 15))),
+    if (action != null) Text(action!, style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w800, fontSize: 12)),
+  ]);
+}
+
+class TournamentActiveCard extends StatelessWidget {
   final Map<String, dynamic> tournament;
   final VoidCallback onTap;
-  const TournamentListCard({super.key, required this.tournament, required this.onTap});
+  final bool compact;
+  const TournamentActiveCard({super.key, required this.tournament, required this.onTap, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
@@ -7851,27 +8156,159 @@ class TournamentListCard extends StatelessWidget {
     final matches = tournamentMatches(tournament);
     final played = matches.where((m) => AppData.text(m['status']) == 'played').length;
     final status = AppData.text(tournament['status'], 'active');
+    final progress = matches.isEmpty ? 0.0 : (played / matches.length).clamp(0.0, 1.0);
+    final scoring = AppData.text(tournament['scoring_type'], 'general');
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
+      child: AppCard(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: AppCard(
-          padding: const EdgeInsets.all(14),
-          child: Row(children: [
-            Container(width: 46, height: 46, decoration: BoxDecoration(color: status == 'finished' ? AppColors.faint : AppColors.tealSoft, borderRadius: BorderRadius.circular(15)), child: Icon(status == 'finished' ? Icons.verified_rounded : Icons.emoji_events_rounded, color: status == 'finished' ? AppColors.muted : AppColors.teal)),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(AppData.text(tournament['name'], 'Competición'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 4),
-              Text('${tournamentFormatLabel(AppData.text(tournament['format'], 'liga'))} · ${teams.length} participantes · $played/${matches.length} resultados', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
-            ])),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
-          ]),
-        ),
+        padding: const EdgeInsets.all(12),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          TournamentIconBadge(scoringType: scoring, finished: status == 'finished'),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AppData.text(tournament['name'], 'Competición'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05)),
+            const SizedBox(height: 5),
+            Row(children: [
+              Container(width: 6, height: 6, decoration: BoxDecoration(color: status == 'finished' ? AppColors.muted : AppColors.green, shape: BoxShape.circle)),
+              const SizedBox(width: 5),
+              Expanded(child: Text(status == 'finished' ? 'Finalizado' : 'En curso', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w800, fontSize: 12))),
+              Text('Jornada ${currentTournamentRound(matches)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11)),
+            ]),
+            if (!compact) ...[
+              const SizedBox(height: 8),
+              ClipRRect(borderRadius: BorderRadius.circular(999), child: LinearProgressIndicator(value: progress, minHeight: 4, color: AppColors.green, backgroundColor: AppColors.lineSoft)),
+            ],
+          ])),
+          const SizedBox(width: 8),
+          Text('${teams.length}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12)),
+        ]),
       ),
     );
   }
+}
+
+class TournamentDashboardMatchCard extends StatelessWidget {
+  final TournamentDashboardMatch item;
+  final VoidCallback onTap;
+  const TournamentDashboardMatchCard({super.key, required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final score = item.played ? '${AppData.intValue(item.match['score_a'])} - ${AppData.intValue(item.match['score_b'])}' : 'Pendiente';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        child: Row(children: [
+          SizedBox(width: 44, child: Text('J${AppData.intValue(item.match['round'], 1)}', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w900, fontSize: 12))),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AppData.text(item.tournament['name'], 'Torneo'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11)),
+            const SizedBox(height: 2),
+            Text('${item.teamA}  vs  ${item.teamB}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05)),
+          ])),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+            decoration: BoxDecoration(color: item.played ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(999)),
+            child: Text(score, style: TextStyle(color: item.played ? AppColors.green : AppColors.orange, fontWeight: FontWeight.w900, fontSize: 11)),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        ]),
+      ),
+    );
+  }
+}
+
+class TournamentIconBadge extends StatelessWidget {
+  final String scoringType;
+  final bool finished;
+  const TournamentIconBadge({super.key, required this.scoringType, this.finished = false});
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (scoringType) {
+      'football' => Icons.sports_soccer_rounded,
+      'tennis_padel' => Icons.sports_tennis_rounded,
+      'basketball' => Icons.sports_basketball_rounded,
+      'cards_mus' => Icons.style_rounded,
+      _ => Icons.emoji_events_rounded,
+    };
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(color: finished ? AppColors.faint : AppColors.navyDeep, borderRadius: BorderRadius.circular(15)),
+      child: Icon(icon, color: finished ? AppColors.muted : Colors.white, size: 24),
+    );
+  }
+}
+
+class TournamentEmptyState extends StatelessWidget {
+  final VoidCallback onCreate;
+  const TournamentEmptyState({super.key, required this.onCreate});
+  @override
+  Widget build(BuildContext context) => AppCard(
+    padding: const EdgeInsets.all(16),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(width: 54, height: 54, decoration: BoxDecoration(color: AppColors.redSoft, borderRadius: BorderRadius.circular(18)), child: const Icon(Icons.emoji_events_rounded, color: AppColors.red)),
+      const SizedBox(height: 12),
+      const Text('Crea tu primer torneo', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
+      const SizedBox(height: 5),
+      const Text('Liga, eliminatoria, americano o manual. Con partidos, tabla y estadísticas.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+      const SizedBox(height: 14),
+      PrimaryButton(label: 'Crear torneo', icon: Icons.add_rounded, onTap: onCreate),
+    ]),
+  );
+}
+
+class TournamentStepIndicator extends StatelessWidget {
+  final int step;
+  const TournamentStepIndicator({super.key, required this.step});
+  @override
+  Widget build(BuildContext context) => Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(5, (index) {
+    final selected = index == step;
+    final done = index < step;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 5),
+      width: selected ? 27 : 22,
+      height: selected ? 27 : 22,
+      decoration: BoxDecoration(color: selected || done ? AppColors.red : AppColors.faint, shape: BoxShape.circle, border: Border.all(color: selected || done ? AppColors.red : AppColors.line)),
+      child: Center(child: Text('${index + 1}', style: TextStyle(color: selected || done ? Colors.white : AppColors.muted, fontSize: 11, fontWeight: FontWeight.w900))),
+    );
+  }));
+}
+
+class TournamentBigChoice extends StatelessWidget {
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String body;
+  final String? badge;
+  final VoidCallback onTap;
+  const TournamentBigChoice({super.key, required this.selected, required this.icon, required this.title, required this.body, this.badge, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: AppCard(
+      onTap: onTap,
+      color: selected ? AppColors.redSoft : AppColors.white,
+      padding: const EdgeInsets.all(13),
+      child: Row(children: [
+        Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.red, borderRadius: BorderRadius.circular(15)), child: Icon(icon, color: Colors.white)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 16))),
+            if (badge != null) Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: AppColors.red, borderRadius: BorderRadius.circular(999)), child: Text(badge!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 9))),
+          ]),
+          const SizedBox(height: 3),
+          Text(body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12, height: 1.25)),
+        ])),
+        const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+      ]),
+    ),
+  );
 }
 
 class TournamentChoice {
@@ -7896,21 +8333,22 @@ class TournamentChoiceGrid extends StatelessWidget {
       final selected = option.value == value;
       return InkWell(
         onTap: () => onChanged(option.value),
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          width: 148,
-          padding: const EdgeInsets.all(12),
+          width: 102,
+          minHeight: 90,
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: selected ? AppColors.tealSoft : AppColors.surface,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: selected ? AppColors.teal : AppColors.line),
+            color: selected ? AppColors.redSoft : AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: selected ? AppColors.red : AppColors.line),
           ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(option.icon, color: selected ? AppColors.teal : AppColors.muted, size: 20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Icon(option.icon, color: selected ? AppColors.red : AppColors.muted, size: 24),
             const SizedBox(height: 7),
-            Text(option.title, style: TextStyle(color: selected ? AppColors.tealDark : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 13)),
+            Text(option.title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: selected ? AppColors.red : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12)),
             const SizedBox(height: 2),
-            Text(option.body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11)),
+            Text(option.body, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 10)),
           ]),
         ),
       );
@@ -7918,32 +8356,81 @@ class TournamentChoiceGrid extends StatelessWidget {
   );
 }
 
+class TournamentRuleChip extends StatelessWidget {
+  final String label;
+  const TournamentRuleChip({super.key, required this.label});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+    decoration: BoxDecoration(color: Colors.white.withOpacity(.75), borderRadius: BorderRadius.circular(999), border: Border.all(color: AppColors.lineSoft)),
+    child: Text(label, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 11)),
+  );
+}
+
+class TournamentDraftMatchTile extends StatelessWidget {
+  final TournamentDraftMatch match;
+  const TournamentDraftMatchTile({super.key, required this.match});
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 7),
+    child: AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(children: [
+        SizedBox(width: 32, child: Text('${match.round}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900))),
+        Expanded(child: Text(match.teamAName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05))),
+        const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('vs', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 11))),
+        Expanded(child: Text(match.teamBName, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05))),
+      ]),
+    ),
+  );
+}
+
+class TournamentReviewRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const TournamentReviewRow({super.key, required this.label, required this.value});
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 7),
+    child: Row(children: [
+      Expanded(child: Text(label, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800))),
+      Flexible(child: Text(value, textAlign: TextAlign.end, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+    ]),
+  );
+}
+
 class TournamentDetailHero extends StatelessWidget {
   final Map<String, dynamic> tournament;
+  final TeamStanding? leader;
   final int teams;
   final int played;
   final int total;
   final int pending;
   final VoidCallback onAdd;
   final VoidCallback onGenerate;
-  const TournamentDetailHero({super.key, required this.tournament, required this.teams, required this.played, required this.total, required this.pending, required this.onAdd, required this.onGenerate});
+  const TournamentDetailHero({super.key, required this.tournament, required this.leader, required this.teams, required this.played, required this.total, required this.pending, required this.onAdd, required this.onGenerate});
 
   @override
   Widget build(BuildContext context) {
     final progress = total <= 0 ? 0.0 : (played / total).clamp(0.0, 1.0);
+    final scoringType = AppData.text(tournament['scoring_type'], 'general');
     return AppCard(
-      color: AppColors.tealDark,
+      color: AppColors.navyDeep,
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(width: 46, height: 46, decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.emoji_events_rounded, color: Colors.white)),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          TournamentIconBadge(scoringType: scoringType),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(AppData.text(tournament['status'], 'active') == 'finished' ? 'Finalizada' : 'En curso', style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800, fontSize: 12)),
-            const SizedBox(height: 2),
-            Text(total == 0 ? 'Genera los partidos para empezar.' : '$played de $total resultados registrados', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+            Row(children: [
+              Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle)),
+              const SizedBox(width: 6),
+              Text(AppData.text(tournament['status'], 'active') == 'finished' ? 'Finalizada' : 'En curso', style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800, fontSize: 12)),
+            ]),
+            const SizedBox(height: 4),
+            Text(total == 0 ? 'Genera los partidos para empezar.' : '$played de $total resultados registrados', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
           ])),
-          FilledButton.icon(onPressed: total == 0 ? onGenerate : onAdd, icon: Icon(total == 0 ? Icons.auto_awesome_motion_rounded : Icons.group_add_rounded), label: Text(total == 0 ? 'Generar' : 'Añadir'), style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.tealDark)),
+          FilledButton.icon(onPressed: total == 0 ? onGenerate : onAdd, icon: Icon(total == 0 ? Icons.auto_awesome_motion_rounded : Icons.group_add_rounded, size: 18), label: Text(total == 0 ? 'Generar' : 'Añadir'), style: FilledButton.styleFrom(backgroundColor: AppColors.red, foregroundColor: Colors.white)),
         ]),
         const SizedBox(height: 14),
         ClipRRect(
@@ -7952,15 +8439,31 @@ class TournamentDetailHero extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: _TournamentHeroStat(value: '$teams', label: 'Participantes')),
+          Expanded(child: TournamentHeroStat(value: '$teams', label: 'Equipos')),
           const SizedBox(width: 8),
-          Expanded(child: _TournamentHeroStat(value: '$pending', label: 'Pendientes')),
+          Expanded(child: TournamentHeroStat(value: '$pending', label: 'Pendientes')),
           const SizedBox(width: 8),
-          Expanded(child: _TournamentHeroStat(value: scoringTypeLabel(AppData.text(tournament['scoring_type'], 'general')), label: 'Sistema')),
+          Expanded(child: TournamentHeroStat(value: leader?.points.toString() ?? '0', label: leader == null ? 'Puntos líder' : leader!.name)),
         ]),
       ]),
     );
   }
+}
+
+class TournamentHeroStat extends StatelessWidget {
+  final String value;
+  final String label;
+  const TournamentHeroStat({super.key, required this.value, required this.label});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(color: Colors.white.withOpacity(.10), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withOpacity(.10))),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+      const SizedBox(height: 2),
+      Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xCFFFFFFF), fontWeight: FontWeight.w800, fontSize: 10.5)),
+    ]),
+  );
 }
 
 class TournamentTabsBar extends StatelessWidget {
@@ -7973,11 +8476,12 @@ class TournamentTabsBar extends StatelessWidget {
       ('Resumen', Icons.dashboard_rounded),
       ('Partidos', Icons.sports_score_rounded),
       ('Tabla', Icons.table_chart_rounded),
+      ('Stats', Icons.query_stats_rounded),
       ('Equipos', Icons.groups_rounded),
     ];
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.line)),
+      decoration: BoxDecoration(color: AppColors.navyDeep, borderRadius: BorderRadius.circular(16)),
       child: Row(children: List.generate(items.length, (i) {
         final selected = i == index;
         return Expanded(
@@ -7985,13 +8489,9 @@ class TournamentTabsBar extends StatelessWidget {
             borderRadius: BorderRadius.circular(13),
             onTap: () => onChanged(i),
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(color: selected ? Colors.white : Colors.transparent, borderRadius: BorderRadius.circular(13)),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Icon(items[i].$2, size: 17, color: selected ? AppColors.teal : AppColors.muted),
-                const SizedBox(height: 3),
-                Text(items[i].$1, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: selected ? AppColors.ink : AppColors.muted)),
-              ]),
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              decoration: BoxDecoration(color: selected ? AppColors.red : Colors.transparent, borderRadius: BorderRadius.circular(13)),
+              child: Text(items[i].$1, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: selected ? Colors.white : const Color(0xCFFFFFFF))),
             ),
           ),
         );
@@ -8007,12 +8507,16 @@ class TournamentOverviewPanel extends StatelessWidget {
   final List<TeamStanding> standings;
   final VoidCallback onAddParticipants;
   final VoidCallback onGenerate;
+  final VoidCallback onManualMatches;
   final VoidCallback? onNextRound;
-  const TournamentOverviewPanel({super.key, required this.tournament, required this.teams, required this.matches, required this.standings, required this.onAddParticipants, required this.onGenerate, this.onNextRound});
+  const TournamentOverviewPanel({super.key, required this.tournament, required this.teams, required this.matches, required this.standings, required this.onAddParticipants, required this.onGenerate, required this.onManualMatches, this.onNextRound});
 
   @override
   Widget build(BuildContext context) {
-    final pending = matches.where((m) => AppData.text(m['status']) != 'played').take(4).toList();
+    final pendingAll = matches.where((m) => AppData.text(m['status']) != 'played').toList();
+    final pending = pendingAll.take(4).toList();
+    final names = teamNameMap(teams);
+    final format = AppData.text(tournament['format'], 'liga');
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (teams.length < 2)
         EmptySlim(icon: Icons.group_add_rounded, title: 'Añade participantes', body: 'Necesitas al menos dos equipos, parejas o jugadores.')
@@ -8020,25 +8524,43 @@ class TournamentOverviewPanel extends StatelessWidget {
         AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Calendario pendiente', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
           const SizedBox(height: 6),
-          const Text('Genera todos los partidos automáticamente según el formato elegido.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+          Text(format == 'manual' ? 'Añade los emparejamientos manuales para empezar.' : 'Genera todos los partidos automáticamente según el formato elegido.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
-          PrimaryButton(label: 'Generar partidos', icon: Icons.auto_awesome_motion_rounded, onTap: onGenerate),
+          PrimaryButton(label: format == 'manual' ? 'Añadir partidos' : 'Generar partidos', icon: format == 'manual' ? Icons.add_link_rounded : Icons.auto_awesome_motion_rounded, onTap: format == 'manual' ? onManualMatches : onGenerate),
         ]))
       else ...[
-        SectionHeader(title: 'Próximos partidos'),
+        SectionHeader(title: 'Próximo partido'),
         const SizedBox(height: 8),
         if (pending.isEmpty)
           EmptySlim(icon: Icons.verified_rounded, title: 'Todo jugado', body: onNextRound == null ? 'Puedes marcar la competición como finalizada.' : 'Puedes generar la siguiente ronda.')
         else
-          ...pending.map((m) => TournamentSimpleMatchCard(match: m, teams: teams, onChanged: () {})),
+          ...pending.map((m) => TournamentSimpleMatchCard(match: m, teams: teams, scoringType: AppData.text(tournament['scoring_type'], 'general'), scoringConfig: tournament['scoring_config'], onChanged: () {})),
         if (onNextRound != null) ...[
           const SizedBox(height: 10),
           SecondaryButton(label: 'Generar siguiente ronda', icon: Icons.account_tree_rounded, onTap: onNextRound!),
         ],
         const SizedBox(height: 16),
-        SectionHeader(title: 'Top clasificación'),
+        SectionHeader(title: 'Último resultado'),
         const SizedBox(height: 8),
-        if (standings.isEmpty) EmptySlim(icon: Icons.table_chart_rounded, title: 'Sin clasificación', body: 'Registra resultados para calcular la tabla.') else ...standings.take(3).map((s) => TournamentStandingTile(standing: s, scoringType: AppData.text(tournament['scoring_type'], 'general'), scoringConfig: tournament['scoring_config'])),
+        if (matches.where((m) => AppData.text(m['status']) == 'played').isEmpty)
+          EmptySlim(icon: Icons.sports_score_rounded, title: 'Sin resultados', body: 'Toca un partido para meter marcador.')
+        else
+          TournamentLatestResultCard(match: matches.where((m) => AppData.text(m['status']) == 'played').last, names: names, scoringType: AppData.text(tournament['scoring_type'], 'general'), scoringConfig: tournament['scoring_config']),
+        const SizedBox(height: 16),
+        Row(children: [
+          Expanded(child: StatCard(icon: Icons.sports_score_rounded, value: '${matches.length}', label: 'Partidos', color: AppColors.red)),
+          const SizedBox(width: 8),
+          Expanded(child: StatCard(icon: Icons.done_all_rounded, value: '${matches.length - pendingAll.length}', label: 'Jugados', color: AppColors.green)),
+          const SizedBox(width: 8),
+          Expanded(child: StatCard(icon: Icons.percent_rounded, value: matches.isEmpty ? '0%' : '${(((matches.length - pendingAll.length) / matches.length) * 100).round()}%', label: 'Progreso', color: AppColors.blue)),
+        ]),
+        const SizedBox(height: 16),
+        SectionHeader(title: 'Líder actual'),
+        const SizedBox(height: 8),
+        if (standings.isEmpty)
+          EmptySlim(icon: Icons.table_chart_rounded, title: 'Sin clasificación', body: 'Registra resultados para calcular la tabla.')
+        else
+          TournamentStandingTile(standing: standings.first, scoringType: AppData.text(tournament['scoring_type'], 'general'), scoringConfig: tournament['scoring_config'], highlighted: true),
       ],
     ]);
   }
@@ -8062,14 +8584,36 @@ class TournamentMatchesPanel extends StatelessWidget {
     }
     final rounds = grouped.keys.toList()..sort();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      AppCard(
+        padding: const EdgeInsets.all(8),
+        child: Row(children: const [
+          Expanded(child: TournamentSmallFilter(label: 'Todos', selected: true)),
+          Expanded(child: TournamentSmallFilter(label: 'Pendientes')),
+          Expanded(child: TournamentSmallFilter(label: 'Jugados')),
+        ]),
+      ),
+      const SizedBox(height: 12),
       for (final round in rounds) ...[
-        SectionHeader(title: 'Jornada/Ronda $round'),
+        SectionHeader(title: 'Jornada $round'),
         const SizedBox(height: 8),
         ...grouped[round]!.map((m) => TournamentSimpleMatchCard(match: m, teams: teams, scoringType: scoringType, scoringConfig: scoringConfig, onChanged: onChanged)),
         const SizedBox(height: 12),
       ],
     ]);
   }
+}
+
+class TournamentSmallFilter extends StatelessWidget {
+  final String label;
+  final bool selected;
+  const TournamentSmallFilter({super.key, required this.label, this.selected = false});
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.symmetric(horizontal: 3),
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    decoration: BoxDecoration(color: selected ? AppColors.red : Colors.transparent, borderRadius: BorderRadius.circular(999)),
+    child: Text(label, textAlign: TextAlign.center, style: TextStyle(color: selected ? Colors.white : AppColors.muted, fontWeight: FontWeight.w900, fontSize: 11)),
+  );
 }
 
 class TournamentSimpleMatchCard extends StatelessWidget {
@@ -8088,34 +8632,52 @@ class TournamentSimpleMatchCard extends StatelessWidget {
     final aName = names[aId] ?? 'Pendiente';
     final bName = bId.isEmpty || bId == 'null' ? 'Pase directo' : names[bId] ?? 'Pendiente';
     final played = AppData.text(match['status']) == 'played';
+    final detailScore = matchDetailScoreText(match, scoringType, scoringConfig);
     final score = played ? '${AppData.intValue(match['score_a'])} - ${AppData.intValue(match['score_b'])}' : 'Pendiente';
-    final details = AppData.asMap(match['result_details']);
-    final detailText = AppData.text(details['note']);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: bId.isEmpty || bId == 'null' ? null : () => showTournamentResultDialog(context, match: match, teams: teams, scoringType: scoringType, scoringConfig: scoringConfig, onChanged: onChanged),
-        child: AppCard(
-          padding: const EdgeInsets.all(13),
-          child: Row(children: [
-            Container(width: 38, height: 38, decoration: BoxDecoration(color: played ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(13)), child: Icon(played ? Icons.check_rounded : Icons.edit_rounded, color: played ? AppColors.green : AppColors.orange)),
-            const SizedBox(width: 11),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(aName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 2),
-              Text('vs $bName', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
-              if (detailText.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(detailText, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w700, fontSize: 11)),
-              ],
-            ])),
-            const SizedBox(width: 10),
-            Text(score, style: TextStyle(color: played ? AppColors.green : AppColors.muted, fontWeight: FontWeight.w900)),
-          ]),
-        ),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: AppCard(
+        onTap: () => showMatchResultDialog(context, match: match, teams: teams, scoringType: scoringType, scoringConfig: scoringConfig, onChanged: onChanged),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        child: Row(children: [
+          SizedBox(width: 40, child: Text('${AppData.intValue(match['round'], 1)}', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900))),
+          Expanded(child: Text(aName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05))),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Column(children: [
+            Text(score, style: TextStyle(color: played ? AppColors.green : AppColors.orange, fontWeight: FontWeight.w900, fontSize: 12)),
+            if (detailScore != null) Text(detailScore, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 9)),
+          ])),
+          Expanded(child: Text(bName, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05))),
+          const SizedBox(width: 4),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        ]),
       ),
     );
+  }
+}
+
+class TournamentLatestResultCard extends StatelessWidget {
+  final Map<String, dynamic> match;
+  final Map<String, String> names;
+  final String scoringType;
+  final dynamic scoringConfig;
+  const TournamentLatestResultCard({super.key, required this.match, required this.names, required this.scoringType, this.scoringConfig});
+
+  @override
+  Widget build(BuildContext context) {
+    final aName = names[AppData.text(match['team_a'])] ?? 'Pendiente';
+    final bName = names[AppData.text(match['team_b'])] ?? 'Pendiente';
+    final details = matchDetailScoreText(match, scoringType, scoringConfig);
+    return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(child: Text(aName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+        Text('${AppData.intValue(match['score_a'])} - ${AppData.intValue(match['score_b'])}', style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900, fontSize: 16)),
+        Expanded(child: Text(bName, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+      ]),
+      if (details != null) ...[
+        const SizedBox(height: 5),
+        Text(details, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
+      ],
+    ]));
   }
 }
 
@@ -8127,48 +8689,133 @@ class TournamentStandingsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (standings.isEmpty) return EmptySlim(icon: Icons.table_chart_rounded, title: 'Sin clasificación', body: 'Añade participantes y registra resultados.');
+    if (standings.isEmpty) return EmptySlim(icon: Icons.table_chart_rounded, title: 'Sin tabla todavía', body: 'Registra resultados para calcular la clasificación.');
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       AppCard(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        color: AppColors.surface,
-        child: const Row(children: [
-          SizedBox(width: 28, child: Text('#', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12))),
-          Expanded(child: Text('Equipo', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12))),
-          SizedBox(width: 34, child: Text('PJ', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12))),
-          SizedBox(width: 42, child: Text('DIF', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12))),
-          SizedBox(width: 42, child: Text('PTS', textAlign: TextAlign.right, style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12))),
-        ]),
+        padding: const EdgeInsets.all(10),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columnSpacing: 14,
+            horizontalMargin: 6,
+            headingTextStyle: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 11),
+            dataTextStyle: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, fontSize: 12),
+            columns: const [
+              DataColumn(label: Text('#')),
+              DataColumn(label: Text('Equipo')),
+              DataColumn(label: Text('PJ')),
+              DataColumn(label: Text('G')),
+              DataColumn(label: Text('E')),
+              DataColumn(label: Text('P')),
+              DataColumn(label: Text('+')),
+              DataColumn(label: Text('-')),
+              DataColumn(label: Text('PTS')),
+            ],
+            rows: List.generate(standings.length, (index) {
+              final s = standings[index];
+              return DataRow(cells: [
+                DataCell(Text('${index + 1}')),
+                DataCell(SizedBox(width: 130, child: Text(s.name, maxLines: 2, overflow: TextOverflow.ellipsis))),
+                DataCell(Text('${s.played}')),
+                DataCell(Text('${s.wins}')),
+                DataCell(Text('${s.draws}')),
+                DataCell(Text('${s.losses}')),
+                DataCell(Text('${s.goalsFor}')),
+                DataCell(Text('${s.goalsAgainst}')),
+                DataCell(Text('${s.points}', style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900))),
+              ]);
+            }),
+          ),
+        ),
       ),
-      const SizedBox(height: 8),
-      ...standings.asMap().entries.map((e) => TournamentStandingTile(position: e.key + 1, standing: e.value, scoringType: scoringType, scoringConfig: scoringConfig)),
+      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(child: TournamentMetricCard(title: 'Más victorias', value: standings.first.name, detail: '${standings.first.wins} victorias', icon: Icons.emoji_events_rounded, color: AppColors.orange)),
+        const SizedBox(width: 8),
+        Expanded(child: TournamentMetricCard(title: 'Mejor diferencia', value: bestGoalDifference(standings).name, detail: '${bestGoalDifference(standings).goalDifference}', icon: Icons.trending_up_rounded, color: AppColors.green)),
+      ]),
     ]);
   }
 }
 
 class TournamentStandingTile extends StatelessWidget {
-  final int? position;
   final TeamStanding standing;
   final String scoringType;
   final dynamic scoringConfig;
-  const TournamentStandingTile({super.key, this.position, required this.standing, required this.scoringType, this.scoringConfig});
+  final bool highlighted;
+  const TournamentStandingTile({super.key, required this.standing, required this.scoringType, this.scoringConfig, this.highlighted = false});
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      child: Row(children: [
-        SizedBox(width: 28, child: Text(position == null ? '•' : '$position', style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900))),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(standing.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-          Text(standingDetailText(standing, scoringType, scoringConfig), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11)),
-        ])),
-        SizedBox(width: 34, child: Text('${standing.played}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900))),
-        SizedBox(width: 42, child: Text('${standing.goalDifference}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900))),
-        SizedBox(width: 42, child: Text('${standing.points}', textAlign: TextAlign.right, style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900))),
+  Widget build(BuildContext context) => AppCard(
+    color: highlighted ? AppColors.orangeSoft : AppColors.white,
+    padding: const EdgeInsets.all(12),
+    child: Row(children: [
+      Container(width: 40, height: 40, decoration: BoxDecoration(color: highlighted ? AppColors.orange : AppColors.tealSoft, borderRadius: BorderRadius.circular(14)), child: Icon(highlighted ? Icons.emoji_events_rounded : Icons.groups_rounded, color: highlighted ? Colors.white : AppColors.teal)),
+      const SizedBox(width: 10),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(standing.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05)),
+        const SizedBox(height: 4),
+        Text(standingDetailText(standing, scoringType, scoringConfig), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+      ])),
+      Text('${standing.points} pts', style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900, fontSize: 16)),
+    ]),
+  );
+}
+
+class TournamentStatsPanel extends StatelessWidget {
+  final List<TeamStanding> standings;
+  final List<Map<String, dynamic>> matches;
+  final List<Map<String, dynamic>> teams;
+  final String scoringType;
+  final Map<String, dynamic> scoringConfig;
+  const TournamentStatsPanel({super.key, required this.standings, required this.matches, required this.teams, required this.scoringType, required this.scoringConfig});
+
+  @override
+  Widget build(BuildContext context) {
+    final pending = matches.where((m) => AppData.text(m['status']) != 'played').length;
+    if (standings.isEmpty) return EmptySlim(icon: Icons.query_stats_rounded, title: 'Sin estadísticas todavía', body: 'Añade resultados para ver líderes y métricas.');
+    final leader = standings.first;
+    final wins = bestWins(standings);
+    final diff = bestGoalDifference(standings);
+    final pointsFor = bestGoalsFor(standings);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(child: TournamentMetricCard(title: 'Líder', value: leader.name, detail: '${leader.points} pts', icon: Icons.emoji_events_rounded, color: AppColors.orange)),
+        const SizedBox(width: 8),
+        Expanded(child: TournamentMetricCard(title: 'Más victorias', value: wins.name, detail: '${wins.wins}', icon: Icons.done_all_rounded, color: AppColors.green)),
       ]),
-    ),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(child: TournamentMetricCard(title: 'Mejor diferencia', value: diff.name, detail: '${diff.goalDifference}', icon: Icons.trending_up_rounded, color: AppColors.blue)),
+        const SizedBox(width: 8),
+        Expanded(child: TournamentMetricCard(title: 'Más a favor', value: pointsFor.name, detail: '${pointsFor.goalsFor}', icon: Icons.add_chart_rounded, color: AppColors.violet)),
+      ]),
+      const SizedBox(height: 8),
+      TournamentMetricCard(title: 'Pendientes', value: '$pending partidos', detail: pending == 0 ? 'Todo cerrado' : 'Aún quedan resultados', icon: Icons.pending_actions_rounded, color: AppColors.red),
+    ]);
+  }
+}
+
+class TournamentMetricCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final String detail;
+  final IconData icon;
+  final Color color;
+  const TournamentMetricCard({super.key, required this.title, required this.value, required this.detail, required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    padding: const EdgeInsets.all(12),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(icon, color: color),
+      const SizedBox(height: 10),
+      Text(title, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11)),
+      const SizedBox(height: 4),
+      Text(value, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05)),
+      const SizedBox(height: 4),
+      Text(detail, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12)),
+    ]),
   );
 }
 
@@ -8181,98 +8828,134 @@ class TournamentTeamsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (teams.isEmpty) return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Sin participantes', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-      const SizedBox(height: 8),
-      const Text('Añade jugadores, parejas o equipos para poder crear partidos.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
-      const SizedBox(height: 12),
-      PrimaryButton(label: 'Añadir participantes', icon: Icons.group_add_rounded, onTap: onAdd),
-    ]));
+    if (teams.isEmpty) return EmptySlim(icon: Icons.groups_rounded, title: 'Sin participantes', body: 'Añade equipos, parejas o jugadores.');
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SectionHeader(title: 'Participantes', action: 'Añadir', onTap: onAdd),
-      const SizedBox(height: 8),
-      ...teams.map((team) => TournamentTeamTile(team: team, matches: matches, onChanged: onChanged)),
+      SecondaryButton(label: 'Añadir participante', icon: Icons.group_add_rounded, onTap: onAdd),
+      const SizedBox(height: 12),
+      ...teams.map((team) => TournamentTeamCard(team: team, matches: matches, onChanged: onChanged)),
     ]);
   }
 }
 
-class TournamentTeamTile extends StatelessWidget {
+class TournamentTeamCard extends StatelessWidget {
   final Map<String, dynamic> team;
   final List<Map<String, dynamic>> matches;
   final VoidCallback onChanged;
-  const TournamentTeamTile({super.key, required this.team, required this.matches, required this.onChanged});
+  const TournamentTeamCard({super.key, required this.team, required this.matches, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    final teamId = team['id'].toString();
-    final used = matches.any((m) => AppData.text(m['team_a']) == teamId || AppData.text(m['team_b']) == teamId);
+    final id = team['id'].toString();
+    final played = matches.where((m) => AppData.text(m['status']) == 'played' && (AppData.text(m['team_a']) == id || AppData.text(m['team_b']) == id)).length;
+    final scheduled = matches.where((m) => AppData.text(m['team_a']) == id || AppData.text(m['team_b']) == id).length;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
         padding: const EdgeInsets.all(12),
         child: Row(children: [
-          Container(width: 38, height: 38, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.groups_rounded, color: AppColors.teal)),
-          const SizedBox(width: 11),
-          Expanded(child: Text(AppData.text(team['name'], 'Participante'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
-          IconButton(icon: const Icon(Icons.edit_rounded, color: AppColors.teal), onPressed: () => renameTournamentTeamDialog(context, team: team, onChanged: onChanged)),
-          IconButton(icon: Icon(Icons.delete_outline_rounded, color: used ? AppColors.muted : AppColors.red), onPressed: used ? null : () => deleteTournamentTeamDialog(context, team: team, onChanged: onChanged)),
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: AppColors.redSoft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.groups_rounded, color: AppColors.red, size: 20)),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AppData.text(team['name'], 'Participante'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05)),
+            const SizedBox(height: 3),
+            Text('$played/$scheduled partidos jugados', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+          ])),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'rename') renameTournamentTeamDialog(context, team: team, onChanged: onChanged);
+              if (value == 'delete') deleteTournamentTeamDialog(context, team: team, onChanged: onChanged);
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'rename', child: Text('Renombrar')),
+              PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+            ],
+          ),
         ]),
       ),
     );
   }
 }
 
-Future<void> showTournamentResultDialog(BuildContext context, {required Map<String, dynamic> match, required List<Map<String, dynamic>> teams, required String scoringType, Map<String, dynamic>? scoringConfig, required VoidCallback onChanged}) async {
+Future<void> showMatchResultDialog(BuildContext context, {required Map<String, dynamic> match, required List<Map<String, dynamic>> teams, required String scoringType, Map<String, dynamic>? scoringConfig, required VoidCallback onChanged}) async {
   final names = teamNameMap(teams);
-  final aName = names[AppData.text(match['team_a'])] ?? 'Equipo A';
-  final bName = names[AppData.text(match['team_b'])] ?? 'Equipo B';
-  final scoreA = TextEditingController(text: match['score_a'] == null ? '' : AppData.intValue(match['score_a']).toString());
-  final scoreB = TextEditingController(text: match['score_b'] == null ? '' : AppData.intValue(match['score_b']).toString());
-  final details = AppData.asMap(match['result_details']);
-  final note = TextEditingController(text: AppData.text(details['note']));
-  final saved = await showDialog<bool>(
+  final aName = names[AppData.text(match['team_a'])] ?? 'Local';
+  final bName = names[AppData.text(match['team_b'])] ?? 'Visitante';
+  final setMode = scoringUsesSetMode(scoringType, scoringConfig);
+  final aController = TextEditingController(text: AppData.text(match['score_a']));
+  final bController = TextEditingController(text: AppData.text(match['score_b']));
+  final setsController = TextEditingController(text: matchDetailSets(match).map((set) => '${set['a']}-${set['b']}').join('\n'));
+  final played = AppData.text(match['status']) == 'played';
+  final result = await showDialog<String>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Resultado'),
+      title: Text('$aName vs $bName'),
       content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('$aName vs $bName', style: const TextStyle(fontWeight: FontWeight.w900)),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: TextField(controller: scoreA, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: aName, hintText: '0'))),
-          const SizedBox(width: 10),
-          Expanded(child: TextField(controller: scoreB, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: bName, hintText: '0'))),
-        ]),
-        const SizedBox(height: 10),
-        TextField(controller: note, decoration: InputDecoration(labelText: scoringType == 'tennis_padel' ? 'Detalle opcional: 6-4, 6-3' : 'Detalle opcional', hintText: scoringScoreLabel(scoringType, scoringConfig))),
+        if (setMode) ...[
+          const Text('Introduce cada set en una línea:', style: TextStyle(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: setsController,
+            minLines: 4,
+            maxLines: 7,
+            keyboardType: TextInputType.multiline,
+            decoration: const InputDecoration(hintText: '6-4\n3-6\n10-8', helperText: 'La app calcula sets ganados y juegos.'),
+          ),
+        ] else ...[
+          Row(children: [
+            Expanded(child: TextField(controller: aController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: matchInputLabel(scoringType, true, scoringConfig)))),
+            const SizedBox(width: 10),
+            Expanded(child: TextField(controller: bController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: matchInputLabel(scoringType, false, scoringConfig)))),
+          ]),
+        ],
       ])),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-        TextButton(onPressed: () async {
-          await AppData.reopenMatch(match['id'].toString());
-          onChanged();
-          if (context.mounted) Navigator.pop(context, false);
-        }, child: const Text('Borrar resultado')),
-        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Guardar')),
+        if (played) TextButton(onPressed: () => Navigator.pop(context, 'reopen'), child: const Text('Borrar resultado')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(onPressed: () => Navigator.pop(context, 'save'), child: const Text('Guardar')),
       ],
     ),
   );
-  if (saved != true) {
-    scoreA.dispose(); scoreB.dispose(); note.dispose();
-    return;
-  }
-  final a = int.tryParse(scoreA.text.trim());
-  final b = int.tryParse(scoreB.text.trim());
-  final detail = note.text.trim();
-  scoreA.dispose(); scoreB.dispose(); note.dispose();
-  if (a == null || b == null) {
-    if (context.mounted) await showToast(context, 'Introduce dos marcadores válidos.', danger: true);
-    return;
-  }
+  final matchId = match['id'].toString();
   try {
-    await AppData.setMatchResult(match['id'].toString(), a, b, details: detail.isEmpty ? null : {'note': detail, 'scoring_type': scoringType});
+    if (result == 'reopen') {
+      await AppData.reopenMatch(matchId);
+      onChanged();
+      return;
+    }
+    if (result != 'save') return;
+    if (setMode) {
+      final parsed = parseSetScoreInput(setsController.text);
+      if (parsed.isEmpty) {
+        if (context.mounted) await showToast(context, 'Introduce al menos un set válido.', danger: true);
+        return;
+      }
+      final setsA = parsed.where((set) => set['a']! > set['b']!).length;
+      final setsB = parsed.where((set) => set['b']! > set['a']!).length;
+      if (setsA == setsB) {
+        if (context.mounted) await showToast(context, 'En este deporte no puede quedar empate a sets.', danger: true);
+        return;
+      }
+      await AppData.setMatchResult(matchId, setsA, setsB, details: {'sets': parsed, 'scoring_type': scoringType});
+    } else {
+      final a = int.tryParse(aController.text.trim());
+      final b = int.tryParse(bController.text.trim());
+      if (a == null || b == null) {
+        if (context.mounted) await showToast(context, 'Introduce dos marcadores válidos.', danger: true);
+        return;
+      }
+      if (!scoringAllowDraw(scoringType, scoringConfig) && a == b) {
+        if (context.mounted) await showToast(context, 'Este sistema no permite empate.', danger: true);
+        return;
+      }
+      await AppData.setMatchResult(matchId, a, b, details: {'scoring_type': scoringType});
+    }
     onChanged();
   } catch (e) {
     if (context.mounted) await showToast(context, humanError(e), danger: true);
+  } finally {
+    aController.dispose();
+    bController.dispose();
+    setsController.dispose();
   }
 }
 
@@ -8318,12 +9001,138 @@ Future<void> deleteTournamentTeamDialog(BuildContext context, {required Map<Stri
 
 String defaultTournamentName(String format) {
   switch (format) {
-    case 'eliminatoria': return 'Copa rápida';
-    case 'americano': return 'Americano';
+    case 'eliminatoria': return 'Copa del grupo';
+    case 'americano': return 'Americano del grupo';
+    case 'manual': return 'Torneo manual';
     default: return 'Liga del grupo';
   }
 }
 
+String stepSubtitle(int step) {
+  switch (step) {
+    case 0: return 'Elige la estructura que mejor se adapta al grupo.';
+    case 1: return 'Configura cómo se anotan y calculan los resultados.';
+    case 2: return 'Añade equipos, parejas o jugadores.';
+    case 3: return 'Revisa o escribe los emparejamientos.';
+    default: return 'Comprueba todo antes de crear.';
+  }
+}
+
+List<TournamentDraftMatch> parseTournamentPairings(String raw) {
+  final output = <TournamentDraftMatch>[];
+  var fallbackRound = 1;
+  for (final line in raw.split(RegExp(r'[\n;]+'))) {
+    var clean = line.trim();
+    if (clean.isEmpty) continue;
+    var round = fallbackRound;
+    final roundMatch = RegExp(r'(?:jornada|ronda|round)\s*(\d+)', caseSensitive: false).firstMatch(clean);
+    if (roundMatch != null) round = int.tryParse(roundMatch.group(1) ?? '') ?? round;
+    if (clean.contains(':')) clean = clean.substring(clean.indexOf(':') + 1).trim();
+    final parts = clean.split(RegExp(r'\s+(?:vs\.?|contra|v)\s+|\s+-\s+', caseSensitive: false));
+    if (parts.length < 2) continue;
+    final a = parts.first.trim().replaceAll(RegExp(r'\s+'), ' ');
+    final b = parts.sublist(1).join(' vs ').trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (a.length < 2 || b.length < 2) continue;
+    output.add(TournamentDraftMatch(round: round, teamAName: a, teamBName: b));
+    fallbackRound = round;
+  }
+  return output;
+}
+
+List<String> tournamentNamesFromManualPairings(List<TournamentDraftMatch> pairs) {
+  return mergeTournamentNames(pairs.expand((p) => [p.teamAName, p.teamBName]).toList());
+}
+
+List<String> mergeTournamentNames(List<String> values) {
+  final seen = <String>{};
+  final output = <String>[];
+  for (final value in values) {
+    final clean = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (clean.length < 2) continue;
+    final key = clean.toLowerCase();
+    if (seen.add(key)) output.add(clean);
+  }
+  return output;
+}
+
+List<TournamentDraftMatch> previewPairingsForFormat(String format, List<String> names) {
+  final clean = mergeTournamentNames(names);
+  if (clean.length < 2) return const [];
+  final rows = <TournamentDraftMatch>[];
+  if (format == 'eliminatoria') {
+    for (var i = 0; i + 1 < clean.length; i += 2) {
+      rows.add(TournamentDraftMatch(round: 1, teamAName: clean[i], teamBName: clean[i + 1]));
+    }
+    return rows;
+  }
+  final rotation = <String?>[...clean];
+  if (rotation.length.isOdd) rotation.add(null);
+  final n = rotation.length;
+  for (var round = 1; round < n; round++) {
+    for (var i = 0; i < n ~/ 2; i++) {
+      final a = rotation[i];
+      final b = rotation[n - 1 - i];
+      if (a == null || b == null) continue;
+      final swap = round.isEven;
+      rows.add(TournamentDraftMatch(round: round, teamAName: swap ? b : a, teamBName: swap ? a : b));
+    }
+    final fixed = rotation.first;
+    final rest = rotation.sublist(1);
+    rest.insert(0, rest.removeLast());
+    rotation
+      ..clear()
+      ..add(fixed)
+      ..addAll(rest);
+  }
+  return rows;
+}
+
+int currentTournamentRound(List<Map<String, dynamic>> matches) {
+  if (matches.isEmpty) return 1;
+  final pending = matches.where((m) => AppData.text(m['status']) != 'played').toList();
+  if (pending.isNotEmpty) return AppData.intValue(pending.first['round'], 1);
+  return matches.fold<int>(1, (value, match) => max(value, AppData.intValue(match['round'], 1)));
+}
+
+List<Map<String, int>> parseSetScoreInput(String raw) {
+  final sets = <Map<String, int>>[];
+  for (final line in raw.split(RegExp(r'[\n,;]+'))) {
+    final match = RegExp(r'(\d+)\s*[-/]\s*(\d+)').firstMatch(line.trim());
+    if (match == null) continue;
+    final a = int.tryParse(match.group(1) ?? '');
+    final b = int.tryParse(match.group(2) ?? '');
+    if (a == null || b == null) continue;
+    sets.add({'a': a, 'b': b});
+  }
+  return sets;
+}
+
+TeamStanding bestWins(List<TeamStanding> rows) {
+  final copy = [...rows]..sort((a, b) {
+    final wins = b.wins.compareTo(a.wins);
+    if (wins != 0) return wins;
+    return b.points.compareTo(a.points);
+  });
+  return copy.first;
+}
+
+TeamStanding bestGoalDifference(List<TeamStanding> rows) {
+  final copy = [...rows]..sort((a, b) {
+    final diff = b.goalDifference.compareTo(a.goalDifference);
+    if (diff != 0) return diff;
+    return b.points.compareTo(a.points);
+  });
+  return copy.first;
+}
+
+TeamStanding bestGoalsFor(List<TeamStanding> rows) {
+  final copy = [...rows]..sort((a, b) {
+    final goals = b.goalsFor.compareTo(a.goalsFor);
+    if (goals != 0) return goals;
+    return b.points.compareTo(a.points);
+  });
+  return copy.first;
+}
 
 class MembersScreen extends StatefulWidget {
   final Map<String, dynamic> group;
