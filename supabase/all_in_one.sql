@@ -1,4 +1,4 @@
--- Grupli v15.32 reset global CANÓNICO Y ÚNICO
+-- Grupli v16 reset global CANÓNICO Y ÚNICO
 -- Ejecutar en Supabase SQL Editor cuando quieras hacer reset completo de Grupli.
 -- Borra y recrea SOLO las tablas/funciones propias de Grupli.
 -- No borra auth.users ni storage.objects directamente.
@@ -6,7 +6,7 @@
 
 create extension if not exists "pgcrypto";
 
--- v15.32 stability note:
+-- v16 tournaments engine note:
 -- No hay SQL incremental separado. Este archivo es la verdad completa para un reset global.
 -- Realtime queda preparado en SQL, pero la app no abre suscripciones automáticas hasta superar QA de estabilidad.
 
@@ -94,6 +94,7 @@ DROP TABLE IF EXISTS public.app_admins CASCADE;
 DROP TABLE IF EXISTS public.notifications CASCADE;
 DROP TABLE IF EXISTS public.user_devices CASCADE;
 DROP TABLE IF EXISTS public.matches CASCADE;
+DROP TABLE IF EXISTS public.tournament_team_members CASCADE;
 DROP TABLE IF EXISTS public.tournament_teams CASCADE;
 DROP TABLE IF EXISTS public.tournaments CASCADE;
 DROP TABLE IF EXISTS public.settlement_payments CASCADE;
@@ -235,8 +236,16 @@ CREATE TABLE public.tournaments (
   format text NOT NULL DEFAULT 'liga' CHECK (format IN ('liga','eliminatoria','americano','manual')),
   team_type text NOT NULL DEFAULT 'equipo' CHECK (team_type IN ('individual','pareja','equipo')),
   scoring_type text NOT NULL DEFAULT 'general' CHECK (scoring_type IN ('general','football','tennis_padel','basketball','cards_mus','custom')),
-  scoring_config jsonb NOT NULL DEFAULT '{"win":3,"draw":1,"loss":0,"unit":"puntos","allowDraw":true}'::jsonb,
-  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','finished')),
+  scoring_config jsonb NOT NULL DEFAULT '{"win":3,"draw":1,"loss":0,"unit":"puntos","allowDraw":true,"result_mode":"simple"}'::jsonb,
+  format_config jsonb NOT NULL DEFAULT '{}'::jsonb,
+  tie_breakers jsonb NOT NULL DEFAULT '["points","wins","direct","difference","for","manual"]'::jsonb,
+  schedule_config jsonb NOT NULL DEFAULT '{}'::jsonb,
+  permissions_config jsonb NOT NULL DEFAULT '{"admin_edit":true,"members_results":false,"rival_confirmation":false}'::jsonb,
+  status text NOT NULL DEFAULT 'scheduled' CHECK (status IN ('draft','scheduled','active','paused','finished','cancelled')),
+  starts_at timestamptz,
+  ends_at timestamptz,
+  is_locked boolean NOT NULL DEFAULT false,
+  finished_at timestamptz,
   created_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -247,7 +256,24 @@ CREATE TABLE public.tournament_teams (
   group_id uuid REFERENCES public.groups(id) ON DELETE CASCADE,
   tournament_id uuid NOT NULL REFERENCES public.tournaments(id) ON DELETE CASCADE,
   name text NOT NULL CHECK (char_length(trim(name)) >= 2),
-  created_at timestamptz NOT NULL DEFAULT now()
+  avatar_url text,
+  color text,
+  seed int,
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','pending','retired')),
+  captain_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.tournament_team_members (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tournament_team_id uuid NOT NULL REFERENCES public.tournament_teams(id) ON DELETE CASCADE,
+  user_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  display_name text,
+  role text NOT NULL DEFAULT 'player' CHECK (role IN ('captain','player','substitute')),
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','pending','retired')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(tournament_team_id, user_id)
 );
 
 CREATE TABLE public.matches (
@@ -260,7 +286,19 @@ CREATE TABLE public.matches (
   score_b int,
   result_details jsonb,
   round int NOT NULL DEFAULT 1,
-  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','played')),
+  round_name text,
+  order_index int NOT NULL DEFAULT 0,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','scheduled','played','postponed','cancelled','no_show','walkover','bye')),
+  scheduled_at timestamptz,
+  duration_minutes int NOT NULL DEFAULT 60 CHECK (duration_minutes > 0),
+  location text,
+  court_name text,
+  event_id uuid REFERENCES public.events(id) ON DELETE SET NULL,
+  winner_team_id uuid REFERENCES public.tournament_teams(id) ON DELETE SET NULL,
+  result_status text NOT NULL DEFAULT 'pending' CHECK (result_status IN ('pending','confirmed','disputed','admin')),
+  notes text,
+  confirmed_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  updated_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   played_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -273,10 +311,14 @@ CREATE INDEX idx_events_series ON public.events(event_series_id, starts_at);
 CREATE INDEX idx_expenses_group_created ON public.expenses(group_id, created_at DESC);
 CREATE INDEX idx_settlement_payments_group_paid ON public.settlement_payments(group_id, paid_at DESC);
 CREATE INDEX idx_tournaments_group_created ON public.tournaments(group_id, created_at DESC);
+CREATE INDEX idx_tournaments_group_status ON public.tournaments(group_id, status);
 CREATE INDEX idx_event_attendance_group_event ON public.event_attendance(group_id, event_id);
 CREATE INDEX idx_expense_participants_group_expense ON public.expense_participants(group_id, expense_id);
 CREATE INDEX idx_tournament_teams_group_tournament ON public.tournament_teams(group_id, tournament_id);
+CREATE INDEX idx_tournament_team_members_team ON public.tournament_team_members(tournament_team_id);
 CREATE INDEX idx_matches_group_tournament ON public.matches(group_id, tournament_id);
+CREATE INDEX idx_matches_tournament_round_order ON public.matches(tournament_id, round, order_index);
+CREATE INDEX idx_matches_scheduled_at ON public.matches(group_id, scheduled_at);
 
 CREATE OR REPLACE FUNCTION public.ensure_current_profile()
 RETURNS void
@@ -673,6 +715,7 @@ ALTER TABLE public.expense_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settlement_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tournaments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tournament_teams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tournament_team_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.matches ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY profiles_select_related ON public.profiles FOR SELECT TO authenticated USING (
@@ -834,6 +877,7 @@ GRANT EXECUTE ON FUNCTION public.cancel_settlement_payment_atomic(uuid) TO authe
 
 CREATE POLICY tournaments_member_all ON public.tournaments FOR ALL TO authenticated USING (public.is_group_member(group_id)) WITH CHECK (public.is_group_member(group_id));
 CREATE POLICY tournament_teams_member_all ON public.tournament_teams FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id))) WITH CHECK (EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id)));
+CREATE POLICY tournament_team_members_member_all ON public.tournament_team_members FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.tournament_teams tt JOIN public.tournaments t ON t.id = tt.tournament_id WHERE tt.id = tournament_team_id AND public.is_group_member(t.group_id))) WITH CHECK (EXISTS (SELECT 1 FROM public.tournament_teams tt JOIN public.tournaments t ON t.id = tt.tournament_id WHERE tt.id = tournament_team_id AND public.is_group_member(t.group_id)));
 CREATE POLICY matches_member_all ON public.matches FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id))) WITH CHECK (EXISTS (SELECT 1 FROM public.tournaments t WHERE t.id = tournament_id AND public.is_group_member(t.group_id)));
 
 REVOKE ALL ON FUNCTION public.ensure_current_profile() FROM PUBLIC;
@@ -2552,6 +2596,7 @@ begin
     'settlement_payments',
     'tournaments',
     'tournament_teams',
+    'tournament_team_members',
     'matches',
     'notifications',
     'support_tickets',

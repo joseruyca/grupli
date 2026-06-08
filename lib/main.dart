@@ -1253,14 +1253,16 @@ class AppData {
       try {
         final teams = asList(await sb
             .from('tournament_teams')
-            .select('id,name,created_at')
+            .select('id,name,avatar_url,color,seed,status,captain_id,created_at')
             .eq('tournament_id', id)
+            .order('seed', ascending: true)
             .order('created_at', ascending: true));
         final matches = asList(await sb
             .from('matches')
-            .select('id,team_a,team_b,score_a,score_b,result_details,round,status,played_at,created_at')
+            .select('id,team_a,team_b,score_a,score_b,result_details,round,round_name,order_index,status,scheduled_at,duration_minutes,location,court_name,event_id,winner_team_id,result_status,notes,played_at,created_at,updated_at')
             .eq('tournament_id', id)
             .order('round', ascending: true)
+            .order('order_index', ascending: true)
             .order('created_at', ascending: true));
         output.add({...row, 'tournament_teams': teams, 'matches': matches});
       } catch (_) {
@@ -1278,14 +1280,16 @@ class AppData {
         .single());
     final teams = asList(await sb
         .from('tournament_teams')
-        .select('id,name,created_at')
+        .select('id,name,avatar_url,color,seed,status,captain_id,created_at')
         .eq('tournament_id', tournamentId)
+        .order('seed', ascending: true)
         .order('created_at', ascending: true));
     final matches = asList(await sb
         .from('matches')
-        .select('id,team_a,team_b,score_a,score_b,result_details,round,status,played_at,created_at')
+        .select('id,team_a,team_b,score_a,score_b,result_details,round,round_name,order_index,status,scheduled_at,duration_minutes,location,court_name,event_id,winner_team_id,result_status,notes,played_at,created_at,updated_at')
         .eq('tournament_id', tournamentId)
         .order('round', ascending: true)
+        .order('order_index', ascending: true)
         .order('created_at', ascending: true));
     return {...row, 'tournament_teams': teams, 'matches': matches};
   }
@@ -1297,6 +1301,12 @@ class AppData {
     String teamType = 'equipo',
     String scoringType = 'general',
     Map<String, dynamic>? scoringConfig,
+    Map<String, dynamic>? formatConfig,
+    Map<String, dynamic>? scheduleConfig,
+    List<String>? tieBreakers,
+    Map<String, dynamic>? permissionsConfig,
+    String status = 'scheduled',
+    DateTime? startsAt,
   }) async {
     final payload = {
       'group_id': groupId,
@@ -1305,6 +1315,12 @@ class AppData {
       'team_type': teamType,
       'scoring_type': scoringType,
       'scoring_config': scoringConfig ?? scoringConfigForType(scoringType),
+      'format_config': formatConfig ?? <String, dynamic>{},
+      'schedule_config': scheduleConfig ?? <String, dynamic>{},
+      'tie_breakers': tieBreakers ?? defaultTieBreakers(scoringType),
+      'permissions_config': permissionsConfig ?? {'admin_edit': true, 'members_results': false, 'rival_confirmation': false},
+      'status': status,
+      'starts_at': startsAt?.toUtc().toIso8601String(),
       'created_by': user?.id,
     };
 
@@ -1313,27 +1329,38 @@ class AppData {
       return row['id'].toString();
     } catch (e) {
       final text = e.toString().toLowerCase();
-      if (!text.contains('scoring_type') && !text.contains('scoring_config')) rethrow;
+      if (!text.contains('format_config') && !text.contains('schedule_config') && !text.contains('tie_breakers') && !text.contains('permissions_config') && !text.contains('scoring_type') && !text.contains('scoring_config')) rethrow;
       final fallback = Map<String, dynamic>.from(payload)
         ..remove('scoring_type')
-        ..remove('scoring_config');
+        ..remove('scoring_config')
+        ..remove('format_config')
+        ..remove('schedule_config')
+        ..remove('tie_breakers')
+        ..remove('permissions_config')
+        ..remove('starts_at');
       final row = await sb.from('tournaments').insert(fallback).select('id').single();
       return row['id'].toString();
     }
   }
 
   static Future<void> updateTournamentStatus(String tournamentId, String status) async {
-    await sb.from('tournaments').update({'status': status, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', tournamentId);
+    await sb.from('tournaments').update({
+      'status': status,
+      'finished_at': status == 'finished' ? DateTime.now().toUtc().toIso8601String() : null,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', tournamentId);
   }
 
   static Future<void> deleteTournament(String tournamentId) async {
     await sb.from('tournaments').delete().eq('id', tournamentId);
   }
 
-  static Future<String> addTournamentTeam(String tournamentId, String name) async {
+  static Future<String> addTournamentTeam(String tournamentId, String name, {int? seed}) async {
     final row = await sb.from('tournament_teams').insert({
       'tournament_id': tournamentId,
       'name': name.trim(),
+      'seed': seed,
+      'status': 'active',
     }).select('id').single();
     return row['id'].toString();
   }
@@ -1341,10 +1368,12 @@ class AppData {
   static Future<int> addTournamentTeams(String tournamentId, List<String> names) async {
     final clean = parseTournamentParticipantNames(names.join('\n'));
     if (clean.isEmpty) return 0;
-    await sb.from('tournament_teams').insert(clean.map((name) => {
+    await sb.from('tournament_teams').insert(List.generate(clean.length, (index) => {
       'tournament_id': tournamentId,
-      'name': name,
-    }).toList());
+      'name': clean[index],
+      'seed': index + 1,
+      'status': 'active',
+    }));
     return clean.length;
   }
 
@@ -1353,6 +1382,14 @@ class AppData {
     if (clean.length < 2) throw Exception('El nombre debe tener al menos 2 caracteres.');
     await sb.from('tournament_teams').update({
       'name': clean,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', teamId);
+  }
+
+  static Future<void> retireTournamentTeam(String teamId) async {
+    await sb.from('tournament_teams').update({
+      'status': 'retired',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', teamId);
   }
 
@@ -1364,31 +1401,49 @@ class AppData {
     await sb.from('matches').delete().eq('tournament_id', tournamentId);
   }
 
-  static Future<void> createManualMatches(String tournamentId, List<Map<String, dynamic>> teams, List<TournamentDraftMatch> pairings) async {
+  static Future<void> createManualMatches(
+    String tournamentId,
+    List<Map<String, dynamic>> teams,
+    List<TournamentDraftMatch> pairings, {
+    Map<String, dynamic>? scheduleConfig,
+  }) async {
     if (pairings.isEmpty) throw Exception('Añade al menos un emparejamiento manual.');
     await clearTournamentMatches(tournamentId);
-    await addManualMatches(tournamentId, teams, pairings);
+    await addManualMatches(tournamentId, teams, pairings, scheduleConfig: scheduleConfig);
   }
 
-  static Future<void> addManualMatches(String tournamentId, List<Map<String, dynamic>> teams, List<TournamentDraftMatch> pairings) async {
+  static Future<void> addManualMatches(
+    String tournamentId,
+    List<Map<String, dynamic>> teams,
+    List<TournamentDraftMatch> pairings, {
+    Map<String, dynamic>? scheduleConfig,
+  }) async {
     if (pairings.isEmpty) throw Exception('Añade al menos un emparejamiento manual.');
     final byName = <String, String>{
       for (final team in teams) AppData.text(team['name']).trim().toLowerCase(): team['id'].toString(),
     };
     final rows = <Map<String, dynamic>>[];
-    for (final pair in pairings) {
+    for (var i = 0; i < pairings.length; i++) {
+      final pair = pairings[i];
       final aId = byName[pair.teamAName.trim().toLowerCase()];
       final bId = byName[pair.teamBName.trim().toLowerCase()];
       if (aId == null || bId == null) {
         throw Exception('No encuentro en participantes: ${aId == null ? pair.teamAName : pair.teamBName}.');
       }
       if (aId == bId) throw Exception('Un equipo no puede jugar contra sí mismo.');
+      final scheduledAt = tournamentScheduledAtForIndex(scheduleConfig, pair.round, i);
       rows.add({
         'tournament_id': tournamentId,
         'team_a': aId,
         'team_b': bId,
         'round': max(1, pair.round),
-        'status': 'pending',
+        'round_name': 'Jornada ${max(1, pair.round)}',
+        'order_index': i,
+        'status': scheduledAt == null ? 'pending' : 'scheduled',
+        'scheduled_at': scheduledAt?.toUtc().toIso8601String(),
+        'duration_minutes': max(15, intValue(scheduleConfig?['duration_minutes'], 60)),
+        'location': text(scheduleConfig?['location']).trim().isEmpty ? null : text(scheduleConfig?['location']).trim(),
+        'court_name': text(scheduleConfig?['court_name']).trim().isEmpty ? null : text(scheduleConfig?['court_name']).trim(),
       });
     }
     await sb.from('matches').insert(rows);
@@ -1411,7 +1466,37 @@ class AppData {
     }
   }
 
-  static Future<void> generateMatches(String tournamentId, String format, List<Map<String, dynamic>> teams) async {
+  static Future<void> createAgendaEventsForTournament(String groupId, String tournamentId, String tournamentName) async {
+    final data = await tournament(tournamentId);
+    final teams = tournamentTeams(data);
+    final names = teamNameMap(teams);
+    final matches = tournamentMatches(data).where((m) => AppData.text(m['scheduled_at']).isNotEmpty && AppData.text(m['event_id']).isEmpty).take(80).toList();
+    for (final match in matches) {
+      final start = DateTime.tryParse(AppData.text(match['scheduled_at']))?.toLocal();
+      if (start == null) continue;
+      final a = teamName(AppData.text(match['team_a']), names);
+      final b = teamName(AppData.text(match['team_b']), names);
+      final roundName = AppData.text(match['round_name'], 'Jornada ${AppData.intValue(match['round'], 1)}');
+      final courtLine = AppData.text(match['court_name']).isEmpty ? '' : '\nPista/Mesa: ${AppData.text(match['court_name'])}';
+      final eventId = await createEvent(
+        groupId,
+        '$tournamentName: $a vs $b',
+        start,
+        AppData.text(match['location']),
+        'Partido de torneo · $roundName$courtLine',
+        2,
+      );
+      await sb.from('matches').update({'event_id': eventId, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', match['id']);
+    }
+  }
+
+  static Future<void> generateMatches(
+    String tournamentId,
+    String format,
+    List<Map<String, dynamic>> teams, {
+    Map<String, dynamic>? formatConfig,
+    Map<String, dynamic>? scheduleConfig,
+  }) async {
     if (teams.length < 2) {
       throw Exception('Añade al menos 2 participantes.');
     }
@@ -1423,17 +1508,34 @@ class AppData {
 
     final rows = <Map<String, dynamic>>[];
     final ordered = teams.map((t) => Map<String, dynamic>.from(t)).toList();
+    var orderIndex = 0;
+
+    Map<String, dynamic> rowFor(Map<String, dynamic>? a, Map<String, dynamic>? b, int round, {String? status, int? scoreA, int? scoreB, Map<String, dynamic>? details}) {
+      final scheduledAt = tournamentScheduledAtForIndex(scheduleConfig, round, orderIndex);
+      final row = {
+        'tournament_id': tournamentId,
+        'team_a': a?['id'],
+        'team_b': b?['id'],
+        'score_a': scoreA,
+        'score_b': scoreB,
+        'round': round,
+        'round_name': format == 'eliminatoria' ? eliminationRoundName(round, ordered.length) : 'Jornada $round',
+        'order_index': orderIndex,
+        'status': status ?? (scheduledAt == null ? 'pending' : 'scheduled'),
+        'scheduled_at': scheduledAt?.toUtc().toIso8601String(),
+        'duration_minutes': max(15, intValue(scheduleConfig?['duration_minutes'], 60)),
+        'location': text(scheduleConfig?['location']).trim().isEmpty ? null : text(scheduleConfig?['location']).trim(),
+        'court_name': text(scheduleConfig?['court_name']).trim().isEmpty ? null : text(scheduleConfig?['court_name']).trim(),
+        'result_details': details,
+      };
+      orderIndex++;
+      return row;
+    }
 
     if (format == 'eliminatoria') {
       if (isPowerOfTwo(ordered.length)) {
         for (var i = 0; i < ordered.length; i += 2) {
-          rows.add({
-            'tournament_id': tournamentId,
-            'team_a': ordered[i]['id'],
-            'team_b': ordered[i + 1]['id'],
-            'round': 1,
-            'status': 'pending',
-          });
+          rows.add(rowFor(ordered[i], ordered[i + 1], 1));
         }
       } else {
         final target = highestPowerOfTwoAtMost(ordered.length);
@@ -1441,57 +1543,29 @@ class AppData {
         var index = 0;
 
         for (var i = 0; i < preliminaryMatches; i++) {
-          rows.add({
-            'tournament_id': tournamentId,
-            'team_a': ordered[index]['id'],
-            'team_b': ordered[index + 1]['id'],
-            'round': 1,
-            'status': 'pending',
-            'result_details': {'stage': 'preliminary'},
-          });
+          rows.add(rowFor(ordered[index], ordered[index + 1], 1, details: {'stage': 'preliminary'}));
           index += 2;
         }
 
         while (index < ordered.length) {
-          rows.add({
-            'tournament_id': tournamentId,
-            'team_a': ordered[index]['id'],
-            'team_b': null,
-            'score_a': 1,
-            'score_b': 0,
-            'round': 1,
-            'status': 'played',
-            'played_at': DateTime.now().toUtc().toIso8601String(),
-            'result_details': {'bye': true, 'stage': 'bye'},
-          });
+          rows.add(rowFor(ordered[index], null, 1, status: 'bye', scoreA: 1, scoreB: 0, details: {'bye': true, 'stage': 'bye'}));
           index++;
         }
       }
     } else {
-      final rotation = <Map<String, dynamic>?>[...ordered];
-      if (rotation.length.isOdd) rotation.add(null);
-      final n = rotation.length;
-      for (var round = 1; round < n; round++) {
-        for (var i = 0; i < n ~/ 2; i++) {
-          final a = rotation[i];
-          final b = rotation[n - 1 - i];
-          if (a == null || b == null) continue;
-          final swap = round.isEven;
-          rows.add({
-            'tournament_id': tournamentId,
-            'team_a': swap ? b['id'] : a['id'],
-            'team_b': swap ? a['id'] : b['id'],
-            'round': round,
-            'status': 'pending',
-          });
+      final legs = max(1, min(4, intValue(formatConfig?['legs'], 1)));
+      final maxRounds = intValue(formatConfig?['max_rounds']);
+      final base = generateRoundRobinIds(ordered.map((e) => e['id'].toString()).toList());
+      final limited = maxRounds > 0 ? base.take(maxRounds).toList() : base;
+      for (var leg = 1; leg <= legs; leg++) {
+        for (var r = 0; r < limited.length; r++) {
+          final round = r + 1 + ((leg - 1) * limited.length);
+          for (final pair in limited[r]) {
+            final a = ordered.firstWhere((t) => t['id'].toString() == pair.$1);
+            final b = ordered.firstWhere((t) => t['id'].toString() == pair.$2);
+            rows.add(leg.isOdd ? rowFor(a, b, round) : rowFor(b, a, round));
+          }
         }
-        final fixed = rotation.first;
-        final rest = rotation.sublist(1);
-        rest.insert(0, rest.removeLast());
-        rotation
-          ..clear()
-          ..add(fixed)
-          ..addAll(rest);
       }
     }
 
@@ -1503,13 +1577,18 @@ class AppData {
     final latestRound = matches.fold<int>(0, (maxRound, m) => max(maxRound, intValue(m['round'])));
     final latestMatches = matches.where((m) => intValue(m['round']) == latestRound).toList();
     if (latestMatches.isEmpty) throw Exception('No hay partidos para generar la siguiente ronda.');
-    if (latestMatches.any((m) => text(m['status']) != 'played')) {
+    if (latestMatches.any((m) => text(m['status']) != 'played' && text(m['status']) != 'bye')) {
       throw Exception('Cierra todos los resultados de la ronda actual antes de avanzar.');
     }
     if (latestMatches.length == 1) throw Exception('La eliminatoria ya tiene final registrada.');
 
     final winners = <String>[];
     for (final match in latestMatches) {
+      final directWinner = text(match['winner_team_id']);
+      if (directWinner.isNotEmpty) {
+        winners.add(directWinner);
+        continue;
+      }
       final a = intValue(match['score_a']);
       final b = intValue(match['score_b']);
       if (a == b) throw Exception('No puede haber empates en eliminatoria.');
@@ -1525,6 +1604,8 @@ class AppData {
         'team_a': winners[i],
         'team_b': winners[i + 1],
         'round': latestRound + 1,
+        'round_name': eliminationRoundName(latestRound + 1, winners.length),
+        'order_index': i ~/ 2,
         'status': 'pending',
       });
     }
@@ -1532,12 +1613,17 @@ class AppData {
   }
 
   static Future<void> setMatchResult(String matchId, int scoreA, int scoreB, {Map<String, dynamic>? details}) async {
+    final current = asMap(await sb.from('matches').select('team_a,team_b').eq('id', matchId).single());
+    final winner = scoreA == scoreB ? null : (scoreA > scoreB ? current['team_a'] : current['team_b']);
     await sb.from('matches').update({
       'score_a': scoreA,
       'score_b': scoreB,
       'result_details': details,
+      'winner_team_id': winner,
       'status': 'played',
+      'result_status': 'confirmed',
       'played_at': DateTime.now().toUtc().toIso8601String(),
+      'updated_by': user?.id,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', matchId);
   }
@@ -1547,8 +1633,40 @@ class AppData {
       'score_a': null,
       'score_b': null,
       'result_details': null,
+      'winner_team_id': null,
       'status': 'pending',
+      'result_status': 'pending',
       'played_at': null,
+      'updated_by': user?.id,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', matchId);
+  }
+
+  static Future<void> updateMatchSchedule(String matchId, DateTime? scheduledAt, int durationMinutes, String location, String courtName, String notes) async {
+    final current = asMap(await sb.from('matches').select('id,event_id,team_a,team_b,tournament_id').eq('id', matchId).single());
+    await sb.from('matches').update({
+      'scheduled_at': scheduledAt?.toUtc().toIso8601String(),
+      'duration_minutes': max(15, durationMinutes),
+      'location': location.trim().isEmpty ? null : location.trim(),
+      'court_name': courtName.trim().isEmpty ? null : courtName.trim(),
+      'notes': notes.trim().isEmpty ? null : notes.trim(),
+      'status': scheduledAt == null ? 'pending' : 'scheduled',
+      'updated_by': user?.id,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', matchId);
+
+    final eventId = text(current['event_id']);
+    if (eventId.isNotEmpty && scheduledAt != null) {
+      try {
+        await updateEvent(eventId, 'Partido de torneo', scheduledAt, location, notes, 2);
+      } catch (_) {}
+    }
+  }
+
+  static Future<void> updateMatchStatus(String matchId, String status) async {
+    await sb.from('matches').update({
+      'status': status,
+      'updated_by': user?.id,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', matchId);
   }
@@ -2225,6 +2343,133 @@ Color attendanceColor(String status) {
 }
 
 
+
+List<String> defaultTieBreakers(String scoringType) {
+  if (scoringUsesSetMode(scoringType)) {
+    return ['points', 'wins', 'set_difference', 'game_difference', 'games_for', 'manual'];
+  }
+  return ['points', 'wins', 'direct', 'difference', 'for', 'manual'];
+}
+
+Map<String, dynamic> tournamentFormatConfig(Map<String, dynamic> tournament) {
+  final raw = tournament['format_config'];
+  if (raw is Map) return Map<String, dynamic>.from(raw);
+  return <String, dynamic>{};
+}
+
+Map<String, dynamic> tournamentScheduleConfig(Map<String, dynamic> tournament) {
+  final raw = tournament['schedule_config'];
+  if (raw is Map) return Map<String, dynamic>.from(raw);
+  return <String, dynamic>{};
+}
+
+String tournamentStatusLabel(String status) {
+  switch (status) {
+    case 'draft': return 'Borrador';
+    case 'scheduled': return 'Programado';
+    case 'active': return 'En curso';
+    case 'paused': return 'Pausado';
+    case 'finished': return 'Finalizado';
+    case 'cancelled': return 'Cancelado';
+    default: return 'En curso';
+  }
+}
+
+Color tournamentStatusColor(String status) {
+  switch (status) {
+    case 'finished': return AppColors.green;
+    case 'paused': return AppColors.amber;
+    case 'cancelled': return AppColors.red;
+    case 'draft': return AppColors.muted;
+    case 'scheduled': return AppColors.blue;
+    default: return AppColors.green;
+  }
+}
+
+String matchStatusLabel(String status) {
+  switch (status) {
+    case 'scheduled': return 'Programado';
+    case 'played': return 'Jugado';
+    case 'postponed': return 'Aplazado';
+    case 'cancelled': return 'Cancelado';
+    case 'no_show': return 'No presentado';
+    case 'walkover': return 'Victoria admin.';
+    case 'bye': return 'Descanso';
+    default: return 'Pendiente';
+  }
+}
+
+Color matchStatusColor(String status) {
+  switch (status) {
+    case 'played': return AppColors.green;
+    case 'scheduled': return AppColors.blue;
+    case 'postponed': return AppColors.amber;
+    case 'cancelled': return AppColors.red;
+    case 'no_show': return AppColors.red;
+    case 'walkover': return AppColors.orange;
+    case 'bye': return AppColors.violet;
+    default: return AppColors.muted;
+  }
+}
+
+String tournamentMatchDateText(Map<String, dynamic> match) {
+  final raw = AppData.text(match['scheduled_at']);
+  if (raw.isEmpty) return 'Sin fecha';
+  final dt = DateTime.tryParse(raw)?.toLocal();
+  if (dt == null) return 'Sin fecha';
+  return DateFormat('EEE d MMM · HH:mm', 'es_ES').format(dt);
+}
+
+DateTime? tournamentScheduledAtForIndex(Map<String, dynamic>? cfg, int round, int orderIndex) {
+  if (cfg == null || cfg['enabled'] != true) return null;
+  final raw = AppData.text(cfg['first_start_at']);
+  final first = DateTime.tryParse(raw)?.toLocal();
+  if (first == null) return null;
+  final daysBetweenRounds = max(0, AppData.intValue(cfg['days_between_rounds'], 7));
+  final interval = max(15, AppData.intValue(cfg['interval_minutes'], 60));
+  final matchesPerRound = max(1, AppData.intValue(cfg['matches_per_round'], 999));
+  final indexInsideRound = orderIndex % matchesPerRound;
+  return first.add(Duration(days: max(0, round - 1) * daysBetweenRounds, minutes: indexInsideRound * interval));
+}
+
+String eliminationRoundName(int round, int size) {
+  if (size <= 2) return 'Final';
+  if (size <= 4) return round <= 1 ? 'Semifinal' : 'Final';
+  if (size <= 8) {
+    if (round <= 1) return 'Cuartos';
+    if (round == 2) return 'Semifinal';
+    return 'Final';
+  }
+  return 'Ronda $round';
+}
+
+List<List<(String, String)>> generateRoundRobinIds(List<String> ids) {
+  if (ids.length < 2) return const <List<(String, String)>>[];
+  final rotation = <String?>[...ids];
+  if (rotation.length.isOdd) rotation.add(null);
+  final n = rotation.length;
+  final rounds = <List<(String, String)>>[];
+  for (var round = 1; round < n; round++) {
+    final pairs = <(String, String)>[];
+    for (var i = 0; i < n ~/ 2; i++) {
+      final a = rotation[i];
+      final b = rotation[n - 1 - i];
+      if (a == null || b == null) continue;
+      final swap = round.isEven;
+      pairs.add((swap ? b : a, swap ? a : b));
+    }
+    rounds.add(pairs);
+    final fixed = rotation.first;
+    final rest = rotation.sublist(1);
+    rest.insert(0, rest.removeLast());
+    rotation
+      ..clear()
+      ..add(fixed)
+      ..addAll(rest);
+  }
+  return rounds;
+}
+
 String tournamentFormatLabel(String format) {
   switch (format) {
     case 'eliminatoria':
@@ -2386,6 +2631,22 @@ String scoringConfigShortText(String type, [dynamic raw]) {
   return 'Victoria ${scoringWinPoints(type, cfg)} · empate ${scoringDrawPoints(type, cfg)} · derrota ${scoringLossPoints(type, cfg)}';
 }
 
+
+String tieBreakerLabel(String value) {
+  switch (value) {
+    case 'points': return 'puntos';
+    case 'wins': return 'victorias';
+    case 'direct': return 'directo';
+    case 'difference': return 'diferencia';
+    case 'for': return 'a favor';
+    case 'set_difference': return 'sets';
+    case 'game_difference': return 'juegos';
+    case 'games_for': return 'juegos a favor';
+    case 'manual': return 'manual';
+    default: return value;
+  }
+}
+
 String scoringConfigFullText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
   if (scoringUsesSetMode(type, cfg)) {
@@ -2453,7 +2714,11 @@ List<Map<String, dynamic>> tournamentTeams(Map<String, dynamic> tournament) {
   final value = tournament['tournament_teams'];
   if (value is! List) return [];
   final teams = value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
-  teams.sort((a, b) => AppData.text(a['name']).toLowerCase().compareTo(AppData.text(b['name']).toLowerCase()));
+  teams.sort((a, b) {
+    final seedCompare = AppData.intValue(a['seed'], 999999).compareTo(AppData.intValue(b['seed'], 999999));
+    if (seedCompare != 0) return seedCompare;
+    return AppData.text(a['name']).toLowerCase().compareTo(AppData.text(b['name']).toLowerCase());
+  });
   return teams;
 }
 
@@ -2464,6 +2729,10 @@ List<Map<String, dynamic>> tournamentMatches(Map<String, dynamic> tournament) {
   matches.sort((a, b) {
     final roundCompare = AppData.intValue(a['round']).compareTo(AppData.intValue(b['round']));
     if (roundCompare != 0) return roundCompare;
+    final orderCompare = AppData.intValue(a['order_index']).compareTo(AppData.intValue(b['order_index']));
+    if (orderCompare != 0) return orderCompare;
+    final dateCompare = AppData.text(a['scheduled_at']).compareTo(AppData.text(b['scheduled_at']));
+    if (dateCompare != 0) return dateCompare;
     return AppData.text(a['created_at']).compareTo(AppData.text(b['created_at']));
   });
   return matches;
@@ -7394,6 +7663,9 @@ class _TournamentsTabState extends State<TournamentsTab> {
       }
     }
     output.sort((a, b) {
+      final dateA = AppData.text(a.match['scheduled_at']);
+      final dateB = AppData.text(b.match['scheduled_at']);
+      if (dateA.isNotEmpty || dateB.isNotEmpty) return dateA.compareTo(dateB);
       final round = AppData.intValue(a.match['round']).compareTo(AppData.intValue(b.match['round']));
       if (round != 0) return round;
       return AppData.text(a.match['created_at']).compareTo(AppData.text(b.match['created_at']));
@@ -7403,8 +7675,8 @@ class _TournamentsTabState extends State<TournamentsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final active = tournaments.where((t) => AppData.text(t['status'], 'active') != 'finished').toList();
-    final finished = tournaments.where((t) => AppData.text(t['status'], 'active') == 'finished').toList();
+    final active = tournaments.where((t) => !['finished', 'cancelled'].contains(AppData.text(t['status'], 'active'))).toList();
+    final finished = tournaments.where((t) => ['finished', 'cancelled'].contains(AppData.text(t['status'], 'active'))).toList();
     final upcoming = _allMatches().take(4).toList();
     final results = _allMatches(played: true).reversed.take(4).toList();
 
@@ -7474,12 +7746,27 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
   final name = TextEditingController();
   final participants = TextEditingController();
   final pairings = TextEditingController();
+  final location = TextEditingController();
+  final courtName = TextEditingController();
   String format = 'liga';
   String teamType = 'equipo';
   String scoringType = 'football';
   bool addToAgenda = true;
+  bool scheduleMatches = true;
   bool loading = false;
   int step = 0;
+  int leagueLegs = 1;
+  int leagueRoundsLimit = 0;
+  int americanoRounds = 5;
+  int courtsCount = 1;
+  int winPoints = 3;
+  int drawPoints = 1;
+  int lossPoints = 0;
+  int targetScore = 0;
+  int bestOf = 3;
+  int daysBetweenRounds = 7;
+  int durationMinutes = 60;
+  int intervalMinutes = 70;
   DateTime firstMatchDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay firstMatchTime = const TimeOfDay(hour: 20, minute: 0);
 
@@ -7488,7 +7775,19 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
     name.dispose();
     participants.dispose();
     pairings.dispose();
+    location.dispose();
+    courtName.dispose();
     super.dispose();
+  }
+
+  void applyScoringDefaults(String type) {
+    final cfg = scoringConfigForType(type);
+    scoringType = type;
+    winPoints = AppData.intValue(cfg['win'], 3);
+    drawPoints = AppData.intValue(cfg['draw'], 1);
+    lossPoints = AppData.intValue(cfg['loss'], 0);
+    bestOf = AppData.intValue(cfg['best_of'], 3);
+    targetScore = AppData.intValue(cfg['target_score']);
   }
 
   Future<void> fillMembers() async {
@@ -7511,39 +7810,80 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
     return mergeTournamentNames([...fromList, ...fromPairs]);
   }
 
+  int get effectiveRoundLimit {
+    if (format == 'americano') return americanoRounds;
+    if (format != 'liga') return 0;
+    return leagueRoundsLimit;
+  }
+
+  int get effectiveLegs => format == 'liga' ? leagueLegs : 1;
+
   List<TournamentDraftMatch> get draftMatches {
     final manual = parseTournamentPairings(pairings.text);
     if (format == 'manual' || manual.isNotEmpty) return manual;
-    return previewPairingsForFormat(format, participantNames);
+    return previewPairingsForFormat(format, participantNames, legs: effectiveLegs, maxRounds: effectiveRoundLimit);
+  }
+
+  Map<String, dynamic> get formatConfig => {
+    'version': 16,
+    'legs': effectiveLegs,
+    'max_rounds': effectiveRoundLimit,
+    'americano_rounds': americanoRounds,
+    'courts_count': courtsCount,
+    'manual_pairings': format == 'manual' || pairings.text.trim().isNotEmpty,
+  };
+
+  Map<String, dynamic> get scoringConfig {
+    final cfg = Map<String, dynamic>.from(scoringConfigForType(scoringType));
+    cfg['win'] = winPoints;
+    cfg['draw'] = scoringAllowDraw(scoringType, cfg) ? drawPoints : 0;
+    cfg['loss'] = lossPoints;
+    cfg['best_of'] = bestOf;
+    if (targetScore > 0) cfg['target_score'] = targetScore;
+    cfg['version'] = 16;
+    return cfg;
+  }
+
+  Map<String, dynamic> get scheduleConfig {
+    final first = DateTime(firstMatchDate.year, firstMatchDate.month, firstMatchDate.day, firstMatchTime.hour, firstMatchTime.minute);
+    return {
+      'version': 16,
+      'enabled': scheduleMatches,
+      'add_to_agenda': addToAgenda,
+      'first_start_at': first.toUtc().toIso8601String(),
+      'days_between_rounds': daysBetweenRounds,
+      'duration_minutes': durationMinutes,
+      'interval_minutes': intervalMinutes,
+      'matches_per_round': max(1, courtsCount),
+      'location': location.text.trim(),
+      'court_name': courtName.text.trim(),
+    };
   }
 
   bool validateStep(int value) {
     if (value == 0) return true;
-    if (value == 1) return true;
-    if (value == 2) {
+    if (value == 1) {
       if (participantNames.length < 2) {
         showToast(context, 'Añade al menos 2 participantes/equipos.', danger: true);
         return false;
       }
       return true;
     }
-    if (value == 3) {
+    if (value == 2) {
       if ((format == 'manual' || pairings.text.trim().isNotEmpty) && draftMatches.isEmpty) {
         showToast(context, 'Escribe emparejamientos tipo: Jornada 1: Equipo Azul vs Equipo Rojo', danger: true);
         return false;
       }
-      if (participantNames.length < 2) {
-        showToast(context, 'Añade participantes antes de revisar emparejamientos.', danger: true);
-        return false;
-      }
       return true;
     }
+    if (value == 3) return true;
+    if (value == 4) return true;
     return true;
   }
 
   Future<void> next() async {
     if (!validateStep(step)) return;
-    if (step < 4) {
+    if (step < 5) {
       setState(() => step++);
     } else {
       await create();
@@ -7569,30 +7909,30 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
 
     setState(() => loading = true);
     try {
+      final firstStart = DateTime(firstMatchDate.year, firstMatchDate.month, firstMatchDate.day, firstMatchTime.hour, firstMatchTime.minute);
       final tournamentId = await AppData.createTournament(
         widget.group['id'].toString(),
         title,
         format: format,
         teamType: teamType,
         scoringType: scoringType,
-        scoringConfig: scoringConfigForType(scoringType),
+        scoringConfig: scoringConfig,
+        formatConfig: formatConfig,
+        scheduleConfig: scheduleConfig,
+        tieBreakers: defaultTieBreakers(scoringType),
+        status: scheduleMatches ? 'scheduled' : 'draft',
+        startsAt: scheduleMatches ? firstStart : null,
       );
       await AppData.addTournamentTeams(tournamentId, names);
       final created = await AppData.tournament(tournamentId);
       final teams = tournamentTeams(created);
       if (format == 'manual' || pairings.text.trim().isNotEmpty) {
-        await AppData.createManualMatches(tournamentId, teams, matches);
+        await AppData.createManualMatches(tournamentId, teams, matches, scheduleConfig: scheduleConfig);
       } else {
-        await AppData.generateMatches(tournamentId, format, teams);
+        await AppData.generateMatches(tournamentId, format, teams, formatConfig: formatConfig, scheduleConfig: scheduleConfig);
       }
-      if (addToAgenda) {
-        final agendaMatches = matches.isNotEmpty ? matches : previewPairingsForFormat(format, names);
-        await AppData.createTournamentAgendaEvents(
-          widget.group['id'].toString(),
-          title,
-          agendaMatches,
-          DateTime(firstMatchDate.year, firstMatchDate.month, firstMatchDate.day, firstMatchTime.hour, firstMatchTime.minute),
-        );
+      if (addToAgenda && scheduleMatches) {
+        await AppData.createAgendaEventsForTournament(widget.group['id'].toString(), tournamentId, title);
       }
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -7608,7 +7948,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
       context: context,
       initialDate: firstMatchDate,
       firstDate: DateTime.now().subtract(const Duration(days: 1)),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 730)),
       locale: const Locale('es', 'ES'),
     );
     if (value != null) setState(() => firstMatchDate = value);
@@ -7624,12 +7964,13 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       PageHeader(title: 'Crear torneo', subtitle: stepSubtitle(step), leading: true),
       const SizedBox(height: 10),
-      TournamentStepIndicator(step: step),
+      TournamentStepIndicator(step: step, total: 6),
       const SizedBox(height: 16),
       if (step == 0) _buildTypeStep()
-      else if (step == 1) _buildScoringStep()
-      else if (step == 2) _buildParticipantsStep()
-      else if (step == 3) _buildPairingsStep()
+      else if (step == 1) _buildParticipantsStep()
+      else if (step == 2) _buildFormatStep()
+      else if (step == 3) _buildScoringStep()
+      else if (step == 4) _buildCalendarStep()
       else _buildReviewStep(),
       const SizedBox(height: 18),
       Row(children: [
@@ -7637,81 +7978,24 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           Expanded(child: SecondaryButton(label: 'Volver', icon: Icons.arrow_back_rounded, onTap: () => setState(() => step--))),
           const SizedBox(width: 10),
         ],
-        Expanded(child: PrimaryButton(label: step == 4 ? 'Crear torneo' : 'Siguiente', icon: step == 4 ? Icons.emoji_events_rounded : Icons.arrow_forward_rounded, loading: loading, onTap: next)),
+        Expanded(child: PrimaryButton(label: step == 5 ? 'Crear torneo' : 'Siguiente', icon: step == 5 ? Icons.emoji_events_rounded : Icons.arrow_forward_rounded, loading: loading, onTap: next)),
       ]),
     ]));
   }
 
   Widget _buildTypeStep() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      FieldLabel('Elige el tipo de torneo'),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const FieldLabel('Nombre'),
+        TextField(controller: name, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(hintText: defaultTournamentName(format))),
+      ])),
+      const SizedBox(height: 12),
+      FieldLabel('Tipo de competición'),
       const SizedBox(height: 8),
-      TournamentBigChoice(
-        selected: format == 'liga',
-        icon: Icons.emoji_events_rounded,
-        title: 'Liga',
-        body: 'Todos contra todos por jornadas. Ideal para ligas largas.',
-        onTap: () => setState(() => format = 'liga'),
-      ),
-      TournamentBigChoice(
-        selected: format == 'eliminatoria',
-        icon: Icons.account_tree_rounded,
-        title: 'Eliminatoria',
-        body: 'Partidos de eliminación directa. Ideal para copas y playoffs.',
-        onTap: () => setState(() => format = 'eliminatoria'),
-      ),
-      TournamentBigChoice(
-        selected: format == 'americano',
-        icon: Icons.groups_rounded,
-        title: 'Americano',
-        body: 'Todos juegan varias rondas y se mantiene ranking. Ideal para grupos grandes.',
-        onTap: () => setState(() => format = 'americano'),
-      ),
-      TournamentBigChoice(
-        selected: format == 'manual',
-        icon: Icons.tune_rounded,
-        title: 'Manual',
-        badge: 'Recomendado',
-        body: 'Tú decides los emparejamientos. Máximo control para casos reales.',
-        onTap: () => setState(() => format = 'manual'),
-      ),
-    ]);
-  }
-
-  Widget _buildScoringStep() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      FieldLabel('Elige deporte y puntuación'),
-      const SizedBox(height: 8),
-      TournamentChoiceGrid(
-        value: scoringType,
-        options: const [
-          TournamentChoice('football', 'Fútbol', 'Goles · empate', Icons.sports_soccer_rounded),
-          TournamentChoice('tennis_padel', 'Pádel / Tenis', 'Sets y juegos', Icons.sports_tennis_rounded),
-          TournamentChoice('basketball', 'Basket', 'Puntos', Icons.sports_basketball_rounded),
-          TournamentChoice('cards_mus', 'Cartas / Mus', 'Tantos', Icons.style_rounded),
-          TournamentChoice('general', 'Libre', 'Simple 3/1/0', Icons.star_rounded),
-        ],
-        onChanged: (v) => setState(() => scoringType = v),
-      ),
-      const SizedBox(height: 14),
-      AppCard(
-        color: AppColors.redSoft,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Icon(Icons.rule_rounded, color: AppColors.red),
-            const SizedBox(width: 8),
-            Expanded(child: Text('Puntuación seleccionada: ${scoringTypeLabel(scoringType)}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
-          ]),
-          const SizedBox(height: 8),
-          Text(scoringConfigFullText(scoringType, scoringConfigForType(scoringType)), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
-          const SizedBox(height: 10),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            TournamentRuleChip(label: scoringUsesSetMode(scoringType) ? 'Resultado por sets' : 'Marcador simple'),
-            TournamentRuleChip(label: scoringAllowDraw(scoringType) ? 'Permite empate' : 'Sin empate'),
-            TournamentRuleChip(label: 'Victoria ${scoringWinPoints(scoringType)} pts'),
-          ]),
-        ]),
-      ),
+      TournamentBigChoice(selected: format == 'liga', icon: Icons.emoji_events_rounded, title: 'Liga', body: 'Jornadas, ida/vuelta, límite de jornadas y tabla automática.', onTap: () => setState(() => format = 'liga')),
+      TournamentBigChoice(selected: format == 'manual', icon: Icons.tune_rounded, title: 'Manual', badge: 'Más flexible', body: 'Partidos creados a mano, fechas individuales y máximo control.', onTap: () => setState(() => format = 'manual')),
+      TournamentBigChoice(selected: format == 'eliminatoria', icon: Icons.account_tree_rounded, title: 'Eliminatoria', body: 'Cuadro directo, byes, siguiente ronda y final.', onTap: () => setState(() => format = 'eliminatoria')),
+      TournamentBigChoice(selected: format == 'americano', icon: Icons.groups_rounded, title: 'Americano', body: 'Rondas rápidas con ranking; primera versión basada en rondas limitadas.', onTap: () => setState(() => format = 'americano')),
     ]);
   }
 
@@ -7731,7 +8015,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
       const SizedBox(height: 14),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Expanded(child: FieldLabel('Añade participantes')),
+          const Expanded(child: FieldLabel('Participantes')),
           TextButton.icon(onPressed: fillMembers, icon: const Icon(Icons.group_add_rounded, size: 18), label: const Text('Miembros')),
         ]),
         TextField(
@@ -7742,57 +8026,58 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             hintText: teamType == 'pareja' ? 'Ana / Javi\nMarta / Luis\nPádel Salvaje' : 'Los Invencibles del Viernes\nEquipo Azul\nPádel Salvaje',
-            helperText: 'Un participante por línea. Los nombres largos se mostrarán en dos líneas.',
+            helperText: 'Un participante por línea. Podrás renombrar o retirar después.',
           ),
         ),
         const SizedBox(height: 10),
-        Text('${participantNames.length} seleccionados', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+        Text('${participantNames.length} participantes preparados', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
       ])),
     ]);
   }
 
-  Widget _buildPairingsStep() {
-    final preview = draftMatches.take(12).toList();
-    final auto = format != 'manual' && pairings.text.trim().isEmpty;
+  Widget _buildFormatStep() {
+    final fullRounds = max(0, participantNames.length.isOdd ? participantNames.length : participantNames.length - 1);
+    final preview = draftMatches.take(10).toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      FieldLabel('Emparejamientos · Jornada 1'),
+      FieldLabel('Formato detallado'),
       const SizedBox(height: 8),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: Text(auto ? 'Generados automáticamente' : 'Manual activado', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
-          TournamentRuleChip(label: '${draftMatches.length} partidos'),
-        ]),
-        const SizedBox(height: 8),
-        Text(auto ? 'Puedes dejarlo así o escribir tus cruces manuales.' : 'Se usarán exactamente los cruces que escribas.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+        Text(tournamentFormatLabel(format), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 16)),
+        const SizedBox(height: 6),
+        Text(tournamentFormatSubtitle(format), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
         const SizedBox(height: 12),
-        TextField(
-          controller: pairings,
-          minLines: format == 'manual' ? 7 : 4,
-          maxLines: 10,
-          textCapitalization: TextCapitalization.words,
-          onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(
-            hintText: 'Jornada 1: Equipo Azul vs Los Invencibles\nJornada 1: Ana / Javi vs Marta / Luis\nJornada 2: Pádel Salvaje vs Anónimos FC',
-            helperText: 'Formato: Jornada X: Equipo A vs Equipo B',
-          ),
-        ),
+        if (format == 'liga') ...[
+          TournamentCounterRow(label: 'Vueltas', value: leagueLegs, min: 1, max: 4, onChanged: (v) => setState(() => leagueLegs = v), helper: leagueLegs == 1 ? 'Solo ida' : '$leagueLegs vueltas'),
+          TournamentCounterRow(label: 'Máximo de jornadas', value: leagueRoundsLimit, min: 0, max: max(1, fullRounds), zeroLabel: 'Todas', onChanged: (v) => setState(() => leagueRoundsLimit = v), helper: leagueRoundsLimit == 0 ? 'Liga completa ($fullRounds jornadas por vuelta)' : 'Liga parcial'),
+        ] else if (format == 'americano') ...[
+          TournamentCounterRow(label: 'Rondas', value: americanoRounds, min: 1, max: 20, onChanged: (v) => setState(() => americanoRounds = v), helper: 'Ranking por rondas'),
+          TournamentCounterRow(label: 'Pistas / mesas', value: courtsCount, min: 1, max: 8, onChanged: (v) => setState(() => courtsCount = v), helper: 'Partidos simultáneos'),
+        ] else if (format == 'eliminatoria') ...[
+          TournamentRuleChip(label: 'Sorteo por orden de participantes'),
+          const SizedBox(height: 8),
+          const Text('Si el número no cuadra, se crean pases directos automáticamente.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+        ] else ...[
+          const Text('Escribe los partidos a mano. Puedes poner Jornada 1, Jornada 2, etc.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+        ],
       ])),
       const SizedBox(height: 12),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Expanded(child: FieldLabel('Añadir todos los partidos a Agenda')),
-          Switch(value: addToAgenda, activeColor: AppColors.red, onChanged: (v) => setState(() => addToAgenda = v)),
+          Expanded(child: Text(format == 'manual' ? 'Emparejamientos manuales' : 'Cruces manuales opcionales', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+          TournamentRuleChip(label: '${draftMatches.length} partidos'),
         ]),
-        if (addToAgenda) ...[
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: SecondaryButton(label: DateFormat('d MMM', 'es_ES').format(firstMatchDate), icon: Icons.calendar_today_rounded, onTap: pickDate)),
-            const SizedBox(width: 10),
-            Expanded(child: SecondaryButton(label: firstMatchTime.format(context), icon: Icons.schedule_rounded, onTap: pickTime)),
-          ]),
-          const SizedBox(height: 8),
-          const Text('Se creará un evento por partido, separados por una hora.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
-        ],
+        const SizedBox(height: 8),
+        TextField(
+          controller: pairings,
+          minLines: format == 'manual' ? 8 : 4,
+          maxLines: 12,
+          textCapitalization: TextCapitalization.words,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            hintText: 'Jornada 1: Equipo Azul vs Los Invencibles\nJornada 1: Ana / Javi vs Marta / Luis\nJornada 2: Pádel Salvaje vs Anónimos FC',
+            helperText: 'Si lo rellenas, la app usará estos cruces.',
+          ),
+        ),
       ])),
       const SizedBox(height: 14),
       SectionHeader(title: 'Vista previa'),
@@ -7804,33 +8089,113 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
     ]);
   }
 
+  Widget _buildScoringStep() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      FieldLabel('Deporte y resultado'),
+      const SizedBox(height: 8),
+      TournamentChoiceGrid(
+        value: scoringType,
+        options: const [
+          TournamentChoice('football', 'Fútbol', 'Goles · empate', Icons.sports_soccer_rounded),
+          TournamentChoice('tennis_padel', 'Pádel / Tenis', 'Sets y juegos', Icons.sports_tennis_rounded),
+          TournamentChoice('basketball', 'Basket', 'Puntos', Icons.sports_basketball_rounded),
+          TournamentChoice('cards_mus', 'Cartas / Mus', 'Tantos', Icons.style_rounded),
+          TournamentChoice('general', 'Libre', 'Simple 3/1/0', Icons.star_rounded),
+        ],
+        onChanged: (v) => setState(() => applyScoringDefaults(v)),
+      ),
+      const SizedBox(height: 14),
+      AppCard(color: AppColors.redSoft, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.rule_rounded, color: AppColors.red),
+          const SizedBox(width: 8),
+          Expanded(child: Text('Resultado del partido: ${scoringTypeLabel(scoringType)}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+        ]),
+        const SizedBox(height: 8),
+        Text(scoringConfigFullText(scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          TournamentRuleChip(label: scoringUsesSetMode(scoringType, scoringConfig) ? 'Resultado por sets' : 'Marcador simple'),
+          TournamentRuleChip(label: scoringAllowDraw(scoringType, scoringConfig) ? 'Permite empate' : 'Sin empate'),
+          if (targetScore > 0) TournamentRuleChip(label: 'Hasta $targetScore ${scoringScoreLabel(scoringType, scoringConfig)}'),
+        ]),
+      ])),
+      const SizedBox(height: 12),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Puntos de clasificación', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 8),
+        TournamentCounterRow(label: 'Victoria', value: winPoints, min: 0, max: 10, onChanged: (v) => setState(() => winPoints = v)),
+        if (scoringAllowDraw(scoringType, scoringConfig)) TournamentCounterRow(label: 'Empate', value: drawPoints, min: 0, max: 10, onChanged: (v) => setState(() => drawPoints = v)),
+        TournamentCounterRow(label: 'Derrota', value: lossPoints, min: -3, max: 5, onChanged: (v) => setState(() => lossPoints = v)),
+        TournamentCounterRow(label: 'Objetivo del partido', value: targetScore, min: 0, max: 99, zeroLabel: 'Libre', onChanged: (v) => setState(() => targetScore = v), helper: 'Ej: mus a 30, ping-pong a 11'),
+        if (scoringUsesSetMode(scoringType, scoringConfig)) TournamentCounterRow(label: 'Mejor de', value: bestOf, min: 1, max: 7, onChanged: (v) => setState(() => bestOf = v.isEven ? v + 1 : v), helper: 'Sets/rondas'),
+      ])),
+      const SizedBox(height: 12),
+      AppCard(color: AppColors.faint, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Desempates', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 8),
+        Text(defaultTieBreakers(scoringType).map(tieBreakerLabel).join(' → '), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+      ])),
+    ]);
+  }
+
+  Widget _buildCalendarStep() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      FieldLabel('Calendario de partidos'),
+      const SizedBox(height: 8),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Expanded(child: Text('Programar fechas', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+          Switch(value: scheduleMatches, activeThumbColor: AppColors.red, onChanged: (v) => setState(() => scheduleMatches = v)),
+        ]),
+        if (scheduleMatches) ...[
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: SecondaryButton(label: DateFormat('d MMM', 'es_ES').format(firstMatchDate), icon: Icons.calendar_today_rounded, onTap: pickDate)),
+            const SizedBox(width: 10),
+            Expanded(child: SecondaryButton(label: firstMatchTime.format(context), icon: Icons.schedule_rounded, onTap: pickTime)),
+          ]),
+          const SizedBox(height: 10),
+          TournamentCounterRow(label: 'Días entre jornadas', value: daysBetweenRounds, min: 0, max: 30, onChanged: (v) => setState(() => daysBetweenRounds = v)),
+          TournamentCounterRow(label: 'Duración partido', value: durationMinutes, min: 15, max: 240, stepValue: 5, onChanged: (v) => setState(() => durationMinutes = v), helper: 'minutos'),
+          TournamentCounterRow(label: 'Separación entre partidos', value: intervalMinutes, min: 15, max: 240, stepValue: 5, onChanged: (v) => setState(() => intervalMinutes = v), helper: 'minutos'),
+        ],
+      ])),
+      const SizedBox(height: 12),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Expanded(child: Text('Añadir a Agenda del grupo', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+          Switch(value: addToAgenda, activeThumbColor: AppColors.red, onChanged: scheduleMatches ? (v) => setState(() => addToAgenda = v) : null),
+        ]),
+        const SizedBox(height: 8),
+        TextField(controller: location, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Ubicación opcional', hintText: 'Polideportivo, bar, casa de Ana...')),
+        const SizedBox(height: 8),
+        TextField(controller: courtName, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Pista / mesa / campo opcional', hintText: 'Pista 2, Mesa 1...')),
+      ])),
+    ]);
+  }
+
   Widget _buildReviewStep() {
     final title = name.text.trim().isEmpty ? defaultTournamentName(format) : name.text.trim();
     final names = participantNames;
     final matches = draftMatches;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const FieldLabel('Nombre del torneo'),
-        TextField(controller: name, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(hintText: title)),
+      AppCard(color: AppColors.faint, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        TournamentReviewRow(label: 'Nombre', value: title),
+        TournamentReviewRow(label: 'Formato', value: tournamentFormatLabel(format)),
+        TournamentReviewRow(label: 'Participantes', value: '${names.length}'),
+        TournamentReviewRow(label: 'Partidos previstos', value: '${matches.length}'),
+        TournamentReviewRow(label: 'Puntuación', value: '${scoringTypeLabel(scoringType)} · V$winPoints ${scoringAllowDraw(scoringType, scoringConfig) ? 'E$drawPoints ' : ''}D$lossPoints'),
+        TournamentReviewRow(label: 'Calendario', value: scheduleMatches ? '${DateFormat('d MMM', 'es_ES').format(firstMatchDate)} · ${firstMatchTime.format(context)}' : 'Sin fechas'),
+        TournamentReviewRow(label: 'Agenda', value: addToAgenda && scheduleMatches ? 'Sí' : 'No'),
       ])),
-      const SizedBox(height: 12),
-      AppCard(
-        color: AppColors.faint,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          TournamentReviewRow(label: 'Formato', value: tournamentFormatLabel(format)),
-          TournamentReviewRow(label: 'Puntuación', value: scoringTypeLabel(scoringType)),
-          TournamentReviewRow(label: 'Participantes', value: '${names.length}'),
-          TournamentReviewRow(label: 'Partidos', value: '${matches.length}'),
-          TournamentReviewRow(label: 'Agenda', value: addToAgenda ? 'Sí · ${DateFormat('d MMM', 'es_ES').format(firstMatchDate)} ${firstMatchTime.format(context)}' : 'No'),
-        ]),
-      ),
       const SizedBox(height: 12),
       SectionHeader(title: 'Primeros partidos'),
       const SizedBox(height: 8),
       if (matches.isEmpty)
-        EmptySlim(icon: Icons.info_outline_rounded, title: 'Se generarán al crear', body: 'La liga o copa generará cruces con los participantes añadidos.')
+        EmptySlim(icon: Icons.info_outline_rounded, title: 'Se generarán al crear', body: 'La app generará los cruces con los participantes añadidos.')
       else
-        ...matches.take(5).map((m) => TournamentDraftMatchTile(match: m)),
+        ...matches.take(6).map((m) => TournamentDraftMatchTile(match: m)),
     ]);
   }
 }
@@ -7934,7 +8299,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
     final pairs = parseTournamentPairings(value ?? '');
     if (pairs.isEmpty) return;
     try {
-      await AppData.addManualMatches(widget.tournamentId, tournamentTeams(t), pairs);
+      await AppData.addManualMatches(widget.tournamentId, tournamentTeams(t), pairs, scheduleConfig: tournamentScheduleConfig(t));
       await load(soft: true);
       if (mounted) await showToast(context, 'Partidos añadidos.');
     } catch (e) {
@@ -7967,7 +8332,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
       if (ok != true) return;
     }
     try {
-      await AppData.generateMatches(widget.tournamentId, format, teams);
+      await AppData.generateMatches(widget.tournamentId, format, teams, formatConfig: tournamentFormatConfig(t), scheduleConfig: tournamentScheduleConfig(t));
       await load(soft: true);
       if (mounted) await showToast(context, 'Calendario generado.');
     } catch (e) {
@@ -8056,6 +8421,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
             onGenerate: regenerate,
             onManualMatches: addManualMatches,
             onNextRound: format == 'eliminatoria' ? nextRound : null,
+            onChanged: () => load(soft: true),
           )
         else if (tab == 1)
           TournamentMatchesPanel(
@@ -8069,8 +8435,17 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
           TournamentStandingsPanel(standings: standings, scoringType: scoringType, scoringConfig: scoringConfig)
         else if (tab == 3)
           TournamentStatsPanel(standings: standings, matches: matches, teams: teams, scoringType: scoringType, scoringConfig: scoringConfig)
+        else if (tab == 4)
+          TournamentTeamsPanel(teams: teams, matches: matches, onChanged: () => load(soft: true), onAdd: addParticipants)
         else
-          TournamentTeamsPanel(teams: teams, matches: matches, onChanged: () => load(soft: true), onAdd: addParticipants),
+          TournamentSettingsPanel(
+            tournament: t ?? {},
+            matches: matches,
+            onRegenerate: regenerate,
+            onManualMatches: addManualMatches,
+            onSetStatus: setStatus,
+            onDelete: deleteTournament,
+          ),
         const SizedBox(height: 16),
         AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           SecondaryButton(label: format == 'manual' ? 'Añadir partidos manuales' : 'Regenerar calendario', icon: format == 'manual' ? Icons.add_link_rounded : Icons.refresh_rounded, onTap: regenerate),
@@ -8170,9 +8545,9 @@ class TournamentActiveCard extends StatelessWidget {
             Text(AppData.text(tournament['name'], 'Competición'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05)),
             const SizedBox(height: 5),
             Row(children: [
-              Container(width: 6, height: 6, decoration: BoxDecoration(color: status == 'finished' ? AppColors.muted : AppColors.green, shape: BoxShape.circle)),
+              Container(width: 6, height: 6, decoration: BoxDecoration(color: tournamentStatusColor(status), shape: BoxShape.circle)),
               const SizedBox(width: 5),
-              Expanded(child: Text(status == 'finished' ? 'Finalizado' : 'En curso', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w800, fontSize: 12))),
+              Expanded(child: Text(tournamentStatusLabel(status), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: tournamentStatusColor(status), fontWeight: FontWeight.w800, fontSize: 12))),
               Text('Jornada ${currentTournamentRound(matches)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11)),
             ]),
             if (!compact) ...[
@@ -8207,6 +8582,8 @@ class TournamentDashboardMatchCard extends StatelessWidget {
             Text(AppData.text(item.tournament['name'], 'Torneo'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11)),
             const SizedBox(height: 2),
             Text('${item.teamA}  vs  ${item.teamB}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05)),
+            const SizedBox(height: 2),
+            Text(tournamentMatchDateText(item.match), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 10)),
           ])),
           const SizedBox(width: 8),
           Container(
@@ -8263,13 +8640,14 @@ class TournamentEmptyState extends StatelessWidget {
 
 class TournamentStepIndicator extends StatelessWidget {
   final int step;
-  const TournamentStepIndicator({super.key, required this.step});
+  final int total;
+  const TournamentStepIndicator({super.key, required this.step, this.total = 5});
   @override
-  Widget build(BuildContext context) => Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(5, (index) {
+  Widget build(BuildContext context) => Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(total, (index) {
     final selected = index == step;
     final done = index < step;
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 5),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
       width: selected ? 27 : 22,
       height: selected ? 27 : 22,
       decoration: BoxDecoration(color: selected || done ? AppColors.red : AppColors.faint, shape: BoxShape.circle, border: Border.all(color: selected || done ? AppColors.red : AppColors.line)),
@@ -8399,6 +8777,41 @@ class TournamentReviewRow extends StatelessWidget {
   );
 }
 
+
+class TournamentCounterRow extends StatelessWidget {
+  final String label;
+  final int value;
+  final int min;
+  final int max;
+  final int stepValue;
+  final String? zeroLabel;
+  final String? helper;
+  final ValueChanged<int> onChanged;
+  const TournamentCounterRow({super.key, required this.label, required this.value, required this.min, required this.max, this.stepValue = 1, this.zeroLabel, this.helper, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = value == 0 && zeroLabel != null ? zeroLabel! : value.toString();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(children: [
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+          if (helper != null) Text(helper!, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11)),
+        ])),
+        IconButton(onPressed: value <= min ? null : () => onChanged(value - stepValue < min ? min : value - stepValue), icon: const Icon(Icons.remove_circle_outline_rounded)),
+        Container(
+          width: 58,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.line)),
+          child: Text(shown, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        ),
+        IconButton(onPressed: value >= max ? null : () => onChanged(value + stepValue > max ? max : value + stepValue), icon: const Icon(Icons.add_circle_outline_rounded)),
+      ]),
+    );
+  }
+}
+
 class TournamentDetailHero extends StatelessWidget {
   final Map<String, dynamic> tournament;
   final TeamStanding? leader;
@@ -8478,6 +8891,7 @@ class TournamentTabsBar extends StatelessWidget {
       ('Tabla', Icons.table_chart_rounded),
       ('Stats', Icons.query_stats_rounded),
       ('Equipos', Icons.groups_rounded),
+      ('Ajustes', Icons.tune_rounded),
     ];
     return Container(
       padding: const EdgeInsets.all(4),
@@ -8509,7 +8923,8 @@ class TournamentOverviewPanel extends StatelessWidget {
   final VoidCallback onGenerate;
   final VoidCallback onManualMatches;
   final VoidCallback? onNextRound;
-  const TournamentOverviewPanel({super.key, required this.tournament, required this.teams, required this.matches, required this.standings, required this.onAddParticipants, required this.onGenerate, required this.onManualMatches, this.onNextRound});
+  final VoidCallback onChanged;
+  const TournamentOverviewPanel({super.key, required this.tournament, required this.teams, required this.matches, required this.standings, required this.onAddParticipants, required this.onGenerate, required this.onManualMatches, this.onNextRound, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -8534,7 +8949,7 @@ class TournamentOverviewPanel extends StatelessWidget {
         if (pending.isEmpty)
           EmptySlim(icon: Icons.verified_rounded, title: 'Todo jugado', body: onNextRound == null ? 'Puedes marcar la competición como finalizada.' : 'Puedes generar la siguiente ronda.')
         else
-          ...pending.map((m) => TournamentSimpleMatchCard(match: m, teams: teams, scoringType: AppData.text(tournament['scoring_type'], 'general'), scoringConfig: tournament['scoring_config'], onChanged: () {})),
+          ...pending.map((m) => TournamentSimpleMatchCard(match: m, teams: teams, scoringType: AppData.text(tournament['scoring_type'], 'general'), scoringConfig: tournament['scoring_config'], onChanged: onChanged)),
         if (onNextRound != null) ...[
           const SizedBox(height: 10),
           SecondaryButton(label: 'Generar siguiente ronda', icon: Icons.account_tree_rounded, onTap: onNextRound!),
@@ -8631,24 +9046,74 @@ class TournamentSimpleMatchCard extends StatelessWidget {
     final bId = AppData.text(match['team_b']);
     final aName = names[aId] ?? 'Pendiente';
     final bName = bId.isEmpty || bId == 'null' ? 'Pase directo' : names[bId] ?? 'Pendiente';
-    final played = AppData.text(match['status']) == 'played';
+    final status = AppData.text(match['status'], 'pending');
+    final played = status == 'played';
     final detailScore = matchDetailScoreText(match, scoringType, scoringConfig);
-    final score = played ? '${AppData.intValue(match['score_a'])} - ${AppData.intValue(match['score_b'])}' : 'Pendiente';
+    final score = played ? '${AppData.intValue(match['score_a'])} - ${AppData.intValue(match['score_b'])}' : matchStatusLabel(status);
+    final dateText = tournamentMatchDateText(match);
+    final statusColor = matchStatusColor(status);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
         onTap: () => showMatchResultDialog(context, match: match, teams: teams, scoringType: scoringType, scoringConfig: scoringConfig, onChanged: onChanged),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        child: Row(children: [
-          SizedBox(width: 40, child: Text('${AppData.intValue(match['round'], 1)}', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900))),
-          Expanded(child: Text(aName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05))),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Column(children: [
-            Text(score, style: TextStyle(color: played ? AppColors.green : AppColors.orange, fontWeight: FontWeight.w900, fontSize: 12)),
-            if (detailScore != null) Text(detailScore, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 9)),
-          ])),
-          Expanded(child: Text(bName, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05))),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: statusColor.withOpacity(.12), borderRadius: BorderRadius.circular(999)),
+              child: Text(AppData.text(match['round_name'], 'Jornada ${AppData.intValue(match['round'], 1)}'), style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 10)),
+            ),
+            const SizedBox(width: 6),
+            Expanded(child: Text(dateText, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11))),
+            PopupMenuButton<String>(
+              onSelected: (value) async {
+                if (value == 'result') {
+                  await showMatchResultDialog(context, match: match, teams: teams, scoringType: scoringType, scoringConfig: scoringConfig, onChanged: onChanged);
+                } else if (value == 'schedule') {
+                  await showMatchScheduleDialog(context, match: match, teams: teams, onChanged: onChanged);
+                } else if (value == 'postponed' || value == 'cancelled' || value == 'pending') {
+                  try {
+                    await AppData.updateMatchStatus(match['id'].toString(), value);
+                    onChanged();
+                  } catch (e) {
+                    if (context.mounted) await showToast(context, humanError(e), danger: true);
+                  }
+                } else if (value == 'reopen') {
+                  try {
+                    await AppData.reopenMatch(match['id'].toString());
+                    onChanged();
+                  } catch (e) {
+                    if (context.mounted) await showToast(context, humanError(e), danger: true);
+                  }
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'result', child: Text('Registrar resultado')),
+                PopupMenuItem(value: 'schedule', child: Text('Cambiar fecha / pista')),
+                PopupMenuItem(value: 'postponed', child: Text('Marcar aplazado')),
+                PopupMenuItem(value: 'cancelled', child: Text('Cancelar partido')),
+                PopupMenuItem(value: 'pending', child: Text('Volver a pendiente')),
+                PopupMenuItem(value: 'reopen', child: Text('Borrar resultado')),
+              ],
+            ),
+          ]),
+          const SizedBox(height: 9),
+          Row(children: [
+            Expanded(child: Text(aName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05))),
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Column(children: [
+              Text(score, style: TextStyle(color: played ? AppColors.green : statusColor, fontWeight: FontWeight.w900, fontSize: 12)),
+              if (detailScore != null) Text(detailScore, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 9)),
+            ])),
+            Expanded(child: Text(bName, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05))),
+          ]),
+          if (AppData.text(match['court_name']).isNotEmpty || AppData.text(match['location']).isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text([
+              if (AppData.text(match['court_name']).isNotEmpty) AppData.text(match['court_name']),
+              if (AppData.text(match['location']).isNotEmpty) AppData.text(match['location']),
+            ].join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11)),
+          ],
         ]),
       ),
     );
@@ -8819,6 +9284,63 @@ class TournamentMetricCard extends StatelessWidget {
   );
 }
 
+
+class TournamentSettingsPanel extends StatelessWidget {
+  final Map<String, dynamic> tournament;
+  final List<Map<String, dynamic>> matches;
+  final VoidCallback onRegenerate;
+  final VoidCallback onManualMatches;
+  final ValueChanged<String> onSetStatus;
+  final VoidCallback onDelete;
+  const TournamentSettingsPanel({super.key, required this.tournament, required this.matches, required this.onRegenerate, required this.onManualMatches, required this.onSetStatus, required this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    final format = AppData.text(tournament['format'], 'liga');
+    final scoringType = AppData.text(tournament['scoring_type'], 'general');
+    final scoringConfig = resolvedScoringConfig(scoringType, tournament['scoring_config']);
+    final formatConfig = tournamentFormatConfig(tournament);
+    final scheduleConfig = tournamentScheduleConfig(tournament);
+    final status = AppData.text(tournament['status'], 'active');
+    final scheduled = matches.where((m) => AppData.text(m['scheduled_at']).isNotEmpty).length;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Configuración del torneo', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 16)),
+        const SizedBox(height: 10),
+        TournamentReviewRow(label: 'Estado', value: tournamentStatusLabel(status)),
+        TournamentReviewRow(label: 'Formato', value: tournamentFormatLabel(format)),
+        TournamentReviewRow(label: 'Participantes', value: teamTypeLabel(AppData.text(tournament['team_type'], 'equipo'))),
+        TournamentReviewRow(label: 'Puntuación', value: scoringConfigShortText(scoringType, scoringConfig)),
+        TournamentReviewRow(label: 'Jornadas límite', value: AppData.intValue(formatConfig['max_rounds']) == 0 ? 'Todas' : '${AppData.intValue(formatConfig['max_rounds'])}'),
+        TournamentReviewRow(label: 'Vueltas', value: '${AppData.intValue(formatConfig['legs'], 1)}'),
+        TournamentReviewRow(label: 'Partidos con fecha', value: '$scheduled/${matches.length}'),
+        TournamentReviewRow(label: 'Agenda', value: scheduleConfig['add_to_agenda'] == true ? 'Activada' : 'No'),
+      ])),
+      const SizedBox(height: 12),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(format == 'manual' ? 'Partidos manuales' : 'Calendario y cruces', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 8),
+        Text('Si regeneras, se borran los partidos y resultados actuales. Úsalo solo antes de empezar o si quieres rehacer el torneo.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+        const SizedBox(height: 12),
+        SecondaryButton(label: format == 'manual' ? 'Añadir partidos manuales' : 'Regenerar partidos', icon: format == 'manual' ? Icons.add_link_rounded : Icons.refresh_rounded, onTap: format == 'manual' ? onManualMatches : onRegenerate),
+      ])),
+      const SizedBox(height: 12),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Estado', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          ActionChip(label: const Text('Programado'), onPressed: () => onSetStatus('scheduled')),
+          ActionChip(label: const Text('En curso'), onPressed: () => onSetStatus('active')),
+          ActionChip(label: const Text('Pausado'), onPressed: () => onSetStatus('paused')),
+          ActionChip(label: const Text('Finalizado'), onPressed: () => onSetStatus('finished')),
+        ]),
+      ])),
+      const SizedBox(height: 12),
+      DangerButton(label: 'Eliminar competición', icon: Icons.delete_outline_rounded, onTap: onDelete),
+    ]);
+  }
+}
+
 class TournamentTeamsPanel extends StatelessWidget {
   final List<Map<String, dynamic>> teams;
   final List<Map<String, dynamic>> matches;
@@ -8873,6 +9395,78 @@ class TournamentTeamCard extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+
+Future<void> showMatchScheduleDialog(BuildContext context, {required Map<String, dynamic> match, required List<Map<String, dynamic>> teams, required VoidCallback onChanged}) async {
+  final scheduled = DateTime.tryParse(AppData.text(match['scheduled_at']))?.toLocal();
+  DateTime selectedDate = scheduled ?? DateTime.now().add(const Duration(days: 1));
+  TimeOfDay selectedTime = scheduled == null ? const TimeOfDay(hour: 20, minute: 0) : TimeOfDay(hour: scheduled.hour, minute: scheduled.minute);
+  final duration = TextEditingController(text: AppData.text(match['duration_minutes']).isEmpty ? '60' : AppData.text(match['duration_minutes']));
+  final location = TextEditingController(text: AppData.text(match['location']));
+  final court = TextEditingController(text: AppData.text(match['court_name']));
+  final notes = TextEditingController(text: AppData.text(match['notes']));
+  var clearDate = false;
+
+  final result = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setLocal) => AlertDialog(
+        title: const Text('Fecha del partido'),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: SecondaryButton(label: DateFormat('d MMM', 'es_ES').format(selectedDate), icon: Icons.calendar_today_rounded, onTap: () async {
+              final picked = await showDatePicker(
+                context: dialogContext,
+                initialDate: selectedDate,
+                firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                lastDate: DateTime.now().add(const Duration(days: 730)),
+                locale: const Locale('es', 'ES'),
+              );
+              if (picked != null) setLocal(() { selectedDate = picked; clearDate = false; });
+            })),
+            const SizedBox(width: 8),
+            Expanded(child: SecondaryButton(label: selectedTime.format(dialogContext), icon: Icons.schedule_rounded, onTap: () async {
+              final picked = await showTimePicker(context: dialogContext, initialTime: selectedTime);
+              if (picked != null) setLocal(() { selectedTime = picked; clearDate = false; });
+            })),
+          ]),
+          CheckboxListTile(
+            value: clearDate,
+            onChanged: (v) => setLocal(() => clearDate = v == true),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Dejar sin fecha'),
+          ),
+          TextField(controller: duration, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: const InputDecoration(labelText: 'Duración en minutos')),
+          const SizedBox(height: 8),
+          TextField(controller: location, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Ubicación')),
+          const SizedBox(height: 8),
+          TextField(controller: court, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Pista / mesa / campo')),
+          const SizedBox(height: 8),
+          TextField(controller: notes, minLines: 2, maxLines: 4, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Notas')),
+        ])),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, 'save'), child: const Text('Guardar')),
+        ],
+      ),
+    ),
+  );
+
+  try {
+    if (result == 'save') {
+      final start = clearDate ? null : DateTime(selectedDate.year, selectedDate.month, selectedDate.day, selectedTime.hour, selectedTime.minute);
+      await AppData.updateMatchSchedule(match['id'].toString(), start, int.tryParse(duration.text.trim()) ?? 60, location.text, court.text, notes.text);
+      onChanged();
+    }
+  } catch (e) {
+    if (context.mounted) await showToast(context, humanError(e), danger: true);
+  } finally {
+    duration.dispose();
+    location.dispose();
+    court.dispose();
+    notes.dispose();
   }
 }
 
@@ -9010,10 +9604,11 @@ String defaultTournamentName(String format) {
 
 String stepSubtitle(int step) {
   switch (step) {
-    case 0: return 'Elige la estructura que mejor se adapta al grupo.';
-    case 1: return 'Configura cómo se anotan y calculan los resultados.';
-    case 2: return 'Añade equipos, parejas o jugadores.';
-    case 3: return 'Revisa o escribe los emparejamientos.';
+    case 0: return 'Nombre y tipo de competición.';
+    case 1: return 'Añade equipos, parejas o jugadores.';
+    case 2: return 'Jornadas, vueltas, rondas y emparejamientos.';
+    case 3: return 'Resultado del partido y puntos de clasificación.';
+    case 4: return 'Fechas, duración, pista y Agenda.';
     default: return 'Comprueba todo antes de crear.';
   }
 }
@@ -9055,7 +9650,12 @@ List<String> mergeTournamentNames(List<String> values) {
   return output;
 }
 
-List<TournamentDraftMatch> previewPairingsForFormat(String format, List<String> names) {
+List<TournamentDraftMatch> previewPairingsForFormat(
+  String format,
+  List<String> names, {
+  int legs = 1,
+  int maxRounds = 0,
+}) {
   final clean = mergeTournamentNames(names);
   if (clean.length < 2) return const [];
   final rows = <TournamentDraftMatch>[];
@@ -9063,19 +9663,26 @@ List<TournamentDraftMatch> previewPairingsForFormat(String format, List<String> 
     for (var i = 0; i + 1 < clean.length; i += 2) {
       rows.add(TournamentDraftMatch(round: 1, teamAName: clean[i], teamBName: clean[i + 1]));
     }
+    if (clean.length.isOdd) {
+      rows.add(TournamentDraftMatch(round: 1, teamAName: clean.last, teamBName: 'Pase directo'));
+    }
     return rows;
   }
+
   final rotation = <String?>[...clean];
   if (rotation.length.isOdd) rotation.add(null);
   final n = rotation.length;
+  final generated = <List<TournamentDraftMatch>>[];
   for (var round = 1; round < n; round++) {
+    final roundRows = <TournamentDraftMatch>[];
     for (var i = 0; i < n ~/ 2; i++) {
       final a = rotation[i];
       final b = rotation[n - 1 - i];
       if (a == null || b == null) continue;
       final swap = round.isEven;
-      rows.add(TournamentDraftMatch(round: round, teamAName: swap ? b : a, teamBName: swap ? a : b));
+      roundRows.add(TournamentDraftMatch(round: round, teamAName: swap ? b : a, teamBName: swap ? a : b));
     }
+    generated.add(roundRows);
     final fixed = rotation.first;
     final rest = rotation.sublist(1);
     rest.insert(0, rest.removeLast());
@@ -9083,6 +9690,17 @@ List<TournamentDraftMatch> previewPairingsForFormat(String format, List<String> 
       ..clear()
       ..add(fixed)
       ..addAll(rest);
+  }
+  final limited = maxRounds > 0 ? generated.take(maxRounds).toList() : generated;
+  for (var leg = 1; leg <= max(1, legs); leg++) {
+    for (var r = 0; r < limited.length; r++) {
+      final targetRound = r + 1 + ((leg - 1) * limited.length);
+      for (final match in limited[r]) {
+        rows.add(leg.isOdd
+            ? TournamentDraftMatch(round: targetRound, teamAName: match.teamAName, teamBName: match.teamBName)
+            : TournamentDraftMatch(round: targetRound, teamAName: match.teamBName, teamBName: match.teamAName));
+      }
+    }
   }
   return rows;
 }
