@@ -220,3 +220,8 @@ Fix de Torneos: corregido `setState` que devolvía `Future` al crear/abrir una c
 ## v15.33
 
 Torneos/Ligas reconstruidos: participantes por nombres, equipos/parejas, round-robin real por jornadas, eliminatoria con BYE y puntuación por deporte.
+
+
+## v15.34
+
+Torneos/Ligas reconstruidos de raíz con flujo más simple, equipos, partidos, resultados y clasificación.
