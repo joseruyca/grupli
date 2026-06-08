@@ -8336,7 +8336,7 @@ class TournamentChoiceGrid extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: Container(
           width: 102,
-          minHeight: 90,
+          constraints: const BoxConstraints(minHeight: 90),
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: selected ? AppColors.redSoft : AppColors.surface,
