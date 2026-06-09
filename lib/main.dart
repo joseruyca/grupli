@@ -16234,9 +16234,9 @@ class GlassAttendanceButton extends StatelessWidget {
   const GlassAttendanceButton({super.key, required this.label, required this.count, required this.selected, required this.color, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => InkWell(
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
     onTap: onTap,
-    borderRadius: BorderRadius.circular(15),
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       height: 42,
@@ -17774,7 +17774,7 @@ class AgendaPremiumHero extends StatelessWidget {
 
     if (next != null) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        DashboardEventCard(event: next, group: group, onChanged: onChanged),
+        EventAgendaCard(event: next, group: group, onChanged: onChanged),
         const SizedBox(height: 10),
         AgendaMatteStatsRow(
           events: events.length,
@@ -17913,9 +17913,9 @@ class _AgendaSwitchItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         height: 42,
@@ -17988,9 +17988,9 @@ class _RoundIconButton extends StatelessWidget {
   const _RoundIconButton({required this.icon, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => InkWell(
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
     onTap: onTap,
-    borderRadius: BorderRadius.circular(15),
     child: Container(
       width: 40,
       height: 40,
@@ -18021,9 +18021,9 @@ class PremiumWeekStrip extends StatelessWidget {
       return Expanded(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: InkWell(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () => onSelect(day),
-            borderRadius: BorderRadius.circular(18),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               height: 82,
@@ -18104,9 +18104,9 @@ class PremiumMonthCalendar extends StatelessWidget {
             return Expanded(
               child: SizedBox(
                 height: 46,
-                child: InkWell(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () => onSelect(day),
-                  borderRadius: BorderRadius.circular(15),
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
@@ -18505,9 +18505,9 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
             Expanded(child: Padding(
               padding: const EdgeInsets.all(11),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                InkWell(
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: open,
-                  borderRadius: BorderRadius.circular(16),
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Container(
                       width: 46,
@@ -18580,9 +18580,9 @@ class CompactAttendanceButton extends StatelessWidget {
   final VoidCallback onTap;
   const CompactAttendanceButton({super.key, required this.label, required this.count, required this.selected, required this.color, required this.onTap});
   @override
-  Widget build(BuildContext context) => InkWell(
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
     onTap: onTap,
-    borderRadius: BorderRadius.circular(12),
     child: Container(
       height: 38,
       decoration: BoxDecoration(color: selected ? color.withOpacity(.12) : Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: selected ? color : AppColors.lineSoft)),
