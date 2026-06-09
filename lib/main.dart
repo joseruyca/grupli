@@ -12637,7 +12637,7 @@ Future<TournamentEditorDraft?> showTournamentEditorDialog(BuildContext context, 
               scoringType: hasResults ? originalScoringType : scoringType,
               scoringConfig: hasResults ? resolvedScoringConfig(originalScoringType, tournament['scoring_config']) : nextCfg,
               formatConfig: hasResults ? originalFormatConfig : nextFormat,
-              tieBreakers: hasResults ? tournamentTieBreakers(tournament) : defaultTieBreakers(scoringType),
+              tieBreakers: hasResults ? tournamentTieBreakers(tournament, originalScoringType) : defaultTieBreakers(scoringType),
               rulesChanged: rulesChanged,
             ));
           }, child: const Text('Guardar')),
