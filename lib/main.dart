@@ -10014,6 +10014,8 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
             onRegenerate: regenerate,
             onManualMatches: addManualMatches,
             onBulkSchedule: reprogramTournamentCalendar,
+            onAddParticipants: addParticipants,
+            onCheckIn: () => showTournamentCheckInDialog(context, teams: teams),
             onEditTournament: editTournamentRules,
             onHistory: showFullHistory,
             onSetStatus: setStatus,
@@ -11266,17 +11268,6 @@ class TournamentOverviewPanel extends StatelessWidget {
                 ? 'Todos los partidos están jugados. Revisa la tabla y finaliza desde Ajustes.'
                 : 'Toca un partido para registrar resultado, cambiar fecha o aplazarlo.';
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      TournamentEditFocusCard(
-        tournament: tournament,
-        teams: teams,
-        matches: matches,
-        standings: standings,
-        onAddParticipants: onAddParticipants,
-        onBulkSchedule: onBulkSchedule,
-        onManualMatches: onManualMatches,
-        onCheckIn: () => showTournamentCheckInDialog(context, teams: teams),
-      ),
-      const SizedBox(height: 12),
       TournamentNextStepCard(title: nextTitle, body: nextBody, icon: teams.length < 2 ? Icons.group_add_rounded : matches.isEmpty ? Icons.auto_awesome_motion_rounded : pendingAll.isEmpty ? Icons.verified_rounded : Icons.sports_score_rounded),
       const SizedBox(height: 12),
       if (teams.length < 2)
@@ -12021,19 +12012,7 @@ class TournamentStandingsPanel extends StatelessWidget {
     if (standings.isEmpty) return EmptySlim(icon: Icons.table_chart_rounded, title: 'Sin tabla todavía', body: 'Registra resultados para calcular la clasificación.');
     final isAmericano = matches.any(isAmericanoMatch);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      TournamentTieBreakersInfoCard(tieBreakers: tieBreakers),
-      const SizedBox(height: 12),
-      SectionHeader(title: isAmericano ? 'Ranking individual' : 'Clasificación rápida'),
-      const SizedBox(height: 8),
-      ...List.generate(standings.length, (index) => TournamentStandingRankCard(
-        position: index + 1,
-        standing: standings[index],
-        scoringType: scoringType,
-        scoringConfig: scoringConfig,
-        explanation: standingRankReason(index, standings, tieBreakers, scoringType, scoringConfig),
-      )),
-      const SizedBox(height: 12),
-      SectionHeader(title: 'Tabla completa'),
+      SectionHeader(title: isAmericano ? 'Ranking completo' : 'Tabla completa'),
       const SizedBox(height: 8),
       AppCard(
         padding: const EdgeInsets.all(10),
@@ -12060,8 +12039,8 @@ class TournamentStandingsPanel extends StatelessWidget {
             rows: List.generate(standings.length, (index) {
               final s = standings[index];
               return DataRow(cells: [
-                DataCell(Text('${index + 1}')),
-                DataCell(SizedBox(width: 130, child: Text(s.name, maxLines: 2, overflow: TextOverflow.ellipsis))),
+                DataCell(Text('${index + 1}', style: TextStyle(fontWeight: FontWeight.w900, color: index == 0 ? AppColors.green : AppColors.ink))),
+                DataCell(SizedBox(width: 150, child: Text(s.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900)))),
                 DataCell(Text('${s.played}')),
                 DataCell(Text('${s.wins}')),
                 DataCell(Text('${s.draws}')),
@@ -12076,14 +12055,40 @@ class TournamentStandingsPanel extends StatelessWidget {
           ),
         ),
       ),
+      const SizedBox(height: 10),
+      TournamentTieBreakersCompactCard(tieBreakers: tieBreakers),
       const SizedBox(height: 12),
-      Row(children: [
-        Expanded(child: TournamentMetricCard(title: 'Más victorias', value: bestWins(standings).name, detail: '${bestWins(standings).wins} victorias', icon: Icons.emoji_events_rounded, color: AppColors.orange)),
-        const SizedBox(width: 8),
-        Expanded(child: TournamentMetricCard(title: 'Mejor diferencia', value: bestGoalDifference(standings).name, detail: '${bestGoalDifference(standings).goalDifference}', icon: Icons.trending_up_rounded, color: AppColors.green)),
-      ]),
+      SectionHeader(title: 'Detalle de posiciones'),
+      const SizedBox(height: 8),
+      ...List.generate(standings.length, (index) => TournamentStandingRankCard(
+        position: index + 1,
+        standing: standings[index],
+        scoringType: scoringType,
+        scoringConfig: scoringConfig,
+        explanation: standingRankReason(index, standings, tieBreakers, scoringType, scoringConfig),
+      )),
     ]);
   }
+}
+
+class TournamentTieBreakersCompactCard extends StatelessWidget {
+  final List<String> tieBreakers;
+  const TournamentTieBreakersCompactCard({super.key, required this.tieBreakers});
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    color: AppColors.faint,
+    padding: const EdgeInsets.all(11),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(width: 32, height: 32, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.rule_rounded, color: AppColors.teal, size: 18)),
+      const SizedBox(width: 9),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Desempates', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12)),
+        const SizedBox(height: 3),
+        Text(standingsOrderText(tieBreakers), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 11.5)),
+      ])),
+    ]),
+  );
 }
 
 class TournamentTieBreakersInfoCard extends StatelessWidget {
@@ -12179,28 +12184,65 @@ class TournamentStatsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final played = matches.where(matchCountsForStandings).length;
     final pending = matches.where((m) => !matchCountsForStandings(m) && !['cancelled', 'bye'].contains(AppData.text(m['status']))).length;
-    if (standings.isEmpty) return EmptySlim(icon: Icons.query_stats_rounded, title: 'Sin estadísticas todavía', body: 'Añade resultados para ver líderes y métricas.');
+    if (standings.isEmpty || played == 0) {
+      return EmptySlim(
+        icon: Icons.query_stats_rounded,
+        title: 'Sin estadísticas útiles todavía',
+        body: 'Cuando registres resultados aparecerán datos reales del torneo. De momento usa la pestaña Tabla para ver la clasificación.',
+      );
+    }
+
     final leader = standings.first;
     final wins = bestWins(standings);
     final diff = bestGoalDifference(standings);
     final pointsFor = bestGoalsFor(standings);
+
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Expanded(child: TournamentMetricCard(title: 'Líder', value: leader.name, detail: '${leader.points} pts', icon: Icons.emoji_events_rounded, color: AppColors.orange)),
-        const SizedBox(width: 8),
-        Expanded(child: TournamentMetricCard(title: 'Más victorias', value: wins.name, detail: '${wins.wins}', icon: Icons.done_all_rounded, color: AppColors.green)),
-      ]),
+      SectionHeader(title: 'Resumen estadístico'),
       const SizedBox(height: 8),
-      Row(children: [
-        Expanded(child: TournamentMetricCard(title: 'Mejor diferencia', value: diff.name, detail: '${diff.goalDifference}', icon: Icons.trending_up_rounded, color: AppColors.blue)),
-        const SizedBox(width: 8),
-        Expanded(child: TournamentMetricCard(title: 'Más a favor', value: pointsFor.name, detail: '${pointsFor.goalsFor}', icon: Icons.add_chart_rounded, color: AppColors.violet)),
-      ]),
-      const SizedBox(height: 8),
-      TournamentMetricCard(title: 'Pendientes', value: '$pending partidos', detail: pending == 0 ? 'Todo cerrado' : 'Aún quedan resultados', icon: Icons.pending_actions_rounded, color: AppColors.red),
+      AppCard(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(children: [
+          TournamentStatsRow(icon: Icons.emoji_events_rounded, color: AppColors.orange, label: 'Líder', value: leader.name, detail: '${leader.points} pts'),
+          const Divider(height: 1, indent: 58, color: AppColors.line),
+          TournamentStatsRow(icon: Icons.done_all_rounded, color: AppColors.green, label: 'Más victorias', value: wins.name, detail: '${wins.wins} victorias'),
+          const Divider(height: 1, indent: 58, color: AppColors.line),
+          TournamentStatsRow(icon: Icons.trending_up_rounded, color: AppColors.blue, label: 'Mejor diferencia', value: diff.name, detail: '${diff.goalDifference}'),
+          const Divider(height: 1, indent: 58, color: AppColors.line),
+          TournamentStatsRow(icon: Icons.add_chart_rounded, color: AppColors.violet, label: 'Más a favor', value: pointsFor.name, detail: '${pointsFor.goalsFor}'),
+          const Divider(height: 1, indent: 58, color: AppColors.line),
+          TournamentStatsRow(icon: Icons.pending_actions_rounded, color: pending == 0 ? AppColors.green : AppColors.red, label: 'Pendientes', value: '$pending partidos', detail: pending == 0 ? 'Todo cerrado' : 'Aún quedan resultados'),
+        ]),
+      ),
     ]);
   }
+}
+
+class TournamentStatsRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String value;
+  final String detail;
+  const TournamentStatsRow({super.key, required this.icon, required this.color, required this.label, required this.value, required this.detail});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    child: Row(children: [
+      Container(width: 36, height: 36, decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: color, size: 19)),
+      const SizedBox(width: 10),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11)),
+        const SizedBox(height: 2),
+        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+      ])),
+      const SizedBox(width: 8),
+      Text(detail, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12)),
+    ]),
+  );
 }
 
 class TournamentMetricCard extends StatelessWidget {
@@ -12227,17 +12269,78 @@ class TournamentMetricCard extends StatelessWidget {
 }
 
 
+
+class TournamentSettingsEditPanel extends StatelessWidget {
+  final String format;
+  final List<Map<String, dynamic>> matches;
+  final VoidCallback onAddParticipants;
+  final VoidCallback onBulkSchedule;
+  final VoidCallback onManualMatches;
+  final VoidCallback onCheckIn;
+  const TournamentSettingsEditPanel({
+    super.key,
+    required this.format,
+    required this.matches,
+    required this.onAddParticipants,
+    required this.onBulkSchedule,
+    required this.onManualMatches,
+    required this.onCheckIn,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final canAddManualMatch = format == 'manual' || format == 'liga';
+    return AppCard(
+      color: AppColors.navyDeep,
+      padding: const EdgeInsets.all(14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(15)),
+            child: const Icon(Icons.edit_note_rounded, color: Colors.white),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Panel de edición', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
+            SizedBox(height: 4),
+            Text('Edita jugadores, fechas y partidos desde Ajustes para no saturar el resumen.', style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.25)),
+          ])),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: SecondaryButton(label: 'Añadir jugadores', icon: Icons.group_add_rounded, onTap: onAddParticipants)),
+          const SizedBox(width: 8),
+          Expanded(child: SecondaryButton(label: 'Cambiar fechas', icon: Icons.edit_calendar_rounded, onTap: matches.isEmpty ? () => showToast(context, 'No hay partidos para mover.', danger: true) : onBulkSchedule)),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          if (canAddManualMatch) ...[
+            Expanded(child: SecondaryButton(label: 'Añadir partido', icon: Icons.add_link_rounded, onTap: onManualMatches)),
+            const SizedBox(width: 8),
+          ],
+          Expanded(child: SecondaryButton(label: 'Check-in', icon: Icons.how_to_reg_rounded, onTap: onCheckIn)),
+        ]),
+      ]),
+    );
+  }
+}
+
+
 class TournamentSettingsPanel extends StatelessWidget {
   final Map<String, dynamic> tournament;
   final List<Map<String, dynamic>> matches;
   final VoidCallback onRegenerate;
   final VoidCallback onManualMatches;
   final VoidCallback onBulkSchedule;
+  final VoidCallback onAddParticipants;
+  final VoidCallback onCheckIn;
   final VoidCallback onEditTournament;
   final VoidCallback onHistory;
   final ValueChanged<String> onSetStatus;
   final VoidCallback onDelete;
-  const TournamentSettingsPanel({super.key, required this.tournament, required this.matches, required this.onRegenerate, required this.onManualMatches, required this.onBulkSchedule, required this.onEditTournament, required this.onHistory, required this.onSetStatus, required this.onDelete});
+  const TournamentSettingsPanel({super.key, required this.tournament, required this.matches, required this.onRegenerate, required this.onManualMatches, required this.onBulkSchedule, required this.onAddParticipants, required this.onCheckIn, required this.onEditTournament, required this.onHistory, required this.onSetStatus, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -12261,6 +12364,15 @@ class TournamentSettingsPanel extends StatelessWidget {
         TournamentReviewRow(label: 'Partidos con fecha', value: '$scheduled/${matches.length}'),
         TournamentReviewRow(label: 'Agenda', value: scheduleConfig['add_to_agenda'] == true ? 'Activada' : 'No'),
       ])),
+      const SizedBox(height: 12),
+      TournamentSettingsEditPanel(
+        format: format,
+        matches: matches,
+        onAddParticipants: onAddParticipants,
+        onBulkSchedule: onBulkSchedule,
+        onManualMatches: onManualMatches,
+        onCheckIn: onCheckIn,
+      ),
       const SizedBox(height: 12),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const Text('Editar torneo', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
