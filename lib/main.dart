@@ -1783,6 +1783,10 @@ class AppData {
 
     final rows = <Map<String, dynamic>>[];
     final ordered = teams.map((t) => Map<String, dynamic>.from(t)).toList();
+    final randomizePairings = text(formatConfig?['randomize_pairings'], 'true') != 'false';
+    if (randomizePairings && format != 'manual') {
+      ordered.shuffle(Random.secure());
+    }
     var orderIndex = 0;
 
     final roundCounters = <int, int>{};
@@ -7188,6 +7192,8 @@ class _CalendarTabState extends State<CalendarTab> {
                 selected: selected,
                 onCreate: () => createFor(selected),
               )
+            else if (selectedEvents.length > 1 && selectedEvents.any(eventIsTournamentEvent))
+              AgendaSameDayCompactCard(events: selectedEvents, group: widget.group, onChanged: reload, title: 'Partidos y planes del día')
             else
               ...selectedEvents.map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
             if (!loading && selectedEvents.isEmpty && upcomingEvents.isNotEmpty) ...[
@@ -8345,12 +8351,12 @@ class SettlementPaymentRow extends StatelessWidget {
                 onPressed: onPaid,
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 9),
-                  foregroundColor: AppColors.green,
-                  backgroundColor: AppColors.greenSoft,
+                  foregroundColor: AppColors.tealDark,
+                  backgroundColor: AppColors.tealSoft,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
                 ),
-                icon: const Icon(Icons.check_rounded, size: 15),
-                label: const Text('Pagado', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 15),
+                label: const Text('Registrar', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
               ),
             ),
           ],
@@ -9004,7 +9010,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
   String teamType = 'equipo';
   String scoringType = 'football';
   String creationTemplate = 'league';
-  bool advancedMode = false;
+  bool advancedMode = true;
   bool addToAgenda = true;
   bool scheduleMatches = true;
   bool loading = false;
@@ -9076,7 +9082,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         teamType = 'equipo';
         scheduleMatches = true;
         addToAgenda = true;
-        applyScoringDefaults(scoringType == 'tennis_padel' ? 'tennis_padel' : 'football');
+        applyScoringDefaults(scoringType == 'tennis_padel' ? 'tennis_padel' : 'general');
         name.text = name.text.trim().isEmpty ? 'Eliminatoria' : name.text;
         break;
       case 'manual_day':
@@ -9094,7 +9100,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         leagueRoundsLimit = 0;
         scheduleMatches = true;
         addToAgenda = true;
-        applyScoringDefaults('football');
+        applyScoringDefaults('general');
         name.text = name.text.trim().isEmpty ? 'Liga' : name.text;
     }
   }
@@ -9173,6 +9179,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
     'americano_rounds': americanoRounds,
     'courts_count': courtsCount,
     'manual_pairings': format == 'manual' || pairings.text.trim().isNotEmpty,
+    'randomize_pairings': true,
   };
 
   Map<String, dynamic> get scoringConfig {
@@ -9394,27 +9401,6 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         selected: creationTemplate,
         onChanged: (value) => setState(() => applyQuickTemplate(value)),
       ),
-      const SizedBox(height: 12),
-      TournamentAdvancedToggleCard(
-        enabled: advancedMode,
-        onChanged: (value) => setState(() => advancedMode = value),
-      ),
-      if (!advancedMode) ...[
-        const SizedBox(height: 10),
-        const TournamentQuickModeInfoCard(),
-      ],
-      if (advancedMode) ...[
-        const SizedBox(height: 12),
-        FieldLabel('Tipo de competición'),
-        const SizedBox(height: 8),
-        TournamentBigChoice(selected: format == 'liga', icon: Icons.emoji_events_rounded, title: 'Liga', body: 'Jornadas, ida/vuelta, límite de jornadas y tabla automática.', onTap: () => setState(() { creationTemplate = 'custom'; format = 'liga'; })),
-        TournamentBigChoice(selected: format == 'manual', icon: Icons.tune_rounded, title: 'Manual', badge: 'Más flexible', body: 'Partidos creados a mano, fechas individuales y máximo control.', onTap: () => setState(() { creationTemplate = 'custom'; format = 'manual'; })),
-        TournamentBigChoice(selected: format == 'eliminatoria', icon: Icons.account_tree_rounded, title: 'Eliminatoria', body: 'Cuadro directo, byes, siguiente ronda y final.', onTap: () => setState(() { creationTemplate = 'custom'; format = 'eliminatoria'; })),
-        TournamentBigChoice(selected: format == 'americano', icon: Icons.groups_rounded, title: 'Americano', body: 'Parejas rotativas, descansos equilibrados y ranking individual.', onTap: () => setState(() { creationTemplate = 'custom'; format = 'americano'; applyScoringDefaults('general'); })),
-      ] else ...[
-        const SizedBox(height: 12),
-        TournamentSimpleFormatSummary(format: format, scoringType: scoringType, teamType: teamType),
-      ],
     ]);
   }
 
@@ -9456,6 +9442,8 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
 
   Widget _buildFormatStep() {
     final fullRounds = max(0, participantNames.length.isOdd ? participantNames.length : participantNames.length - 1);
+    final totalLeagueRounds = fullRounds * max(1, leagueLegs);
+    final limitedLeagueRounds = leagueRoundsLimit <= 0 ? totalLeagueRounds : leagueRoundsLimit * max(1, leagueLegs);
     final preview = draftMatches.take(10).toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       FieldLabel(advancedMode ? 'Formato detallado' : 'Formato'),
@@ -9482,10 +9470,10 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         const SizedBox(height: 12),
         if (format == 'liga') ...[
           TournamentCounterRow(label: 'Vueltas', value: leagueLegs, min: 1, max: 4, onChanged: (v) => setState(() => leagueLegs = v), helper: leagueLegs == 1 ? 'Solo ida' : '$leagueLegs vueltas'),
-          TournamentCounterRow(label: 'Máximo de jornadas', value: leagueRoundsLimit, min: 0, max: max(1, fullRounds), zeroLabel: 'Todas', onChanged: (v) => setState(() => leagueRoundsLimit = v), helper: leagueRoundsLimit == 0 ? 'Liga completa ($fullRounds jornadas por vuelta)' : 'Liga parcial'),
+          TournamentCounterRow(label: 'Jornadas por vuelta', value: leagueRoundsLimit, min: 0, max: max(1, fullRounds), zeroLabel: 'Todas', onChanged: (v) => setState(() => leagueRoundsLimit = v), helper: leagueRoundsLimit == 0 ? 'Liga completa: $fullRounds por vuelta · $totalLeagueRounds en total' : '$leagueRoundsLimit por vuelta · $limitedLeagueRounds en total'),
         ] else if (format == 'americano') ...[
           TournamentCounterRow(label: 'Rondas', value: americanoRounds, min: 1, max: 20, onChanged: (v) => setState(() => americanoRounds = v), helper: 'Ranking individual por puntos conseguidos'),
-          TournamentCounterRow(label: 'Pistas / mesas', value: courtsCount, min: 1, max: 8, onChanged: (v) => setState(() => courtsCount = v), helper: '1 partido por pista y ronda'),
+          TournamentCounterRow(label: 'Pistas / mesas', value: courtsCount, min: 1, max: 12, onChanged: (v) => setState(() => courtsCount = v), helper: '1 partido por pista y ronda'),
           const SizedBox(height: 6),
           Wrap(spacing: 8, runSpacing: 8, children: const [
             TournamentRuleChip(label: 'Parejas rotativas'),
@@ -9499,9 +9487,10 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
             TournamentRuleChip(label: 'Cabezas de serie'),
             TournamentRuleChip(label: 'Byes automáticos'),
             TournamentRuleChip(label: 'Cuadro visual'),
+            TournamentRuleChip(label: 'Sorteo automático'),
           ]),
           const SizedBox(height: 8),
-          const Text('El orden de participantes marca las cabezas de serie. Si el número no cuadra, los favoritos reciben pase directo automáticamente.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+          const Text('Al crear el torneo, la app sortea automáticamente los cruces para evitar ventajas por el orden de escritura. Si el número no cuadra, los pases directos también se asignan tras el sorteo.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
         ] else ...[
           const Text('Escribe los partidos a mano. Puedes poner Jornada 1, Jornada 2, etc.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
         ],
@@ -9648,9 +9637,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           ]),
           const SizedBox(height: 10),
           TournamentCounterRow(label: 'Días entre jornadas', value: daysBetweenRounds, min: 0, max: 30, onChanged: (v) => setState(() => daysBetweenRounds = v)),
-          TournamentCounterRow(label: 'Pistas / mesas simultáneas', value: courtsCount, min: 1, max: 8, onChanged: (v) => setState(() => courtsCount = v), helper: courtsCount == 1 ? 'una a la vez' : 'partidos en paralelo'),
-          TournamentCounterRow(label: 'Duración partido', value: durationMinutes, min: 15, max: 240, stepValue: 5, onChanged: (v) => setState(() => durationMinutes = v), helper: 'minutos'),
-          TournamentCounterRow(label: 'Separación entre turnos', value: intervalMinutes, min: 15, max: 240, stepValue: 5, onChanged: (v) => setState(() => intervalMinutes = v), helper: 'minutos'),
+          TournamentCounterRow(label: 'Pistas / mesas simultáneas', value: courtsCount, min: 1, max: 12, onChanged: (v) => setState(() => courtsCount = v), helper: courtsCount == 1 ? 'una a la vez' : 'partidos en paralelo'),
         ],
       ])),
       const SizedBox(height: 12),
@@ -10574,7 +10561,7 @@ class TournamentSimpleFormatConfigCard extends StatelessWidget {
         TournamentCounterRow(label: 'Rondas', value: rounds <= 0 ? 5 : rounds, min: 1, max: 20, onChanged: onRoundsChanged, helper: 'ranking individual')
       else
         TournamentCounterRow(label: 'Jornadas límite', value: rounds, min: 0, max: 30, zeroLabel: 'Todas', onChanged: onRoundsChanged, helper: 'déjalo en Todas para liga completa'),
-      TournamentCounterRow(label: 'Pistas / mesas', value: courts, min: 1, max: 8, onChanged: onCourtsChanged, helper: courts <= 1 ? 'una a la vez' : 'en paralelo'),
+      TournamentCounterRow(label: 'Pistas / mesas', value: courts, min: 1, max: 12, onChanged: onCourtsChanged, helper: courts <= 1 ? 'una a la vez' : 'en paralelo'),
     ]));
   }
 }
@@ -13002,12 +12989,6 @@ Future<void> showTournamentBulkScheduleDialog(
                 })),
               ]),
               const SizedBox(height: 10),
-              Row(children: [
-                Expanded(child: TextField(controller: duration, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: const InputDecoration(labelText: 'Duración'))),
-                const SizedBox(width: 8),
-                Expanded(child: TextField(controller: interval, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: const InputDecoration(labelText: 'Separación'))),
-              ]),
-              const SizedBox(height: 8),
               TextField(controller: location, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Ubicación')),
               const SizedBox(height: 8),
               TextField(controller: court, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Nombre base pista/mesa', hintText: 'Pista, Mesa, Campo...')),
@@ -13016,7 +12997,7 @@ Future<void> showTournamentBulkScheduleDialog(
                 const Expanded(child: Text('Pistas/mesas simultáneas', style: TextStyle(fontWeight: FontWeight.w900))),
                 IconButton(onPressed: courts <= 1 ? null : () => setLocal(() => courts--), icon: const Icon(Icons.remove_circle_outline_rounded)),
                 Text('$courts', style: const TextStyle(fontWeight: FontWeight.w900)),
-                IconButton(onPressed: courts >= 8 ? null : () => setLocal(() => courts++), icon: const Icon(Icons.add_circle_outline_rounded)),
+                IconButton(onPressed: courts >= 12 ? null : () => setLocal(() => courts++), icon: const Icon(Icons.add_circle_outline_rounded)),
               ]),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
@@ -17979,16 +17960,9 @@ class AgendaPremiumHero extends StatelessWidget {
 
     if (next != null) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (nextDayEvents.length > 1) ...[
-          SectionHeader(title: 'Próximos de ese día', action: '${nextDayEvents.length}'),
-          const SizedBox(height: 8),
-          ...nextDayEvents.take(3).map((event) => EventAgendaCard(event: event, group: group, onChanged: onChanged)),
-          if (nextDayEvents.length > 3)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text('+ ${nextDayEvents.length - 3} más ese día', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
-            ),
-        ] else
+        if (nextDayEvents.length > 1)
+          AgendaSameDayCompactCard(events: nextDayEvents, group: group, onChanged: onChanged, title: 'Próximos de ese día')
+        else
           EventAgendaCard(event: next, group: group, onChanged: onChanged),
         const SizedBox(height: 10),
         AgendaMatteStatsRow(
@@ -18663,6 +18637,109 @@ class CalendarDaySummary extends StatelessWidget {
           ),
         ),
       ]),
+    );
+  }
+}
+
+
+class AgendaSameDayCompactCard extends StatelessWidget {
+  final List<Map<String, dynamic>> events;
+  final Map<String, dynamic> group;
+  final VoidCallback onChanged;
+  final String title;
+  const AgendaSameDayCompactCard({super.key, required this.events, required this.group, required this.onChanged, this.title = 'Planes del día'});
+
+  @override
+  Widget build(BuildContext context) {
+    final ordered = [...events]..sort((a, b) {
+      final da = DateTime.tryParse(AppData.text(a['starts_at'])) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final db = DateTime.tryParse(AppData.text(b['starts_at'])) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return da.compareTo(db);
+    });
+    final firstDate = DateTime.tryParse(AppData.text(ordered.first['starts_at']))?.toLocal() ?? DateTime.now();
+    final hasTournament = ordered.any(eventIsTournamentEvent);
+    final accent = hasTournament ? AppColors.amber : eventKindColor(ordered.first);
+
+    Future<void> openEvent(Map<String, dynamic> event) async {
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: group)));
+      onChanged();
+    }
+
+    return AppCard(
+      color: hasTournament ? AppColors.amberSoft : AppColors.surface,
+      padding: const EdgeInsets.all(12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 45,
+            height: 48,
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: accent.withOpacity(.20))),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text(shortWeekday(firstDate).toUpperCase(), style: TextStyle(color: accent, fontSize: 9.5, fontWeight: FontWeight.w900)),
+              Text(firstDate.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 19, fontWeight: FontWeight.w900, height: 1)),
+            ]),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 15)),
+            const SizedBox(height: 3),
+            Text('${ordered.length} evento${ordered.length == 1 ? '' : 's'} · ${DateFormat('d MMM', 'es_ES').format(firstDate).replaceAll('.', '')}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
+          ])),
+          if (hasTournament) const TournamentAgendaBadge(),
+        ]),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17), border: Border.all(color: AppColors.lineSoft)),
+          child: Column(children: [
+            for (int i = 0; i < ordered.take(6).length; i++) ...[
+              AgendaCompactEventRow(event: ordered[i], onTap: () => openEvent(ordered[i])),
+              if (i != ordered.take(6).length - 1) const Divider(height: 1, indent: 58, color: AppColors.lineSoft),
+            ],
+          ]),
+        ),
+        if (ordered.length > 6) ...[
+          const SizedBox(height: 8),
+          Text('+ ${ordered.length - 6} más', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
+        ],
+      ]),
+    );
+  }
+}
+
+class AgendaCompactEventRow extends StatelessWidget {
+  final Map<String, dynamic> event;
+  final VoidCallback onTap;
+  const AgendaCompactEventRow({super.key, required this.event, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final date = DateTime.tryParse(AppData.text(event['starts_at']))?.toLocal() ?? DateTime.now();
+    final color = eventKindColor(event);
+    final isTournament = eventIsTournamentEvent(event);
+    final yes = attendanceCount(event, 'yes');
+    final minPeople = AppData.intValue(event['min_people'], 1);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        child: Row(children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(color: isTournament ? AppColors.amberSoft : eventKindSoftColor(event), borderRadius: BorderRadius.circular(14)),
+            child: Icon(eventKindIcon(event), color: color, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 13)),
+            const SizedBox(height: 3),
+            Text('${DateFormat('HH:mm', 'es_ES').format(date)} · $yes/$minPeople van', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11.5)),
+          ])),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        ]),
+      ),
     );
   }
 }
