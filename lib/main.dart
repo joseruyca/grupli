@@ -5942,25 +5942,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
 
   void reload() => setState(load);
 
-  double _myOpenBalance(List<Map<String, dynamic>> expenses) {
-    final uid = AppData.user?.id;
-    if (uid == null) return 0;
-    double total = 0;
-    for (final expense in expenses) {
-      if (AppData.text(expense['status'], 'pending') == 'paid') continue;
-      final paidBy = expense['paid_by']?.toString();
-      final participants = AppData.asList(expense['expense_participants']);
-      for (final row in participants) {
-        final item = AppData.asMap(row);
-        final rowUserId = item['user_id']?.toString();
-        final share = AppData.doubleValue(item['share_amount']);
-        final paid = item['paid'] == true;
-        if (paidBy == uid && rowUserId != uid && !paid) total += share;
-        if (rowUserId == uid && paidBy != uid && !paid) total -= share;
-      }
-    }
-    return double.parse(total.toStringAsFixed(2));
-  }  @override
+  @override
   Widget build(BuildContext context) {
     final group = widget.group;
     final groupId = group['id'].toString();
@@ -5981,8 +5963,6 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                 final mine = myAttendanceStatus(event);
                 return mine == null || mine == 'maybe';
               }).toList();
-              final myBalance = _myOpenBalance(data?.expenses ?? const <Map<String, dynamic>>[]);
-              final tournamentsActive = data?.activeTournaments ?? 0;
               Future<void> openCreateEvent() async {
                 final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: group)));
                 if (ok == true) reload();
@@ -6081,17 +6061,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                         DashboardUpcomingEventsCard(events: nextDayEvents, group: group, onChanged: reload)
                       else
                         DashboardEventCard(event: nextEvent, group: group, onChanged: reload),
-                      const SizedBox(height: 14),
-                      DashboardMiniSummaryRow(
-                        events: upcoming.length,
-                        pending: myDecisionPending.length,
-                        balance: myBalance,
-                        tournaments: tournamentsActive,
-                        onCalendar: () => widget.onNavigateTab?.call(1),
-                        onFinances: () => widget.onNavigateTab?.call(2),
-                        onTournaments: () => widget.onNavigateTab?.call(3),
-                      ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       SectionHeader(title: 'Actividad reciente', action: 'Calendario', onTap: () => widget.onNavigateTab?.call(1)),
                       const SizedBox(height: 8),
                       DashboardActivityCard(
@@ -8924,7 +8894,6 @@ class _TournamentsTabState extends State<TournamentsTab> {
   Widget build(BuildContext context) {
     final active = tournaments.where((t) => !['finished', 'cancelled'].contains(AppData.text(t['status'], 'active'))).toList();
     final finished = tournaments.where((t) => ['finished', 'cancelled'].contains(AppData.text(t['status'], 'active'))).toList();
-    final upcoming = _allMatches().take(4).toList();
     final results = _allMatches(played: true).reversed.take(4).toList();
 
     return SafeArea(
@@ -8951,13 +8920,6 @@ class _TournamentsTabState extends State<TournamentsTab> {
               TournamentSectionHeader(title: 'Torneos activos', action: active.isEmpty ? null : 'Ver todos'),
               const SizedBox(height: 8),
               ...active.take(4).map((t) => TournamentActiveCard(tournament: t, onTap: () => openTournament(t))),
-              const SizedBox(height: 16),
-              TournamentSectionHeader(title: 'Próximos partidos', action: upcoming.isEmpty ? null : 'Ver agenda'),
-              const SizedBox(height: 8),
-              if (upcoming.isEmpty)
-                EmptySlim(icon: Icons.calendar_month_rounded, title: 'Sin partidos pendientes', body: 'Cuando programes partidos aparecerán aquí.')
-              else
-                ...upcoming.map((m) => TournamentDashboardMatchCard(item: m, onTap: () => openTournament(m.tournament))),
               const SizedBox(height: 16),
               TournamentSectionHeader(title: 'Últimos resultados'),
               const SizedBox(height: 8),
