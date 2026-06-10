@@ -2711,13 +2711,15 @@ String eventKind(Map<String, dynamic> event) {
 bool eventIsTournamentEvent(Map<String, dynamic> event) => eventKind(event) == 'torneo';
 
 Color agendaDayAccentColor(List<Map<String, dynamic>> events) {
-  if (events.any(eventIsTournamentEvent)) return AppColors.amber;
-  return events.isNotEmpty ? eventKindColor(events.first) : AppColors.navAgenda;
+  // Para días con torneos usamos teal como color estructural. El dorado queda solo
+  // para puntos, chips e iconos pequeños, evitando una Agenda demasiado amarilla.
+  if (events.any(eventIsTournamentEvent)) return AppColors.teal;
+  return events.isNotEmpty ? eventKindColor(events.first) : AppColors.teal;
 }
 
 Color agendaDaySoftColor(List<Map<String, dynamic>> events) {
-  if (events.any(eventIsTournamentEvent)) return AppColors.amberSoft;
-  return events.isNotEmpty ? eventKindSoftColor(events.first) : AppColors.orangeSoft;
+  if (events.any(eventIsTournamentEvent)) return AppColors.surface;
+  return events.isNotEmpty ? eventKindSoftColor(events.first) : AppColors.tealSoft;
 }
 
 List<Map<String, dynamic>> eventsOnSameDay(List<Map<String, dynamic>> events, Map<String, dynamic>? anchor) {
@@ -2793,7 +2795,7 @@ Color eventKindSoftColor(Map<String, dynamic> event) {
     case 'entrenamiento': return const Color(0xFFEAF0FF);
     case 'cena': return AppColors.violetSoft;
     case 'reunion': return const Color(0xFFFFF7DB);
-    case 'torneo': return AppColors.amberSoft;
+    case 'torneo': return AppColors.faint;
     default: return AppColors.tealSoft;
   }
 }
@@ -10650,7 +10652,7 @@ class TournamentPremiumBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AppCard(
-    color: AppColors.orangeSoft,
+    color: AppColors.faint,
     padding: const EdgeInsets.all(12),
     onTap: () => showPremiumUpsellDialog(context),
     child: Row(children: [
@@ -10671,7 +10673,7 @@ class TournamentPremiumMiniCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AppCard(
-    color: AppColors.orangeSoft,
+    color: AppColors.tealSoft,
     padding: const EdgeInsets.all(12),
     child: Row(children: [
       const Text('👑', style: TextStyle(fontSize: 22)),
@@ -12389,7 +12391,7 @@ class TournamentTeamCard extends StatelessWidget {
             Container(
               width: 30,
               height: 30,
-              decoration: BoxDecoration(color: AppColors.orangeSoft, borderRadius: BorderRadius.circular(11)),
+              decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(11)),
               child: Center(child: Text('#${AppData.intValue(team['seed'])}', style: const TextStyle(color: AppColors.orange, fontWeight: FontWeight.w900, fontSize: 11))),
             ),
           ],
@@ -12646,7 +12648,7 @@ Future<TournamentEditorDraft?> showTournamentEditorDialog(BuildContext context, 
           const SizedBox(height: 12),
           if (hasResults)
             AppCard(
-              color: AppColors.orangeSoft,
+              color: AppColors.tealSoft,
               padding: const EdgeInsets.all(10),
               child: const Text('Hay resultados registrados. Para proteger la tabla, el deporte y las reglas están bloqueados. Puedes cambiar el nombre.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25)),
             )
@@ -16148,7 +16150,7 @@ class DashboardUpcomingEventsCard extends StatelessWidget {
     });
     final firstDate = DateTime.tryParse(AppData.text(ordered.first['starts_at']))?.toLocal() ?? DateTime.now();
     final hasTournament = ordered.any(eventIsTournamentEvent);
-    final accent = hasTournament ? AppColors.amber : eventKindColor(ordered.first);
+    final accent = hasTournament ? AppColors.teal : eventKindColor(ordered.first);
 
     Future<void> openEvent(Map<String, dynamic> event) async {
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: group)));
@@ -16872,16 +16874,16 @@ class TournamentAgendaBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     decoration: BoxDecoration(
-      color: AppColors.amber.withOpacity(.13),
+      color: Colors.white,
       borderRadius: BorderRadius.circular(99),
-      border: Border.all(color: AppColors.amber.withOpacity(.28)),
+      border: Border.all(color: AppColors.amber.withOpacity(.42)),
     ),
     child: const Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(Icons.workspace_premium_rounded, color: AppColors.amber, size: 14),
-      SizedBox(width: 5),
-      Text('Liga/Torneo', style: TextStyle(color: AppColors.amber, fontWeight: FontWeight.w900, fontSize: 11)),
+      Icon(Icons.emoji_events_rounded, color: AppColors.amber, size: 13),
+      SizedBox(width: 4),
+      Text('Torneo', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 10.5)),
     ]),
   );
 }
@@ -18070,7 +18072,7 @@ class AgendaViewSwitch extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       padding: const EdgeInsets.all(5),
-      color: AppColors.orangeSoft,
+      color: AppColors.tealSoft,
       child: Row(children: [
         Expanded(child: _AgendaSwitchItem(label: 'Semana', icon: Icons.view_week_rounded, selected: index == 0, onTap: () => onChanged(0))),
         const SizedBox(width: 5),
@@ -18098,10 +18100,10 @@ class _AgendaSwitchItem extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? AppColors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: selected ? [BoxShadow(color: AppColors.navAgenda.withOpacity(.13), blurRadius: 12, offset: const Offset(0, 6))] : null,
+          boxShadow: selected ? [BoxShadow(color: AppColors.teal.withOpacity(.10), blurRadius: 12, offset: const Offset(0, 6))] : null,
         ),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, color: selected ? AppColors.navAgenda : AppColors.muted, size: 18),
+          Icon(icon, color: selected ? AppColors.teal : AppColors.muted, size: 18),
           const SizedBox(width: 7),
           Text(label, style: TextStyle(color: selected ? AppColors.ink : AppColors.muted, fontWeight: FontWeight.w900)),
         ]),
@@ -18205,9 +18207,9 @@ class PremiumWeekStrip extends StatelessWidget {
               height: 82,
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               decoration: BoxDecoration(
-                color: active ? AppColors.navAgenda : hasEvents ? color.withOpacity(.10) : AppColors.surface,
+                color: active ? AppColors.teal : AppColors.surface,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: active ? AppColors.navAgenda : today ? AppColors.navAgenda.withOpacity(.45) : hasEvents ? color.withOpacity(.25) : AppColors.line),
+                border: Border.all(color: active ? AppColors.teal : today ? AppColors.teal.withOpacity(.45) : hasEvents ? AppColors.line : AppColors.line),
               ),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 Text(shortWeekday(day).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? Colors.white : AppColors.muted, fontSize: 10, fontWeight: FontWeight.w900)),
@@ -18287,9 +18289,9 @@ class PremiumMonthCalendar extends StatelessWidget {
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
                     decoration: BoxDecoration(
-                      color: active ? AppColors.navAgenda : hasEvents ? mainColor.withOpacity(.10) : Colors.transparent,
+                      color: active ? AppColors.teal : Colors.transparent,
                       borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: active ? AppColors.navAgenda : today ? AppColors.navAgenda.withOpacity(.45) : hasEvents ? mainColor.withOpacity(.26) : Colors.transparent),
+                      border: Border.all(color: active ? AppColors.teal : today ? AppColors.teal.withOpacity(.45) : hasEvents ? AppColors.line : Colors.transparent),
                     ),
                     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                       Text(day.day.toString(), maxLines: 1, style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: active || hasEvents || today ? FontWeight.w900 : FontWeight.w700, fontSize: 14)),
@@ -18306,7 +18308,7 @@ class PremiumMonthCalendar extends StatelessWidget {
                                 ],
                               )
                             : today
-                                ? Container(width: 14, height: 4, decoration: BoxDecoration(color: active ? Colors.white : AppColors.navAgenda, borderRadius: BorderRadius.circular(99)))
+                                ? Container(width: 14, height: 4, decoration: BoxDecoration(color: active ? Colors.white : AppColors.teal, borderRadius: BorderRadius.circular(99)))
                                 : const SizedBox.shrink(),
                       ),
                     ]),
@@ -18385,7 +18387,7 @@ class PremiumAgendaEmptyState extends StatelessWidget {
       color: AppColors.surface,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.orangeSoft, borderRadius: BorderRadius.circular(17)), child: const Icon(Icons.event_available_rounded, color: AppColors.navAgenda)),
+          Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(17)), child: const Icon(Icons.event_available_rounded, color: AppColors.navAgenda)),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(hasAnyEvents ? 'No hay planes este día' : 'Empieza la agenda del grupo', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 16)),
@@ -18709,7 +18711,7 @@ class AgendaNoMorePlansCard extends StatelessWidget {
       Container(
         width: 42,
         height: 42,
-        decoration: BoxDecoration(color: AppColors.orangeSoft, borderRadius: BorderRadius.circular(15)),
+        decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(15)),
         child: const Icon(Icons.event_available_rounded, color: AppColors.orange, size: 20),
       ),
       const SizedBox(width: 10),
@@ -18751,7 +18753,7 @@ class AgendaSameDayCompactCard extends StatelessWidget {
     });
     final firstDate = DateTime.tryParse(AppData.text(ordered.first['starts_at']))?.toLocal() ?? DateTime.now();
     final hasTournament = ordered.any(eventIsTournamentEvent);
-    final accent = hasTournament ? AppColors.amber : eventKindColor(ordered.first);
+    final accent = hasTournament ? AppColors.teal : eventKindColor(ordered.first);
 
     Future<void> openEvent(Map<String, dynamic> event) async {
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: group)));
@@ -18762,10 +18764,6 @@ class AgendaSameDayCompactCard extends StatelessWidget {
       color: AppColors.white,
       padding: const EdgeInsets.all(12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (hasTournament) ...[
-          Container(height: 4, decoration: BoxDecoration(color: AppColors.amber, borderRadius: BorderRadius.circular(99))),
-          const SizedBox(height: 10),
-        ],
         Row(children: [
           Container(
             width: 45,
@@ -18786,7 +18784,7 @@ class AgendaSameDayCompactCard extends StatelessWidget {
         ]),
         const SizedBox(height: 10),
         Container(
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17), border: Border.all(color: AppColors.lineSoft)),
+          decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(17), border: Border.all(color: AppColors.lineSoft)),
           child: Column(children: [
             for (int i = 0; i < ordered.take(6).length; i++) ...[
               AgendaCompactEventRow(event: ordered[i], onTap: () => openEvent(ordered[i])),
@@ -18825,8 +18823,8 @@ class AgendaCompactEventRow extends StatelessWidget {
           Container(
             width: 38,
             height: 38,
-            decoration: BoxDecoration(color: isTournament ? AppColors.amberSoft : eventKindSoftColor(event), borderRadius: BorderRadius.circular(14)),
-            child: Icon(eventKindIcon(event), color: color, size: 18),
+            decoration: BoxDecoration(color: isTournament ? Colors.white : eventKindSoftColor(event), borderRadius: BorderRadius.circular(14), border: Border.all(color: isTournament ? AppColors.lineSoft : Colors.transparent)),
+            child: Icon(eventKindIcon(event), color: isTournament ? AppColors.amber : color, size: 18),
           ),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -18888,17 +18886,9 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 11),
       child: AppCard(
-        color: isTournament ? const Color(0xFFFFFBF0) : AppColors.white,
+        color: AppColors.white,
         padding: EdgeInsets.zero,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (isTournament)
-            Container(
-              height: 5,
-              decoration: const BoxDecoration(
-                color: AppColors.amber,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-            ),
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: open,
