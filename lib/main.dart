@@ -2680,13 +2680,56 @@ String newLocalUuid() {
 String eventKind(Map<String, dynamic> event) {
   final explicit = AppData.text(event['kind']).toLowerCase();
   final title = AppData.text(event['title']).toLowerCase();
-  final joined = '$explicit $title';
+  final notes = AppData.text(event['notes']).toLowerCase();
+  final joined = '$explicit $title $notes';
+
+  // Importante: los partidos creados desde Torneos/Ligas deben verse como evento especial,
+  // no como una quedada normal ni como un partido genérico de fútbol/pádel.
+  if (
+    joined.contains('partido de torneo') ||
+    joined.contains('partido de liga') ||
+    joined.contains('torneo') ||
+    joined.contains('liga') ||
+    joined.contains('copa') ||
+    joined.contains('americano') ||
+    joined.contains('eliminatoria')
+  ) {
+    return 'torneo';
+  }
+
   if (joined.contains('partido') || joined.contains('fútbol') || joined.contains('futbol') || joined.contains('pádel') || joined.contains('padel') || joined.contains('tenis')) return 'partido';
   if (joined.contains('entrenamiento') || joined.contains('entreno') || joined.contains('gym')) return 'entrenamiento';
   if (joined.contains('cena') || joined.contains('comida') || joined.contains('bar') || joined.contains('restaurante')) return 'cena';
   if (joined.contains('reunión') || joined.contains('reunion') || joined.contains('meeting')) return 'reunion';
-  if (joined.contains('torneo') || joined.contains('liga') || joined.contains('copa')) return 'torneo';
   return 'quedada';
+}
+
+bool eventIsTournamentEvent(Map<String, dynamic> event) => eventKind(event) == 'torneo';
+
+Color agendaDayAccentColor(List<Map<String, dynamic>> events) {
+  if (events.any(eventIsTournamentEvent)) return AppColors.amber;
+  return events.isNotEmpty ? eventKindColor(events.first) : AppColors.navAgenda;
+}
+
+Color agendaDaySoftColor(List<Map<String, dynamic>> events) {
+  if (events.any(eventIsTournamentEvent)) return AppColors.amberSoft;
+  return events.isNotEmpty ? eventKindSoftColor(events.first) : AppColors.orangeSoft;
+}
+
+List<Map<String, dynamic>> eventsOnSameDay(List<Map<String, dynamic>> events, Map<String, dynamic>? anchor) {
+  if (anchor == null) return const <Map<String, dynamic>>[];
+  final anchorDate = DateTime.tryParse(AppData.text(anchor['starts_at']))?.toLocal();
+  if (anchorDate == null) return [anchor];
+  final result = events.where((event) {
+    final date = DateTime.tryParse(AppData.text(event['starts_at']))?.toLocal();
+    return date != null && sameDay(date, anchorDate);
+  }).toList();
+  result.sort((a, b) {
+    final da = DateTime.tryParse(AppData.text(a['starts_at'])) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final db = DateTime.tryParse(AppData.text(b['starts_at'])) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    return da.compareTo(db);
+  });
+  return result;
 }
 
 bool eventIsRoutine(Map<String, dynamic> event) {
@@ -2735,7 +2778,7 @@ Color eventKindColor(Map<String, dynamic> event) {
     case 'entrenamiento': return AppColors.blue;
     case 'cena': return AppColors.violet;
     case 'reunion': return AppColors.amber;
-    case 'torneo': return AppColors.orange;
+    case 'torneo': return AppColors.amber;
     default: return AppColors.teal;
   }
 }
@@ -2746,7 +2789,7 @@ Color eventKindSoftColor(Map<String, dynamic> event) {
     case 'entrenamiento': return const Color(0xFFEAF0FF);
     case 'cena': return AppColors.violetSoft;
     case 'reunion': return const Color(0xFFFFF7DB);
-    case 'torneo': return AppColors.orangeSoft;
+    case 'torneo': return AppColors.amberSoft;
     default: return AppColors.tealSoft;
   }
 }
@@ -5927,6 +5970,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
               final events = data?.events ?? <Map<String, dynamic>>[];
               final upcoming = data?.upcomingEvents ?? <Map<String, dynamic>>[];
               final nextEvent = upcoming.isNotEmpty ? upcoming.first : null;
+              final nextDayEvents = eventsOnSameDay(upcoming, nextEvent);
               final myDecisionPending = upcoming.where((event) {
                 final mine = myAttendanceStatus(event);
                 return mine == null || mine == 'maybe';
@@ -6027,6 +6071,8 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                           title: 'Sin quedadas',
                           body: 'Crea un plan para que el grupo pueda confirmar asistencia.',
                         )
+                      else if (nextDayEvents.length > 1)
+                        DashboardUpcomingEventsCard(events: nextDayEvents, group: group, onChanged: reload)
                       else
                         DashboardEventCard(event: nextEvent, group: group, onChanged: reload),
                       const SizedBox(height: 14),
@@ -9031,7 +9077,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         scheduleMatches = true;
         addToAgenda = true;
         applyScoringDefaults(scoringType == 'tennis_padel' ? 'tennis_padel' : 'football');
-        name.text = name.text.trim().isEmpty ? 'Copa rápida' : name.text;
+        name.text = name.text.trim().isEmpty ? 'Eliminatoria' : name.text;
         break;
       case 'manual_day':
         format = 'manual';
@@ -9039,7 +9085,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         scheduleMatches = true;
         addToAgenda = true;
         applyScoringDefaults('general');
-        name.text = name.text.trim().isEmpty ? 'Partidos del grupo' : name.text;
+        name.text = name.text.trim().isEmpty ? 'Manual' : name.text;
         break;
       default:
         format = 'liga';
@@ -9049,7 +9095,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         scheduleMatches = true;
         addToAgenda = true;
         applyScoringDefaults('football');
-        name.text = name.text.trim().isEmpty ? 'Liga del grupo' : name.text;
+        name.text = name.text.trim().isEmpty ? 'Liga' : name.text;
     }
   }
 
@@ -9342,7 +9388,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         TextField(controller: name, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(hintText: defaultTournamentName(format))),
       ])),
       const SizedBox(height: 12),
-      FieldLabel('Plantillas rápidas'),
+      FieldLabel('Tipo de torneo'),
       const SizedBox(height: 8),
       TournamentQuickTemplateGrid(
         selected: creationTemplate,
@@ -9353,6 +9399,10 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         enabled: advancedMode,
         onChanged: (value) => setState(() => advancedMode = value),
       ),
+      if (!advancedMode) ...[
+        const SizedBox(height: 10),
+        const TournamentQuickModeInfoCard(),
+      ],
       if (advancedMode) ...[
         const SizedBox(height: 12),
         FieldLabel('Tipo de competición'),
@@ -10352,6 +10402,20 @@ class TournamentCreationHeroCard extends StatelessWidget {
   );
 }
 
+IconData tournamentTemplateIcon(String value) {
+  switch (value) {
+    case 'americano_padel':
+      return Icons.sync_alt_rounded;
+    case 'quick_cup':
+      return Icons.account_tree_rounded;
+    case 'manual_day':
+      return Icons.tune_rounded;
+    case 'league':
+    default:
+      return Icons.table_chart_rounded;
+  }
+}
+
 class TournamentQuickTemplate {
   final String value;
   final String emoji;
@@ -10367,11 +10431,10 @@ class TournamentQuickTemplateGrid extends StatelessWidget {
   const TournamentQuickTemplateGrid({super.key, required this.selected, required this.onChanged});
 
   static const templates = [
-    TournamentQuickTemplate('league', '⚽', 'Liga sencilla', 'Jornadas + tabla automática'),
-    TournamentQuickTemplate('padel_league', '🎾', 'Liga pádel', 'Parejas, sets y pistas'),
-    TournamentQuickTemplate('americano_padel', '🔁', 'Americano', 'Rondas, descansos y ranking', badge: 'Popular'),
-    TournamentQuickTemplate('quick_cup', '🏆', 'Copa rápida', 'Eliminatoria y final'),
-    TournamentQuickTemplate('manual_day', '✍️', 'Manual', 'Tú decides los cruces'),
+    TournamentQuickTemplate('league', '', 'Liga', 'Jornadas y clasificación'),
+    TournamentQuickTemplate('americano_padel', '', 'Americano', 'Rondas y ranking individual'),
+    TournamentQuickTemplate('quick_cup', '', 'Eliminatoria', 'Cuadro, semifinal y final'),
+    TournamentQuickTemplate('manual_day', '', 'Manual', 'Tú decides los partidos'),
   ];
 
   @override
@@ -10395,7 +10458,12 @@ class TournamentQuickTemplateGrid extends StatelessWidget {
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Text(item.emoji, style: const TextStyle(fontSize: 25)),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(color: active ? AppColors.red : AppColors.faint, borderRadius: BorderRadius.circular(12)),
+                child: Icon(tournamentTemplateIcon(item.value), color: active ? Colors.white : AppColors.muted, size: 18),
+              ),
               const Spacer(),
               if (item.badge.isNotEmpty)
                 Container(
@@ -10435,9 +10503,27 @@ class TournamentAdvancedToggleCard extends StatelessWidget {
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(enabled ? 'Modo avanzado activo' : 'Modo rápido recomendado', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         const SizedBox(height: 3),
-        Text(enabled ? 'Puedes tocar formatos, rondas, vueltas y cruces.' : 'La app usa valores seguros para crear rápido.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+        Text(enabled ? 'Puedes tocar formato, rondas, vueltas, cruces y reglas.' : 'Sigues los mismos pasos, pero la app oculta ajustes técnicos y aplica valores seguros.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
       ])),
       Switch(value: enabled, activeThumbColor: AppColors.orange, onChanged: onChanged),
+    ]),
+  );
+}
+
+class TournamentQuickModeInfoCard extends StatelessWidget {
+  const TournamentQuickModeInfoCard({super.key});
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    color: AppColors.tealSoft,
+    padding: const EdgeInsets.all(11),
+    child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(Icons.info_outline_rounded, color: AppColors.teal, size: 20),
+      SizedBox(width: 9),
+      Expanded(child: Text(
+        'Modo rápido: eliges Liga, Americano, Eliminatoria o Manual y sigues el mismo proceso, pero sin ajustes técnicos innecesarios.',
+        style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12),
+      )),
     ]),
   );
 }
@@ -16078,6 +16164,103 @@ class _TinyDivider extends StatelessWidget {
   Widget build(BuildContext context) => Container(width: 1, height: 34, color: AppColors.line);
 }
 
+
+class DashboardUpcomingEventsCard extends StatelessWidget {
+  final List<Map<String, dynamic>> events;
+  final Map<String, dynamic> group;
+  final VoidCallback onChanged;
+  const DashboardUpcomingEventsCard({super.key, required this.events, required this.group, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final ordered = [...events]..sort((a, b) {
+      final da = DateTime.tryParse(AppData.text(a['starts_at'])) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final db = DateTime.tryParse(AppData.text(b['starts_at'])) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return da.compareTo(db);
+    });
+    final firstDate = DateTime.tryParse(AppData.text(ordered.first['starts_at']))?.toLocal() ?? DateTime.now();
+    final hasTournament = ordered.any(eventIsTournamentEvent);
+    final accent = hasTournament ? AppColors.amber : eventKindColor(ordered.first);
+
+    Future<void> openEvent(Map<String, dynamic> event) async {
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: group)));
+      onChanged();
+    }
+
+    return AppCard(
+      color: hasTournament ? const Color(0xFF2F260E) : AppColors.navy,
+      padding: const EdgeInsets.all(14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 58,
+            height: 62,
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: accent.withOpacity(.28))),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text(shortWeekday(firstDate).toUpperCase(), style: TextStyle(color: accent, fontSize: 10, fontWeight: FontWeight.w900)),
+              Text(firstDate.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 24, fontWeight: FontWeight.w900, height: 1)),
+              Text(DateFormat('MMM', 'es_ES').format(firstDate).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800)),
+            ]),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${ordered.length} planes el mismo día', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, height: 1.05)),
+            const SizedBox(height: 5),
+            Text(hasTournament ? 'Incluye partidos de liga/torneo' : 'Toca uno para abrir su tarjeta', style: TextStyle(color: hasTournament ? AppColors.amberSoft : const Color(0xDFFFFFFF), fontWeight: FontWeight.w800, fontSize: 12)),
+          ])),
+        ]),
+        const SizedBox(height: 12),
+        for (final event in ordered.take(4)) ...[
+          DashboardUpcomingEventRow(event: event, onTap: () => openEvent(event)),
+          if (event != ordered.take(4).last) const Divider(height: 1, color: Color(0x25FFFFFF)),
+        ],
+        if (ordered.length > 4) ...[
+          const SizedBox(height: 8),
+          Text('+ ${ordered.length - 4} más en Agenda', style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800)),
+        ],
+      ]),
+    );
+  }
+}
+
+class DashboardUpcomingEventRow extends StatelessWidget {
+  final Map<String, dynamic> event;
+  final VoidCallback onTap;
+  const DashboardUpcomingEventRow({super.key, required this.event, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final date = DateTime.tryParse(AppData.text(event['starts_at']))?.toLocal() ?? DateTime.now();
+    final color = eventKindColor(event);
+    final isTournament = eventIsTournamentEvent(event);
+    final yes = attendanceCount(event, 'yes');
+    final minPeople = AppData.intValue(event['min_people'], 1);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        child: Row(children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: isTournament ? AppColors.amber.withOpacity(.16) : Colors.white.withOpacity(.10), borderRadius: BorderRadius.circular(14)),
+            child: Icon(eventKindIcon(event), color: isTournament ? AppColors.amber : color, size: 19),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5)),
+            const SizedBox(height: 3),
+            Text('${DateFormat('HH:mm', 'es_ES').format(date)} · $yes/$minPeople van', style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, fontSize: 11.5)),
+          ])),
+          if (isTournament) const TournamentAgendaBadge(),
+        ]),
+      ),
+    );
+  }
+}
+
 class DashboardEventCard extends StatefulWidget {
   final Map<String, dynamic> event;
   final Map<String, dynamic> group;
@@ -16113,11 +16296,12 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
     final no = attendanceCount(event, 'no');
     final mine = myAttendanceStatus(event);
     final color = eventKindColor(event);
+    final isTournament = eventIsTournamentEvent(event);
     final missing = max(0, minPeople - yes);
     final progress = minPeople <= 0 ? 0.0 : min(1.0, yes / minPeople);
 
     return AppCard(
-      color: AppColors.navy,
+      color: isTournament ? const Color(0xFF2F260E) : AppColors.navy,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       onTap: () async {
         await Navigator.of(context).push(MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, group: widget.group)));
@@ -16712,6 +16896,26 @@ class RoutineBadge extends StatelessWidget {
       ]),
     );
   }
+}
+
+
+class TournamentAgendaBadge extends StatelessWidget {
+  const TournamentAgendaBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    decoration: BoxDecoration(
+      color: AppColors.amber.withOpacity(.13),
+      borderRadius: BorderRadius.circular(99),
+      border: Border.all(color: AppColors.amber.withOpacity(.28)),
+    ),
+    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(Icons.workspace_premium_rounded, color: AppColors.amber, size: 14),
+      SizedBox(width: 5),
+      Text('Liga/Torneo', style: TextStyle(color: AppColors.amber, fontWeight: FontWeight.w900, fontSize: 11)),
+    ]),
+  );
 }
 
 class EventKindPill extends StatelessWidget {
@@ -17769,12 +17973,23 @@ class AgendaPremiumHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final next = upcomingEvents.isNotEmpty ? upcomingEvents.first : null;
+    final nextDayEvents = eventsOnSameDay(upcomingEvents, next);
     final totalYes = upcomingEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
     final totalMaybe = upcomingEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
 
     if (next != null) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        EventAgendaCard(event: next, group: group, onChanged: onChanged),
+        if (nextDayEvents.length > 1) ...[
+          SectionHeader(title: 'Próximos de ese día', action: '${nextDayEvents.length}'),
+          const SizedBox(height: 8),
+          ...nextDayEvents.take(3).map((event) => EventAgendaCard(event: event, group: group, onChanged: onChanged)),
+          if (nextDayEvents.length > 3)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text('+ ${nextDayEvents.length - 3} más ese día', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+            ),
+        ] else
+          EventAgendaCard(event: next, group: group, onChanged: onChanged),
         const SizedBox(height: 10),
         AgendaMatteStatsRow(
           events: events.length,
@@ -18017,7 +18232,7 @@ class PremiumWeekStrip extends StatelessWidget {
       final today = sameDay(day, DateTime.now());
       final dayEvents = eventsFor(day);
       final hasEvents = dayEvents.isNotEmpty;
-      final color = hasEvents ? eventKindColor(dayEvents.first) : AppColors.navAgenda;
+      final color = agendaDayAccentColor(dayEvents);
       return Expanded(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -18100,7 +18315,7 @@ class PremiumMonthCalendar extends StatelessWidget {
             final today = sameDay(day, DateTime.now());
             final dayEvents = eventsFor(day);
             final hasEvents = dayEvents.isNotEmpty;
-            final mainColor = hasEvents ? eventKindColor(dayEvents.first) : AppColors.navAgenda;
+            final mainColor = agendaDayAccentColor(dayEvents);
             return Expanded(
               child: SizedBox(
                 height: 46,
@@ -18156,10 +18371,10 @@ class AgendaSelectedDayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasEvents = events.isNotEmpty;
-    final color = hasEvents ? eventKindColor(events.first) : AppColors.navAgenda;
+    final color = agendaDayAccentColor(events);
     return AppCard(
       padding: const EdgeInsets.all(14),
-      color: hasEvents ? eventKindSoftColor(events.first) : AppColors.orangeSoft,
+      color: agendaDaySoftColor(events),
       child: Row(children: [
         Container(
           width: 58,
@@ -18421,7 +18636,7 @@ class CalendarDaySummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasEvents = events.isNotEmpty;
-    final color = hasEvents ? eventKindColor(events.first) : AppColors.teal;
+    final color = agendaDayAccentColor(events);
     return AppCard(
       padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
       child: Row(children: [
@@ -18465,12 +18680,13 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
   bool saving = false;
 
   Future<void> setStatus(String status) async {
-    setState(() => saving = true);
+    if (saving) return;
+    if (mounted) setState(() => saving = true);
     try {
       await AppData.setAttendance(widget.event['id'].toString(), status);
       widget.onChanged();
     } catch (e) {
-      await showToast(context, e.toString(), danger: true);
+      if (mounted) await showToast(context, e.toString(), danger: true);
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -18492,85 +18708,92 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
     final mine = myAttendanceStatus(event);
     final viable = yes >= minPeople;
     final color = eventKindColor(event);
+    final isTournament = eventIsTournamentEvent(event);
     final progress = min(1.0, yes / max(1, minPeople));
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 11),
       child: AppCard(
+        color: isTournament ? const Color(0xFFFFFBF0) : AppColors.white,
         padding: EdgeInsets.zero,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Container(width: 6, color: color),
-            Expanded(child: Padding(
-              padding: const EdgeInsets.all(11),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: open,
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Container(
-                      width: 46,
-                      height: 50,
-                      decoration: BoxDecoration(color: eventKindSoftColor(event), borderRadius: BorderRadius.circular(17)),
-                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Icon(eventKindIcon(event), color: color, size: 20),
-                        const SizedBox(height: 3),
-                        Text(DateFormat('HH:mm', 'es_ES').format(date), style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900)),
-                      ]),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Wrap(spacing: 6, runSpacing: 6, children: [
-                        EventKindPill(event: event, compact: true),
-                        if (eventIsRoutine(event)) RoutineBadge(label: eventRoutineBadge(event)),
-                      ]),
-                      const SizedBox(height: 7),
-                      Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w900, height: 1.1)),
-                      const SizedBox(height: 6),
-                      MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
-                      const SizedBox(height: 7),
-                      Row(children: [
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(99),
-                            child: LinearProgressIndicator(
-                              value: progress,
-                              minHeight: 7,
-                              backgroundColor: AppColors.line,
-                              valueColor: AlwaysStoppedAnimation<Color>(viable ? AppColors.green : color),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text('$yes/$minPeople', style: TextStyle(color: viable ? AppColors.green : color, fontWeight: FontWeight.w900, fontSize: 12)),
-                      ]),
-                      const SizedBox(height: 6),
-                      Text(
-                        viable ? 'Plan viable · mínimo alcanzado' : 'Faltan ${max(0, minPeople - yes)} para alcanzar el mínimo',
-                        style: TextStyle(color: viable ? AppColors.green : AppColors.amber, fontWeight: FontWeight.w900, fontSize: 12),
-                      ),
-                    ])),
-                    const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (isTournament)
+            Container(
+              height: 5,
+              decoration: const BoxDecoration(
+                color: AppColors.amber,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+            ),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: open,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(11, 11, 11, 8),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(
+                  width: 48,
+                  height: 52,
+                  decoration: BoxDecoration(color: eventKindSoftColor(event), borderRadius: BorderRadius.circular(17)),
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(eventKindIcon(event), color: color, size: 20),
+                    const SizedBox(height: 3),
+                    Text(DateFormat('HH:mm', 'es_ES').format(date), style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900)),
                   ]),
                 ),
-                const SizedBox(height: 9),
-                Row(children: [
-                  Expanded(child: CompactAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
-                  const SizedBox(width: 7),
-                  Expanded(child: CompactAttendanceButton(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
-                  const SizedBox(width: 7),
-                  Expanded(child: CompactAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
-                ]),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Wrap(spacing: 6, runSpacing: 6, children: [
+                    EventKindPill(event: event, compact: true),
+                    if (isTournament) const TournamentAgendaBadge(),
+                    if (eventIsRoutine(event)) RoutineBadge(label: eventRoutineBadge(event)),
+                  ]),
+                  const SizedBox(height: 7),
+                  Text(AppData.text(event['title'], 'Evento'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 16.5, fontWeight: FontWeight.w900, height: 1.1)),
+                  const SizedBox(height: 6),
+                  MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
+                  const SizedBox(height: 7),
+                  Row(children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 7,
+                          backgroundColor: AppColors.line,
+                          valueColor: AlwaysStoppedAnimation<Color>(viable ? AppColors.green : color),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text('$yes/$minPeople', style: TextStyle(color: viable ? AppColors.green : color, fontWeight: FontWeight.w900, fontSize: 12)),
+                  ]),
+                  const SizedBox(height: 6),
+                  Text(
+                    viable ? 'Plan viable · mínimo alcanzado' : 'Faltan ${max(0, minPeople - yes)} para alcanzar el mínimo',
+                    style: TextStyle(color: viable ? AppColors.green : AppColors.amber, fontWeight: FontWeight.w900, fontSize: 12),
+                  ),
+                ])),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
               ]),
-            )),
-          ]),
-        ),
+            ),
+          ),
+          Container(height: 1, color: AppColors.lineSoft),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(11, 9, 11, 11),
+            child: Row(children: [
+              Expanded(child: CompactAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
+              const SizedBox(width: 7),
+              Expanded(child: CompactAttendanceButton(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
+              const SizedBox(width: 7),
+              Expanded(child: CompactAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
+            ]),
+          ),
+        ]),
       ),
     );
   }
 }
-
 
 class CompactAttendanceButton extends StatelessWidget {
   final String label;
