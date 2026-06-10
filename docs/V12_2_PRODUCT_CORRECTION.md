@@ -23,6 +23,6 @@ Contrato de producto:
 - El grupo es un espacio privado cerrado.
 - El creador es owner/admin.
 - Los eventos/quedadas viven en Inicio y Calendario.
-- Finanzas debe funcionar como reparto tipo Tricount.
+- Finanzas debe funcionar como reparto con reparto claro.
 - Torneos/Ligas deben servir para organizar competiciones reales del grupo.
 - No debe haber datos de ejemplo mezclados con datos reales.

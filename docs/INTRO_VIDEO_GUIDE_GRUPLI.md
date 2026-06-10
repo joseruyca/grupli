@@ -12,7 +12,7 @@ Guion:
 
 1. 0–3s: “Organiza tu grupo en segundos”. Mostrar Mis grupos.
 2. 3–8s: “Crea planes y confirma asistencia”. Mostrar Inicio + botones Voy/Duda/No.
-3. 8–14s: “Controla gastos como Tricount”. Mostrar Finanzas.
+3. 8–14s: “Controla gastos de forma clara”. Mostrar Finanzas.
 4. 14–20s: “Monta torneos y ligas”. Mostrar Torneos.
 5. 20–25s: “Invita con código o enlace”. Mostrar Más.
 6. 25–30s: “Grupli: planes, gastos y torneos en un solo lugar”.

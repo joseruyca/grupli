@@ -1,4 +1,4 @@
-# V14.5 — Finanzas tipo Tricount definitivo
+# V14.5 — Finanzas con reparto claro definitivo
 
 Esta fase pule Finanzas para que sea una de las funciones fuertes de Grupli.
 

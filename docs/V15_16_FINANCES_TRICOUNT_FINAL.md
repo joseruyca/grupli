@@ -1,4 +1,4 @@
-# v15.16 — Finanzas final tipo Tricount
+# v15.16 — Finanzas final con reparto claro
 
 Objetivo: dejar Finanzas como una sección rápida, clara y accionable.
 
@@ -20,4 +20,4 @@ Objetivo: dejar Finanzas como una sección rápida, clara y accionable.
 
 ## SQL
 
-Ejecutar `supabase/patch_v15_16_finances_tricount_final.sql`.
+Ejecutar `supabase/patch_v15_16_finances_settlements_final.sql`.

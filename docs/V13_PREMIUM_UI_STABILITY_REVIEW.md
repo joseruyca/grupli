@@ -31,7 +31,7 @@ La estructura de navegación se mantiene así:
 
 ## Finanzas
 
-Se mantiene el flujo tipo Tricount:
+Se mantiene el flujo con reparto claro:
 
 - Gasto total.
 - Quién pagó.

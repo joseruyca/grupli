@@ -13,7 +13,7 @@ Construir Grupli como una app móvil premium para Play Store y App Store, no com
 5. Detalle / Más del grupo: cabecera visual, acciones de invitación, miembros, ajustes y actividad.
 6. Eventos: próximos eventos, confirmaciones, crear evento.
 7. Calendario: vista mensual y agenda diaria.
-8. Finanzas: resumen estilo Tricount, gastos recientes y añadir gasto.
+8. Finanzas: resumen con reparto sencillo, gastos recientes y añadir gasto.
 9. Torneos: lista de ligas/torneos y crear torneo.
 10. Perfil: escueto, foto/nombre/ajustes/cerrar sesión.
 

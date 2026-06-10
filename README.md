@@ -30,7 +30,7 @@ Se elimina la pestaña Eventos como navegación principal. Dentro de cada grupo,
 
 Rehace el flujo de torneos/ligas: creación guiada, formatos liga/eliminatoria/americano, participantes, generación automática de partidos, resultados, clasificación y rondas.
 
-## v12.4 — Finanzas estilo Tricount
+## v12.4 — Finanzas con reparto sencillo
 
 Mejora completa de Finanzas: balances por miembro, quién debe a quién, formulario de gasto guiado, detalle de gasto, liquidación y reapertura de pagos. No requiere SQL nuevo si ya está ejecutado el `all_in_one.sql` de v12.
 
@@ -92,7 +92,7 @@ Corrección incluida: `docs/V14_2_COMPILE_FIX.md`.
 Última mejora incluida: `docs/V14_4_CALENDAR_EVENTS_POLISH.md`.
 
 
-Última mejora incluida: `docs/V14_5_FINANCES_TRICOUNT_FINAL.md`.
+Última mejora incluida: `docs/V14_5_FINANCES_SETTLEMENTS_FINAL.md`.
 
 
 Última corrección incluida: `docs/V14_5_1_FINANCES_COMPILE_FIX.md`.

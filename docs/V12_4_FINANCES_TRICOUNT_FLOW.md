@@ -1,4 +1,4 @@
-# v12.4 — Finanzas estilo Tricount
+# v12.4 — Finanzas con reparto sencillo
 
 Esta fase convierte Finanzas en una herramienta real para grupos privados.
 

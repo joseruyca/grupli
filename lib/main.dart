@@ -4269,22 +4269,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   static const slides = [
     _OnboardingSlideData(
       icon: Icons.groups_rounded,
-      title: 'Todo tu grupo\nen un solo lugar',
-      body: 'Crea grupos privados para quedar, organizar planes y saber qué toca esta semana sin perderte en chats.',
+      title: 'Tu grupo,\nsiempre ordenado',
+      body: 'Crea espacios privados para coordinar planes, asistencia, gastos y competiciones sin perder información en chats.',
       accent: AppColors.teal,
       soft: AppColors.tealSoft,
     ),
     _OnboardingSlideData(
       icon: Icons.event_available_rounded,
-      title: 'Agenda clara\ny asistencia rápida',
-      body: 'Cada plan muestra quién va, quién duda y si falta gente. Confirmar es cuestión de un toque.',
+      title: 'Planes claros\ny asistencia rápida',
+      body: 'Cada evento muestra fecha, ubicación, quién va, quién duda y si falta gente. Confirmar solo lleva un toque.',
       accent: AppColors.violet,
       soft: AppColors.violetSoft,
     ),
     _OnboardingSlideData(
-      icon: Icons.account_balance_wallet_rounded,
-      title: 'Gastos y torneos\nsin líos',
-      body: 'Reparte pagos tipo Tricount, liquida saldos y monta ligas o torneos con resultados y clasificación.',
+      icon: Icons.emoji_events_rounded,
+      title: 'Gastos, ligas\ny torneos',
+      body: 'Registra gastos, liquida pagos pendientes y organiza ligas o torneos con calendario, resultados y clasificación.',
       accent: AppColors.orange,
       soft: AppColors.orangeSoft,
     ),
@@ -7419,7 +7419,7 @@ class _FinancesTabState extends State<FinancesTab> {
                     SectionHeader(title: 'Movimientos', action: hasMovements ? '${data.expenses.length + data.settlementPayments.length}' : '0'),
                     const SizedBox(height: 8),
                     if (!hasMovements)
-                      EmptyBlock(icon: Icons.receipt_long_rounded, title: 'Aún no hay movimientos', body: 'Añade el primer gasto. Aquí verás gastos y pagos registrados, como en Tricount.')
+                      EmptyBlock(icon: Icons.receipt_long_rounded, title: 'Aún no hay movimientos', body: 'Añade el primer gasto. Aquí verás gastos y pagos registrados, como en reparto de gastos.')
                     else ...[
                       if (data.expenses.isNotEmpty) ...[
                         SectionHeader(title: 'Gastos pagados', action: 'Total ${money(summary.totalExpenses)}'),
