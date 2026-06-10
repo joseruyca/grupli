@@ -7068,9 +7068,6 @@ class _CalendarTabState extends State<CalendarTab> {
     }).toList();
 
     final selectedEvents = _eventsForDay(byDay, selected);
-    final selectedYes = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'yes'));
-    final selectedMaybe = selectedEvents.fold<int>(0, (sum, e) => sum + attendanceCount(e, 'maybe'));
-
     final weekStart = today;
     final weekDays = List<DateTime>.generate(7, (i) => DateTime(weekStart.year, weekStart.month, weekStart.day).add(Duration(days: i)));
     final weekEventsCount = weekDays.fold<int>(0, (sum, day) => sum + _eventsForDay(byDay, day).length);
@@ -7094,21 +7091,13 @@ class _CalendarTabState extends State<CalendarTab> {
               ErrorBlock(message: errorMessage!, onRetry: () { reload(); }),
               const SizedBox(height: 12),
             ],
-            AgendaPremiumHero(
-              events: visibleEvents,
-              upcomingEvents: upcomingEvents,
-              group: widget.group,
-              onChanged: reload,
-              onCreate: () => createFor(selected),
-            ),
             if (refreshing) ...[
-              const SizedBox(height: 10),
               ClipRRect(
                 borderRadius: BorderRadius.circular(99),
                 child: const LinearProgressIndicator(minHeight: 3, color: AppColors.navAgenda, backgroundColor: AppColors.line),
               ),
+              const SizedBox(height: 10),
             ],
-            const SizedBox(height: 14),
             AgendaViewSwitch(
               index: viewMode,
               onChanged: (i) => setState(() => viewMode = i),
@@ -7178,30 +7167,28 @@ class _CalendarTabState extends State<CalendarTab> {
               ),
             ],
             const SizedBox(height: 16),
-            AgendaSelectedDayCard(
-              day: selected,
-              events: selectedEvents,
-              confirmed: selectedYes,
-              maybe: selectedMaybe,
-              onCreate: () => createFor(selected),
-            ),
-            const SizedBox(height: 12),
-            if (selectedEvents.isEmpty)
+            if (selectedEvents.isNotEmpty) ...[
+              SectionHeader(title: 'Planes del día', action: '${selectedEvents.length}'),
+              const SizedBox(height: 10),
+              AgendaSameDayCompactCard(events: selectedEvents, group: widget.group, onChanged: reload, title: agendaSelectedDayTitle(selected)),
+              const SizedBox(height: 18),
+            ],
+            SectionHeader(title: selectedEvents.isEmpty ? 'Próximos planes' : 'Siguientes planes', action: '${upcomingEvents.length}'),
+            const SizedBox(height: 10),
+            if (upcomingEvents.isEmpty)
               PremiumAgendaEmptyState(
                 hasAnyEvents: visibleEvents.isNotEmpty,
                 selected: selected,
                 onCreate: () => createFor(selected),
               )
-            else if (selectedEvents.length > 1 && selectedEvents.any(eventIsTournamentEvent))
-              AgendaSameDayCompactCard(events: selectedEvents, group: widget.group, onChanged: reload, title: 'Partidos y planes del día')
             else
-              ...selectedEvents.map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
-            if (!loading && selectedEvents.isEmpty && upcomingEvents.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              SectionHeader(title: 'Próximos planes', action: '${upcomingEvents.length}'),
-              const SizedBox(height: 10),
-              ...upcomingEvents.take(4).map((e) => EventAgendaCard(event: e, group: widget.group, onChanged: reload)),
-            ],
+              AgendaGroupedUpcomingList(
+                events: upcomingEvents,
+                group: widget.group,
+                onChanged: reload,
+                excludeDay: selectedEvents.isNotEmpty ? selected : null,
+                onCreate: () => createFor(selected),
+              ),
           ],
         ),
       ),
@@ -18642,12 +18629,118 @@ class CalendarDaySummary extends StatelessWidget {
 }
 
 
+
+String agendaSelectedDayTitle(DateTime day) {
+  final today = DateTime.now();
+  if (sameDay(day, today)) return 'Hoy';
+  return DateFormat('EEEE d MMM', 'es_ES').format(day).replaceAll('.', '');
+}
+
+class AgendaGroupedUpcomingList extends StatelessWidget {
+  final List<Map<String, dynamic>> events;
+  final Map<String, dynamic> group;
+  final VoidCallback onChanged;
+  final DateTime? excludeDay;
+  final VoidCallback onCreate;
+  const AgendaGroupedUpcomingList({
+    super.key,
+    required this.events,
+    required this.group,
+    required this.onChanged,
+    this.excludeDay,
+    required this.onCreate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = events.where((event) {
+      if (excludeDay == null) return true;
+      final date = DateTime.tryParse(AppData.text(event['starts_at']))?.toLocal();
+      return date == null || !sameDay(date, excludeDay!);
+    }).toList()
+      ..sort((a, b) {
+        final da = DateTime.tryParse(AppData.text(a['starts_at'])) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final db = DateTime.tryParse(AppData.text(b['starts_at'])) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return da.compareTo(db);
+      });
+
+    if (filtered.isEmpty) {
+      return AgendaNoMorePlansCard(onCreate: onCreate);
+    }
+
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final event in filtered) {
+      final date = DateTime.tryParse(AppData.text(event['starts_at']))?.toLocal();
+      if (date == null) continue;
+      grouped.putIfAbsent(calendarDayKey(date), () => <Map<String, dynamic>>[]).add(event);
+    }
+
+    final keys = grouped.keys.toList()..sort();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      for (final key in keys.take(5)) ...[
+        AgendaSameDayCompactCard(
+          events: grouped[key]!,
+          group: group,
+          onChanged: onChanged,
+          title: agendaSelectedDayTitle(DateTime.parse(key)),
+          compactHeader: true,
+        ),
+        const SizedBox(height: 10),
+      ],
+      if (keys.length > 5)
+        AppCard(
+          color: AppColors.surface,
+          padding: const EdgeInsets.all(12),
+          child: Text('+ ${keys.length - 5} días más con planes', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+        ),
+    ]);
+  }
+}
+
+class AgendaNoMorePlansCard extends StatelessWidget {
+  final VoidCallback onCreate;
+  const AgendaNoMorePlansCard({super.key, required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    color: AppColors.surface,
+    padding: const EdgeInsets.all(14),
+    child: Row(children: [
+      Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(color: AppColors.orangeSoft, borderRadius: BorderRadius.circular(15)),
+        child: const Icon(Icons.event_available_rounded, color: AppColors.orange, size: 20),
+      ),
+      const SizedBox(width: 10),
+      const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('No hay más planes', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        SizedBox(height: 3),
+        Text('Crea un nuevo evento para el grupo.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+      ])),
+      const SizedBox(width: 8),
+      TextButton.icon(
+        onPressed: onCreate,
+        style: TextButton.styleFrom(
+          backgroundColor: AppColors.teal,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        icon: const Icon(Icons.add_rounded, size: 18),
+        label: const Text('Crear', style: TextStyle(fontWeight: FontWeight.w900)),
+      ),
+    ]),
+  );
+}
+
 class AgendaSameDayCompactCard extends StatelessWidget {
   final List<Map<String, dynamic>> events;
   final Map<String, dynamic> group;
   final VoidCallback onChanged;
   final String title;
-  const AgendaSameDayCompactCard({super.key, required this.events, required this.group, required this.onChanged, this.title = 'Planes del día'});
+  final bool compactHeader;
+  const AgendaSameDayCompactCard({super.key, required this.events, required this.group, required this.onChanged, this.title = 'Planes del día', this.compactHeader = false});
 
   @override
   Widget build(BuildContext context) {
@@ -18666,9 +18759,13 @@ class AgendaSameDayCompactCard extends StatelessWidget {
     }
 
     return AppCard(
-      color: hasTournament ? AppColors.amberSoft : AppColors.surface,
+      color: AppColors.white,
       padding: const EdgeInsets.all(12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (hasTournament) ...[
+          Container(height: 4, decoration: BoxDecoration(color: AppColors.amber, borderRadius: BorderRadius.circular(99))),
+          const SizedBox(height: 10),
+        ],
         Row(children: [
           Container(
             width: 45,
