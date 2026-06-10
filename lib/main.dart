@@ -3142,6 +3142,23 @@ class AmericanoGeneratedMatch {
   });
 }
 
+int recommendedAmericanoRounds(int players, int courts) {
+  if (players < 4) return 1;
+  final activeCourts = max(1, min(courts, players ~/ 4));
+  final allPartnerPairs = players * (players - 1) ~/ 2;
+  final partnerPairsPerRound = activeCourts * 2;
+  return max(1, min(40, (allPartnerPairs / max(1, partnerPairsPerRound)).ceil()));
+}
+
+String americanoRulesText(int players, int courts, int rounds) {
+  final recommended = recommendedAmericanoRounds(players, courts);
+  if (players < 4) return 'El americano necesita al menos 4 jugadores.';
+  final roundText = rounds >= recommended
+      ? 'Con $rounds rondas hay margen para rotar bien las parejas.'
+      : 'Con $rounds rondas quizá no todos jueguen con todas las parejas; recomendado: $recommended.';
+  return 'Ranking individual: cada jugador suma los puntos que consigue en cada partido, aunque juegue con parejas distintas. $roundText';
+}
+
 String americanoPairKey(String a, String b) {
   final pair = [a, b]..sort();
   return pair.join('|');
@@ -3172,18 +3189,24 @@ List<List<String>> americanoSideSplits(List<String> group) {
 List<AmericanoGeneratedMatch> generateAmericanoRoundsIds(List<String> ids, {required int rounds, required int courts}) {
   final clean = ids.where((id) => id.trim().isNotEmpty).toList();
   if (clean.length < 4) return const [];
+
   final maxCourts = max(1, min(courts, clean.length ~/ 4));
+  final targetRounds = max(1, rounds);
   final partnerCounts = <String, int>{};
   final opponentCounts = <String, int>{};
   final restCounts = <String, int>{for (final id in clean) id: 0};
+  final playedCounts = <String, int>{for (final id in clean) id: 0};
   final output = <AmericanoGeneratedMatch>[];
 
-  for (var round = 1; round <= max(1, rounds); round++) {
+  for (var round = 1; round <= targetRounds; round++) {
     final rotated = [...clean];
     final shift = (round - 1) % rotated.length;
     final shifted = [...rotated.skip(shift), ...rotated.take(shift)];
     final orderRank = {for (var i = 0; i < shifted.length; i++) shifted[i]: i};
+
     shifted.sort((a, b) {
+      final playedCompare = (playedCounts[a] ?? 0).compareTo(playedCounts[b] ?? 0);
+      if (playedCompare != 0) return playedCompare;
       final restCompare = (restCounts[b] ?? 0).compareTo(restCounts[a] ?? 0);
       if (restCompare != 0) return restCompare;
       return (orderRank[a] ?? 0).compareTo(orderRank[b] ?? 0);
@@ -3212,14 +3235,19 @@ List<AmericanoGeneratedMatch> generateAmericanoRoundsIds(List<String> ids, {requ
                 final p2 = split[1];
                 final q1 = split[2];
                 final q2 = split[3];
+
                 final partnerPenalty = americanoPairCount(partnerCounts, p1, p2) + americanoPairCount(partnerCounts, q1, q2);
                 final opponentPenalty =
                     americanoPairCount(opponentCounts, p1, q1) +
                     americanoPairCount(opponentCounts, p1, q2) +
                     americanoPairCount(opponentCounts, p2, q1) +
                     americanoPairCount(opponentCounts, p2, q2);
-                final restBalance = group.fold<int>(0, (value, id) => value + (restCounts[id] ?? 0));
-                final score = (partnerPenalty * 100) + (opponentPenalty * 10) - restBalance;
+
+                final groupPlayed = group.fold<int>(0, (value, id) => value + (playedCounts[id] ?? 0));
+                final groupRested = group.fold<int>(0, (value, id) => value + (restCounts[id] ?? 0));
+
+                final score = (partnerPenalty * 10000) + (opponentPenalty * 80) + (groupPlayed * 12) - (groupRested * 6);
+
                 if (score < bestScore) {
                   bestScore = score;
                   best = split;
@@ -3241,6 +3269,9 @@ List<AmericanoGeneratedMatch> generateAmericanoRoundsIds(List<String> ids, {requ
         for (final b in sideB) {
           americanoIncrementPair(opponentCounts, a, b);
         }
+      }
+      for (final id in best) {
+        playedCounts[id] = (playedCounts[id] ?? 0) + 1;
       }
       remaining.removeWhere((id) => best!.contains(id));
       court++;
@@ -6817,6 +6848,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         final minPeople = AppData.intValue(event['min_people'], 2);
         final mine = myAttendanceStatus(event);
         final pending = max(0, data.members.length - yes - maybe - no);
+        final canManageEvent = AppData.text(event['created_by']).isNotEmpty && AppData.text(event['created_by']) == (AppData.user?.id ?? '');
 
         return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           PageHeader(title: AppData.text(event['title'], 'Evento'), subtitle: AppData.text(widget.group['name'], 'Grupo'), leading: true),
@@ -6851,10 +6883,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             const SizedBox(height: 18),
             PrimaryButton(label: 'Ir a Google Maps', icon: Icons.navigation_rounded, onTap: () { openAddressInGoogleMaps(context, AppData.text(event['location'])); }),
           ],
-          const SizedBox(height: 18),
-          SecondaryButton(label: 'Editar evento', icon: Icons.edit_rounded, onTap: () => editEvent(event)),
-          const SizedBox(height: 10),
-          DangerButton(label: 'Cancelar evento', icon: Icons.event_busy_rounded, onTap: () => cancelEvent(event)),
+          if (canManageEvent) ...[
+            const SizedBox(height: 18),
+            SecondaryButton(label: 'Editar evento', icon: Icons.edit_rounded, onTap: () => editEvent(event)),
+            const SizedBox(height: 10),
+            DangerButton(label: 'Cancelar evento', icon: Icons.event_busy_rounded, onTap: () => cancelEvent(event)),
+          ],
         ]));
       },
     );
@@ -7138,6 +7172,8 @@ class _CalendarTabState extends State<CalendarTab> {
                 ),
               ),
             ],
+            const SizedBox(height: 10),
+            EventTypeLegend(events: visibleEvents),
             const SizedBox(height: 16),
             if (selectedEvents.isNotEmpty) ...[
               SectionHeader(title: 'Planes del día', action: '${selectedEvents.length}'),
@@ -7205,9 +7241,9 @@ class _FinancesTabState extends State<FinancesTab> {
   Future<void> markSettlementPaid(SettlementDebt debt) async {
     final confirmed = await confirmAction(
       context,
-      title: 'Marcar pago como hecho',
+      title: 'Liquidar pago',
       body: '${debt.fromName} pagó a ${debt.toName} ${money(debt.amount)}. Esto actualizará el balance neto del grupo.',
-      confirmLabel: 'Registrar pago',
+      confirmLabel: 'Liquidar',
     );
     if (confirmed != true) return;
 
@@ -8315,7 +8351,7 @@ class SettlementPaymentRow extends StatelessWidget {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
                 ),
                 icon: const Icon(Icons.check_circle_outline_rounded, size: 15),
-                label: const Text('Registrar', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                label: const Text('Liquidar', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
               ),
             ),
           ],
@@ -9393,6 +9429,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
 
   Widget _buildFormatStep() {
     final fullRounds = max(0, participantNames.length.isOdd ? participantNames.length : participantNames.length - 1);
+    final americanoRecommendedRounds = recommendedAmericanoRounds(participantNames.length, courtsCount);
     final totalLeagueRounds = fullRounds * max(1, leagueLegs);
     final limitedLeagueRounds = leagueRoundsLimit <= 0 ? totalLeagueRounds : leagueRoundsLimit * max(1, leagueLegs);
     final preview = draftMatches.take(10).toList();
@@ -9423,16 +9460,20 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           TournamentCounterRow(label: 'Vueltas', value: leagueLegs, min: 1, max: 4, onChanged: (v) => setState(() => leagueLegs = v), helper: leagueLegs == 1 ? 'Solo ida' : '$leagueLegs vueltas'),
           TournamentCounterRow(label: 'Jornadas por vuelta', value: leagueRoundsLimit, min: 0, max: max(1, fullRounds), zeroLabel: 'Todas', onChanged: (v) => setState(() => leagueRoundsLimit = v), helper: leagueRoundsLimit == 0 ? 'Liga completa: $fullRounds por vuelta · $totalLeagueRounds en total' : '$leagueRoundsLimit por vuelta · $limitedLeagueRounds en total'),
         ] else if (format == 'americano') ...[
-          TournamentCounterRow(label: 'Rondas', value: americanoRounds, min: 1, max: 20, onChanged: (v) => setState(() => americanoRounds = v), helper: 'Ranking individual por puntos conseguidos'),
+          TournamentCounterRow(label: 'Rondas', value: americanoRounds, min: 1, max: 40, onChanged: (v) => setState(() => americanoRounds = v), helper: 'Recomendado: $americanoRecommendedRounds rondas'),
           TournamentCounterRow(label: 'Pistas / mesas', value: courtsCount, min: 1, max: 12, onChanged: (v) => setState(() => courtsCount = v), helper: '1 partido por pista y ronda'),
           const SizedBox(height: 6),
           Wrap(spacing: 8, runSpacing: 8, children: const [
-            TournamentRuleChip(label: 'Parejas rotativas'),
+            TournamentRuleChip(label: 'Ranking individual'),
+            TournamentRuleChip(label: 'Pareja distinta si se puede'),
             TournamentRuleChip(label: 'Descansos equilibrados'),
-            TournamentRuleChip(label: 'Evita repeticiones'),
           ]),
           const SizedBox(height: 8),
-          const Text('Cada ronda usa 4 jugadores por pista. Si sobran jugadores, la app reparte descansos intentando que todos jueguen parecido.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          Text(americanoRulesText(participantNames.length, courtsCount, americanoRounds), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          if (participantNames.length >= 4 && americanoRounds != americanoRecommendedRounds) ...[
+            const SizedBox(height: 10),
+            SecondaryButton(label: 'Usar $americanoRecommendedRounds rondas recomendadas', icon: Icons.auto_awesome_rounded, onTap: () => setState(() => americanoRounds = americanoRecommendedRounds)),
+          ],
         ] else if (format == 'eliminatoria') ...[
           Wrap(spacing: 8, runSpacing: 8, children: const [
             TournamentRuleChip(label: 'Cabezas de serie'),
@@ -16888,9 +16929,7 @@ class EventTypeLegend extends StatelessWidget {
     final ordered = <String>['partido', 'entrenamiento', 'cena', 'reunion', 'torneo', 'quedada']
         .where((kind) => kinds.containsKey(kind))
         .toList();
-    if (ordered.isEmpty) {
-      ordered.addAll(['partido', 'entrenamiento', 'cena', 'torneo']);
-    }
+    if (ordered.isEmpty) return const SizedBox.shrink();
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       color: AppColors.surface,
