@@ -4374,71 +4374,493 @@ class _OnboardingSlideData {
   const _OnboardingSlideData({required this.icon, required this.title, required this.body, required this.accent, required this.soft});
 }
 
-class OnboardingSlide extends StatelessWidget {
+
+class OnboardingSlide extends StatefulWidget {
   final _OnboardingSlideData data;
   final int index;
   const OnboardingSlide({super.key, required this.data, required this.index});
 
   @override
+  State<OnboardingSlide> createState() => _OnboardingSlideState();
+}
+
+class _OnboardingSlideState extends State<OnboardingSlide> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 5200))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Expanded(
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(34),
-            gradient: LinearGradient(
-              colors: index == 0
-                  ? const [Color(0xFF073A57), Color(0xFF0B6B8F)]
-                  : index == 1
-                      ? const [Color(0xFF4038A8), Color(0xFF6657D8)]
-                      : const [Color(0xFF016B62), Color(0xFFE98A2C)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: const [BoxShadow(color: Color(0x22073A57), blurRadius: 28, offset: Offset(0, 16))],
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) => _IntroSceneFrame(
+            index: widget.index,
+            data: widget.data,
+            progress: _controller.value,
           ),
-          child: Stack(children: [
-            Positioned.fill(
-              child: Wrap(
-                spacing: 23,
-                runSpacing: 22,
-                children: List.generate(48, (i) => Icon(_decorIcon(i), color: Colors.white.withOpacity(.08), size: 19)),
-              ),
-            ),
-            Align(
-              alignment: Alignment.center,
-              child: Container(
-                width: 170,
-                height: 170,
-                decoration: BoxDecoration(color: Colors.white.withOpacity(.14), shape: BoxShape.circle),
-                child: Center(
-                  child: Container(
-                    width: 104,
-                    height: 104,
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(32)),
-                    child: Icon(data.icon, color: data.accent, size: 48),
-                  ),
-                ),
-              ),
-            ),
-          ]),
         ),
       ),
       const SizedBox(height: 28),
-      Text(data.title, style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.02, letterSpacing: -1.1)),
+      TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 520),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, child) => Opacity(
+          opacity: value,
+          child: Transform.translate(offset: Offset(0, 16 * (1 - value)), child: child),
+        ),
+        child: Text(widget.data.title, style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.02, letterSpacing: -1.1)),
+      ),
       const SizedBox(height: 12),
-      Text(data.body, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.muted, height: 1.42)),
+      TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 620),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, child) => Opacity(
+          opacity: value,
+          child: Transform.translate(offset: Offset(0, 18 * (1 - value)), child: child),
+        ),
+        child: Text(widget.data.body, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.muted, height: 1.42)),
+      ),
       const SizedBox(height: 4),
     ]);
   }
+}
 
-  IconData _decorIcon(int i) {
-    const icons = [Icons.calendar_month_rounded, Icons.payments_rounded, Icons.emoji_events_rounded, Icons.check_circle_rounded, Icons.lock_rounded, Icons.people_alt_rounded];
-    return icons[i % icons.length];
+class _IntroSceneFrame extends StatelessWidget {
+  final int index;
+  final _OnboardingSlideData data;
+  final double progress;
+  const _IntroSceneFrame({required this.index, required this.data, required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(34),
+        gradient: LinearGradient(
+          colors: index == 0
+              ? const [Color(0xFF073A57), Color(0xFF0B6B8F)]
+              : index == 1
+                  ? const [Color(0xFF123D72), Color(0xFF0C8A8A)]
+                  : const [Color(0xFF063346), Color(0xFF0F766E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: const [BoxShadow(color: Color(0x22073A57), blurRadius: 28, offset: Offset(0, 16))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(27),
+        child: Stack(children: [
+          Positioned.fill(child: _IntroAnimatedBackground(progress: progress, index: index)),
+          if (index == 0)
+            _GroupPrivateScene(progress: progress)
+          else if (index == 1)
+            _AgendaScene(progress: progress)
+          else
+            _FinanceTournamentScene(progress: progress),
+        ]),
+      ),
+    );
   }
 }
+
+class _IntroAnimatedBackground extends StatelessWidget {
+  final double progress;
+  final int index;
+  const _IntroAnimatedBackground({required this.progress, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    final icons = <IconData>[
+      Icons.calendar_month_rounded,
+      Icons.payments_rounded,
+      Icons.emoji_events_rounded,
+      Icons.check_circle_rounded,
+      Icons.lock_rounded,
+      Icons.people_alt_rounded,
+    ];
+    return Stack(children: [
+      Positioned(
+        right: -34 + sin(progress * pi * 2) * 10,
+        top: -24 + cos(progress * pi * 2) * 8,
+        child: _GlowCircle(size: 138, color: Colors.white.withOpacity(.12)),
+      ),
+      Positioned(
+        left: -42 + cos(progress * pi * 2) * 8,
+        bottom: -34 + sin(progress * pi * 2) * 10,
+        child: _GlowCircle(size: 122, color: Colors.white.withOpacity(.10)),
+      ),
+      Positioned.fill(
+        child: Wrap(
+          spacing: 23,
+          runSpacing: 22,
+          children: List.generate(48, (i) {
+            final wave = sin((progress * pi * 2) + i * .55);
+            return Transform.translate(
+              offset: Offset(0, wave * 2.2),
+              child: Icon(icons[(i + index) % icons.length], color: Colors.white.withOpacity(.055 + (wave + 1) * .012), size: 18),
+            );
+          }),
+        ),
+      ),
+    ]);
+  }
+}
+
+class _GlowCircle extends StatelessWidget {
+  final double size;
+  final Color color;
+  const _GlowCircle({required this.size, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  );
+}
+
+class _GroupPrivateScene extends StatelessWidget {
+  final double progress;
+  const _GroupPrivateScene({required this.progress});
+
+  double _pop(double start, double end) => Curves.easeOutBack.transform(((progress - start) / (end - start)).clamp(0.0, 1.0).toDouble());
+
+  @override
+  Widget build(BuildContext context) {
+    final invitePulse = .5 + .5 * sin(progress * pi * 2);
+    return Center(
+      child: Transform.translate(
+        offset: Offset(0, sin(progress * pi * 2) * 4),
+        child: Container(
+          width: 250,
+          constraints: const BoxConstraints(maxHeight: 330),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(.96),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 24, offset: Offset(0, 14))],
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              height: 66,
+              decoration: BoxDecoration(
+                color: AppColors.tealSoft,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Stack(children: [
+                Positioned(left: 14, top: 14, child: _MiniAvatar(label: 'J', color: AppColors.teal)),
+                Positioned(left: 42, top: 14, child: Transform.scale(scale: _pop(.05, .32), child: _MiniAvatar(label: 'M', color: AppColors.orange))),
+                Positioned(left: 70, top: 14, child: Transform.scale(scale: _pop(.15, .42), child: _MiniAvatar(label: 'A', color: AppColors.violet))),
+                Positioned(
+                  right: 12,
+                  top: 14,
+                  child: Transform.scale(
+                    scale: 1 + invitePulse * .05,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(99)),
+                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.lock_rounded, color: AppColors.teal, size: 14),
+                        SizedBox(width: 5),
+                        Text('Privado', style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 11)),
+                      ]),
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 12),
+            const Text('Los pingüino', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w900, height: 1)),
+            const SizedBox(height: 5),
+            const Text('Agenda, gastos y torneos del grupo', style: TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 14),
+            _SceneMiniTile(icon: Icons.calendar_month_rounded, color: AppColors.teal, title: 'Plan del viernes', subtitle: '4 van · 1 duda', progress: _pop(.25, .55)),
+            const SizedBox(height: 8),
+            _SceneMiniTile(icon: Icons.account_balance_wallet_rounded, color: AppColors.green, title: 'Pago pendiente', subtitle: 'Liquidar € 2,50', progress: _pop(.35, .68)),
+            const SizedBox(height: 8),
+            _SceneMiniTile(icon: Icons.emoji_events_rounded, color: AppColors.red, title: 'Liga activa', subtitle: 'Jornada 2 lista', progress: _pop(.45, .78)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _AgendaScene extends StatelessWidget {
+  final double progress;
+  const _AgendaScene({required this.progress});
+
+  double _ease(double start, double end) => Curves.easeOutCubic.transform(((progress - start) / (end - start)).clamp(0.0, 1.0).toDouble());
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = progress > .34;
+    final confirmed = progress > .62;
+    final pulse = .5 + .5 * sin(progress * pi * 2);
+    return Center(
+      child: Container(
+        width: 258,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(.97),
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 24, offset: Offset(0, 14))],
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Row(children: [
+            Icon(Icons.calendar_month_rounded, color: AppColors.teal, size: 19),
+            SizedBox(width: 7),
+            Text('Agenda', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
+          ]),
+          const SizedBox(height: 12),
+          Row(children: List.generate(5, (i) {
+            final active = i == 2;
+            return Expanded(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                height: active ? 58 : 50,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: active ? AppColors.teal : AppColors.surface,
+                  borderRadius: BorderRadius.circular(17),
+                  border: Border.all(color: active ? AppColors.teal : AppColors.line),
+                ),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(['L','M','X','J','V'][i], style: TextStyle(color: active ? Colors.white : AppColors.muted, fontWeight: FontWeight.w900, fontSize: 10)),
+                  const SizedBox(height: 4),
+                  Text('${10 + i}', style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: active ? 19 : 16)),
+                  const SizedBox(height: 4),
+                  Container(width: active ? 18 : 6, height: 5, decoration: BoxDecoration(color: active ? Colors.white : AppColors.line, borderRadius: BorderRadius.circular(99))),
+                ]),
+              ),
+            );
+          })),
+          const SizedBox(height: 14),
+          Transform.translate(
+            offset: Offset(0, (1 - _ease(.18, .45)) * 18),
+            child: Opacity(
+              opacity: _ease(.18, .45),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(21)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.location_on_outlined, color: AppColors.teal, size: 20)),
+                    const SizedBox(width: 9),
+                    const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Partido del grupo', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+                      SizedBox(height: 2),
+                      Text('Vie 12 · 20:00', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+                    ])),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 280),
+                      width: confirmed ? 48 : 42,
+                      height: 26,
+                      decoration: BoxDecoration(color: confirmed ? AppColors.green : AppColors.white, borderRadius: BorderRadius.circular(99)),
+                      child: Center(child: Text(confirmed ? '4/4' : '3/4', style: TextStyle(color: confirmed ? Colors.white : AppColors.teal, fontWeight: FontWeight.w900, fontSize: 11))),
+                    ),
+                  ]),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: _IntroAttendanceButton(label: 'Voy', color: AppColors.green, selected: confirmed || selected, pulse: pulse)),
+                    const SizedBox(width: 7),
+                    Expanded(child: _IntroAttendanceButton(label: 'Duda', color: AppColors.amber, selected: !confirmed && selected, pulse: 0)),
+                    const SizedBox(width: 7),
+                    Expanded(child: _IntroAttendanceButton(label: 'No', color: AppColors.red, selected: false, pulse: 0)),
+                  ]),
+                ]),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _FinanceTournamentScene extends StatelessWidget {
+  final double progress;
+  const _FinanceTournamentScene({required this.progress});
+
+  double _ease(double start, double end) => Curves.easeOutCubic.transform(((progress - start) / (end - start)).clamp(0.0, 1.0).toDouble());
+
+  @override
+  Widget build(BuildContext context) {
+    final paid = progress > .46;
+    final tableStep = progress > .66;
+    return Center(
+      child: Container(
+        width: 260,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(.97),
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 24, offset: Offset(0, 14))],
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Transform.translate(
+            offset: Offset(0, (1 - _ease(.05, .32)) * 18),
+            child: Opacity(
+              opacity: _ease(.05, .32),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: AppColors.greenSoft, borderRadius: BorderRadius.circular(21)),
+                child: Row(children: [
+                  Container(width: 39, height: 39, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: Icon(paid ? Icons.verified_rounded : Icons.account_balance_wallet_rounded, color: AppColors.green)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(paid ? 'Pago liquidado' : 'Pago recomendado', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 2),
+                    Text(paid ? 'Balance del grupo a cero' : 'Marta liquida € 2,50 a Javi', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+                  ])),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 350),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(color: paid ? AppColors.green : AppColors.teal, borderRadius: BorderRadius.circular(99)),
+                    child: Text(paid ? 'Listo' : 'Liquidar', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Transform.translate(
+            offset: Offset(0, (1 - _ease(.28, .55)) * 20),
+            child: Opacity(
+              opacity: _ease(.28, .55),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: AppColors.orangeSoft, borderRadius: BorderRadius.circular(21)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Row(children: [
+                    Icon(Icons.emoji_events_rounded, color: AppColors.orange, size: 20),
+                    SizedBox(width: 7),
+                    Text('Liga del grupo', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+                    Spacer(),
+                    Text('J2', style: TextStyle(color: AppColors.orange, fontWeight: FontWeight.w900)),
+                  ]),
+                  const SizedBox(height: 10),
+                  _MiniRankingRow(position: 1, name: tableStep ? 'Cuatro' : 'Dos', points: tableStep ? '6 pts' : '3 pts', active: true),
+                  const SizedBox(height: 7),
+                  _MiniRankingRow(position: 2, name: tableStep ? 'Dos' : 'Cuatro', points: tableStep ? '3 pts' : '3 pts', active: false),
+                  const SizedBox(height: 7),
+                  _MiniRankingRow(position: 3, name: 'Tres', points: '0 pts', active: false),
+                ]),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _MiniAvatar extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _MiniAvatar({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 34,
+    height: 34,
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
+    child: Center(child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13))),
+  );
+}
+
+class _SceneMiniTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final double progress;
+  const _SceneMiniTile({required this.icon, required this.color, required this.title, required this.subtitle, required this.progress});
+
+  @override
+  Widget build(BuildContext context) => Opacity(
+    opacity: progress.clamp(0.0, 1.0).toDouble(),
+    child: Transform.translate(
+      offset: Offset(0, 14 * (1 - progress)),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(17), border: Border.all(color: AppColors.lineSoft)),
+        child: Row(children: [
+          Container(width: 34, height: 34, decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color, size: 18)),
+          const SizedBox(width: 9),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12.5)),
+            const SizedBox(height: 2),
+            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11)),
+          ])),
+        ]),
+      ),
+    ),
+  );
+}
+
+class _IntroAttendanceButton extends StatelessWidget {
+  final String label;
+  final Color color;
+  final bool selected;
+  final double pulse;
+  const _IntroAttendanceButton({required this.label, required this.color, required this.selected, required this.pulse});
+
+  @override
+  Widget build(BuildContext context) => AnimatedContainer(
+    duration: const Duration(milliseconds: 300),
+    height: 34,
+    decoration: BoxDecoration(
+      color: selected ? color.withOpacity(.14 + pulse * .05) : Colors.white,
+      borderRadius: BorderRadius.circular(13),
+      border: Border.all(color: selected ? color : AppColors.line),
+    ),
+    child: Center(child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11.5))),
+  );
+}
+
+class _MiniRankingRow extends StatelessWidget {
+  final int position;
+  final String name;
+  final String points;
+  final bool active;
+  const _MiniRankingRow({required this.position, required this.name, required this.points, required this.active});
+
+  @override
+  Widget build(BuildContext context) => AnimatedContainer(
+    duration: const Duration(milliseconds: 360),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    decoration: BoxDecoration(color: active ? Colors.white : Colors.white.withOpacity(.64), borderRadius: BorderRadius.circular(14)),
+    child: Row(children: [
+      Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(color: active ? AppColors.orange : AppColors.lineSoft, shape: BoxShape.circle),
+        child: Center(child: Text('$position', style: TextStyle(color: active ? Colors.white : AppColors.muted, fontWeight: FontWeight.w900, fontSize: 11))),
+      ),
+      const SizedBox(width: 8),
+      Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12))),
+      Text(points, style: TextStyle(color: active ? AppColors.green : AppColors.muted, fontWeight: FontWeight.w900, fontSize: 11)),
+    ]),
+  );
+}
+
 
 class WelcomeScreen extends StatelessWidget {
   final VoidCallback? onShowIntro;
