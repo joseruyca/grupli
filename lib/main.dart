@@ -2780,10 +2780,10 @@ IconData eventKindIcon(Map<String, dynamic> event) {
 
 Color eventKindColor(Map<String, dynamic> event) {
   switch (eventKind(event)) {
-    case 'partido': return AppColors.teal;
-    case 'entrenamiento': return AppColors.blue;
-    case 'cena': return AppColors.violet;
-    case 'reunion': return AppColors.amber;
+    case 'partido': return AppColors.blue;
+    case 'entrenamiento': return AppColors.violet;
+    case 'cena': return AppColors.orange;
+    case 'reunion': return AppColors.green;
     case 'torneo': return AppColors.amber;
     default: return AppColors.teal;
   }
@@ -2791,10 +2791,10 @@ Color eventKindColor(Map<String, dynamic> event) {
 
 Color eventKindSoftColor(Map<String, dynamic> event) {
   switch (eventKind(event)) {
-    case 'partido': return AppColors.tealSoft;
-    case 'entrenamiento': return const Color(0xFFEAF0FF);
-    case 'cena': return AppColors.violetSoft;
-    case 'reunion': return const Color(0xFFFFF7DB);
+    case 'partido': return const Color(0xFFEAF0FF);
+    case 'entrenamiento': return AppColors.violetSoft;
+    case 'cena': return AppColors.orangeSoft;
+    case 'reunion': return AppColors.greenSoft;
     case 'torneo': return AppColors.faint;
     default: return AppColors.tealSoft;
   }
@@ -6632,12 +6632,6 @@ class GroupMoreTab extends StatelessWidget {
                 refresh();
               }
             },
-          ),
-          SettingsRow(
-            icon: Icons.lock_rounded,
-            title: 'Privacidad',
-            subtitle: 'Grupo privado por invitación. Nadie entra sin código.',
-            onTap: () => showToast(context, 'Grupli funciona con grupos privados por invitación.'),
           ),
           SettingsRow(
             icon: Icons.support_agent_rounded,
@@ -14155,21 +14149,21 @@ class _MembersScreenState extends State<MembersScreen> {
               const SizedBox(height: 16),
               PermissionMatrixCard(),
               const SizedBox(height: 16),
-              DangerButton(
-                label: isOwner ? 'Owner protegido' : 'Salir del grupo',
-                icon: isOwner ? Icons.shield_rounded : Icons.logout_rounded,
-                onTap: () => _leaveGroup(groupName, isOwner),
-              ),
-              const SizedBox(height: 10),
-              EmptySlim(
-                icon: Icons.shield_outlined,
-                title: isOwner ? 'El owner no se puede expulsar' : canManage ? 'Puedes gestionar miembros' : 'Permisos de miembro',
-                body: isOwner
-                    ? 'Para evitar errores, el owner queda protegido. Más adelante añadiremos transferencia de propiedad.'
-                    : canManage
-                        ? 'Puedes hacer admins, quitar admins y expulsar miembros. El owner queda protegido.'
-                        : 'Puedes ver el grupo y participar. Solo owner/admins pueden gestionar miembros.',
-              ),
+              if (isOwner)
+                AppCard(
+                  color: AppColors.tealSoft,
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+                    Icon(Icons.shield_rounded, color: AppColors.teal),
+                    SizedBox(width: 10),
+                    Expanded(child: Text('Eres owner del grupo. Puedes gestionar miembros y eliminar el grupo desde Ajustes.', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.3))),
+                  ]),
+                )
+              else
+                DangerButton(
+                  label: 'Salir del grupo',
+                  icon: Icons.logout_rounded,
+                  onTap: () => _leaveGroup(groupName, isOwner),
+                ),
             ]);
           },
         ),
@@ -14462,7 +14456,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       const SizedBox(height: 8),
       SettingsRow(icon: Icons.groups_rounded, title: 'Miembros y roles', subtitle: 'Owner, admins y miembros', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
       SettingsRow(icon: Icons.verified_user_rounded, title: 'Permisos', subtitle: 'Qué puede hacer cada rol', onTap: () => showPermissionSheet(context)),
-      SettingsRow(icon: Icons.lock_rounded, title: 'Privacidad', subtitle: 'Grupo privado por invitación', onTap: () => showToast(context, 'Los grupos siguen siendo privados por seguridad.')),
       SettingsRow(icon: Icons.delete_outline_rounded, title: 'Eliminar grupo', subtitle: 'Solo owner · elimina eventos, gastos y torneos', danger: true, onTap: deleteGroupFlow),
     ]));
   }
@@ -16046,8 +16039,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final name = data.name;
           final email = data.email;
           final avatarUrl = data.avatarUrl;
-          final ownedGroups = data.groups.where((g) => AppData.text(g['role']) == 'owner').length;
-
           return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
               RoundBackButton(onTap: goBackFromProfile),
@@ -16088,24 +16079,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(name, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 3),
                 Text(email, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
-                const SizedBox(height: 12),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: const [
-                    AccountStatusPill(icon: Icons.verified_user_rounded, label: 'Cuenta activa', color: AppColors.green),
-                    AccountStatusPill(icon: Icons.lock_rounded, label: 'Grupos privados', color: AppColors.teal),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                Row(children: [
-                  Expanded(child: TinyStat(icon: Icons.groups_rounded, value: '${data.groups.length}', label: 'Grupos')),
-                  const SizedBox(width: 10),
-                  Expanded(child: TinyStat(icon: Icons.admin_panel_settings_rounded, value: '${data.adminGroups}', label: 'Admin')),
-                  const SizedBox(width: 10),
-                  Expanded(child: TinyStat(icon: Icons.workspace_premium_rounded, value: '$ownedGroups', label: 'Owner')),
-                ]),
+                const SizedBox(height: 8),
               ]),
             ),
             const SizedBox(height: 18),
@@ -16128,9 +16102,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SectionHeader(title: 'Ajustes'),
             const SizedBox(height: 8),
             SettingsRow(icon: Icons.notifications_none_rounded, title: 'Notificaciones', subtitle: 'Eventos, gastos y torneos', onTap: showNotificationsSheet),
-            SettingsRow(icon: Icons.language_rounded, title: 'Idioma', subtitle: 'Español por defecto', onTap: () => showToast(context, 'Idioma fijado en español para esta versión.')),
+            SettingsRow(icon: Icons.language_rounded, title: 'Idioma', subtitle: 'Español ahora · inglés preparado para lanzamiento', onTap: () => showToast(context, 'La app se lanzará como mínimo en español e inglés.')),
             SettingsRow(icon: Icons.lock_outline_rounded, title: 'Privacidad y seguridad', subtitle: 'Grupos cerrados, roles y acceso privado', onTap: showPrivacySheet),
-            SettingsRow(icon: Icons.download_rounded, title: 'Datos de la cuenta', subtitle: 'Perfil, grupos y actividad visible', onTap: () => showToast(context, 'Exportación preparada para una fase posterior.')),
             SettingsRow(icon: Icons.help_outline_rounded, title: 'Ayuda y soporte', subtitle: 'Reportar bugs, dudas o sugerencias', onTap: openSupport),
             if (data.isAdmin)
               SettingsRow(icon: Icons.admin_panel_settings_rounded, title: 'Panel admin', subtitle: 'Roles, reportes, métricas y calidad de Grupli', onTap: openAdminPanel),
@@ -17348,28 +17321,46 @@ class EventTypeLegend extends StatelessWidget {
     for (final event in events) {
       kinds.putIfAbsent(eventKind(event), () => event);
     }
-    final ordered = <String>['partido', 'entrenamiento', 'cena', 'reunion', 'torneo', 'quedada']
+    final ordered = <String>['quedada', 'partido', 'entrenamiento', 'torneo', 'cena', 'reunion']
         .where((kind) => kinds.containsKey(kind))
         .toList();
     if (ordered.isEmpty) return const SizedBox.shrink();
+
     return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      color: AppColors.surface,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: const [
-          Icon(Icons.palette_outlined, color: AppColors.teal, size: 18),
-          SizedBox(width: 7),
-          Text('Colores del calendario', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12.5)),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      color: AppColors.white,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(children: [
+          for (int i = 0; i < ordered.length; i++) ...[
+            EventLegendMiniChip(event: kinds[ordered[i]] ?? {'title': ordered[i]}),
+            if (i != ordered.length - 1) const SizedBox(width: 7),
+          ],
         ]),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 7,
-          runSpacing: 7,
-          children: ordered.map((kind) {
-            final sample = kinds[kind] ?? {'title': kind};
-            return EventKindPill(event: sample, compact: true);
-          }).toList(),
-        ),
+      ),
+    );
+  }
+}
+
+class EventLegendMiniChip extends StatelessWidget {
+  final Map<String, dynamic> event;
+  const EventLegendMiniChip({super.key, required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = eventKindColor(event);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(.09),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(.22)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(eventKindIcon(event), color: color, size: 13),
+        const SizedBox(width: 5),
+        Text(eventKindLabel(event), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11)),
       ]),
     );
   }
