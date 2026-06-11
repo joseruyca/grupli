@@ -1806,9 +1806,14 @@ class BottomBar extends StatelessWidget {
 }
 
 class PageHeader extends StatelessWidget {
-  final String title; final String subtitle; final bool leading;
-  const PageHeader({super.key, required this.title, this.subtitle = '', this.leading = false});
-  @override Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+  final String title;
+  final String subtitle;
+  final bool leading;
+  final Widget? action;
+  const PageHeader({super.key, required this.title, this.subtitle = '', this.leading = false, this.action});
+
+  @override
+  Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
     if (leading) ...[RoundBackButton(onTap: () => Navigator.of(context).maybePop()), const SizedBox(width: 12)],
     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.headlineMedium),
@@ -1816,8 +1821,37 @@ class PageHeader extends StatelessWidget {
         const SizedBox(height: 5),
         Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
       ],
-    ]))
+    ])),
+    if (action != null) ...[
+      const SizedBox(width: 10),
+      action!,
+    ],
   ]);
+}
+
+class HeaderCreateButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  const HeaderCreateButton({super.key, required this.label, required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: AppColors.teal,
+    borderRadius: BorderRadius.circular(16),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, color: Colors.white, size: 18),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+        ]),
+      ),
+    ),
+  );
 }
 
 class CenterLoader extends StatelessWidget { final String label; const CenterLoader({super.key, required this.label}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 40), child: Column(children: [const CircularProgressIndicator(color: AppColors.teal), const SizedBox(height: 12), Text(label, style: Theme.of(context).textTheme.bodyMedium)])); }
@@ -1929,6 +1963,7 @@ String humanizeError(String raw) {
   if (text.contains('member_not_found') || text.contains('not_member')) return 'Ese miembro ya no está disponible en el grupo.';
   if (text.contains('invalid_role')) return 'Ese rol no es válido.';
   if (text.contains('settlement_payments') || text.contains('create_settlement_payment_atomic')) return 'Falta actualizar la base de datos de finanzas. Ejecuta el último parche SQL de finanzas/realtime y vuelve a probar.';
+  if (text.contains('tournaments_scoring_type_check')) return 'Falta actualizar la base de datos de torneos. Ejecuta el parche SQL v16.16.1 y vuelve a crear la competición.';
   if (text.contains('permission') || text.contains('policy') || text.contains('rls') || text.contains('not allowed') || text.contains('denied') || text.contains('violates row-level')) return 'No tienes permiso para hacer esa acción.';
   if (looksLikeNetworkError(original)) return 'No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.';
   if (text.contains('duplicate') || text.contains('already') || text.contains('unique constraint')) return 'Parece que esto ya existe o ya se había guardado.';

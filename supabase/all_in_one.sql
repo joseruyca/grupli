@@ -235,7 +235,7 @@ CREATE TABLE public.tournaments (
   name text NOT NULL CHECK (char_length(trim(name)) >= 2),
   format text NOT NULL DEFAULT 'liga' CHECK (format IN ('liga','eliminatoria','americano','manual')),
   team_type text NOT NULL DEFAULT 'equipo' CHECK (team_type IN ('individual','pareja','equipo')),
-  scoring_type text NOT NULL DEFAULT 'general' CHECK (scoring_type IN ('general','football','tennis_padel','basketball','cards_mus','custom')),
+  scoring_type text NOT NULL DEFAULT 'general' CHECK (scoring_type IN ('general','football','tennis_padel','basketball','volleyball','ping_pong','cards_mus','darts','billiards','esports','custom')),
   scoring_config jsonb NOT NULL DEFAULT '{"win":3,"draw":1,"loss":0,"unit":"puntos","allowDraw":true,"result_mode":"simple"}'::jsonb,
   format_config jsonb NOT NULL DEFAULT '{}'::jsonb,
   tie_breakers jsonb NOT NULL DEFAULT '["points","wins","direct","difference","for","manual"]'::jsonb,

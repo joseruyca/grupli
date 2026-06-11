@@ -808,6 +808,7 @@ class AppData {
       return row['id'].toString();
     } catch (e) {
       final text = e.toString().toLowerCase();
+      if (text.contains('tournaments_scoring_type_check')) rethrow;
       if (!text.contains('format_config') && !text.contains('schedule_config') && !text.contains('tie_breakers') && !text.contains('permissions_config') && !text.contains('scoring_type') && !text.contains('scoring_config')) rethrow;
       final fallback = Map<String, dynamic>.from(payload)
         ..remove('scoring_type')

@@ -856,7 +856,16 @@ class _CalendarTabState extends State<CalendarTab> {
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 112),
           children: [
-            PageHeader(title: 'Agenda', subtitle: 'Planes, rutinas y asistencia del grupo.', leading: false),
+            PageHeader(
+              title: 'Agenda',
+              subtitle: 'Planes, rutinas y asistencia del grupo.',
+              leading: false,
+              action: HeaderCreateButton(
+                label: 'Crear',
+                icon: Icons.add_rounded,
+                onTap: () => createFor(selected),
+              ),
+            ),
             const SizedBox(height: 12),
             if (loading && events.isEmpty) ...[
               const CenterLoader(label: 'Cargando agenda...'),

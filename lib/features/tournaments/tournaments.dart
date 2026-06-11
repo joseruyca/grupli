@@ -168,9 +168,9 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
   String teamType = 'equipo';
   String scoringType = 'football';
   String creationTemplate = 'league';
-  bool advancedMode = true;
   bool addToAgenda = true;
   bool scheduleMatches = true;
+  bool randomizePairings = true;
   bool loading = false;
   int step = 0;
   int leagueLegs = 1;
@@ -199,6 +199,10 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
     super.dispose();
   }
 
+  bool get sportSupportsAmericano => TournamentEngineV2.supportsAmericano(scoringType);
+
+  List<String> get allowedTemplateValues => TournamentEngineV2.allowedTemplateValues(scoringType);
+
   void applyScoringDefaults(String type) {
     final cfg = scoringConfigForType(type);
     scoringType = type;
@@ -207,63 +211,83 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
     lossPoints = AppData.intValue(cfg['loss'], 0);
     bestOf = AppData.intValue(cfg['best_of'], 3);
     targetScore = AppData.intValue(cfg['target_score']);
+    format = TournamentEngineV2.normalizeFormat(type, format);
+    creationTemplate = TournamentEngineV2.templateForFormat(format);
+    if (format != 'americano') americanoRounds = max(1, americanoRounds);
+    syncTeamTypeForContext(force: true);
   }
 
   void applyQuickTemplate(String template) {
-    creationTemplate = template;
+    final requestedFormat = TournamentEngineV2.formatForTemplate(template);
+    format = TournamentEngineV2.normalizeFormat(scoringType, requestedFormat);
+    creationTemplate = TournamentEngineV2.templateForFormat(format);
     pairings.clear();
     manualRows.clear();
-    switch (template) {
-      case 'padel_league':
-        format = 'liga';
-        teamType = 'pareja';
-        courtsCount = max(1, courtsCount);
-        leagueLegs = 1;
-        leagueRoundsLimit = 0;
-        scheduleMatches = true;
-        addToAgenda = true;
-        applyScoringDefaults('tennis_padel');
-        name.text = name.text.trim().isEmpty ? 'Liga de pádel' : name.text;
-        break;
+    switch (creationTemplate) {
       case 'americano_padel':
         format = 'americano';
-        teamType = 'individual';
+        randomizePairings = true;
         courtsCount = max(1, courtsCount);
         americanoRounds = max(5, americanoRounds);
+        if (scoringUsesSetMode(scoringType, scoringConfigForType(scoringType))) bestOf = 1;
         scheduleMatches = true;
         addToAgenda = true;
-        applyScoringDefaults('general');
-        name.text = name.text.trim().isEmpty ? 'Americano de pádel' : name.text;
+        name.text = name.text.trim().isEmpty ? 'Americano' : name.text;
         break;
       case 'quick_cup':
         format = 'eliminatoria';
-        teamType = 'equipo';
+        randomizePairings = true;
         scheduleMatches = true;
         addToAgenda = true;
-        applyScoringDefaults(scoringType == 'tennis_padel' ? 'tennis_padel' : 'general');
         name.text = name.text.trim().isEmpty ? 'Eliminatoria' : name.text;
         break;
       case 'manual_day':
         format = 'manual';
-        teamType = 'equipo';
+        randomizePairings = false;
         scheduleMatches = true;
         addToAgenda = true;
-        applyScoringDefaults('general');
         name.text = name.text.trim().isEmpty ? 'Manual' : name.text;
         break;
       default:
         format = 'liga';
-        teamType = 'equipo';
+        randomizePairings = true;
         leagueLegs = 1;
         leagueRoundsLimit = 0;
         scheduleMatches = true;
         addToAgenda = true;
-        applyScoringDefaults('general');
         name.text = name.text.trim().isEmpty ? 'Liga' : name.text;
     }
+    syncTeamTypeForContext(force: true);
   }
 
+  List<TournamentChoice> participantTypeChoicesForContext() => TournamentEngineV2.participantChoices(scoringType, format);
+
+  String recommendedTeamTypeForContext() => TournamentEngineV2.defaultParticipantType(scoringType, format);
+
+  void syncTeamTypeForContext({bool force = false}) {
+    final normalizedFormat = TournamentEngineV2.normalizeFormat(scoringType, format);
+    if (normalizedFormat != format) {
+      format = normalizedFormat;
+      creationTemplate = TournamentEngineV2.templateForFormat(format);
+    }
+    final normalizedMode = TournamentEngineV2.normalizeParticipantType(scoringType, format, teamType);
+    if (force || normalizedMode != teamType) teamType = normalizedMode;
+  }
+
+  String participantTypeTitle() => TournamentEngineV2.participantTitle(scoringType, format, teamType);
+
+  String participantHintText() => TournamentEngineV2.participantHint(scoringType, format, teamType);
+
+  String participantHelperText() => TournamentEngineV2.participantHelp(scoringType, format, teamType);
+
   Future<void> fillMembers() async {
+    if (!(format == 'americano' || teamType == 'individual')) {
+      await showToast(context, teamType == 'pareja'
+          ? 'Para parejas, escribe una pareja por línea: Ana / Javi.'
+          : 'Para equipos, escribe el nombre de cada equipo. Los miembros del grupo no siempre son equipos.',
+          danger: true);
+      return;
+    }
     try {
       final members = await AppData.members(widget.group['id'].toString());
       final names = members.map(memberDisplayName).where((n) => n.trim().length >= 2).toSet().toList();
@@ -331,13 +355,16 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
   }
 
   Map<String, dynamic> get formatConfig => {
-    'version': 16,
+    'version': TournamentEngineV2.version,
+    'engine': 'tournaments_v2',
+    'sport': scoringType,
+    'participant_type': teamType,
     'legs': effectiveLegs,
     'max_rounds': effectiveRoundLimit,
     'americano_rounds': americanoRounds,
     'courts_count': courtsCount,
     'manual_pairings': format == 'manual' || pairings.text.trim().isNotEmpty,
-    'randomize_pairings': true,
+    'randomize_pairings': randomizePairings,
   };
 
   Map<String, dynamic> get scoringConfig {
@@ -347,14 +374,19 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
     cfg['loss'] = lossPoints;
     cfg['best_of'] = bestOf;
     if (targetScore > 0) cfg['target_score'] = targetScore;
-    cfg['version'] = 16;
+    cfg['version'] = TournamentEngineV2.version;
+    cfg['engine'] = 'tournaments_v2';
+    cfg['sport'] = scoringType;
+    cfg['format'] = format;
+    cfg['participant_type'] = teamType;
     return cfg;
   }
 
   Map<String, dynamic> get scheduleConfig {
     final first = DateTime(firstMatchDate.year, firstMatchDate.month, firstMatchDate.day, firstMatchTime.hour, firstMatchTime.minute);
     return {
-      'version': 16,
+      'version': TournamentEngineV2.version,
+      'engine': 'tournaments_v2',
       'enabled': scheduleMatches,
       'add_to_agenda': addToAgenda,
       'first_start_at': first.toUtc().toIso8601String(),
@@ -370,16 +402,21 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
 
   bool validateStep(int value) {
     if (value == 0) return true;
-    if (value == 1) {
-      if (participantNames.length < 2) {
-        showToast(context, 'Añade al menos 2 participantes/equipos.', danger: true);
+    if (value == 1) return true;
+    if (value == 2) {
+      final setupError = TournamentEngineV2.setupError(
+        sport: scoringType,
+        format: format,
+        participantType: teamType,
+        participantCount: participantNames.length,
+        manualMatchesCount: manualRows.isNotEmpty ? manualRows.length : parseTournamentPairings(pairings.text).length,
+      );
+      if (setupError != null) {
+        showToast(context, setupError, danger: true);
         return false;
       }
-      return true;
-    }
-    if (value == 2) {
       if ((format == 'manual' || pairings.text.trim().isNotEmpty) && draftMatches.isEmpty) {
-        showToast(context, 'Escribe emparejamientos tipo: Jornada 1: Equipo Azul vs Equipo Rojo', danger: true);
+        showToast(context, 'Faltan emparejamientos válidos. Usa: Jornada 1: Equipo Azul vs Equipo Rojo', danger: true);
         return false;
       }
       return true;
@@ -410,6 +447,17 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
       await showToast(context, 'Añade al menos 2 participantes/equipos.', danger: true);
       return;
     }
+    final setupError = TournamentEngineV2.setupError(
+      sport: scoringType,
+      format: format,
+      participantType: teamType,
+      participantCount: names.length,
+      manualMatchesCount: manualRows.isNotEmpty ? manualRows.length : parseTournamentPairings(pairings.text).length,
+    );
+    if (setupError != null) {
+      await showToast(context, setupError, danger: true);
+      return;
+    }
     if ((format == 'manual' || pairings.text.trim().isNotEmpty) && matches.isEmpty) {
       await showToast(context, 'Faltan emparejamientos manuales válidos.', danger: true);
       return;
@@ -427,7 +475,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         scoringConfig: scoringConfig,
         formatConfig: formatConfig,
         scheduleConfig: scheduleConfig,
-        tieBreakers: defaultTieBreakers(scoringType),
+        tieBreakers: TournamentEngineV2.defaultTieBreakers(scoringType, format),
         status: scheduleMatches ? 'scheduled' : 'draft',
         startsAt: scheduleMatches ? firstStart : null,
       );
@@ -528,8 +576,8 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
       TournamentStepIndicator(step: step, total: 6),
       const SizedBox(height: 16),
       if (step == 0) _buildTypeStep()
-      else if (step == 1) _buildParticipantsStep()
-      else if (step == 2) _buildFormatStep()
+      else if (step == 1) _buildFormatStep()
+      else if (step == 2) _buildParticipantsStep()
       else if (step == 3) _buildScoringStep()
       else if (step == 4) _buildCalendarStep()
       else _buildReviewStep(),
@@ -553,33 +601,69 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         TextField(controller: name, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(hintText: defaultTournamentName(format))),
       ])),
       const SizedBox(height: 12),
-      FieldLabel('Tipo de torneo'),
+      FieldLabel('Primero elige el deporte'),
       const SizedBox(height: 8),
-      TournamentQuickTemplateGrid(
-        selected: creationTemplate,
-        onChanged: (value) => setState(() => applyQuickTemplate(value)),
+      TournamentSportEmojiPicker(
+        value: scoringType,
+        onChanged: (value) => setState(() => applyScoringDefaults(value)),
+      ),
+      const SizedBox(height: 10),
+      TournamentValidationCard(scoringType: scoringType, scoringConfig: scoringConfig),
+      const SizedBox(height: 10),
+      AppCard(
+        color: AppColors.faint,
+        padding: const EdgeInsets.all(12),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.sports_score_rounded, color: AppColors.teal, size: 20)),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Motor V2: deporte primero', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            Text(TournamentEngineV2.resultContractText(scoringType, format), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+          ])),
+        ]),
       ),
     ]);
   }
 
   Widget _buildParticipantsStep() {
+    syncTeamTypeForContext();
+    final choices = participantTypeChoicesForContext();
+    final preview = draftMatches.take(8).toList();
+    final isRestricted = choices.length == 1;
+    final canAutoFillMembers = format == 'americano' || teamType == 'individual';
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      FieldLabel('Tipo de participantes'),
+      FieldLabel('Quién participa'),
       const SizedBox(height: 8),
-      TournamentChoiceGrid(
-        value: teamType,
-        options: const [
-          TournamentChoice('individual', 'Jugadores', 'Uno contra uno', Icons.person_rounded),
-          TournamentChoice('pareja', 'Parejas', 'Ana / Javi', Icons.people_rounded),
-          TournamentChoice('equipo', 'Equipos', 'Nombres libres', Icons.groups_rounded),
-        ],
-        onChanged: (v) => setState(() => teamType = v),
+      AppCard(
+        color: format == 'americano' ? AppColors.tealSoft : AppColors.faint,
+        padding: const EdgeInsets.all(12),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: Icon(format == 'americano' ? Icons.shuffle_rounded : Icons.groups_rounded, color: AppColors.teal, size: 20)),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(participantTypeTitle(), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            Text(participantHelperText(), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+          ])),
+        ]),
       ),
-      const SizedBox(height: 14),
+      const SizedBox(height: 12),
+      if (choices.isNotEmpty) ...[
+        FieldLabel(isRestricted ? 'Tipo fijado por el formato' : 'Tipo de participantes'),
+        const SizedBox(height: 8),
+        TournamentChoiceGrid(
+          value: teamType,
+          options: choices,
+          onChanged: isRestricted ? (_) {} : (v) => setState(() => teamType = v),
+        ),
+        const SizedBox(height: 14),
+      ],
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Expanded(child: FieldLabel('Participantes')),
-          TextButton.icon(onPressed: fillMembers, icon: const Icon(Icons.group_add_rounded, size: 18), label: const Text('Miembros')),
+          Expanded(child: FieldLabel(participantTypeTitle())),
+          if (canAutoFillMembers)
+            TextButton.icon(onPressed: fillMembers, icon: const Icon(Icons.group_add_rounded, size: 18), label: const Text('Miembros')),
         ]),
         TextField(
           controller: participants,
@@ -588,85 +672,26 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           textCapitalization: TextCapitalization.words,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
-            hintText: teamType == 'pareja' ? 'Ana / Javi\nMarta / Luis\nPádel Salvaje' : 'Los Invencibles del Viernes\nEquipo Azul\nPádel Salvaje',
-            helperText: 'Un participante por línea. Podrás renombrar o retirar después.',
+            hintText: participantHintText(),
+            helperText: participantHelperText(),
           ),
         ),
         const SizedBox(height: 10),
-        Text('${participantNames.length} participantes preparados', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+        Row(children: [
+          TournamentRuleChip(label: '${participantNames.length} preparados'),
+          const SizedBox(width: 6),
+          TournamentRuleChip(label: tournamentFormatLabel(format)),
+        ]),
       ])),
-    ]);
-  }
-
-  Widget _buildFormatStep() {
-    final fullRounds = max(0, participantNames.length.isOdd ? participantNames.length : participantNames.length - 1);
-    final americanoRecommendedRounds = recommendedAmericanoRounds(participantNames.length, courtsCount);
-    final totalLeagueRounds = fullRounds * max(1, leagueLegs);
-    final limitedLeagueRounds = leagueRoundsLimit <= 0 ? totalLeagueRounds : leagueRoundsLimit * max(1, leagueLegs);
-    final preview = draftMatches.take(10).toList();
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      FieldLabel(advancedMode ? 'Formato detallado' : 'Formato'),
-      const SizedBox(height: 8),
-      if (!advancedMode)
-        TournamentSimpleFormatConfigCard(
-          format: format,
-          rounds: format == 'americano' ? americanoRounds : leagueRoundsLimit,
-          courts: courtsCount,
-          onRoundsChanged: (v) => setState(() {
-            if (format == 'americano') {
-              americanoRounds = v;
-            } else if (format == 'liga') {
-              leagueRoundsLimit = v;
-            }
-          }),
-          onCourtsChanged: (v) => setState(() => courtsCount = v),
-        ),
-      if (advancedMode)
-        AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(tournamentFormatLabel(format), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 16)),
-        const SizedBox(height: 6),
-        Text(tournamentFormatSubtitle(format), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
-        const SizedBox(height: 12),
-        if (format == 'liga') ...[
-          TournamentCounterRow(label: 'Vueltas', value: leagueLegs, min: 1, max: 4, onChanged: (v) => setState(() => leagueLegs = v), helper: leagueLegs == 1 ? 'Solo ida' : '$leagueLegs vueltas'),
-          TournamentCounterRow(label: 'Jornadas por vuelta', value: leagueRoundsLimit, min: 0, max: max(1, fullRounds), zeroLabel: 'Todas', onChanged: (v) => setState(() => leagueRoundsLimit = v), helper: leagueRoundsLimit == 0 ? 'Liga completa: $fullRounds por vuelta · $totalLeagueRounds en total' : '$leagueRoundsLimit por vuelta · $limitedLeagueRounds en total'),
-        ] else if (format == 'americano') ...[
-          TournamentCounterRow(label: 'Rondas', value: americanoRounds, min: 1, max: 40, onChanged: (v) => setState(() => americanoRounds = v), helper: 'Recomendado: $americanoRecommendedRounds rondas'),
-          TournamentCounterRow(label: 'Pistas / mesas', value: courtsCount, min: 1, max: 12, onChanged: (v) => setState(() => courtsCount = v), helper: '1 partido por pista y ronda'),
-          const SizedBox(height: 6),
-          Wrap(spacing: 8, runSpacing: 8, children: const [
-            TournamentRuleChip(label: 'Ranking individual'),
-            TournamentRuleChip(label: 'Pareja distinta si se puede'),
-            TournamentRuleChip(label: 'Descansos equilibrados'),
-          ]),
-          const SizedBox(height: 8),
-          Text(americanoRulesText(participantNames.length, courtsCount, americanoRounds), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
-          if (participantNames.length >= 4 && americanoRounds != americanoRecommendedRounds) ...[
-            const SizedBox(height: 10),
-            SecondaryButton(label: 'Usar $americanoRecommendedRounds rondas recomendadas', icon: Icons.auto_awesome_rounded, onTap: () => setState(() => americanoRounds = americanoRecommendedRounds)),
-          ],
-        ] else if (format == 'eliminatoria') ...[
-          Wrap(spacing: 8, runSpacing: 8, children: const [
-            TournamentRuleChip(label: 'Cabezas de serie'),
-            TournamentRuleChip(label: 'Byes automáticos'),
-            TournamentRuleChip(label: 'Cuadro visual'),
-            TournamentRuleChip(label: 'Sorteo automático'),
-          ]),
-          const SizedBox(height: 8),
-          const Text('Al crear el torneo, la app sortea automáticamente los cruces para evitar ventajas por el orden de escritura. Si el número no cuadra, los pases directos también se asignan tras el sorteo.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
-        ] else ...[
-          const Text('Escribe los partidos a mano. Puedes poner Jornada 1, Jornada 2, etc.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
-        ],
-      ])),
-      const SizedBox(height: 12),
       if (format == 'manual') ...[
+        const SizedBox(height: 12),
         AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Expanded(child: Text('Editor visual de partidos', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+            const Expanded(child: Text('Selector visual de partidos', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
             TournamentRuleChip(label: '${manualRows.length} partidos'),
           ]),
           const SizedBox(height: 8),
-          Text('Añade cruces con selectores, fecha individual, pista y notas. Es más seguro que escribirlo a mano.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          const Text('Crea cada partido con selectores para evitar errores de texto. Puedes poner jornada, fecha, pista y notas.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
           const SizedBox(height: 12),
           Row(children: [
             Expanded(child: PrimaryButton(label: 'Añadir partido', icon: Icons.add_rounded, onTap: addManualDraftRow)),
@@ -677,7 +702,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           ]),
           const SizedBox(height: 12),
           if (manualRows.isEmpty)
-            EmptySlim(icon: Icons.table_rows_rounded, title: 'Sin partidos manuales', body: 'Pulsa Añadir partido para crear los cruces uno a uno.')
+            EmptySlim(icon: Icons.table_rows_rounded, title: 'Sin partidos manuales', body: 'Añade participantes y pulsa Añadir partido para crear los cruces.')
           else
             ...List.generate(manualRows.length, (index) => TournamentManualDraftRowCard(
               row: manualRows[index],
@@ -691,7 +716,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         const SizedBox(height: 12),
         AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Expanded(child: Text('Importar desde texto', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+            const Expanded(child: Text('Importar cruces desde texto', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
             TournamentRuleChip(label: '${parseTournamentPairings(pairings.text).length} escritos'),
           ]),
           const SizedBox(height: 8),
@@ -703,81 +728,211 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               hintText: 'Jornada 1: Equipo Azul vs Los Invencibles\nJornada 1: Ana / Javi vs Marta / Luis',
-              helperText: 'Solo se usará si no has añadido partidos en el editor visual.',
+              helperText: 'Solo se usará si no has añadido partidos con el selector visual.',
             ),
           ),
         ])),
-      ] else ...[
+      ] else if (format != 'americano') ...[
+        const SizedBox(height: 12),
         AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             const Expanded(child: Text('Cruces manuales opcionales', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
-            TournamentRuleChip(label: '${draftMatches.length} partidos'),
+            TournamentRuleChip(label: '${parseTournamentPairings(pairings.text).length} escritos'),
           ]),
+          const SizedBox(height: 8),
+          const Text('Normalmente la app sortea/genera los cruces. Usa esto solo si quieres controlar los emparejamientos desde el inicio.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
           const SizedBox(height: 8),
           TextField(
             controller: pairings,
-            minLines: 4,
-            maxLines: 12,
+            minLines: 3,
+            maxLines: 8,
             textCapitalization: TextCapitalization.words,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
-              hintText: 'Jornada 1: Equipo Azul vs Los Invencibles\nJornada 1: Ana / Javi vs Marta / Luis\nJornada 2: Pádel Salvaje vs Anónimos FC',
-              helperText: 'Si lo rellenas, la app usará estos cruces.',
+              hintText: 'Jornada 1: Equipo Azul vs Los Invencibles\nJornada 1: Ana / Javi vs Marta / Luis',
+              helperText: 'Si lo rellenas, la app usará estos cruces en vez del sorteo automático.',
             ),
           ),
         ])),
       ],
       const SizedBox(height: 14),
-      SectionHeader(title: 'Vista previa'),
+      SectionHeader(title: format == 'manual' ? 'Partidos preparados' : 'Vista previa'),
       const SizedBox(height: 8),
       if (preview.isEmpty)
-        EmptySlim(icon: Icons.sports_score_rounded, title: 'Sin cruces todavía', body: 'Añade participantes o escribe emparejamientos manuales.')
+        EmptySlim(icon: Icons.sports_score_rounded, title: 'Sin cruces todavía', body: format == 'manual' ? 'Añade partidos con el selector visual o importa cruces.' : 'Añade participantes para ver los primeros cruces.')
       else
         ...preview.map((m) => TournamentDraftMatchTile(match: m)),
     ]);
   }
 
+
+  Widget _buildFormatStep() {
+    final fullRounds = max(0, participantNames.length.isOdd ? participantNames.length : participantNames.length - 1);
+    final totalLeagueRounds = fullRounds * max(1, leagueLegs);
+    final limitedLeagueRounds = leagueRoundsLimit <= 0 ? totalLeagueRounds : leagueRoundsLimit * max(1, leagueLegs);
+    final hasParticipants = participantNames.length >= 2;
+    final preview = hasParticipants ? draftMatches.take(8).toList() : <TournamentDraftMatch>[];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      FieldLabel('Formato de competición'),
+      const SizedBox(height: 8),
+      TournamentQuickTemplateGrid(
+        selected: creationTemplate,
+        allowedValues: allowedTemplateValues,
+        onChanged: (value) => setState(() => applyQuickTemplate(value)),
+      ),
+      const SizedBox(height: 12),
+      TournamentSimpleFormatSummary(format: format, scoringType: scoringType, teamType: teamType),
+      const SizedBox(height: 12),
+      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.redSoft, borderRadius: BorderRadius.circular(14)), child: Icon(tournamentTemplateIcon(creationTemplate), color: AppColors.red, size: 20)),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(tournamentFormatLabel(format), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 16)),
+            const SizedBox(height: 3),
+            Text(TournamentEngineV2.formatHelp(scoringType, format), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          ])),
+        ]),
+        const SizedBox(height: 12),
+        if (format == 'liga') ...[
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            TournamentRuleChip(label: scoringTableContractChip(scoringType, scoringConfig)),
+            TournamentRuleChip(label: 'Todos contra todos'),
+            TournamentRuleChip(label: 'Sorteo automático'),
+          ]),
+          const SizedBox(height: 10),
+          TournamentCounterRow(label: 'Vueltas', value: leagueLegs, min: 1, max: 4, onChanged: (v) => setState(() => leagueLegs = v), helper: leagueLegs == 1 ? 'Solo ida' : '$leagueLegs vueltas'),
+          TournamentCounterRow(label: 'Jornadas por vuelta', value: leagueRoundsLimit, min: 0, max: max(1, fullRounds), zeroLabel: 'Todas', onChanged: (v) => setState(() => leagueRoundsLimit = v), helper: leagueRoundsLimit == 0 ? (hasParticipants ? 'Liga completa: $fullRounds por vuelta · $totalLeagueRounds en total' : 'Se calcula al añadir participantes') : '$leagueRoundsLimit por vuelta · $limitedLeagueRounds en total'),
+        ] else if (format == 'americano') ...[
+          Wrap(spacing: 8, runSpacing: 8, children: const [
+            TournamentRuleChip(label: 'Solo jugadores'),
+            TournamentRuleChip(label: 'Parejas rotativas'),
+            TournamentRuleChip(label: 'Ranking individual'),
+            TournamentRuleChip(label: 'Descansos equilibrados'),
+          ]),
+          const SizedBox(height: 10),
+          TournamentCounterRow(label: 'Rondas', value: americanoRounds, min: 1, max: 40, onChanged: (v) => setState(() => americanoRounds = v), helper: hasParticipants ? 'Recomendado: ${recommendedAmericanoRounds(participantNames.length, courtsCount)} rondas' : 'Se recomienda al añadir jugadores'),
+          TournamentCounterRow(label: 'Pistas / mesas', value: courtsCount, min: 1, max: 12, onChanged: (v) => setState(() => courtsCount = v), helper: '1 partido por pista y ronda'),
+          const SizedBox(height: 8),
+          Text(hasParticipants ? americanoRulesText(participantNames.length, courtsCount, americanoRounds) : 'En el siguiente paso añade jugadores individuales. La app intentará que cada ronda tenga parejas distintas antes de repetir.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          if (hasParticipants && participantNames.length >= 4 && americanoRounds != recommendedAmericanoRounds(participantNames.length, courtsCount)) ...[
+            const SizedBox(height: 10),
+            SecondaryButton(label: 'Usar ${recommendedAmericanoRounds(participantNames.length, courtsCount)} rondas recomendadas', icon: Icons.auto_awesome_rounded, onTap: () => setState(() => americanoRounds = recommendedAmericanoRounds(participantNames.length, courtsCount))),
+          ],
+        ] else if (format == 'eliminatoria') ...[
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            TournamentRuleChip(label: randomizePairings ? 'Sorteo automático' : 'Orden como seed'),
+            const TournamentRuleChip(label: 'Byes automáticos'),
+            const TournamentRuleChip(label: 'Gana y avanza'),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            const Expanded(child: Text('Sortear cruces al crear', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+            Switch(value: randomizePairings, activeThumbColor: AppColors.red, onChanged: (v) => setState(() => randomizePairings = v)),
+          ]),
+          Text(randomizePairings ? 'Recomendado para grupos normales: evita que el orden de escritura favorezca a nadie.' : 'Usa el orden de participantes como cabeza de serie: #1 contra el último, #2 contra el penúltimo. Después podrás cambiar seeds desde Participantes.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+        ] else ...[
+          Wrap(spacing: 8, runSpacing: 8, children: const [
+            TournamentRuleChip(label: 'Todo editable'),
+            TournamentRuleChip(label: 'Selector visual'),
+            TournamentRuleChip(label: 'Fechas por partido'),
+          ]),
+          const SizedBox(height: 8),
+          const Text('Manual sirve para torneos raros, eventos de un día o cruces que quieres decidir tú. En el siguiente paso crearás los partidos uno a uno.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+        ],
+      ])),
+      const SizedBox(height: 12),
+      AppCard(
+        color: AppColors.tealSoft,
+        padding: const EdgeInsets.all(12),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(width: 36, height: 36, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.group_add_rounded, color: AppColors.teal, size: 19)),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(format == 'americano' ? 'Siguiente: jugadores individuales' : format == 'manual' ? 'Siguiente: participantes y selector de partidos' : 'Siguiente: participantes adecuados', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            Text(format == 'americano'
+                ? 'No se crean parejas fijas: Grupli las rota ronda a ronda.'
+                : !sportSupportsAmericano
+                    ? 'Para este deporte se prioriza Liga, Eliminatoria o Manual. Americano se reserva para juegos de parejas rotativas.'
+                    : scoringType == 'tennis_padel'
+                        ? 'Podrás elegir parejas o jugadores individuales según cómo juguéis.'
+                        : format == 'eliminatoria'
+                            ? 'Añade equipos/jugadores y Grupli sortea el cuadro.'
+                            : 'Añade jugadores, parejas o equipos y prepara los cruces.',
+                style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+          ])),
+        ]),
+      ),
+      if (hasParticipants) ...[
+        const SizedBox(height: 14),
+        SectionHeader(title: 'Vista previa'),
+        const SizedBox(height: 8),
+        if (preview.isEmpty)
+          EmptySlim(icon: Icons.sports_score_rounded, title: 'Sin cruces todavía', body: 'Revisa participantes o crea los cruces manuales.')
+        else
+          ...preview.map((m) => TournamentDraftMatchTile(match: m)),
+      ],
+    ]);
+  }
+
+
   Widget _buildScoringStep() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      FieldLabel('Deporte y resultado'),
+      FieldLabel('Sistema de resultado'),
       const SizedBox(height: 8),
-      TournamentSportEmojiPicker(
-        value: scoringType,
-        onChanged: (v) => setState(() => applyScoringDefaults(v)),
-      ),
-      const SizedBox(height: 10),
-      TournamentValidationCard(scoringType: scoringType, scoringConfig: scoringConfig),
-      const SizedBox(height: 14),
       AppCard(color: AppColors.redSoft, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Icon(Icons.rule_rounded, color: AppColors.red),
+          Text(scoringEmoji(scoringType), style: const TextStyle(fontSize: 24)),
           const SizedBox(width: 8),
-          Expanded(child: Text('Resultado del partido: ${scoringTypeLabel(scoringType)}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+          Expanded(child: Text('${scoringResultInputTitle(scoringType, scoringConfig)} · ${scoringTypeLabel(scoringType)}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
         ]),
         const SizedBox(height: 8),
-        Text(scoringConfigFullText(scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+        Text(TournamentEngineV2.resultContractText(scoringType, format), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.3)),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8, children: [
-          TournamentRuleChip(label: scoringUsesSetMode(scoringType, scoringConfig) ? 'Resultado por sets' : 'Marcador simple'),
+          TournamentRuleChip(label: scoringUsesSetMode(scoringType, scoringConfig) ? 'Registrar parciales' : scoringScoreLabel(scoringType, scoringConfig)),
           TournamentRuleChip(label: scoringAllowDraw(scoringType, scoringConfig) ? 'Permite empate' : 'Sin empate'),
-          if (targetScore > 0) TournamentRuleChip(label: 'Hasta $targetScore ${scoringScoreLabel(scoringType, scoringConfig)}'),
+          if (scoringUsesGameSetMode(scoringType, scoringConfig)) const TournamentRuleChip(label: 'Juegos para desempate'),
+          if (scoringUsesPointSetMode(scoringType, scoringConfig)) const TournamentRuleChip(label: 'Puntos de set'),
         ]),
       ])),
       const SizedBox(height: 12),
-      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Puntos de clasificación', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 8),
-        TournamentCounterRow(label: 'Victoria', value: winPoints, min: 0, max: 10, onChanged: (v) => setState(() => winPoints = v)),
-        if (scoringAllowDraw(scoringType, scoringConfig)) TournamentCounterRow(label: 'Empate', value: drawPoints, min: 0, max: 10, onChanged: (v) => setState(() => drawPoints = v)),
-        TournamentCounterRow(label: 'Derrota', value: lossPoints, min: -3, max: 5, onChanged: (v) => setState(() => lossPoints = v)),
-        TournamentCounterRow(label: 'Objetivo del partido', value: targetScore, min: 0, max: 999, zeroLabel: 'Libre', onChanged: (v) => setState(() => targetScore = v), helper: 'Ej: mus a 30, ping-pong a 11'),
-        if (scoringUsesSetMode(scoringType, scoringConfig)) TournamentCounterRow(label: 'Mejor de', value: bestOf, min: 1, max: 7, onChanged: (v) => setState(() => bestOf = v.isEven ? v + 1 : v), helper: 'Sets/rondas'),
-      ])),
+      if (format == 'americano')
+        AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Ranking Americano', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          Text(
+            scoringUsesGameSetMode(scoringType, scoringConfig)
+                ? 'Cada jugador suma los juegos reales que consigue en sus partidos, aunque vaya cambiando de pareja. Las victorias se muestran como apoyo, pero no sustituyen al ranking acumulado.'
+                : scoringUsesPointSetMode(scoringType, scoringConfig)
+                    ? 'Cada jugador suma los puntos reales de set que consigue en sus partidos. El ranking es individual y las parejas rotan.'
+                    : 'Cada jugador suma el marcador real que consigue en sus partidos. El ranking es individual y las parejas rotan.',
+            style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3),
+          ),
+          if (scoringUsesSetMode(scoringType, scoringConfig)) ...[
+            const SizedBox(height: 10),
+            TournamentCounterRow(label: 'Parciales por partido', value: bestOf, min: 1, max: 7, onChanged: (v) => setState(() => bestOf = v), helper: 'normal: 1 set/partida'),
+          ],
+        ]))
+      else
+        AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Clasificación', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          Text(scoringConfigFullText(scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          const SizedBox(height: 10),
+          TournamentCounterRow(label: 'Victoria', value: winPoints, min: 0, max: 10, onChanged: (v) => setState(() => winPoints = v)),
+          if (scoringAllowDraw(scoringType, scoringConfig)) TournamentCounterRow(label: 'Empate', value: drawPoints, min: 0, max: 10, onChanged: (v) => setState(() => drawPoints = v)),
+          TournamentCounterRow(label: 'Derrota', value: lossPoints, min: -3, max: 5, onChanged: (v) => setState(() => lossPoints = v)),
+          if (scoringUsesSetMode(scoringType, scoringConfig)) TournamentCounterRow(label: 'Mejor de', value: bestOf, min: 1, max: 7, onChanged: (v) => setState(() => bestOf = v.isEven ? v + 1 : v), helper: 'sets/rondas'),
+          if (targetScore > 0 || scoringResultModel(scoringType, scoringConfig) == 'target_points')
+            TournamentCounterRow(label: 'Objetivo orientativo', value: targetScore, min: 0, max: 999, zeroLabel: 'Libre', onChanged: (v) => setState(() => targetScore = v)),
+        ])),
       const SizedBox(height: 12),
       AppCard(color: AppColors.faint, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Desempates', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         const SizedBox(height: 8),
-        Text(defaultTieBreakers(scoringType).map(tieBreakerLabel).join(' → '), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+        Text(standingsOrderTextForScoring(TournamentEngineV2.defaultTieBreakers(scoringType, format), scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
       ])),
     ]);
   }
@@ -839,9 +994,10 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
       AppCard(color: AppColors.faint, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         TournamentReviewRow(label: 'Nombre', value: title),
         TournamentReviewRow(label: 'Formato', value: tournamentFormatLabel(format)),
-        TournamentReviewRow(label: 'Participantes', value: '${names.length}'),
+        TournamentReviewRow(label: 'Participantes', value: '${names.length} · ${participantTypeTitle()}'),
         TournamentReviewRow(label: 'Partidos previstos', value: '${matches.length}'),
-        TournamentReviewRow(label: 'Puntuación', value: '${scoringTypeLabel(scoringType)} · V$winPoints ${scoringAllowDraw(scoringType, scoringConfig) ? 'E$drawPoints ' : ''}D$lossPoints'),
+        TournamentReviewRow(label: 'Resultado', value: '${scoringTypeLabel(scoringType)} · ${scoringConfigShortText(scoringType, scoringConfig)}'),
+        TournamentReviewRow(label: 'Motor', value: 'Torneos V2 · deporte primero'),
         TournamentReviewRow(label: 'Calendario', value: scheduleMatches ? '${DateFormat('d MMM', 'es_ES').format(firstMatchDate)} · ${firstMatchTime.format(context)}' : 'Sin fechas'),
         TournamentReviewRow(label: 'Agenda', value: addToAgenda && scheduleMatches ? 'Sí' : 'No'),
       ])),
@@ -901,12 +1057,41 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
     }
   }
 
+  String get currentFormat => AppData.text(tournament?['format'], 'liga');
+  String get currentTeamType => AppData.text(tournament?['team_type'], 'equipo');
+  String get currentScoringType => AppData.text(tournament?['scoring_type'], 'general');
+
+  bool get currentCanAddMembers => currentFormat == 'americano' || currentTeamType == 'individual';
+  bool get currentCanCreatePairs => currentFormat != 'americano' && currentTeamType == 'pareja';
+
+  String get currentParticipantAddTitle {
+    if (currentFormat == 'americano') return 'Añadir jugadores';
+    if (currentTeamType == 'pareja') return 'Añadir parejas';
+    if (currentTeamType == 'individual') return 'Añadir jugadores';
+    return 'Añadir equipos';
+  }
+
+  String get currentParticipantAddHint {
+    if (currentFormat == 'americano') return 'Ana\nJavi\nMarta\nLuis';
+    if (currentTeamType == 'pareja') return 'Ana / Javi\nMarta / Luis\nCris / Pablo';
+    if (currentTeamType == 'individual') return 'Ana\nJavi\nMarta\nLuis';
+    if (currentScoringType == 'football') return 'Los Pingüinos FC\nEquipo Azul\nLa Banda del Domingo';
+    return 'Equipo Azul\nLos Invencibles\nGrupo del Viernes';
+  }
+
+  String get currentParticipantAddHelp {
+    if (currentFormat == 'americano') return 'Un jugador por línea. En Americano Grupli crea parejas rotativas automáticamente.';
+    if (currentTeamType == 'pareja') return 'Una pareja por línea. Usa el formato Ana / Javi para que se entienda bien.';
+    if (currentTeamType == 'individual') return 'Un jugador por línea.';
+    return 'Un equipo por línea. No añadas jugadores sueltos si esta competición es por equipos.';
+  }
+
   Future<void> addParticipants() async {
     final controller = TextEditingController();
     final value = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Añadir jugadores, parejas o equipos'),
+        title: Text(currentParticipantAddTitle),
         content: SizedBox(
           width: double.maxFinite,
           child: TextField(
@@ -915,9 +1100,9 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
             maxLines: 10,
             autofocus: true,
             textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              hintText: 'Ana\nJavi\nMarta / Luis\nEquipo azul',
-              helperText: 'Uno por línea. Puedes escribir jugadores, parejas o equipos. Después podrás renombrar, cambiar seed o eliminar desde Participantes.',
+            decoration: InputDecoration(
+              hintText: currentParticipantAddHint,
+              helperText: currentParticipantAddHelp,
             ),
           ),
         ),
@@ -940,6 +1125,13 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
   }
 
   Future<void> addGroupMembersVisual() async {
+    if (!currentCanAddMembers) {
+      await showToast(context, currentTeamType == 'pareja'
+          ? 'Esta competición usa parejas. Crea las parejas desde el botón Pareja o escríbelas como Ana / Javi.'
+          : 'Esta competición usa equipos. Añade nombres de equipos en vez de cargar miembros sueltos.',
+          danger: true);
+      return;
+    }
     try {
       final members = await AppData.members(widget.group['id'].toString());
       if (!mounted) return;
@@ -960,6 +1152,13 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
   }
 
   Future<void> createPairVisual() async {
+    if (!currentCanCreatePairs) {
+      await showToast(context, currentFormat == 'americano'
+          ? 'En Americano no se crean parejas fijas: Grupli las rota ronda a ronda.'
+          : 'Esta competición no está configurada como parejas.',
+          danger: true);
+      return;
+    }
     try {
       final members = await AppData.members(widget.group['id'].toString());
       if (!mounted) return;
@@ -1218,7 +1417,18 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
         else if (tab == 3)
           TournamentStatsPanel(standings: standings, matches: matches, teams: teams, scoringType: scoringType, scoringConfig: scoringConfig)
         else if (tab == 4)
-          TournamentTeamsPanel(teams: teams, matches: matches, showSeeds: format == 'eliminatoria', onChanged: () => load(soft: true), onAdd: addParticipants, onAddMembers: addGroupMembersVisual, onCreatePair: createPairVisual)
+          TournamentTeamsPanel(
+            teams: teams,
+            matches: matches,
+            format: format,
+            teamType: AppData.text(t?['team_type'], 'equipo'),
+            scoringType: scoringType,
+            showSeeds: format == 'eliminatoria',
+            onChanged: () => load(soft: true),
+            onAdd: addParticipants,
+            onAddMembers: addGroupMembersVisual,
+            onCreatePair: createPairVisual,
+          )
         else
           TournamentSettingsPanel(
             tournament: t ?? {},
@@ -1546,9 +1756,9 @@ class TournamentCreationHeroCard extends StatelessWidget {
       ),
       const SizedBox(width: 12),
       const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Crea un torneo sin complicarte', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
+        Text('Crea una competición bien configurada', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
         SizedBox(height: 5),
-        Text('Elige una plantilla rápida. Si quieres tocarlo todo, activa el modo avanzado.', style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.25)),
+        Text('Primero elige el deporte. Después Grupli adapta formato, resultados y tabla.', style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.25)),
       ])),
     ]),
   );
@@ -1580,7 +1790,8 @@ class TournamentQuickTemplate {
 class TournamentQuickTemplateGrid extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onChanged;
-  const TournamentQuickTemplateGrid({super.key, required this.selected, required this.onChanged});
+  final List<String>? allowedValues;
+  const TournamentQuickTemplateGrid({super.key, required this.selected, required this.onChanged, this.allowedValues});
 
   static const templates = [
     TournamentQuickTemplate('league', '', 'Liga', 'Jornadas y clasificación'),
@@ -1590,11 +1801,15 @@ class TournamentQuickTemplateGrid extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    children: templates.map((item) {
-      final active = selected == item.value;
+  Widget build(BuildContext context) {
+    final visibleTemplates = allowedValues == null
+        ? templates
+        : templates.where((item) => allowedValues!.contains(item.value)).toList();
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: visibleTemplates.map((item) {
+        final active = selected == item.value;
       return InkWell(
         onTap: () => onChanged(item.value),
         borderRadius: BorderRadius.circular(18),
@@ -1631,8 +1846,9 @@ class TournamentQuickTemplateGrid extends StatelessWidget {
           ]),
         ),
       );
-    }).toList(),
-  );
+      }).toList(),
+    );
+  }
 }
 
 class TournamentAdvancedToggleCard extends StatelessWidget {
@@ -3085,8 +3301,9 @@ class TournamentSimpleMatchCard extends StatelessWidget {
     final status = AppData.text(match['status'], 'pending');
     final played = matchCountsForStandings(match);
     final specialText = matchSpecialResultText(match, names);
+    final specialAllowed = !isAmericanoMatch(match);
     final detailScore = specialText.isNotEmpty ? specialText : matchDetailScoreText(match, scoringType, scoringConfig);
-    final score = played ? '${AppData.intValue(match['score_a'])} - ${AppData.intValue(match['score_b'])}' : matchStatusLabel(status);
+    final score = played ? matchPrimaryScoreText(match, scoringType, scoringConfig) : matchStatusLabel(status);
     final dateText = tournamentMatchDateText(match);
     final statusColor = matchStatusColor(status);
     return Padding(
@@ -3149,7 +3366,7 @@ class TournamentSimpleMatchCard extends StatelessWidget {
               },
               itemBuilder: (context) => [
                 const PopupMenuItem(value: 'result', child: Text('Registrar resultado')),
-                const PopupMenuItem(value: 'special', child: Text('No presentado / victoria admin.')),
+                if (specialAllowed) const PopupMenuItem(value: 'special', child: Text('No presentado / victoria admin.')),
                 const PopupMenuItem(value: 'schedule', child: Text('Cambiar fecha / pista')),
                 const PopupMenuItem(value: 'move_up', child: Text('Subir en la jornada')),
                 const PopupMenuItem(value: 'move_down', child: Text('Bajar en la jornada')),
@@ -3200,7 +3417,7 @@ class TournamentLatestResultCard extends StatelessWidget {
     return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Expanded(child: Text(aName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
-        Text('${AppData.intValue(match['score_a'])} - ${AppData.intValue(match['score_b'])}', style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900, fontSize: 16)),
+        Text(matchPrimaryScoreText(match, scoringType, scoringConfig), style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900, fontSize: 16)),
         Expanded(child: Text(bName, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
       ]),
       if (details != null) ...[
@@ -3219,12 +3436,118 @@ class TournamentStandingsPanel extends StatelessWidget {
   final Map<String, dynamic> scoringConfig;
   const TournamentStandingsPanel({super.key, required this.standings, required this.matches, required this.tieBreakers, required this.scoringType, required this.scoringConfig});
 
+  List<DataColumn> _columns(bool isAmericano, bool setMode) {
+    if (isAmericano) {
+      final main = scoringUsesGameSetMode(scoringType, scoringConfig)
+          ? 'JUEGOS'
+          : scoringUsesPointSetMode(scoringType, scoringConfig)
+              ? 'PUNTOS'
+              : scoringScoreLabel(scoringType, scoringConfig).toUpperCase();
+      return [
+        const DataColumn(label: Text('#')),
+        const DataColumn(label: Text('Jugador')),
+        const DataColumn(label: Text('PJ')),
+        const DataColumn(label: Text('V')),
+        DataColumn(label: Text(main)),
+        const DataColumn(label: Text('CONTRA')),
+        const DataColumn(label: Text('DIF')),
+      ];
+    }
+    if (setMode) {
+      return [
+        const DataColumn(label: Text('#')),
+        const DataColumn(label: Text('Equipo')),
+        const DataColumn(label: Text('PJ')),
+        const DataColumn(label: Text('V')),
+        const DataColumn(label: Text('P')),
+        DataColumn(label: Text(scoringTableForLabel(scoringType, scoringConfig))),
+        DataColumn(label: Text(scoringTableAgainstLabel(scoringType, scoringConfig))),
+        DataColumn(label: Text(scoringTableDifferenceLabel(scoringType, scoringConfig))),
+        DataColumn(label: Text(scoringSecondaryForLabel(scoringType, scoringConfig))),
+        DataColumn(label: Text(scoringSecondaryAgainstLabel(scoringType, scoringConfig))),
+        DataColumn(label: Text(scoringSecondaryDifferenceLabel(scoringType, scoringConfig))),
+        const DataColumn(label: Text('PTS')),
+      ];
+    }
+    final allowDraw = scoringAllowDraw(scoringType, scoringConfig);
+    return [
+      const DataColumn(label: Text('#')),
+      const DataColumn(label: Text('Equipo')),
+      const DataColumn(label: Text('PJ')),
+      const DataColumn(label: Text('G')),
+      if (allowDraw) const DataColumn(label: Text('E')),
+      const DataColumn(label: Text('P')),
+      DataColumn(label: Text(scoringTableForLabel(scoringType, scoringConfig))),
+      DataColumn(label: Text(scoringTableAgainstLabel(scoringType, scoringConfig))),
+      DataColumn(label: Text(scoringTableDifferenceLabel(scoringType, scoringConfig))),
+      const DataColumn(label: Text('PTS')),
+    ];
+  }
+
+  List<DataCell> _cells(TeamStanding s, int index, bool isAmericano, bool setMode) {
+    final base = [
+      DataCell(Text('${index + 1}', style: TextStyle(fontWeight: FontWeight.w900, color: index == 0 ? AppColors.green : AppColors.ink))),
+      DataCell(SizedBox(width: 150, child: Text(s.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900)))),
+      DataCell(Text('${s.played}')),
+    ];
+    if (isAmericano) {
+      return [
+        ...base,
+        DataCell(Text('${s.wins}')),
+        DataCell(Text('${s.goalsFor}', style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900))),
+        DataCell(Text('${s.goalsAgainst}')),
+        DataCell(Text('${s.goalDifference}')),
+      ];
+    }
+    if (setMode) {
+      return [
+        ...base,
+        DataCell(Text('${s.wins}')),
+        DataCell(Text('${s.losses}')),
+        DataCell(Text('${s.goalsFor}')),
+        DataCell(Text('${s.goalsAgainst}')),
+        DataCell(Text('${s.goalDifference}')),
+        DataCell(Text('${s.secondaryFor}')),
+        DataCell(Text('${s.secondaryAgainst}')),
+        DataCell(Text('${s.secondaryDifference}')),
+        DataCell(Text('${s.points}', style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900))),
+      ];
+    }
+    final allowDraw = scoringAllowDraw(scoringType, scoringConfig);
+    return [
+      ...base,
+      DataCell(Text('${s.wins}')),
+      if (allowDraw) DataCell(Text('${s.draws}')),
+      DataCell(Text('${s.losses}')),
+      DataCell(Text('${s.goalsFor}')),
+      DataCell(Text('${s.goalsAgainst}')),
+      DataCell(Text('${s.goalDifference}')),
+      DataCell(Text('${s.points}', style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900))),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     if (standings.isEmpty) return EmptySlim(icon: Icons.table_chart_rounded, title: 'Sin tabla todavía', body: 'Registra resultados para calcular la clasificación.');
     final isAmericano = matches.any(isAmericanoMatch);
+    final setMode = scoringUsesSetMode(scoringType, scoringConfig);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SectionHeader(title: isAmericano ? 'Ranking completo' : 'Tabla completa'),
+      SectionHeader(title: isAmericano ? 'Ranking individual' : 'Tabla completa'),
+      const SizedBox(height: 8),
+      AppCard(
+        color: AppColors.faint,
+        padding: const EdgeInsets.all(11),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(scoringEmoji(scoringType), style: const TextStyle(fontSize: 22)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(
+            isAmericano
+                ? 'Americano: ranking individual. Cada jugador suma los juegos/puntos que consigue con parejas rotativas.'
+                : scoringCreationHelp(scoringType, scoringConfig),
+            style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12, height: 1.25),
+          )),
+        ]),
+      ),
       const SizedBox(height: 8),
       AppCard(
         padding: const EdgeInsets.all(10),
@@ -3235,40 +3558,16 @@ class TournamentStandingsPanel extends StatelessWidget {
             horizontalMargin: 6,
             headingTextStyle: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 11),
             dataTextStyle: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, fontSize: 12),
-            columns: [
-              const DataColumn(label: Text('#')),
-              DataColumn(label: Text(isAmericano ? 'Jugador' : 'Equipo')),
-              const DataColumn(label: Text('PJ')),
-              const DataColumn(label: Text('G')),
-              const DataColumn(label: Text('E')),
-              const DataColumn(label: Text('P')),
-              const DataColumn(label: Text('+')),
-              const DataColumn(label: Text('-')),
-              const DataColumn(label: Text('DIF')),
-              const DataColumn(label: Text('NP')),
-              const DataColumn(label: Text('PTS')),
-            ],
+            columns: _columns(isAmericano, setMode),
             rows: List.generate(standings.length, (index) {
               final s = standings[index];
-              return DataRow(cells: [
-                DataCell(Text('${index + 1}', style: TextStyle(fontWeight: FontWeight.w900, color: index == 0 ? AppColors.green : AppColors.ink))),
-                DataCell(SizedBox(width: 150, child: Text(s.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900)))),
-                DataCell(Text('${s.played}')),
-                DataCell(Text('${s.wins}')),
-                DataCell(Text('${s.draws}')),
-                DataCell(Text('${s.losses}')),
-                DataCell(Text('${s.goalsFor}')),
-                DataCell(Text('${s.goalsAgainst}')),
-                DataCell(Text('${s.goalDifference}')),
-                DataCell(Text('${s.noShows}')),
-                DataCell(Text('${s.points}', style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900))),
-              ]);
+              return DataRow(cells: _cells(s, index, isAmericano, setMode));
             }),
           ),
         ),
       ),
       const SizedBox(height: 10),
-      TournamentTieBreakersCompactCard(tieBreakers: tieBreakers),
+      TournamentTieBreakersCompactCard(tieBreakers: tieBreakers, scoringType: scoringType, scoringConfig: scoringConfig),
       const SizedBox(height: 12),
       SectionHeader(title: 'Detalle de posiciones'),
       const SizedBox(height: 8),
@@ -3285,7 +3584,9 @@ class TournamentStandingsPanel extends StatelessWidget {
 
 class TournamentTieBreakersCompactCard extends StatelessWidget {
   final List<String> tieBreakers;
-  const TournamentTieBreakersCompactCard({super.key, required this.tieBreakers});
+  final String scoringType;
+  final Map<String, dynamic>? scoringConfig;
+  const TournamentTieBreakersCompactCard({super.key, required this.tieBreakers, required this.scoringType, this.scoringConfig});
 
   @override
   Widget build(BuildContext context) => AppCard(
@@ -3297,7 +3598,7 @@ class TournamentTieBreakersCompactCard extends StatelessWidget {
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Desempates', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12)),
         const SizedBox(height: 3),
-        Text(standingsOrderText(tieBreakers), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 11.5)),
+        Text(standingsOrderTextForScoring(tieBreakers, scoringType, scoringConfig), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 11.5)),
       ])),
     ]),
   );
@@ -3305,7 +3606,9 @@ class TournamentTieBreakersCompactCard extends StatelessWidget {
 
 class TournamentTieBreakersInfoCard extends StatelessWidget {
   final List<String> tieBreakers;
-  const TournamentTieBreakersInfoCard({super.key, required this.tieBreakers});
+  final String scoringType;
+  final Map<String, dynamic>? scoringConfig;
+  const TournamentTieBreakersInfoCard({super.key, required this.tieBreakers, this.scoringType = 'general', this.scoringConfig});
 
   @override
   Widget build(BuildContext context) => AppCard(
@@ -3317,7 +3620,7 @@ class TournamentTieBreakersInfoCard extends StatelessWidget {
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Criterios de desempate', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         const SizedBox(height: 4),
-        Text(standingsOrderText(tieBreakers), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25)),
+        Text(standingsOrderTextForScoring(tieBreakers, scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25)),
       ])),
     ]),
   );
@@ -3629,25 +3932,69 @@ class TournamentSettingsPanel extends StatelessWidget {
 class TournamentTeamsPanel extends StatelessWidget {
   final List<Map<String, dynamic>> teams;
   final List<Map<String, dynamic>> matches;
+  final String format;
+  final String teamType;
+  final String scoringType;
   final bool showSeeds;
   final VoidCallback onChanged;
   final VoidCallback onAdd;
   final VoidCallback onAddMembers;
   final VoidCallback onCreatePair;
-  const TournamentTeamsPanel({super.key, required this.teams, required this.matches, this.showSeeds = false, required this.onChanged, required this.onAdd, required this.onAddMembers, required this.onCreatePair});
+  const TournamentTeamsPanel({
+    super.key,
+    required this.teams,
+    required this.matches,
+    this.format = 'liga',
+    this.teamType = 'equipo',
+    this.scoringType = 'general',
+    this.showSeeds = false,
+    required this.onChanged,
+    required this.onAdd,
+    required this.onAddMembers,
+    required this.onCreatePair,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isAmericano = format == 'americano';
+    final allowMembers = isAmericano || teamType == 'individual';
+    final allowPair = !isAmericano && teamType == 'pareja';
+    final title = isAmericano
+        ? 'Jugadores del americano'
+        : teamType == 'pareja'
+            ? 'Parejas participantes'
+            : teamType == 'individual'
+                ? 'Jugadores participantes'
+                : 'Equipos participantes';
+    final subtitle = isAmericano
+        ? 'Ranking individual: no crees parejas fijas, Grupli las rota.'
+        : teamType == 'pareja'
+            ? 'Cada fila es una pareja. Mantén el formato Ana / Javi.'
+            : teamType == 'individual'
+                ? 'Cada fila es un jugador.'
+                : 'Cada fila es un equipo. Ideal para fútbol, basket, volley o esports.';
+    final emptyBody = isAmericano
+        ? 'Añade jugadores individuales. Las parejas se crearán automáticamente en cada ronda.'
+        : teamType == 'pareja'
+            ? 'Crea parejas desde miembros del grupo o escríbelas como Ana / Javi.'
+            : teamType == 'individual'
+                ? 'Añade jugadores desde miembros o escríbelos manualmente.'
+                : 'Escribe los nombres de los equipos que participarán.';
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       TournamentParticipantsEditorHeader(
         teamsCount: teams.length,
+        title: title,
+        subtitle: subtitle,
+        writeLabel: teamType == 'equipo' ? 'Escribir equipos' : teamType == 'pareja' ? 'Escribir parejas' : 'Escribir jugadores',
+        showMembers: allowMembers,
+        showPair: allowPair,
         onAddText: onAdd,
         onAddMembers: onAddMembers,
         onCreatePair: onCreatePair,
       ),
       const SizedBox(height: 12),
       if (teams.isEmpty)
-        EmptySlim(icon: Icons.groups_rounded, title: 'Sin participantes', body: 'Añade miembros del grupo, crea una pareja o escribe equipos manualmente.')
+        EmptySlim(icon: Icons.groups_rounded, title: 'Sin participantes', body: emptyBody)
       else
         ...teams.map((team) => TournamentTeamCard(team: team, matches: matches, showSeed: showSeeds, onChanged: onChanged)),
     ]);
@@ -3709,12 +4056,22 @@ class TournamentTeamCard extends StatelessWidget {
 
 class TournamentParticipantsEditorHeader extends StatelessWidget {
   final int teamsCount;
+  final String title;
+  final String subtitle;
+  final String writeLabel;
+  final bool showMembers;
+  final bool showPair;
   final VoidCallback onAddText;
   final VoidCallback onAddMembers;
   final VoidCallback onCreatePair;
   const TournamentParticipantsEditorHeader({
     super.key,
     required this.teamsCount,
+    this.title = 'Editor de participantes',
+    this.subtitle = '',
+    this.writeLabel = 'Escribir nombres / equipos',
+    this.showMembers = true,
+    this.showPair = true,
     required this.onAddText,
     required this.onAddMembers,
     required this.onCreatePair,
@@ -3729,19 +4086,21 @@ class TournamentParticipantsEditorHeader extends StatelessWidget {
         Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.redSoft, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.groups_rounded, color: AppColors.red)),
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Editor de participantes', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+          Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
           const SizedBox(height: 3),
-          Text('$teamsCount participante${teamsCount == 1 ? '' : 's'} · añade miembros, parejas o equipos', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+          Text(subtitle.isEmpty ? '$teamsCount participante${teamsCount == 1 ? '' : 's'}' : '$teamsCount participante${teamsCount == 1 ? '' : 's'} · $subtitle', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12, height: 1.25)),
         ])),
       ]),
       const SizedBox(height: 12),
-      Row(children: [
-        Expanded(child: SecondaryButton(label: 'Miembros', icon: Icons.group_add_rounded, onTap: onAddMembers)),
-        const SizedBox(width: 8),
-        Expanded(child: SecondaryButton(label: 'Pareja', icon: Icons.people_rounded, onTap: onCreatePair)),
-      ]),
-      const SizedBox(height: 8),
-      SecondaryButton(label: 'Escribir nombres / equipos', icon: Icons.edit_rounded, onTap: onAddText),
+      if (showMembers || showPair) ...[
+        Row(children: [
+          if (showMembers) Expanded(child: SecondaryButton(label: 'Miembros', icon: Icons.group_add_rounded, onTap: onAddMembers)),
+          if (showMembers && showPair) const SizedBox(width: 8),
+          if (showPair) Expanded(child: SecondaryButton(label: 'Crear pareja', icon: Icons.people_rounded, onTap: onCreatePair)),
+        ]),
+        const SizedBox(height: 8),
+      ],
+      SecondaryButton(label: writeLabel, icon: Icons.edit_rounded, onTap: onAddText),
     ]),
   );
 }
@@ -4351,6 +4710,7 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
   final aName = tournamentMatchSideName(match, names, true);
   final bName = tournamentMatchSideName(match, names, false);
   final setMode = scoringUsesSetMode(scoringType, scoringConfig);
+  final americano = isAmericanoMatch(match);
   final aController = TextEditingController(text: AppData.text(match['score_a']));
   final bController = TextEditingController(text: AppData.text(match['score_b']));
   final setsController = TextEditingController(text: matchDetailSets(match).map((set) => '${set['a']}-${set['b']}').join('\n'));
@@ -4360,15 +4720,32 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
     builder: (context) => AlertDialog(
       title: Text('$aName vs $bName'),
       content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        AppCard(
+          color: AppColors.faint,
+          padding: const EdgeInsets.all(10),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(scoringEmoji(scoringType), style: const TextStyle(fontSize: 22)),
+            const SizedBox(width: 8),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(scoringResultInputTitle(scoringType, scoringConfig), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 13)),
+              const SizedBox(height: 3),
+              Text(scoringResultInputHelp(scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11.5, height: 1.25)),
+            ])),
+          ]),
+        ),
+        const SizedBox(height: 10),
         if (setMode) ...[
-          const Text('Introduce cada set en una línea:', style: TextStyle(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
+          const Text('Parciales', style: TextStyle(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
           TextField(
             controller: setsController,
             minLines: 4,
             maxLines: 7,
             keyboardType: TextInputType.multiline,
-            decoration: const InputDecoration(hintText: '6-4\n3-6\n10-8', helperText: 'La app calcula sets ganados y juegos.'),
+            decoration: InputDecoration(
+              hintText: scoringUsesGameSetMode(scoringType, scoringConfig) ? '6-7\n6-4\n6-0' : '25-21\n22-25\n15-12',
+              helperText: scoringUsesGameSetMode(scoringType, scoringConfig) ? 'Cada línea es un set con juegos.' : 'Cada línea es un set con puntos.',
+            ),
           ),
         ] else ...[
           Row(children: [
@@ -4399,13 +4776,44 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
         if (context.mounted) await showToast(context, 'Introduce al menos un set válido.', danger: true);
         return;
       }
+      if (parsed.any((set) => set['a'] == set['b'])) {
+        if (context.mounted) await showToast(context, 'Un set no puede acabar empatado.', danger: true);
+        return;
+      }
       final setsA = parsed.where((set) => set['a']! > set['b']!).length;
       final setsB = parsed.where((set) => set['b']! > set['a']!).length;
       if (setsA == setsB) {
         if (context.mounted) await showToast(context, 'En este deporte no puede quedar empate a sets.', danger: true);
         return;
       }
-      await AppData.setMatchResult(matchId, setsA, setsB, details: {'sets': parsed, 'scoring_type': scoringType});
+      final bestOf = scoringBestOf(scoringType, scoringConfig);
+      final neededSets = (bestOf / 2).floor() + 1;
+      final winnerSets = max(setsA, setsB);
+      if (parsed.length > bestOf) {
+        if (context.mounted) await showToast(context, 'Hay demasiados parciales para este partido.', danger: true);
+        return;
+      }
+      if (!americano) {
+        if (winnerSets > neededSets) {
+          if (context.mounted) await showToast(context, 'Hay demasiados sets para un partido al mejor de $bestOf.', danger: true);
+          return;
+        }
+        if (winnerSets < neededSets) {
+          if (context.mounted) await showToast(context, 'El ganador debe llegar a $neededSets set${neededSets == 1 ? '' : 's'}.', danger: true);
+          return;
+        }
+      }
+      final gamesA = parsed.fold<int>(0, (sum, set) => sum + AppData.intValue(set['a']));
+      final gamesB = parsed.fold<int>(0, (sum, set) => sum + AppData.intValue(set['b']));
+      await AppData.setMatchResult(matchId, setsA, setsB, details: {
+        'sets': parsed,
+        'sets_a': setsA,
+        'sets_b': setsB,
+        'games_a': gamesA,
+        'games_b': gamesB,
+        'scoring_type': scoringType,
+        'score_model': scoringResultModel(scoringType, scoringConfig),
+      });
     } else {
       final a = int.tryParse(aController.text.trim());
       final b = int.tryParse(bController.text.trim());
@@ -4417,7 +4825,7 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
         if (context.mounted) await showToast(context, 'Este sistema no permite empate.', danger: true);
         return;
       }
-      await AppData.setMatchResult(matchId, a, b, details: {'scoring_type': scoringType});
+      await AppData.setMatchResult(matchId, a, b, details: {'scoring_type': scoringType, 'score_model': scoringResultModel(scoringType, scoringConfig)});
     }
     onChanged();
   } catch (e) {
@@ -4595,14 +5003,16 @@ String defaultTournamentName(String format) {
 
 String stepSubtitle(int step) {
   switch (step) {
-    case 0: return 'Nombre y tipo de competición.';
-    case 1: return 'Añade equipos, parejas o jugadores.';
-    case 2: return 'Jornadas, vueltas, rondas y emparejamientos.';
-    case 3: return 'Resultado del partido y puntos de clasificación.';
-    case 4: return 'Fechas, duración, pista y Agenda.';
-    default: return 'Comprueba todo antes de crear.';
+    case 0: return 'Deporte primero: la app adapta todo lo demás.';
+    case 1: return 'Solo se muestran formatos válidos para ese deporte.';
+    case 2: return 'Participantes correctos: jugadores, parejas o equipos.';
+    case 3: return 'Resultado real: goles, sets, puntos o ranking americano.';
+    case 4: return 'Fechas, pistas y eventos de Agenda.';
+    default: return 'Revisión completa antes de crear.';
   }
 }
+
+bool scoringSupportsAmericano(String type) => TournamentEngineV2.supportsAmericano(type);
 
 List<TournamentDraftMatch> parseTournamentPairings(String raw) {
   final output = <TournamentDraftMatch>[];

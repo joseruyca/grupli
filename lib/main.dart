@@ -30,6 +30,7 @@ part 'features/auth/auth.dart';
 part 'features/groups/groups.dart';
 part 'features/agenda/agenda.dart';
 part 'features/finances/finances.dart';
+part 'features/tournaments/tournament_engine_v2.dart';
 part 'features/tournaments/tournaments.dart';
 part 'features/profile/profile_members_admin.dart';
 part 'core/widgets/shared_widgets.dart';
@@ -972,10 +973,7 @@ Color attendanceColor(String status) {
 
 
 List<String> defaultTieBreakers(String scoringType) {
-  if (scoringUsesSetMode(scoringType)) {
-    return ['points', 'wins', 'set_difference', 'game_difference', 'games_for', 'manual'];
-  }
-  return ['points', 'wins', 'direct', 'difference', 'for', 'manual'];
+  return TournamentEngineV2.defaultTieBreakers(scoringType, 'liga');
 }
 
 Map<String, dynamic> tournamentFormatConfig(Map<String, dynamic> tournament) {
@@ -1367,6 +1365,17 @@ String scoringTypeLabel(String type) {
   }
 }
 
+
+String scoringTableContractChip(String type, [dynamic raw]) {
+  final model = scoringResultModel(type, raw);
+  if (model == 'goals') return 'Tabla por goles';
+  if (model == 'sets_games') return 'Tabla por sets/juegos';
+  if (model == 'sets_points') return 'Tabla por sets/puntos';
+  if (model == 'total_points') return 'Tabla por puntos';
+  if (type == 'basketball') return 'Tabla por puntos';
+  return 'Tabla adaptada';
+}
+
 String scoringTypeSubtitle(String type) {
   switch (type) {
     case 'football':
@@ -1404,6 +1413,7 @@ Map<String, dynamic> scoringConfigForType(String type) {
         'unit': 'goles',
         'allowDraw': true,
         'result_mode': 'simple',
+        'score_model': 'goals',
         'score_label': 'goles',
         'ranking_label': 'DG',
       };
@@ -1415,6 +1425,7 @@ Map<String, dynamic> scoringConfigForType(String type) {
         'unit': 'sets',
         'allowDraw': false,
         'result_mode': 'sets',
+        'score_model': 'sets_games',
         'best_of': 3,
         'set_label': 'juegos',
         'ranking_label': 'DS',
@@ -1427,6 +1438,7 @@ Map<String, dynamic> scoringConfigForType(String type) {
         'unit': 'puntos',
         'allowDraw': false,
         'result_mode': 'simple',
+        'score_model': 'total_points',
         'score_label': 'puntos',
         'ranking_label': 'DP',
       };
@@ -1438,6 +1450,7 @@ Map<String, dynamic> scoringConfigForType(String type) {
         'unit': 'sets',
         'allowDraw': false,
         'result_mode': 'sets',
+        'score_model': 'sets_points',
         'best_of': 5,
         'set_label': 'puntos',
         'target_score': 25,
@@ -1451,6 +1464,7 @@ Map<String, dynamic> scoringConfigForType(String type) {
         'unit': 'sets',
         'allowDraw': false,
         'result_mode': 'sets',
+        'score_model': 'sets_points',
         'best_of': 5,
         'set_label': 'puntos',
         'target_score': 11,
@@ -1464,6 +1478,7 @@ Map<String, dynamic> scoringConfigForType(String type) {
         'unit': 'juegos',
         'allowDraw': false,
         'result_mode': 'simple',
+        'score_model': 'games',
         'score_label': 'juegos',
         'ranking_label': 'DIF',
       };
@@ -1475,6 +1490,7 @@ Map<String, dynamic> scoringConfigForType(String type) {
         'unit': 'puntos',
         'allowDraw': false,
         'result_mode': 'simple',
+        'score_model': 'target_points',
         'score_label': 'puntos',
         'target_score': 501,
         'ranking_label': 'DIF',
@@ -1487,6 +1503,7 @@ Map<String, dynamic> scoringConfigForType(String type) {
         'unit': 'partidas',
         'allowDraw': false,
         'result_mode': 'simple',
+        'score_model': 'games',
         'score_label': 'partidas',
         'ranking_label': 'DIF',
       };
@@ -1498,6 +1515,7 @@ Map<String, dynamic> scoringConfigForType(String type) {
         'unit': 'mapas',
         'allowDraw': true,
         'result_mode': 'simple',
+        'score_model': 'games',
         'score_label': 'mapas',
         'ranking_label': 'DIF',
       };
@@ -1509,6 +1527,7 @@ Map<String, dynamic> scoringConfigForType(String type) {
         'unit': 'puntos',
         'allowDraw': true,
         'result_mode': 'simple',
+        'score_model': 'manual_points',
         'score_label': 'puntos',
         'ranking_label': 'DIF',
       };
@@ -1520,6 +1539,7 @@ Map<String, dynamic> scoringConfigForType(String type) {
         'unit': 'puntos',
         'allowDraw': true,
         'result_mode': 'simple',
+        'score_model': 'manual_points',
         'score_label': 'puntos',
         'ranking_label': 'DIF',
       };
@@ -1541,11 +1561,146 @@ int scoringDrawPoints(String type, [dynamic raw]) => AppData.intValue(resolvedSc
 int scoringLossPoints(String type, [dynamic raw]) => AppData.intValue(resolvedScoringConfig(type, raw)['loss'], 0);
 String scoringMetricUnit(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['unit'], 'puntos');
 bool scoringAllowDraw(String type, [dynamic raw]) => resolvedScoringConfig(type, raw)['allowDraw'] == true;
-bool scoringUsesSetMode(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['result_mode'], 'simple') == 'sets';
+bool scoringUsesSetMode(String type, [dynamic raw]) => scoringResultModel(type, raw).startsWith('sets');
 int scoringBestOf(String type, [dynamic raw]) => max(1, AppData.intValue(resolvedScoringConfig(type, raw)['best_of'], 3));
 String scoringScoreLabel(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['score_label'], scoringMetricUnit(type, raw));
 String scoringSetLabel(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['set_label'], 'juegos');
 String scoringRankingLabel(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['ranking_label'], 'DIF');
+
+String scoringResultModel(String type, [dynamic raw]) {
+  final cfg = resolvedScoringConfig(type, raw);
+  final model = AppData.text(cfg['score_model']);
+  if (model.isNotEmpty) return model;
+  return AppData.text(cfg['result_mode'], 'simple') == 'sets' ? 'sets_points' : 'manual_points';
+}
+
+bool scoringUsesGameSetMode(String type, [dynamic raw]) => scoringResultModel(type, raw) == 'sets_games';
+bool scoringUsesPointSetMode(String type, [dynamic raw]) => scoringResultModel(type, raw) == 'sets_points';
+
+String scoringTableForLabel(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return 'GF';
+    case 'sets_games':
+    case 'sets_points':
+      return 'SF';
+    case 'total_points':
+      return 'PF';
+    default:
+      return '+';
+  }
+}
+
+String scoringTableAgainstLabel(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return 'GC';
+    case 'sets_games':
+    case 'sets_points':
+      return 'SC';
+    case 'total_points':
+      return 'PC';
+    default:
+      return '-';
+  }
+}
+
+String scoringTableDifferenceLabel(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return 'DG';
+    case 'sets_games':
+    case 'sets_points':
+      return 'DS';
+    case 'total_points':
+      return 'DP';
+    default:
+      return 'DIF';
+  }
+}
+
+String scoringSecondaryForLabel(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'sets_games':
+      return 'JF';
+    case 'sets_points':
+      return 'PF';
+    default:
+      return '+2';
+  }
+}
+
+String scoringSecondaryAgainstLabel(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'sets_games':
+      return 'JC';
+    case 'sets_points':
+      return 'PC';
+    default:
+      return '-2';
+  }
+}
+
+String scoringSecondaryDifferenceLabel(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'sets_games':
+      return 'DJ';
+    case 'sets_points':
+      return 'DP';
+    default:
+      return 'DIF2';
+  }
+}
+
+String scoringResultInputTitle(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return 'Resultado por goles';
+    case 'sets_games':
+      return 'Resultado por sets y juegos';
+    case 'sets_points':
+      return 'Resultado por sets y puntos';
+    case 'total_points':
+      return 'Resultado por puntos totales';
+    case 'games':
+      return 'Resultado por juegos/partidas';
+    default:
+      return 'Resultado editable';
+  }
+}
+
+String scoringResultInputHelp(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return 'Escribe los goles de cada equipo. La tabla calcula puntos, goles a favor, goles en contra y diferencia.';
+    case 'sets_games':
+      return 'Escribe cada set en una línea: 6-7, 6-4, 6-0. La app calcula Sets 2-1, juegos a favor/en contra y desempates.';
+    case 'sets_points':
+      return 'Escribe cada set en una línea: 25-21, 22-25, 15-12. La app calcula sets, puntos de set y diferencia.';
+    case 'total_points':
+      return 'Escribe los puntos anotados por cada equipo. La tabla calcula victorias y diferencia de puntos.';
+    case 'games':
+      return 'Escribe juegos, partidas o mapas ganados por cada lado.';
+    default:
+      return 'Marcador flexible. La clasificación usa las reglas configuradas para esta competición.';
+  }
+}
+
+String scoringCreationHelp(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return 'Fútbol: marcador por goles. Tabla: puntos, GF, GC y DG.';
+    case 'sets_games':
+      return 'Tenis/Pádel: introduces sets completos. Tabla: victorias, sets, juegos y desempates.';
+    case 'sets_points':
+      return 'Voleibol/Ping pong: introduces sets completos. Tabla: victorias, sets, puntos y desempates.';
+    case 'total_points':
+      return 'Basket: marcador por puntos. Tabla: victorias, puntos a favor/en contra y diferencia.';
+    default:
+      return scoringConfigFullText(type, raw);
+  }
+}
+
 
 String scoringEmoji(String type) {
   switch (type) {
@@ -1565,16 +1720,19 @@ String scoringEmoji(String type) {
 
 String scoringValidationText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
-  if (scoringUsesSetMode(type, cfg)) {
-    final target = AppData.intValue(cfg['target_score']);
-    return target > 0
-        ? 'Validación: sets sin empate · objetivo orientativo $target · mejor de ${scoringBestOf(type, cfg)}.'
-        : 'Validación: sets sin empate · mejor de ${scoringBestOf(type, cfg)}.';
+  switch (scoringResultModel(type, cfg)) {
+    case 'goals':
+      return 'Fútbol real: goles, empate permitido, GF/GC/DG y puntos de liga.';
+    case 'sets_games':
+      return 'Raqueta: cada set guarda juegos. No se mete solo 2-1; se introducen todos los parciales.';
+    case 'sets_points':
+      return 'Sets: cada parcial guarda puntos. No hay empate a sets.';
+    case 'total_points':
+      return 'Basket: puntos totales, sin empate, diferencia de puntos.';
+    default:
+      if (!scoringAllowDraw(type, cfg)) return 'Validación: el marcador no puede quedar empatado.';
+      return 'Validación: permite empate y calcula puntos/diferencia automáticamente.';
   }
-  if (!scoringAllowDraw(type, cfg)) {
-    return 'Validación: el marcador no puede quedar empatado.';
-  }
-  return 'Validación: permite empate y calcula puntos/diferencia automáticamente.';
 }
 
 class GrupliPremium {
@@ -1601,10 +1759,18 @@ bool tournamentFeatureIsPremium(String feature) {
 
 String scoringConfigShortText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
-  if (scoringUsesSetMode(type, cfg)) {
-    return 'Resultado por sets/rondas · mejor de ${scoringBestOf(type, cfg)}';
+  switch (scoringResultModel(type, cfg)) {
+    case 'goals':
+      return 'Goles · GF/GC/DG';
+    case 'sets_games':
+      return 'Sets + juegos · mejor de ${scoringBestOf(type, cfg)}';
+    case 'sets_points':
+      return 'Sets + puntos · mejor de ${scoringBestOf(type, cfg)}';
+    case 'total_points':
+      return 'Puntos totales · diferencia';
+    default:
+      return 'Victoria ${scoringWinPoints(type, cfg)} · empate ${scoringDrawPoints(type, cfg)} · derrota ${scoringLossPoints(type, cfg)}';
   }
-  return 'Victoria ${scoringWinPoints(type, cfg)} · empate ${scoringDrawPoints(type, cfg)} · derrota ${scoringLossPoints(type, cfg)}';
 }
 
 
@@ -1619,16 +1785,50 @@ String tieBreakerLabel(String value) {
     case 'game_difference': return 'juegos';
     case 'games_for': return 'juegos a favor';
     case 'manual': return 'manual';
+    case 'no_shows': return 'no presentados';
     default: return value;
+  }
+}
+
+String tieBreakerLabelForScoring(String value, String scoringType, [dynamic raw]) {
+  switch (value) {
+    case 'set_difference':
+      return 'diferencia de sets';
+    case 'game_difference':
+      if (scoringUsesGameSetMode(scoringType, raw)) return 'diferencia de juegos';
+      if (scoringUsesPointSetMode(scoringType, raw)) return 'diferencia de puntos de set';
+      return tieBreakerLabel(value);
+    case 'games_for':
+      if (scoringUsesGameSetMode(scoringType, raw)) return 'juegos a favor';
+      if (scoringUsesPointSetMode(scoringType, raw)) return 'puntos de set a favor';
+      return tieBreakerLabel(value);
+    case 'difference':
+      if (scoringResultModel(scoringType, raw) == 'goals') return 'diferencia de goles';
+      if (scoringResultModel(scoringType, raw) == 'total_points') return 'diferencia de puntos';
+      return tieBreakerLabel(value);
+    case 'for':
+      if (scoringResultModel(scoringType, raw) == 'goals') return 'goles a favor';
+      if (scoringResultModel(scoringType, raw) == 'total_points') return 'puntos a favor';
+      return tieBreakerLabel(value);
+    default:
+      return tieBreakerLabel(value);
   }
 }
 
 String scoringConfigFullText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
-  if (scoringUsesSetMode(type, cfg)) {
-    return 'Se registra cada set/ronda (${scoringSetLabel(type, cfg)} por parcial) y la app calcula ganador, parciales y desempates.';
+  switch (scoringResultModel(type, cfg)) {
+    case 'goals':
+      return 'Se registra el marcador en goles. La clasificación usa puntos de liga, goles a favor, goles en contra y diferencia de goles.';
+    case 'sets_games':
+      return 'Se registra cada set con sus juegos. La app calcula sets ganados, juegos totales y desempates.';
+    case 'sets_points':
+      return 'Se registra cada set con sus puntos. La app calcula sets ganados, puntos totales y desempates.';
+    case 'total_points':
+      return 'Se registra el marcador total de puntos. La clasificación usa victorias, puntos a favor/en contra y diferencia.';
+    default:
+      return 'Marcador directo en ${scoringScoreLabel(type, cfg)}. La clasificación usa victoria ${scoringWinPoints(type, cfg)}, empate ${scoringDrawPoints(type, cfg)} y derrota ${scoringLossPoints(type, cfg)}.';
   }
-  return 'Marcador directo en ${scoringScoreLabel(type, cfg)}. La clasificación usa victoria ${scoringWinPoints(type, cfg)}, empate ${scoringDrawPoints(type, cfg)} y derrota ${scoringLossPoints(type, cfg)}.';
 }
 
 String standingsHeaderForScoring(String type, [dynamic raw]) {
@@ -1637,25 +1837,49 @@ String standingsHeaderForScoring(String type, [dynamic raw]) {
 }
 
 String standingDetailText(TeamStanding standing, String scoringType, [dynamic scoringConfig]) {
-  if (scoringUsesSetMode(scoringType, scoringConfig)) {
-    return '${standing.wins}G · ${standing.losses}P · parciales ${standing.goalsFor}-${standing.goalsAgainst} · ${scoringSetLabel(scoringType, scoringConfig)} ${standing.secondaryFor}-${standing.secondaryAgainst}';
+  final model = scoringResultModel(scoringType, scoringConfig);
+  if (standing.americanoRawScore) {
+    final unit = scoringUsesGameSetMode(scoringType, scoringConfig)
+        ? 'juegos'
+        : scoringUsesPointSetMode(scoringType, scoringConfig)
+            ? 'puntos'
+            : scoringScoreLabel(scoringType, scoringConfig);
+    return '${standing.played} partidos · $unit ${standing.goalsFor}-${standing.goalsAgainst} · victorias ${standing.wins}';
   }
-  return '${standing.wins}G · ${standing.draws}E · ${standing.losses}P · ${scoringMetricUnit(scoringType, scoringConfig)} ${standing.goalsFor}-${standing.goalsAgainst}';
+  switch (model) {
+    case 'goals':
+      return '${standing.wins}G · ${standing.draws}E · ${standing.losses}P · GF ${standing.goalsFor} · GC ${standing.goalsAgainst} · DG ${standing.goalDifference}';
+    case 'sets_games':
+      return '${standing.wins}G · ${standing.losses}P · sets ${standing.goalsFor}-${standing.goalsAgainst} · juegos ${standing.secondaryFor}-${standing.secondaryAgainst}';
+    case 'sets_points':
+      return '${standing.wins}G · ${standing.losses}P · sets ${standing.goalsFor}-${standing.goalsAgainst} · puntos ${standing.secondaryFor}-${standing.secondaryAgainst}';
+    case 'total_points':
+      return '${standing.wins}G · ${standing.losses}P · PF ${standing.goalsFor} · PC ${standing.goalsAgainst} · DP ${standing.goalDifference}';
+    default:
+      return '${standing.wins}G · ${standing.draws}E · ${standing.losses}P · ${scoringMetricUnit(scoringType, scoringConfig)} ${standing.goalsFor}-${standing.goalsAgainst}';
+  }
 }
 
 String standingMetricText(TeamStanding standing, String scoringType, [dynamic scoringConfig]) {
   if (scoringUsesSetMode(scoringType, scoringConfig)) {
-    return 'DP ${standing.goalDifference} · DIF ${standing.secondaryDifference}';
+    return '${scoringTableDifferenceLabel(scoringType, scoringConfig)} ${standing.goalDifference} · ${scoringSecondaryDifferenceLabel(scoringType, scoringConfig)} ${standing.secondaryDifference}';
   }
   return 'PTS · ${scoringRankingLabel(scoringType, scoringConfig)} ${standing.goalDifference}';
 }
 
 String matchInputLabel(String type, bool local, [dynamic raw]) {
   final side = local ? 'Local' : 'Visitante';
-  if (scoringUsesSetMode(type, raw)) {
-    return '$side sets';
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return '$side goles';
+    case 'total_points':
+      return '$side puntos';
+    case 'games':
+      return '$side juegos';
+    default:
+      if (scoringUsesSetMode(type, raw)) return '$side sets';
+      return '$side ${scoringScoreLabel(type, raw)}';
   }
-  return '$side ${scoringScoreLabel(type, raw)}';
 }
 
 List<Map<String, int>> matchDetailSets(Map<String, dynamic> match) {
@@ -1668,11 +1892,31 @@ List<Map<String, int>> matchDetailSets(Map<String, dynamic> match) {
       .toList();
 }
 
+int matchSetGamesFor(Map<String, dynamic> match, bool local) {
+  var total = 0;
+  for (final set in matchDetailSets(match)) {
+    total += AppData.intValue(set[local ? 'a' : 'b']);
+  }
+  return total;
+}
+
+String matchPrimaryScoreText(Map<String, dynamic> match, String type, [dynamic raw]) {
+  final a = AppData.intValue(match['score_a']);
+  final b = AppData.intValue(match['score_b']);
+  if (scoringUsesSetMode(type, raw)) {
+    return 'Sets $a - $b';
+  }
+  return '$a - $b';
+}
+
 String? matchDetailScoreText(Map<String, dynamic> match, String type, [dynamic raw]) {
   if (!scoringUsesSetMode(type, raw)) return null;
   final sets = matchDetailSets(match);
   if (sets.isEmpty) return null;
-  return sets.map((set) => '${set['a']}-${set['b']}').join(' · ');
+  final secondaryA = matchSetGamesFor(match, true);
+  final secondaryB = matchSetGamesFor(match, false);
+  final secondaryLabel = scoringUsesGameSetMode(type, raw) ? 'juegos' : 'puntos';
+  return '$secondaryLabel $secondaryA-$secondaryB · ${sets.map((set) => '${set['a']}-${set['b']}').join(' · ')}';
 }
 
 String tournamentMatchWinnerId(Map<String, dynamic> match) {
@@ -1838,7 +2082,7 @@ List<String> tournamentTieBreakers(Map<String, dynamic> tournament, String scori
     final values = raw.map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList();
     if (values.isNotEmpty) return values;
   }
-  return defaultTieBreakers(scoringType);
+  return TournamentEngineV2.defaultTieBreakers(scoringType, AppData.text(tournament['format'], 'liga'));
 }
 
 int _compareDesc(int a, int b) => b.compareTo(a);
@@ -1850,6 +2094,11 @@ int _directTieBreakerCompare(TeamStanding a, TeamStanding b, List<Map<String, dy
   var bDiff = 0;
   var aFor = 0;
   var bFor = 0;
+  var aSecondaryDiff = 0;
+  var bSecondaryDiff = 0;
+  var aSecondaryFor = 0;
+  var bSecondaryFor = 0;
+  final setMode = scoringUsesSetMode(scoringType, scoringConfig);
   for (final match in matches) {
     if (!matchCountsForStandings(match)) continue;
     final teamA = AppData.text(match['team_a']);
@@ -1860,10 +2109,18 @@ int _directTieBreakerCompare(TeamStanding a, TeamStanding b, List<Map<String, dy
     final rawB = AppData.intValue(match['score_b']);
     final aScore = teamA == a.id ? rawA : rawB;
     final bScore = teamA == a.id ? rawB : rawA;
+    final localSecondaryA = setMode ? matchSetGamesFor(match, true) : 0;
+    final localSecondaryB = setMode ? matchSetGamesFor(match, false) : 0;
+    final aSecondaryScore = teamA == a.id ? localSecondaryA : localSecondaryB;
+    final bSecondaryScore = teamA == a.id ? localSecondaryB : localSecondaryA;
     aFor += aScore;
     bFor += bScore;
     aDiff += aScore - bScore;
     bDiff += bScore - aScore;
+    aSecondaryFor += aSecondaryScore;
+    bSecondaryFor += bSecondaryScore;
+    aSecondaryDiff += aSecondaryScore - bSecondaryScore;
+    bSecondaryDiff += bSecondaryScore - aSecondaryScore;
     if (aScore > bScore) {
       aPoints += scoringWinPoints(scoringType, scoringConfig);
       bPoints += scoringLossPoints(scoringType, scoringConfig);
@@ -1879,7 +2136,11 @@ int _directTieBreakerCompare(TeamStanding a, TeamStanding b, List<Map<String, dy
   if (c != 0) return c;
   c = _compareDesc(aDiff, bDiff);
   if (c != 0) return c;
-  return _compareDesc(aFor, bFor);
+  c = _compareDesc(aFor, bFor);
+  if (c != 0) return c;
+  c = _compareDesc(aSecondaryDiff, bSecondaryDiff);
+  if (c != 0) return c;
+  return _compareDesc(aSecondaryFor, bSecondaryFor);
 }
 
 int compareTeamStandings(
@@ -1909,6 +2170,8 @@ int compareTeamStandings(
         c = _compareDesc(a.goalsFor, b.goalsFor);
         break;
       case 'set_difference':
+        c = _compareDesc(a.goalDifference, b.goalDifference);
+        break;
       case 'game_difference':
         c = _compareDesc(a.secondaryDifference, b.secondaryDifference);
         break;
@@ -1928,6 +2191,10 @@ String standingsOrderText(List<String> tieBreakers) {
   return tieBreakers.map(tieBreakerLabel).join(' → ');
 }
 
+String standingsOrderTextForScoring(List<String> tieBreakers, String scoringType, [dynamic scoringConfig]) {
+  return tieBreakers.map((value) => tieBreakerLabelForScoring(value, scoringType, scoringConfig)).join(' → ');
+}
+
 String standingRankReason(int index, List<TeamStanding> standings, List<String> tieBreakers, String scoringType, Map<String, dynamic>? scoringConfig) {
   final current = standings[index];
   if (index == 0) {
@@ -1942,8 +2209,9 @@ String standingRankReason(int index, List<TeamStanding> standings, List<String> 
     if (breaker == 'wins' && current.wins != previous.wins) return 'Desempate por victorias: ${previous.wins} vs ${current.wins}.';
     if ((breaker == 'difference') && current.goalDifference != previous.goalDifference) return 'Desempate por diferencia: ${previous.goalDifference} vs ${current.goalDifference}.';
     if (breaker == 'for' && current.goalsFor != previous.goalsFor) return 'Desempate por puntos a favor: ${previous.goalsFor} vs ${current.goalsFor}.';
-    if ((breaker == 'set_difference' || breaker == 'game_difference') && current.secondaryDifference != previous.secondaryDifference) return 'Desempate por ${tieBreakerLabel(breaker)}: ${previous.secondaryDifference} vs ${current.secondaryDifference}.';
-    if (breaker == 'games_for' && current.secondaryFor != previous.secondaryFor) return 'Desempate por juegos a favor: ${previous.secondaryFor} vs ${current.secondaryFor}.';
+    if (breaker == 'set_difference' && current.goalDifference != previous.goalDifference) return 'Desempate por diferencia de sets: ${previous.goalDifference} vs ${current.goalDifference}.';
+    if (breaker == 'game_difference' && current.secondaryDifference != previous.secondaryDifference) return 'Desempate por ${tieBreakerLabel(breaker)}: ${previous.secondaryDifference} vs ${current.secondaryDifference}.';
+    if (breaker == 'games_for' && current.secondaryFor != previous.secondaryFor) return 'Desempate por juegos/puntos a favor: ${previous.secondaryFor} vs ${current.secondaryFor}.';
     if (breaker == 'direct') return 'Mismo puntaje: se revisa enfrentamiento directo antes de seguir con la diferencia.';
   }
   return 'Mismo puntaje. Se aplica el siguiente criterio configurado o el orden manual.';
@@ -1990,55 +2258,61 @@ List<TeamStanding> calculateStandings(
       final aRows = sideA.map((id) => table[id]).whereType<TeamStanding>().toList();
       final bRows = sideB.map((id) => table[id]).whereType<TeamStanding>().toList();
       if (aRows.isEmpty || bRows.isEmpty) continue;
+      for (final row in [...aRows, ...bRows]) {
+        row.americanoRawScore = true;
+      }
+
+      final americanoScoreA = setMode ? matchSetGamesFor(match, true) : scoreA;
+      final americanoScoreB = setMode ? matchSetGamesFor(match, false) : scoreB;
 
       for (final row in aRows) {
         row.played++;
-        row.goalsFor += scoreA;
-        row.goalsAgainst += scoreB;
+        row.goalsFor += americanoScoreA;
+        row.goalsAgainst += americanoScoreB;
       }
       for (final row in bRows) {
         row.played++;
-        row.goalsFor += scoreB;
-        row.goalsAgainst += scoreA;
+        row.goalsFor += americanoScoreB;
+        row.goalsAgainst += americanoScoreA;
       }
 
       if (setMode) {
-        for (final set in matchDetailSets(match)) {
-          final setA = AppData.intValue(set['a']);
-          final setB = AppData.intValue(set['b']);
-          for (final row in aRows) {
-            row.secondaryFor += setA;
-            row.secondaryAgainst += setB;
-          }
-          for (final row in bRows) {
-            row.secondaryFor += setB;
-            row.secondaryAgainst += setA;
-          }
+        for (final row in aRows) {
+          row.secondaryFor += scoreA;
+          row.secondaryAgainst += scoreB;
+        }
+        for (final row in bRows) {
+          row.secondaryFor += scoreB;
+          row.secondaryAgainst += scoreA;
         }
       }
 
       if (scoreA > scoreB) {
         for (final row in aRows) {
           row.wins++;
-          row.points += scoreA;
+          row.points += americanoScoreA;
         }
         for (final row in bRows) {
           row.losses++;
-          row.points += scoreB;
+          row.points += americanoScoreB;
         }
       } else if (scoreA < scoreB) {
         for (final row in bRows) {
           row.wins++;
-          row.points += scoreB;
+          row.points += americanoScoreB;
         }
         for (final row in aRows) {
           row.losses++;
-          row.points += scoreA;
+          row.points += americanoScoreA;
         }
       } else {
-        for (final row in [...aRows, ...bRows]) {
+        for (final row in aRows) {
           row.draws++;
-          row.points += scoreA;
+          row.points += americanoScoreA;
+        }
+        for (final row in bRows) {
+          row.draws++;
+          row.points += americanoScoreB;
         }
       }
       continue;
@@ -2117,6 +2391,7 @@ class TeamStanding {
   int points = 0;
   int noShows = 0;
   int adminWins = 0;
+  bool americanoRawScore = false;
 
   TeamStanding({required this.id, required this.name});
 
