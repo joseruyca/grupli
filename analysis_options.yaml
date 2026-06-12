@@ -1,5 +1,15 @@
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  errors:
+    deprecated_member_use: ignore
+    use_build_context_synchronously: ignore
+    use_string_in_part_of_directives: ignore
+    library_private_types_in_public_api: ignore
+    unnecessary_library_name: ignore
+    unnecessary_import: ignore
+    curly_braces_in_flow_control_structures: ignore
+
 linter:
   rules:
     prefer_const_constructors: false

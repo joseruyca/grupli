@@ -368,62 +368,26 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       const SizedBox(height: 16),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Container(width: 46, height: 46, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)), child: Icon(groupTypeIcon(type), color: AppColors.teal)),
+          Container(width: 46, height: 46, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.groups_rounded, color: AppColors.teal)),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Información básica', style: Theme.of(context).textTheme.titleMedium),
-            Text('Esto ayuda a Grupli a ordenar planes, gastos y torneos.', style: Theme.of(context).textTheme.bodyMedium),
+            Text('Nombre, descripción, portada y reglas del grupo.', style: Theme.of(context).textTheme.bodyMedium),
           ])),
         ]),
         const SizedBox(height: 16),
         FieldLabel('Nombre del grupo'),
         TextField(controller: nameController, textInputAction: TextInputAction.next, decoration: const InputDecoration(hintText: 'Nombre del grupo')),
-        const SizedBox(height: 12),
-        FieldLabel('Tipo de grupo'),
-        DropdownButtonFormField<String>(
-          value: type,
-          decoration: const InputDecoration(prefixIcon: Icon(Icons.category_rounded)),
-          items: const [
-            DropdownMenuItem(value: 'deporte', child: Text('Deporte')),
-            DropdownMenuItem(value: 'amigos', child: Text('Amigos')),
-            DropdownMenuItem(value: 'viaje', child: Text('Viaje')),
-            DropdownMenuItem(value: 'cartas', child: Text('Cartas')),
-            DropdownMenuItem(value: 'otro', child: Text('Otro')),
-          ],
-          onChanged: (v) => setState(() => type = groupTypeValue(v ?? 'otro')),
-        ),
+
         const SizedBox(height: 12),
         FieldLabel('Descripción'),
         TextField(controller: descriptionController, maxLines: 3, decoration: const InputDecoration(hintText: 'Explica para qué se usa este grupo')),
         const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            FieldLabel('Moneda'),
-            DropdownButtonFormField<String>(
-              value: currency,
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.payments_rounded)),
-              items: const [
-                DropdownMenuItem(value: 'EUR', child: Text('EUR')),
-                DropdownMenuItem(value: 'USD', child: Text('USD')),
-                DropdownMenuItem(value: 'GBP', child: Text('GBP')),
-              ],
-              onChanged: (v) => setState(() => currency = v ?? 'EUR'),
-            ),
-          ])),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            FieldLabel('Idioma'),
-            DropdownButtonFormField<String>(
-              value: language,
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.language_rounded)),
-              items: const [
-                DropdownMenuItem(value: 'es', child: Text('ES')),
-                DropdownMenuItem(value: 'en', child: Text('EN')),
-              ],
-              onChanged: (v) => setState(() => language = v ?? 'es'),
-            ),
-          ])),
-        ]),
+        StatusNotice(
+          icon: Icons.tune_rounded,
+          title: 'Idioma y moneda',
+          body: 'Por ahora Grupli trabaja en español y euros. Estos ajustes se activarán cuando estén cerrados en toda la app.',
+        ),
         const SizedBox(height: 12),
         FieldLabel('Zona horaria'),
         TextField(controller: timezoneController, decoration: const InputDecoration(prefixIcon: Icon(Icons.schedule_rounded), hintText: 'Europe/Madrid')),
@@ -786,7 +750,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   final token = await PushNotificationService.enableForCurrentDevice();
                   if (!mounted) return;
                   if (token == null) {
-                    await showToast(context, 'Falta Firebase o el permiso de notificaciones está desactivado.', danger: true);
+                    await showToast(context, 'No se pudieron activar las notificaciones en este dispositivo.', danger: true);
                   } else {
                     await showToast(context, 'Notificaciones push activadas en este dispositivo.');
                   }
@@ -795,7 +759,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting)
                   const CenterLoader(label: 'Cargando avisos...')
                 else if (snapshot.hasError)
-                  ErrorBlock(message: 'No se pudieron cargar los avisos. Ejecuta el SQL de notificaciones si acabas de actualizar.', onRetry: reload)
+                  ErrorBlock(message: 'No se pudieron cargar los avisos. Inténtalo de nuevo.', onRetry: reload)
                 else if (notifications.isEmpty)
                   EmptyBlock(
                     icon: Icons.notifications_none_rounded,
@@ -839,18 +803,16 @@ class PushStatusCard extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(configured ? 'Push preparado para APK' : 'Push pendiente de Firebase', style: Theme.of(context).textTheme.titleMedium),
+          Text('Notificaciones del dispositivo', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           Text(
-            configured
-                ? 'Activa este dispositivo para recibir avisos del grupo aunque la app no esté abierta.'
-                : 'Los avisos internos ya funcionan. Para push real necesitas Firebase y google-services.json en Android.',
+            'Activa este dispositivo para recibir avisos importantes de tus grupos.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(onPressed: onEnable, icon: const Icon(Icons.power_settings_new_rounded), label: Text(configured ? 'Activar en este dispositivo' : 'Comprobar configuración')),
+            child: TextButton.icon(onPressed: onEnable, icon: const Icon(Icons.power_settings_new_rounded), label: const Text('Activar en este dispositivo')),
           ),
         ])),
       ]),
@@ -1016,7 +978,7 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Enviar reporte', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
-            Text('Zona: $groupName · Versión v15.21 · ${kIsWeb ? 'web' : defaultTargetPlatform.name}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+            Text('Zona: $groupName · ${AppConfig.appVersion}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
           ])),
         ]),
       ),
@@ -1217,7 +1179,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             if (!data.isOwner)
               EmptySlim(icon: Icons.lock_rounded, title: 'Solo owner', body: 'Los usuarios son información sensible. Support y viewer no pueden gestionarlos.')
             else if (data.users.isEmpty)
-              EmptySlim(icon: Icons.people_alt_rounded, title: 'Sin usuarios visibles', body: 'Ejecuta el SQL v15.29 si esta lista aparece vacía.')
+              EmptySlim(icon: Icons.people_alt_rounded, title: 'Sin usuarios visibles', body: 'Todavía no hay usuarios para mostrar.')
             else
               ...data.users.map((u) => AdminUserCard(user: u, onBlock: () => setUserStatus(u, 'blocked'), onActivate: () => setUserStatus(u, 'active'))),
           ] else if (section == 2) ...[
@@ -1235,7 +1197,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             if (!data.isOwner)
               EmptySlim(icon: Icons.lock_rounded, title: 'Solo owner', body: 'Los tokens/dispositivos son datos técnicos sensibles.')
             else if (data.devices.isEmpty)
-              EmptySlim(icon: Icons.phone_android_rounded, title: 'Sin dispositivos', body: 'Aparecerán cuando los usuarios activen push en la APK.')
+              EmptySlim(icon: Icons.phone_android_rounded, title: 'Sin dispositivos', body: 'Aparecerán cuando los usuarios activen notificaciones en su móvil.')
             else
               ...data.devices.map((d) => AdminDeviceCard(device: d)),
           ] else ...[
@@ -1800,11 +1762,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) await showToast(context, 'Foto actualizada.');
     } catch (e) {
       if (mounted) {
-        await showToast(
-          context,
-          'No se ha podido subir la foto. Ejecuta el SQL de avatares si aún no lo has hecho.',
-          danger: true,
-        );
+        await showToast(context, 'No se ha podido subir la foto. Inténtalo de nuevo.', danger: true);
       }
     } finally {
       if (mounted) setState(() => photoLoading = false);
@@ -1909,7 +1867,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   setSheetState(() {});
                 }
                 return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  const SheetTitle(icon: Icons.notifications_active_outlined, title: 'Notificaciones', body: 'Elige qué avisos quieres recibir por grupo. Las notificaciones internas funcionan con Supabase; el push móvil se activa con Firebase.'),
+                  const SheetTitle(icon: Icons.notifications_active_outlined, title: 'Notificaciones', body: 'Elige qué avisos quieres recibir de tus grupos.'),
                   const SizedBox(height: 12),
                   NotificationPreferenceSwitch(icon: Icons.event_available_rounded, title: 'Eventos', body: 'Nuevas quedadas, cambios y cancelaciones', value: enabled('notify_events'), onChanged: (v) => toggle('notify_events', v)),
                   NotificationPreferenceSwitch(icon: Icons.account_balance_wallet_rounded, title: 'Finanzas', body: 'Gastos nuevos y pagos importantes', value: enabled('notify_expenses'), onChanged: (v) => toggle('notify_expenses', v)),
@@ -1920,20 +1878,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     final token = await PushNotificationService.enableForCurrentDevice();
                     if (!mounted) return;
                     if (token == null) {
-                      await showToast(context, 'Falta Firebase o el permiso de notificaciones está desactivado.', danger: true);
+                      await showToast(context, 'No se pudieron activar las notificaciones en este dispositivo.', danger: true);
                     } else {
-                      await showToast(context, 'Push activado en este dispositivo.');
-                    }
-                  }),
-                  const SizedBox(height: 8),
-                  SecondaryButton(label: 'Enviar aviso de prueba', icon: Icons.bolt_rounded, onTap: () async {
-                    try {
-                      await AppData.createTestNotification();
-                      if (!mounted) return;
-                      await showToast(context, 'Aviso de prueba creado. Si el webhook está activo, llegará push al móvil.');
-                    } catch (e) {
-                      if (!mounted) return;
-                      await showToast(context, 'No se pudo crear la prueba. Ejecuta el SQL v15.22.', danger: true);
+                      await showToast(context, 'Notificaciones activadas en este dispositivo.');
                     }
                   }),
                 ]);
@@ -1954,26 +1901,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: const [
           SheetTitle(icon: Icons.lock_outline_rounded, title: 'Privacidad y seguridad', body: 'Grupli está pensada para grupos cerrados. Nadie entra sin invitación o código.'),
           SizedBox(height: 12),
-          PreferencePreviewRow(icon: Icons.verified_user_rounded, title: 'Cuenta protegida', body: 'Acceso mediante Supabase Auth y sesión privada'),
+          PreferencePreviewRow(icon: Icons.verified_user_rounded, title: 'Cuenta protegida', body: 'Acceso seguro y sesión privada'),
           PreferencePreviewRow(icon: Icons.groups_rounded, title: 'Grupos privados', body: 'El contenido del grupo queda limitado a sus miembros'),
           PreferencePreviewRow(icon: Icons.admin_panel_settings_rounded, title: 'Roles claros', body: 'Owner, admins y miembros tienen permisos separados'),
           PreferencePreviewRow(icon: Icons.delete_outline_rounded, title: 'Eliminación de cuenta', body: 'Puedes iniciar el borrado de cuenta desde Perfil con confirmación explícita'),
-        ]),
-      ),
-    );
-  }
-
-  void showAboutSheet() {
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: const [
-          SheetTitle(icon: Icons.auto_awesome_rounded, title: 'Grupli', body: 'App para organizar grupos privados: quedadas, calendario, gastos, torneos, miembros y permisos.'),
-          SizedBox(height: 12),
-          PreferencePreviewRow(icon: Icons.phone_android_rounded, title: 'Versión', body: 'v15.22 · Push notifications reales'),
-          PreferencePreviewRow(icon: Icons.web_rounded, title: 'Preparada para web/PWA/APK', body: 'Lista para pruebas reales y control interno'),
         ]),
       ),
     );
@@ -2092,12 +2023,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SectionHeader(title: 'Ajustes'),
             const SizedBox(height: 8),
             SettingsRow(icon: Icons.notifications_none_rounded, title: 'Notificaciones', subtitle: 'Eventos, gastos y torneos', onTap: showNotificationsSheet),
-            SettingsRow(icon: Icons.language_rounded, title: 'Idioma', subtitle: 'Español ahora · inglés preparado para lanzamiento', onTap: () => showToast(context, 'La app se lanzará como mínimo en español e inglés.')),
+            SettingsRow(icon: Icons.language_rounded, title: 'Idioma', subtitle: 'Español', onTap: () => showToast(context, 'El selector de idioma llegará en una próxima versión.')),
             SettingsRow(icon: Icons.lock_outline_rounded, title: 'Privacidad y seguridad', subtitle: 'Grupos cerrados, roles y acceso privado', onTap: showPrivacySheet),
             SettingsRow(icon: Icons.help_outline_rounded, title: 'Ayuda y soporte', subtitle: 'Reportar bugs, dudas o sugerencias', onTap: openSupport),
             if (data.isAdmin)
               SettingsRow(icon: Icons.admin_panel_settings_rounded, title: 'Panel admin', subtitle: 'Roles, reportes, métricas y calidad de Grupli', onTap: openAdminPanel),
-            SettingsRow(icon: Icons.info_outline_rounded, title: 'Acerca de Grupli', subtitle: 'Versión y estado del producto', onTap: showAboutSheet),
             SettingsRow(icon: Icons.delete_forever_rounded, title: 'Eliminar cuenta', subtitle: 'Borra tu cuenta y datos personales de Grupli', danger: true, onTap: deleteAccountFlow),
             const SizedBox(height: 10),
             DangerButton(label: 'Cerrar sesión', icon: Icons.logout_rounded, onTap: confirmSignOut),

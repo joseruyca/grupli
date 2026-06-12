@@ -3,7 +3,6 @@ library grupli_app;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -76,12 +75,26 @@ Future<void> main() async {
     return Material(
       color: Colors.white,
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: SingleChildScrollView(
-            child: Text(
-              'Error visible en Grupli:\n\n${details.exceptionAsString()}',
-              style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w800),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.error_outline_rounded, color: Color(0xFF087A78), size: 42),
+                SizedBox(height: 14),
+                Text(
+                  'Algo no ha ido bien',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF12263A)),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Cierra esta pantalla y vuelve a intentarlo. Si se repite, envíanos un reporte desde Ayuda.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
+                ),
+              ],
             ),
           ),
         ),
@@ -102,7 +115,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v15.34.1';
+  static const appVersion = 'v16.20';
   static const enableRealtimeSubscriptions = false;
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
@@ -332,7 +345,6 @@ class _AppRootState extends State<AppRoot> {
   Session? _session;
   StreamSubscription<AuthState>? _authSub;
   StreamSubscription<Uri>? _appLinksSub;
-  AppLinks? _appLinks;
   String? _lastHandledInviteCode;
   DateTime? _lastHandledInviteAt;
   bool _ready = false;
@@ -359,8 +371,6 @@ class _AppRootState extends State<AppRoot> {
   Future<void> _startAppLinkListener() async {
     if (kIsWeb) return;
     final links = AppLinks();
-    _appLinks = links;
-
     try {
       final initial = await links.getInitialLink();
       if (initial != null) {

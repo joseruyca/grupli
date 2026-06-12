@@ -319,7 +319,7 @@ class AppData {
     } catch (e) {
       final message = e.toString().toLowerCase();
       if (message.contains('function') || message.contains('delete_group_safe')) {
-        throw Exception('Falta ejecutar el SQL v15.25.5 para poder eliminar grupos de forma segura.');
+        throw Exception('No se pudo eliminar el grupo de forma segura. Inténtalo de nuevo más tarde.');
       }
       rethrow;
     }

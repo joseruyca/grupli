@@ -52,6 +52,14 @@ Write-Host "Preparando dependencias..." -ForegroundColor Cyan
 flutter clean
 flutter pub get
 
+Write-Host "Analizando errores reales antes de crear APK release..." -ForegroundColor Cyan
+$AnalyzeOutput = flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1
+$AnalyzeText = ($AnalyzeOutput | Out-String)
+Write-Host $AnalyzeText
+if ($LASTEXITCODE -ne 0 -or $AnalyzeText -match '(?m)^\s*error\s+-') {
+  throw "flutter analyze tiene errores reales. Corrige los errores antes de crear la APK release."
+}
+
 Write-Host "Creando APK RELEASE de prueba..." -ForegroundColor Cyan
 flutter build apk --release @Defines
 

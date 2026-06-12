@@ -1,12 +1,1 @@
-[
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "com.joseruyca.grupli",
-      "sha256_cert_fingerprints": [
-        "REEMPLAZA_ESTE_VALOR_CON_EL_SHA256_DE_LA_FIRMA_ANDROID"
-      ]
-    }
-  }
-]
+[]

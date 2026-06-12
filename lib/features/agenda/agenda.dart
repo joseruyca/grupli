@@ -377,7 +377,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      await showToast(context, e.toString(), danger: true);
+      await showToast(context, humanError(e), danger: true);
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -557,7 +557,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       await AppData.setAttendance(eventId, status);
       reload();
     } catch (e) {
-      await showToast(context, e.toString(), danger: true);
+      await showToast(context, humanError(e), danger: true);
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -593,7 +593,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       await AppData.cancelEventWithScope(event['id'].toString(), scope);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      await showToast(context, e.toString(), danger: true);
+      await showToast(context, humanError(e), danger: true);
     }
   }
 

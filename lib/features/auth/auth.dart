@@ -139,7 +139,29 @@ class _AuthScreenState extends State<AuthScreen> {
       await AppData.ensureProfile();
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
-      await showToast(context, e.toString(), danger: true);
+      await showToast(context, humanError(e), danger: true);
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> resetPassword() async {
+    final mail = email.text.trim();
+    if (mail.isEmpty) {
+      await showToast(context, 'Introduce tu email y te enviaremos un enlace para cambiar la contraseña.', danger: true);
+      return;
+    }
+    setState(() => loading = true);
+    try {
+      await AppData.sb.auth.resetPasswordForEmail(
+        mail,
+        redirectTo: AppConfig.appBaseUrl,
+      );
+      if (!mounted) return;
+      await showToast(context, 'Te hemos enviado un enlace para cambiar la contraseña.');
+    } catch (e) {
+      if (!mounted) return;
+      await showToast(context, humanError(e), danger: true);
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -151,7 +173,7 @@ class _AuthScreenState extends State<AuthScreen> {
       await AppData.clearLocalSession();
       await AppData.sb.auth.signInWithOAuth(provider, redirectTo: Uri.base.origin);
     } catch (e) {
-      await showToast(context, e.toString(), danger: true);
+      await showToast(context, humanError(e), danger: true);
     }
   }
 
@@ -180,17 +202,12 @@ class _AuthScreenState extends State<AuthScreen> {
           obscureText: hidden,
           decoration: InputDecoration(prefixIcon: const Icon(Icons.lock_outline_rounded), hintText: '••••••••', suffixIcon: IconButton(icon: Icon(hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined), onPressed: () => setState(() => hidden = !hidden))),
         ),
-        if (!widget.register) Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => showToast(context, 'Usa Supabase Auth para recuperar contraseña más adelante.'), child: const Text('¿Olvidaste tu contraseña?'))),
         if (!widget.register)
           Align(
             alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: loading ? null : () async {
-                await AppData.clearLocalSession();
-                if (context.mounted) await showToast(context, 'Sesión local limpiada. Vuelve a iniciar sesión.');
-              },
-              icon: const Icon(Icons.restart_alt_rounded, size: 18),
-              label: const Text('Limpiar sesión de este móvil'),
+            child: TextButton(
+              onPressed: loading ? null : resetPassword,
+              child: const Text('¿Olvidaste tu contraseña?'),
             ),
           ),
         const SizedBox(height: 16),

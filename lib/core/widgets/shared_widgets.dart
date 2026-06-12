@@ -1958,12 +1958,12 @@ String humanizeError(String raw) {
   if (text.contains('weak password')) return 'La contraseña es demasiado débil.';
   if (text.contains('user already registered') || text.contains('already registered')) return 'Esta cuenta ya existe. Inicia sesión en lugar de registrarte.';
   if (text.contains('confirmation_required')) return 'Para eliminar la cuenta debes escribir ELIMINAR exactamente.';
-  if (looksLikeSessionProblem(original)) return 'La sesión guardada en este móvil estaba caducada. Pulsa “Salir y volver a entrar” o “Limpiar sesión de este móvil” e inicia sesión otra vez.';
+  if (looksLikeSessionProblem(original)) return 'Tu sesión ha caducado. Cierra sesión e inicia sesión de nuevo.';
   if (text.contains('owner_protected') || text.contains('owner') || text.contains('creador del grupo')) return 'El creador del grupo está protegido. Transfiere o elimina el grupo antes de hacer esa acción.';
   if (text.contains('member_not_found') || text.contains('not_member')) return 'Ese miembro ya no está disponible en el grupo.';
   if (text.contains('invalid_role')) return 'Ese rol no es válido.';
-  if (text.contains('settlement_payments') || text.contains('create_settlement_payment_atomic')) return 'Falta actualizar la base de datos de finanzas. Ejecuta el último parche SQL de finanzas/realtime y vuelve a probar.';
-  if (text.contains('tournaments_scoring_type_check')) return 'Falta actualizar la base de datos de torneos. Ejecuta el parche SQL v16.16.1 y vuelve a crear la competición.';
+  if (text.contains('settlement_payments') || text.contains('create_settlement_payment_atomic')) return 'Finanzas necesita una actualización interna. Vuelve a intentarlo más tarde.';
+  if (text.contains('tournaments_scoring_type_check')) return 'Torneos necesita una actualización interna. Vuelve a intentarlo más tarde.';
   if (text.contains('permission') || text.contains('policy') || text.contains('rls') || text.contains('not allowed') || text.contains('denied') || text.contains('violates row-level')) return 'No tienes permiso para hacer esa acción.';
   if (looksLikeNetworkError(original)) return 'No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.';
   if (text.contains('duplicate') || text.contains('already') || text.contains('unique constraint')) return 'Parece que esto ya existe o ya se había guardado.';
@@ -2291,7 +2291,6 @@ class PremiumWeekStrip extends StatelessWidget {
       final today = sameDay(day, DateTime.now());
       final dayEvents = eventsFor(day);
       final hasEvents = dayEvents.isNotEmpty;
-      final color = agendaDayAccentColor(dayEvents);
       return Expanded(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -2374,7 +2373,6 @@ class PremiumMonthCalendar extends StatelessWidget {
             final today = sameDay(day, DateTime.now());
             final dayEvents = eventsFor(day);
             final hasEvents = dayEvents.isNotEmpty;
-            final mainColor = agendaDayAccentColor(dayEvents);
             return Expanded(
               child: SizedBox(
                 height: 46,
@@ -2954,7 +2952,7 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
       await AppData.setAttendance(widget.event['id'].toString(), status);
       widget.onChanged();
     } catch (e) {
-      if (mounted) await showToast(context, e.toString(), danger: true);
+      if (mounted) await showToast(context, humanError(e), danger: true);
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -3676,7 +3674,72 @@ class MetaLine extends StatelessWidget { final IconData icon; final String text;
 
 class AttendancePick extends StatelessWidget { final String label; final int count; final bool selected; final Color color; final VoidCallback onTap; const AttendancePick({super.key, required this.label, required this.count, required this.selected, required this.color, required this.onTap}); @override Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(15), child: Container(padding: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: selected ? color.withOpacity(.10) : Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: selected ? color : AppColors.line)), child: Column(children: [Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: color), const SizedBox(height: 4), Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900)), Text(count.toString(), style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 18))]))); }
 
-class StatusNotice extends StatelessWidget { final bool ok; final String text; const StatusNotice({super.key, required this.ok, required this.text}); @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: ok ? const Color(0xFFEAF8F0) : const Color(0xFFFFF6DF), borderRadius: BorderRadius.circular(14), border: Border.all(color: ok ? const Color(0xFFBFEBD2) : const Color(0xFFFFE3A6))), child: Row(children: [Icon(ok ? Icons.check_circle_rounded : Icons.info_rounded, color: ok ? AppColors.green : AppColors.amber), const SizedBox(width: 10), Expanded(child: Text(text, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)))])); }
+class StatusNotice extends StatelessWidget {
+  final bool ok;
+  final String text;
+  final IconData? icon;
+  final String? title;
+  final String? body;
+
+  const StatusNotice({
+    super.key,
+    bool? ok,
+    String? text,
+    this.icon,
+    this.title,
+    this.body,
+  })  : ok = ok ?? true,
+        text = text ?? '';
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveIcon = icon ?? (ok ? Icons.check_circle_rounded : Icons.info_rounded);
+    final effectiveTitle = title;
+    final effectiveBody = body ?? text;
+    final accent = ok ? AppColors.green : AppColors.amber;
+    final bg = ok ? const Color(0xFFEAF8F0) : const Color(0xFFFFF6DF);
+    final border = ok ? const Color(0xFFBFEBD2) : const Color(0xFFFFE3A6);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        crossAxisAlignment: effectiveTitle == null ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        children: [
+          Icon(effectiveIcon, color: accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: effectiveTitle == null
+                ? Text(
+                    effectiveBody,
+                    style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        effectiveTitle,
+                        style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink),
+                      ),
+                      if (effectiveBody.trim().isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          effectiveBody,
+                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.muted, height: 1.25),
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class SmallPick extends StatelessWidget { final String label; final String value; final IconData icon; final VoidCallback onTap; const SmallPick({super.key, required this.label, required this.value, required this.icon, required this.onTap}); @override Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [FieldLabel(label), InkWell(onTap: onTap, borderRadius: BorderRadius.circular(15), child: Container(height: 50, padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration(border: Border.all(color: AppColors.line), borderRadius: BorderRadius.circular(15)), child: Row(children: [Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w800))), Icon(icon, color: AppColors.muted, size: 20)])))]); }
 

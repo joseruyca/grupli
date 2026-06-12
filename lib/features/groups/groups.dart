@@ -418,25 +418,17 @@ class CreateGroupScreen extends StatefulWidget {
 class _CreateGroupScreenState extends State<CreateGroupScreen> {
   final name = TextEditingController();
   final description = TextEditingController();
-  String type = 'deporte';
+  String type = 'otro';
   String currency = 'EUR';
   bool loading = false;
   Uint8List? coverBytes;
   String? coverFileName;
   int step = 0;
 
-  static const groupTypes = [
-    ('deporte', 'Deporte', Icons.sports_tennis_rounded, 'Pádel, fútbol, running...'),
-    ('amigos', 'Amigos', Icons.groups_2_rounded, 'Quedadas, cenas y planes'),
-    ('viaje', 'Viaje', Icons.flight_takeoff_rounded, 'Gastos y planes del viaje'),
-    ('cartas', 'Cartas', Icons.style_rounded, 'Mus, poker, juegos de mesa'),
-    ('otro', 'Otro', Icons.auto_awesome_rounded, 'Cualquier grupo privado'),
-  ];
-
   @override
   void initState() {
     super.initState();
-    description.text = groupTypeDefaultDescription(type);
+    description.text = groupTypeDefaultDescription('otro');
   }
 
   @override
@@ -465,15 +457,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     setState(() {
       coverBytes = framed;
       coverFileName = 'group-cover.png';
-    });
-  }
-
-  void selectType(String value) {
-    setState(() {
-      type = value;
-      if (description.text.trim().isEmpty || description.text == groupTypeDefaultDescription('deporte') || description.text == groupTypeDefaultDescription('amigos') || description.text == groupTypeDefaultDescription('viaje') || description.text == groupTypeDefaultDescription('cartas') || description.text == groupTypeDefaultDescription('otro')) {
-        description.text = groupTypeDefaultDescription(type);
-      }
     });
   }
 
@@ -518,7 +501,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   Widget build(BuildContext context) {
     final title = step == 0 ? 'Crea tu grupo' : step == 1 ? 'Dale identidad' : 'Primeros pasos';
     final subtitle = step == 0
-        ? 'Nombre, tipo y privacidad. Todo privado por defecto.'
+        ? 'Nombre y privacidad. Todo privado por defecto.'
         : step == 1
             ? 'Añade una portada y una descripción clara.'
             : 'Después de crearlo podrás invitar, crear el primer plan y añadir gastos.';
@@ -539,34 +522,18 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         if (step == 0) ...[
           AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             FieldLabel('Nombre del grupo'),
-            TextField(controller: name, autofocus: true, textInputAction: TextInputAction.next, decoration: const InputDecoration(hintText: 'Ej. Pádel los miércoles')),
-            const SizedBox(height: 16),
-            FieldLabel('Tipo de grupo'),
-            const SizedBox(height: 8),
-            Wrap(spacing: 8, runSpacing: 8, children: groupTypes.map((item) {
-              final active = type == item.$1;
-              return InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => selectType(item.$1),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  width: MediaQuery.sizeOf(context).width > 460 ? 150 : 152,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: active ? AppColors.tealDark : AppColors.faint,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: active ? AppColors.tealDark : AppColors.line),
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Icon(item.$3, color: active ? Colors.white : AppColors.teal),
-                    const SizedBox(height: 8),
-                    Text(item.$2, style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 2),
-                    Text(item.$4, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? Colors.white70 : AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700)),
-                  ]),
-                ),
-              );
-            }).toList()),
+            TextField(
+              controller: name,
+              autofocus: true,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(hintText: 'Ej. Pádel los miércoles'),
+            ),
+            const SizedBox(height: 12),
+            StatusNotice(
+              icon: Icons.lock_outline_rounded,
+              title: 'Grupo privado',
+              body: 'Todos los grupos son privados. Después podrás invitar a miembros con código o enlace.',
+            ),
           ])),
         ] else if (step == 1) ...[
           AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -602,16 +569,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             FieldLabel('Descripción'),
             TextField(controller: description, minLines: 2, maxLines: 4, decoration: const InputDecoration(hintText: '¿Para qué usará el grupo Grupli?')),
             const SizedBox(height: 12),
-            FieldLabel('Moneda'),
-            DropdownButtonFormField<String>(
-              value: currency,
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.payments_rounded)),
-              items: const [
-                DropdownMenuItem(value: 'EUR', child: Text('EUR · Euro')),
-                DropdownMenuItem(value: 'USD', child: Text('USD · Dólar')),
-                DropdownMenuItem(value: 'GBP', child: Text('GBP · Libra')),
-              ],
-              onChanged: (v) => setState(() => currency = v ?? 'EUR'),
+            StatusNotice(
+              icon: Icons.payments_rounded,
+              title: 'Moneda del grupo',
+              body: 'De momento el grupo usará euros. La selección de moneda se activará cuando Finanzas esté preparada para convertir importes de forma segura.',
             ),
           ])),
         ] else ...[
@@ -621,10 +582,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             _SetupTodoRow(icon: Icons.event_available_rounded, title: 'Crear primer plan', body: 'Una quedada rápida para que todos confirmen asistencia.'),
             const Divider(height: 20, color: AppColors.line),
             _SetupTodoRow(icon: Icons.account_balance_wallet_rounded, title: 'Primer gasto', body: 'Si el grupo ya tiene gastos, Grupli calculará saldos.'),
-            if (type == 'deporte' || type == 'cartas') ...[
-              const Divider(height: 20, color: AppColors.line),
-              _SetupTodoRow(icon: Icons.emoji_events_rounded, title: 'Torneo opcional', body: 'Al entrar al grupo podrás crear liga, eliminatoria o americano.'),
-            ],
+            const Divider(height: 20, color: AppColors.line),
+            _SetupTodoRow(icon: Icons.emoji_events_rounded, title: 'Torneo opcional', body: 'Si el grupo lo necesita, podrás crear liga, eliminatoria, americano o partidos manuales.'),
           ])),
         ],
         const SizedBox(height: 22),

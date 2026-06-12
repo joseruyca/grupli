@@ -465,7 +465,7 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      await showToast(context, e.toString(), danger: true);
+      await showToast(context, humanError(e), danger: true);
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -632,7 +632,7 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
       await action();
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      await showToast(context, e.toString(), danger: true);
+      await showToast(context, humanError(e), danger: true);
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -1551,14 +1551,6 @@ String _financeMainTitle(FinanceSummary summary) {
   if (summary.myNet > 0.01) return 'Te deben ${money(summary.myNet)}';
   if (summary.myNet < -0.01) return 'Debes ${money(-summary.myNet)}';
   return 'Hay pagos pendientes';
-}
-
-String _financeMainSubtitle(FinanceSummary summary) {
-  if (summary.pendingAmount <= 0.01) return 'No hay deudas abiertas en este grupo.';
-  if (summary.compensatedAmount > 0.01) {
-    return 'Total ${money(summary.pendingAmount)} · mover ${money(summary.settlementAmount)}.';
-  }
-  return 'Con ${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} se puede dejar el grupo a cero.';
 }
 
 class SettlementRow extends StatelessWidget {
