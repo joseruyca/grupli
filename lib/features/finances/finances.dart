@@ -763,16 +763,47 @@ class FinanceHeroCard extends StatelessWidget {
   final VoidCallback onCreate;
   const FinanceHeroCard({super.key, required this.summary, required this.onCreate});
 
+  void _showMetricInfo(BuildContext context, String title, String value, String body) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 22),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(color: AppColors.greenSoft, borderRadius: BorderRadius.circular(15)),
+                child: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.green, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: const TextStyle(color: AppColors.ink, fontSize: 18, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 2),
+                Text(value, style: const TextStyle(color: AppColors.greenDark, fontSize: 22, fontWeight: FontWeight.w900)),
+              ])),
+            ]),
+            const SizedBox(height: 14),
+            Text(body, style: const TextStyle(color: AppColors.muted, fontSize: 13.5, height: 1.35, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 14),
+            SecondaryButton(label: 'Entendido', icon: Icons.check_rounded, onTap: () => Navigator.pop(context)),
+          ]),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final clean = summary.pendingAmount <= .01;
     return AppCard(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       color: AppColors.greenDark,
-      child: Stack(children: [
-        Positioned(right: -6, top: -4, child: Icon(Icons.stacked_line_chart_rounded, size: 92, color: Colors.white.withOpacity(.06))),
-        Positioned(right: 22, top: 18, child: Icon(Icons.savings_rounded, size: 54, color: Colors.white.withOpacity(.18))),
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Container(
             width: 46,
@@ -799,12 +830,23 @@ class FinanceHeroCard extends StatelessWidget {
         ]),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: _HeroFinanceMetric(label: 'Gastado', value: money(summary.totalExpenses))),
+          Expanded(child: _HeroFinanceMetric(
+            label: 'Gastado',
+            value: money(summary.totalExpenses),
+            onTap: () => _showMetricInfo(context, 'Gastado', money(summary.totalExpenses), 'Suma de todos los gastos registrados en el grupo. Sirve para entender cuánto se ha movido en total, no lo que debe una persona concreta.'),
+          )),
           const SizedBox(width: 8),
-          Expanded(child: _HeroFinanceMetric(label: 'Pendiente', value: money(summary.pendingAmount))),
+          Expanded(child: _HeroFinanceMetric(
+            label: 'Pendiente',
+            value: money(summary.pendingAmount),
+            onTap: () => _showMetricInfo(context, 'Pendiente', money(summary.pendingAmount), 'Dinero que todavía queda por compensar entre miembros. Cuando las liquidaciones se registran correctamente, este valor baja hasta cero.'),
+          )),
           const SizedBox(width: 8),
-          Expanded(child: _HeroFinanceMetric(label: 'A mover', value: money(summary.settlementAmount))),
-        ]),
+          Expanded(child: _HeroFinanceMetric(
+            label: 'A mover',
+            value: money(summary.settlementAmount),
+            onTap: () => _showMetricInfo(context, 'A mover', money(summary.settlementAmount), 'Cantidad mínima recomendada para liquidar el grupo con el menor número de pagos posible.'),
+          )),
         ]),
       ]),
     );
@@ -814,18 +856,34 @@ class FinanceHeroCard extends StatelessWidget {
 class _HeroFinanceMetric extends StatelessWidget {
   final String label;
   final String value;
-  const _HeroFinanceMetric({required this.label, required this.value});
+  final VoidCallback onTap;
+  const _HeroFinanceMetric({required this.label, required this.value, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(.14), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(.14))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 11, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 4),
-        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-      ]),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(color: Colors.white.withOpacity(.14), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(.16))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 10.5, fontWeight: FontWeight.w800))),
+            const Icon(Icons.info_outline_rounded, color: Color(0xDFFFFFFF), size: 13),
+          ]),
+          const SizedBox(height: 5),
+          SizedBox(
+            height: 22,
+            width: double.infinity,
+            child: FittedBox(
+              alignment: Alignment.centerLeft,
+              fit: BoxFit.scaleDown,
+              child: Text(value, maxLines: 1, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+            ),
+          ),
+        ]),
+      ),
     );
   }
 }

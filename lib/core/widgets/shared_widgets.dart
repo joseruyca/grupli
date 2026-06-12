@@ -815,24 +815,7 @@ class WeekStrip extends StatelessWidget {
                   height: 8,
                   child: Center(
                     child: hasEvents
-                        ? Wrap(
-                            alignment: WrapAlignment.center,
-                            spacing: 2,
-                            runSpacing: 0,
-                            children: [
-                              for (final event in dayEvents.take(3))
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                    color: active ? Colors.white : eventKindColor(event),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              if (dayEvents.length > 3)
-                                Text('+', style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 9, height: .8)),
-                            ],
-                          )
+                        ? EventDayMarkers(events: dayEvents, active: active, compact: true)
                         : Container(width: today ? 16 : 6, height: 4, decoration: BoxDecoration(color: active ? Colors.white : AppColors.line, borderRadius: BorderRadius.circular(99))),
                   ),
                 ),
@@ -850,17 +833,10 @@ class EventTypeLegend extends StatelessWidget {
   final List<Map<String, dynamic>> events;
   const EventTypeLegend({super.key, required this.events});
 
+  static const List<String> _orderedKinds = ['quedada', 'partido', 'entrenamiento', 'torneo', 'cena', 'reunion'];
+
   @override
   Widget build(BuildContext context) {
-    final kinds = <String, Map<String, dynamic>>{};
-    for (final event in events) {
-      kinds.putIfAbsent(eventKind(event), () => event);
-    }
-    final ordered = <String>['quedada', 'partido', 'entrenamiento', 'torneo', 'cena', 'reunion']
-        .where((kind) => kinds.containsKey(kind))
-        .toList();
-    if (ordered.isEmpty) return const SizedBox.shrink();
-
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       color: AppColors.white,
@@ -868,9 +844,9 @@ class EventTypeLegend extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         child: Row(children: [
-          for (int i = 0; i < ordered.length; i++) ...[
-            EventLegendMiniChip(event: kinds[ordered[i]] ?? {'title': ordered[i]}),
-            if (i != ordered.length - 1) const SizedBox(width: 7),
+          for (int i = 0; i < _orderedKinds.length; i++) ...[
+            EventLegendMiniChip(event: {'kind': _orderedKinds[i], 'title': _orderedKinds[i]}),
+            if (i != _orderedKinds.length - 1) const SizedBox(width: 7),
           ],
         ]),
       ),
@@ -901,6 +877,40 @@ class EventLegendMiniChip extends StatelessWidget {
   }
 }
 
+
+
+class EventDayMarkers extends StatelessWidget {
+  final List<Map<String, dynamic>> events;
+  final bool active;
+  final bool compact;
+  const EventDayMarkers({super.key, required this.events, required this.active, this.compact = false});
+
+  @override
+  Widget build(BuildContext context) {
+    if (events.isEmpty) return const SizedBox.shrink();
+    final visible = events.take(3).toList();
+    final barWidth = compact ? 9.0 : 11.0;
+    final barHeight = compact ? 4.0 : 4.5;
+    return Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
+      for (int i = 0; i < visible.length; i++) ...[
+        Container(
+          width: barWidth,
+          height: barHeight,
+          decoration: BoxDecoration(
+            color: active ? Colors.white : eventKindColor(visible[i]),
+            borderRadius: BorderRadius.circular(99),
+            boxShadow: active ? null : [BoxShadow(color: eventKindColor(visible[i]).withOpacity(.22), blurRadius: 4, offset: const Offset(0, 1))],
+          ),
+        ),
+        if (i != visible.length - 1) const SizedBox(width: 2),
+      ],
+      if (events.length > 3) ...[
+        const SizedBox(width: 2),
+        Text('+', style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: compact ? 9 : 10, height: .8)),
+      ],
+    ]);
+  }
+}
 
 class RoutineBadge extends StatelessWidget {
   final String label;
@@ -2302,9 +2312,9 @@ class PremiumWeekStrip extends StatelessWidget {
               height: 82,
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               decoration: BoxDecoration(
-                color: active ? AppColors.teal : AppColors.surface,
+                color: active ? AppColors.teal : hasEvents ? eventKindSoftColor(dayEvents.first) : AppColors.surface,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: active ? AppColors.teal : today ? AppColors.teal.withOpacity(.45) : hasEvents ? AppColors.line : AppColors.line),
+                border: Border.all(color: active ? AppColors.teal : today ? AppColors.teal.withOpacity(.45) : hasEvents ? eventKindColor(dayEvents.first).withOpacity(.34) : AppColors.line),
               ),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 Text(shortWeekday(day).toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: active ? Colors.white : AppColors.muted, fontSize: 10, fontWeight: FontWeight.w900)),
@@ -2314,16 +2324,7 @@ class PremiumWeekStrip extends StatelessWidget {
                 SizedBox(
                   height: 11,
                   child: hasEvents
-                      ? Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 2,
-                          children: [
-                            for (final event in dayEvents.take(3))
-                              Container(width: 6, height: 6, decoration: BoxDecoration(color: active ? Colors.white : eventKindColor(event), shape: BoxShape.circle)),
-                            if (dayEvents.length > 3)
-                              Text('+', style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 10, height: .8)),
-                          ],
-                        )
+                      ? EventDayMarkers(events: dayEvents, active: active)
                       : Container(width: today ? 18 : 7, height: 4, decoration: BoxDecoration(color: active ? Colors.white : AppColors.line, borderRadius: BorderRadius.circular(99))),
                 ),
               ]),
@@ -2383,9 +2384,9 @@ class PremiumMonthCalendar extends StatelessWidget {
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
                     decoration: BoxDecoration(
-                      color: active ? AppColors.teal : Colors.transparent,
+                      color: active ? AppColors.teal : hasEvents ? eventKindSoftColor(dayEvents.first) : Colors.transparent,
                       borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: active ? AppColors.teal : today ? AppColors.teal.withOpacity(.45) : hasEvents ? AppColors.line : Colors.transparent),
+                      border: Border.all(color: active ? AppColors.teal : today ? AppColors.teal.withOpacity(.45) : hasEvents ? eventKindColor(dayEvents.first).withOpacity(.38) : Colors.transparent),
                     ),
                     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                       Text(day.day.toString(), maxLines: 1, style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: active || hasEvents || today ? FontWeight.w900 : FontWeight.w700, fontSize: 14)),
@@ -2393,14 +2394,7 @@ class PremiumMonthCalendar extends StatelessWidget {
                       SizedBox(
                         height: 7,
                         child: hasEvents
-                            ? Wrap(
-                                alignment: WrapAlignment.center,
-                                spacing: 1.8,
-                                children: [
-                                  for (final event in dayEvents.take(3))
-                                    Container(width: 5.5, height: 5.5, decoration: BoxDecoration(color: active ? Colors.white : eventKindColor(event), shape: BoxShape.circle)),
-                                ],
-                              )
+                            ? EventDayMarkers(events: dayEvents, active: active, compact: true)
                             : today
                                 ? Container(width: 14, height: 4, decoration: BoxDecoration(color: active ? Colors.white : AppColors.teal, borderRadius: BorderRadius.circular(99)))
                                 : const SizedBox.shrink(),
@@ -3819,18 +3813,7 @@ class MonthGrid extends StatelessWidget {
                       height: 7,
                       child: Center(
                         child: hasEvents
-                            ? Wrap(
-                                alignment: WrapAlignment.center,
-                                spacing: 1.5,
-                                children: [
-                                  for (final event in dayEvents.take(3))
-                                    Container(
-                                      width: 5.5,
-                                      height: 5.5,
-                                      decoration: BoxDecoration(color: active ? Colors.white : eventKindColor(event), shape: BoxShape.circle),
-                                    ),
-                                ],
-                              )
+                            ? EventDayMarkers(events: dayEvents, active: active, compact: true)
                             : const SizedBox(height: 5),
                       ),
                     ),

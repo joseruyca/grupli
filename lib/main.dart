@@ -115,7 +115,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v16.20';
+  static const appVersion = 'v16.20.1';
   static const enableRealtimeSubscriptions = false;
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
@@ -787,22 +787,22 @@ IconData eventKindIcon(Map<String, dynamic> event) {
 
 Color eventKindColor(Map<String, dynamic> event) {
   switch (eventKind(event)) {
-    case 'partido': return AppColors.blue;
-    case 'entrenamiento': return AppColors.violet;
-    case 'cena': return AppColors.orange;
-    case 'reunion': return AppColors.green;
-    case 'torneo': return AppColors.amber;
+    case 'partido': return const Color(0xFF1E63A7);
+    case 'entrenamiento': return const Color(0xFF6F4BA4);
+    case 'cena': return const Color(0xFFD97706);
+    case 'reunion': return const Color(0xFF218A4B);
+    case 'torneo': return const Color(0xFFE09B18);
     default: return AppColors.teal;
   }
 }
 
 Color eventKindSoftColor(Map<String, dynamic> event) {
   switch (eventKind(event)) {
-    case 'partido': return const Color(0xFFEAF0FF);
-    case 'entrenamiento': return AppColors.violetSoft;
-    case 'cena': return AppColors.orangeSoft;
-    case 'reunion': return AppColors.greenSoft;
-    case 'torneo': return AppColors.faint;
+    case 'partido': return const Color(0xFFE8F1FF);
+    case 'entrenamiento': return const Color(0xFFF1EAFE);
+    case 'cena': return const Color(0xFFFFF0D9);
+    case 'reunion': return const Color(0xFFE7F6EC);
+    case 'torneo': return const Color(0xFFFFF5DA);
     default: return AppColors.tealSoft;
   }
 }

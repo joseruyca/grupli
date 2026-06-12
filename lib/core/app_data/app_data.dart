@@ -49,6 +49,15 @@ class AppData {
     return s.isEmpty ? fallback : s;
   }
 
+
+  static bool eventIsCancelled(Map<String, dynamic> event) {
+    return text(event['status']).toLowerCase() == 'cancelled';
+  }
+
+  static List<Map<String, dynamic>> activeEventsOnly(List<Map<String, dynamic>> rows) {
+    return rows.where((event) => !eventIsCancelled(event)).toList();
+  }
+
   static int intValue(dynamic value, [int fallback = 0]) {
     if (value is int) return value;
     if (value is num) return value.toInt();
@@ -331,7 +340,7 @@ class AppData {
 
     try {
       final res = await sb.rpc('group_events_with_attendance', params: {'p_group_id': cleanGroupId});
-      final rows = asList(res);
+      final rows = activeEventsOnly(asList(res));
       rows.sort((a, b) {
         final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
         final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -348,7 +357,7 @@ class AppData {
           .select('*, event_attendance(status,user_id)')
           .eq('group_id', cleanGroupId)
           .order('starts_at');
-      final rows = asList(res);
+      final rows = activeEventsOnly(asList(res));
       rows.sort((a, b) {
         final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
         final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -359,7 +368,7 @@ class AppData {
       // Fallback defensivo: si Supabase no puede resolver el embed de asistencia
       // por una relación/política temporal, la agenda debe seguir mostrando eventos.
       final res = await sb.from('events').select('*').eq('group_id', cleanGroupId).order('starts_at');
-      final rows = asList(res);
+      final rows = activeEventsOnly(asList(res));
       rows.sort((a, b) {
         final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
         final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -494,10 +503,14 @@ class AppData {
   }
 
   static Future<void> cancelEvent(String eventId) async {
-    await sb.from('events').update({
+    final updated = await sb.from('events').update({
       'status': 'cancelled',
       'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', eventId);
+    }).eq('id', eventId).select('id,status');
+    final rows = asList(updated);
+    if (rows.isEmpty) {
+      throw Exception('No se pudo cancelar el evento. Puede que no tengas permiso o que el evento ya no exista.');
+    }
   }
 
   static Future<void> cancelEventWithScope(String eventId, String scope) async {
