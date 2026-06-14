@@ -1,17 +1,19 @@
-# Grupli v16.22.1 — instalación local
+# Grupli v16.22.6 — instalación local
+
+## Instalar ZIP
 
 ```powershell
 $Dest = "$env:USERPROFILE\Desktop\grupliv2"
 
-$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v16.22.1-event-contributions-security-fix*.zip" |
+$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v16.22.6-event-contributions-ux-polish*.zip" |
   Sort-Object LastWriteTime -Descending |
   Select-Object -First 1
 
 if (-not $Zip) {
-  throw "No encuentro el ZIP v16.22.1 en Descargas."
+  throw "No encuentro el ZIP v16.22.6 en Descargas."
 }
 
-$Temp = "$env:TEMP\grupli_extract_v16221"
+$Temp = "$env:TEMP\grupli_extract_v16226"
 $EnvBackup = "$env:TEMP\grupli_env_backup.txt"
 $GitBackup = "$env:TEMP\grupli_git_backup"
 
@@ -26,7 +28,6 @@ if (Test-Path "$Dest\.git") {
 
 Remove-Item $Temp -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $Temp -Force | Out-Null
-New-Item -ItemType Directory -Path $Dest -Force | Out-Null
 
 Expand-Archive -Path $Zip.FullName -DestinationPath $Temp -Force
 
@@ -49,19 +50,45 @@ Remove-Item $Temp -Recurse -Force -ErrorAction SilentlyContinue
 cd $Dest
 ```
 
-## SQL v16.22
+## Comprobar, APK y web
 
 ```powershell
 cd "$env:USERPROFILE\Desktop\grupliv2"
-Get-Content ".\supabase\patch_v16_22_event_contributions.sql" | Set-Clipboard
+
+Remove-Item ".\test" -Recurse -Force -ErrorAction SilentlyContinue
+
+flutter clean
+Remove-Item ".\.dart_tool" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item ".\build" -Recurse -Force -ErrorAction SilentlyContinue
+
+flutter pub get
+flutter analyze --no-fatal-infos --no-fatal-warnings
+
+Set-ExecutionPolicy -Scope Process Bypass -Force
+.\scripts\build_android_debug_apk.ps1
+
+.\scripts\build_web_release.ps1
 ```
 
-Supabase → SQL Editor → New query → pegar → Run.
+## Copiar APK
 
-## Quality gate
+```powershell
+Copy-Item `
+  "$env:USERPROFILE\Desktop\grupliv2\build\app\outputs\flutter-apk\app-debug.apk" `
+  "$env:USERPROFILE\Desktop\Grupli-v16.22.6.apk" `
+  -Force
+```
+
+## Subir a GitHub
 
 ```powershell
 cd "$env:USERPROFILE\Desktop\grupliv2"
-Set-ExecutionPolicy -Scope Process Bypass -Force
-.\scripts\quality_gate_v16_22_1.ps1
+
+Remove-Item Env:GIT_DIR -ErrorAction SilentlyContinue
+Remove-Item Env:GIT_WORK_TREE -ErrorAction SilentlyContinue
+
+git status
+git add -A
+git commit -m "Improve event contributions UX"
+git push -u origin main
 ```

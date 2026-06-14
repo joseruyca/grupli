@@ -1,6 +1,6 @@
 # Grupli
 
-Versión actual: v16.22.1 — event contributions + security audit fix v12 - Rebuild limpio
+Versión actual: v16.22.6 — mejoras UX en “Qué llevamos”
 
 Esta versión rehace la app desde cero a nivel de interfaz Flutter.
 
@@ -247,3 +247,16 @@ Fix de `vercel_build.sh` para despliegue web en Vercel sin quality gate ni audit
 ## v16.22.5
 
 Fix Vercel env alias compatibility. Vercel variables named EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY are mapped at build time to Flutter dart-defines SUPABASE_URL and SUPABASE_ANON_KEY. No secrets or service_role keys are hardcoded in frontend.
+
+
+## v16.22.6
+
+Mejora de UX para la función **Qué llevamos** dentro de eventos:
+
+- Se eliminan botones duplicados dentro de cada aportación.
+- La acción principal queda clara: **Añadir lo que llevo** o **Editar lo que llevo**.
+- El modal ahora pregunta de forma más natural: **¿Qué vas a llevar?**.
+- Los textos se simplifican para que cualquier persona lo entienda rápido.
+- Las ideas rápidas cambian según el tipo de evento: deporte, cena, fiesta o reunión.
+- El botón **Quitar lo que llevo** pasa dentro del modal de edición, con confirmación posterior.
+- No requiere SQL nuevo.
