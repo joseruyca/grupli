@@ -237,3 +237,8 @@ Fix de compilación de Torneos: tabla usa `goalDifference` en lugar de `diff`.
 ## Security Baseline
 
 Grupli no debe hardcodear secrets ni claves reales en frontend. Ejecuta `scripts/security_audit_v16_21.ps1` antes de generar builds. `SUPABASE_URL` y `SUPABASE_ANON_KEY` deben llegar por `.env` local o variables de entorno del despliegue.
+
+
+## v16.22.2
+
+Fix de `vercel_build.sh` para despliegue web en Vercel sin quality gate ni auditoría en build.
