@@ -43,6 +43,20 @@ if (-not ($Defines -match '^--dart-define=APP_BASE_URL=')) {
   $Defines += "--dart-define=APP_BASE_URL=https://grupli.vercel.app"
 }
 
+$RequiredDefines = @("SUPABASE_URL", "SUPABASE_ANON_KEY")
+foreach ($required in $RequiredDefines) {
+  $hasValue = $false
+  foreach ($define in $Defines) {
+    if ($define -like "--dart-define=$required=*") {
+      $hasValue = $true
+      break
+    }
+  }
+  if (-not $hasValue) {
+    throw "Falta $required en .env. Por seguridad Grupli ya no usa claves hardcodeadas en el frontend."
+  }
+}
+
 Write-Host "Preparando dependencias web..." -ForegroundColor Cyan
 flutter pub get
 

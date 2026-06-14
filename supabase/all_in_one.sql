@@ -71,6 +71,7 @@ begin
         'regenerate_group_invite_code',
         'remove_group_member',
         'set_event_attendance_group_id',
+        'set_event_contribution_group_id',
         'set_expense_participant_group_id',
         'set_group_member_role',
         'set_match_group_id',
@@ -100,6 +101,7 @@ DROP TABLE IF EXISTS public.tournaments CASCADE;
 DROP TABLE IF EXISTS public.settlement_payments CASCADE;
 DROP TABLE IF EXISTS public.expense_participants CASCADE;
 DROP TABLE IF EXISTS public.expenses CASCADE;
+DROP TABLE IF EXISTS public.event_contributions CASCADE;
 DROP TABLE IF EXISTS public.event_attendance CASCADE;
 DROP TABLE IF EXISTS public.events CASCADE;
 DROP TABLE IF EXISTS public.group_members CASCADE;
@@ -185,6 +187,17 @@ CREATE TABLE public.event_attendance (
   event_id uuid NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('yes','maybe','no','pending')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(event_id, user_id)
+);
+
+CREATE TABLE public.event_contributions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id uuid REFERENCES public.groups(id) ON DELETE CASCADE,
+  event_id uuid NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  items_text text NOT NULL CHECK (char_length(trim(items_text)) BETWEEN 2 AND 240),
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(event_id, user_id)
@@ -313,6 +326,8 @@ CREATE INDEX idx_settlement_payments_group_paid ON public.settlement_payments(gr
 CREATE INDEX idx_tournaments_group_created ON public.tournaments(group_id, created_at DESC);
 CREATE INDEX idx_tournaments_group_status ON public.tournaments(group_id, status);
 CREATE INDEX idx_event_attendance_group_event ON public.event_attendance(group_id, event_id);
+CREATE INDEX idx_event_contributions_group_event ON public.event_contributions(group_id, event_id);
+CREATE INDEX idx_event_contributions_user ON public.event_contributions(user_id);
 CREATE INDEX idx_expense_participants_group_expense ON public.expense_participants(group_id, expense_id);
 CREATE INDEX idx_tournament_teams_group_tournament ON public.tournament_teams(group_id, tournament_id);
 CREATE INDEX idx_tournament_team_members_team ON public.tournament_team_members(tournament_team_id);
@@ -650,6 +665,38 @@ CREATE TRIGGER set_event_attendance_group_id_trigger
 BEFORE INSERT OR UPDATE OF event_id ON public.event_attendance
 FOR EACH ROW EXECUTE FUNCTION public.set_event_attendance_group_id();
 
+CREATE OR REPLACE FUNCTION public.set_event_contribution_group_id()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_group_id uuid;
+BEGIN
+  SELECT e.group_id INTO v_group_id
+  FROM public.events e
+  WHERE e.id = NEW.event_id
+    AND e.status <> 'cancelled';
+
+  IF v_group_id IS NULL THEN
+    RAISE EXCEPTION 'Evento no válido.';
+  END IF;
+
+  NEW.group_id := v_group_id;
+  IF NEW.user_id IS NULL THEN
+    NEW.user_id := auth.uid();
+  END IF;
+  NEW.items_text := trim(NEW.items_text);
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER set_event_contribution_group_id_trigger
+BEFORE INSERT OR UPDATE OF event_id, items_text ON public.event_contributions
+FOR EACH ROW EXECUTE FUNCTION public.set_event_contribution_group_id();
+
 CREATE OR REPLACE FUNCTION public.set_expense_participant_group_id()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -710,6 +757,7 @@ ALTER TABLE public.groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.event_attendance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_contributions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expense_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settlement_payments ENABLE ROW LEVEL SECURITY;
@@ -750,6 +798,41 @@ CREATE POLICY attendance_select_member ON public.event_attendance FOR SELECT TO 
 CREATE POLICY attendance_insert_self ON public.event_attendance FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid() AND EXISTS (SELECT 1 FROM public.events e WHERE e.id = event_id AND public.is_group_member(e.group_id)));
 CREATE POLICY attendance_update_self ON public.event_attendance FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 CREATE POLICY attendance_delete_self ON public.event_attendance FOR DELETE TO authenticated USING (user_id = auth.uid());
+
+CREATE POLICY event_contributions_select_member ON public.event_contributions
+FOR SELECT TO authenticated
+USING (public.is_group_member(group_id));
+
+CREATE POLICY event_contributions_insert_self ON public.event_contributions
+FOR INSERT TO authenticated
+WITH CHECK (
+  user_id = auth.uid()
+  AND public.is_group_member(group_id)
+  AND EXISTS (
+    SELECT 1 FROM public.events e
+    WHERE e.id = event_id
+      AND e.group_id = group_id
+      AND e.status <> 'cancelled'
+  )
+);
+
+CREATE POLICY event_contributions_update_self ON public.event_contributions
+FOR UPDATE TO authenticated
+USING (user_id = auth.uid() AND public.is_group_member(group_id))
+WITH CHECK (
+  user_id = auth.uid()
+  AND public.is_group_member(group_id)
+  AND EXISTS (
+    SELECT 1 FROM public.events e
+    WHERE e.id = event_id
+      AND e.group_id = group_id
+      AND e.status <> 'cancelled'
+  )
+);
+
+CREATE POLICY event_contributions_delete_self_or_admin ON public.event_contributions
+FOR DELETE TO authenticated
+USING (user_id = auth.uid() OR public.is_group_admin(group_id));
 
 CREATE POLICY expenses_select_member ON public.expenses FOR SELECT TO authenticated USING (public.is_group_member(group_id));
 CREATE POLICY expenses_insert_member ON public.expenses FOR INSERT TO authenticated WITH CHECK (public.is_group_member(group_id));
@@ -1444,6 +1527,7 @@ begin
   delete from public.user_settings where user_id = v_uid;
 
   -- Participaciones personales.
+  delete from public.event_contributions where user_id = v_uid;
   delete from public.event_attendance where user_id = v_uid;
 
   -- Los gastos pagados o creados por el usuario se eliminan para no dejar
@@ -1892,6 +1976,7 @@ begin
   update public.app_quality_events set user_id = null where user_id = v_user_id;
 
   -- Eventos/asistencia.
+  delete from public.event_contributions where user_id = v_user_id;
   delete from public.event_attendance where user_id = v_user_id;
 
   -- Finanzas.
@@ -1967,6 +2052,7 @@ begin
   delete from public.support_tickets where user_id = v_uid;
   update public.app_quality_events set user_id = null where user_id = v_uid;
 
+  delete from public.event_contributions where user_id = v_uid;
   delete from public.event_attendance where user_id = v_uid;
   delete from public.settlement_payments where from_user = v_uid or to_user = v_uid or created_by = v_uid;
   delete from public.expense_participants where user_id = v_uid;
@@ -2591,6 +2677,7 @@ begin
     'group_members',
     'events',
     'event_attendance',
+    'event_contributions',
     'expenses',
     'expense_participants',
     'settlement_payments',

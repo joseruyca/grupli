@@ -7,6 +7,7 @@ union all select 'groups', count(*) from public.groups
 union all select 'group_members', count(*) from public.group_members
 union all select 'events', count(*) from public.events
 union all select 'event_attendance', count(*) from public.event_attendance
+union all select 'event_contributions', count(*) from public.event_contributions
 union all select 'expenses', count(*) from public.expenses
 union all select 'expense_participants', count(*) from public.expense_participants
 union all select 'settlement_payments', count(*) from public.settlement_payments
@@ -35,7 +36,7 @@ from pg_class
 where relnamespace = 'public'::regnamespace
   and relkind = 'r'
   and relname in (
-    'profiles','groups','group_members','events','event_attendance','expenses',
+    'profiles','groups','group_members','events','event_attendance','event_contributions','expenses',
     'expense_participants','settlement_payments','tournaments','tournament_teams',
     'matches','notifications','support_tickets','app_admins','app_quality_events','app_user_flags'
   )

@@ -45,6 +45,20 @@ if (Test-Path ".\.env") {
   }
 }
 
+$RequiredDefines = @("SUPABASE_URL", "SUPABASE_ANON_KEY")
+foreach ($required in $RequiredDefines) {
+  $hasValue = $false
+  foreach ($define in $Defines) {
+    if ($define -like "--dart-define=$required=*") {
+      $hasValue = $true
+      break
+    }
+  }
+  if (-not $hasValue) {
+    throw "Falta $required en .env. Por seguridad Grupli ya no usa claves hardcodeadas en el frontend."
+  }
+}
+
 Write-Host "Preparando Firebase Android/notificaciones..." -ForegroundColor Cyan
 & "$PSScriptRoot\configure_firebase_android.ps1"
 

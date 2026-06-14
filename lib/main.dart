@@ -105,6 +105,11 @@ Future<void> main() async {
   Intl.defaultLocale = 'es_ES';
   await initializeDateFormatting('es_ES');
 
+  if (!AppConfig.hasSupabaseRuntimeConfig) {
+    runApp(const GrupliConfigurationMissingApp());
+    return;
+  }
+
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
@@ -115,13 +120,15 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v16.20.1';
+  static const appVersion = 'v16.22.1';
   static const enableRealtimeSubscriptions = false;
+
+  // Security baseline:
+  // - No Supabase URL/key fallback is allowed in the frontend.
+  // - Runtime config must arrive through --dart-define from .env locally
+  //   or from Vercel environment variables in web builds.
   static const supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
-
-  static const fallbackSupabaseUrl = 'https://izusbttdgtwbnuyzjrpw.supabase.co';
-  static const fallbackSupabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6dXNidHRkZ3R3Ym51eXpqcnB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNjI2MDAsImV4cCI6MjA5NTYzODYwMH0.S6GqpaZuPpQsM4ZPbvMC4nzbFVtT-r47fPdT59PdDxU';
 
   static const appBaseUrlDefine = String.fromEnvironment('APP_BASE_URL');
   static const fallbackAppBaseUrl = 'https://grupli.vercel.app';
@@ -134,17 +141,78 @@ class AppConfig {
   static const osmGeocoderEndpointDefine = String.fromEnvironment('OSM_GEOCODER_ENDPOINT');
   static const fallbackOsmGeocoderEndpoint = 'https://photon.komoot.io/api/';
 
-  static String get supabaseUrl => supabaseUrlDefine.trim().isNotEmpty ? supabaseUrlDefine.trim() : fallbackSupabaseUrl;
-  static String get supabaseAnonKey => supabaseAnonDefine.trim().isNotEmpty ? supabaseAnonDefine.trim() : fallbackSupabaseAnonKey;
+  static String get supabaseUrl => supabaseUrlDefine.trim();
+  static String get supabaseAnonKey => supabaseAnonDefine.trim();
   static String get appBaseUrl => appBaseUrlDefine.trim().isNotEmpty ? appBaseUrlDefine.trim().replaceFirst(RegExp(r'/+$'), '') : fallbackAppBaseUrl;
 
   static String get osmGeocoderEndpoint => osmGeocoderEndpointDefine.trim().isNotEmpty ? osmGeocoderEndpointDefine.trim() : fallbackOsmGeocoderEndpoint;
+
+  static bool get hasSupabaseRuntimeConfig =>
+      supabaseUrl.trim().isNotEmpty &&
+      supabaseAnonKey.trim().isNotEmpty &&
+      supabaseUrl.trim().startsWith('https://') &&
+      supabaseUrl.trim().contains('.supabase.co');
 
   static bool get firebaseConfigured =>
       firebaseApiKey.trim().isNotEmpty &&
       firebaseAppId.trim().isNotEmpty &&
       firebaseMessagingSenderId.trim().isNotEmpty &&
       firebaseProjectId.trim().isNotEmpty;
+}
+
+class GrupliConfigurationMissingApp extends StatelessWidget {
+  const GrupliConfigurationMissingApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFFF7FBFA),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 420),
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFE4EFEE)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x14000000),
+                      blurRadius: 24,
+                      offset: Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.lock_outline_rounded, color: Color(0xFF087A78), size: 42),
+                    SizedBox(height: 14),
+                    Text(
+                      'Configuración pendiente',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF12263A)),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'La app necesita su configuración segura de entorno para arrancar. Revisa el archivo .env local o las variables del entorno de despliegue.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 

@@ -1,4 +1,6 @@
-# Grupli v12 - Rebuild limpio
+# Grupli
+
+Versión actual: v16.22.1 — event contributions + security audit fix v12 - Rebuild limpio
 
 Esta versión rehace la app desde cero a nivel de interfaz Flutter.
 
@@ -230,3 +232,8 @@ Torneos/Ligas reconstruidos de raíz con flujo más simple, equipos, partidos, r
 ## v15.34.1
 
 Fix de compilación de Torneos: tabla usa `goalDifference` en lugar de `diff`.
+
+
+## Security Baseline
+
+Grupli no debe hardcodear secrets ni claves reales en frontend. Ejecuta `scripts/security_audit_v16_21.ps1` antes de generar builds. `SUPABASE_URL` y `SUPABASE_ANON_KEY` deben llegar por `.env` local o variables de entorno del despliegue.

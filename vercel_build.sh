@@ -20,6 +20,8 @@ if [ "$1" = "install" ]; then
 fi
 
 if [ "$1" = "build" ]; then
+  : "${SUPABASE_URL:?Missing SUPABASE_URL in Vercel environment}"
+  : "${SUPABASE_ANON_KEY:?Missing SUPABASE_ANON_KEY in Vercel environment}"
   flutter clean
   rm -rf build .dart_tool
   flutter pub get

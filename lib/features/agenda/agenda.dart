@@ -563,6 +563,50 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
   }
 
+  Future<void> saveContribution(Map<String, dynamic> event, [Map<String, dynamic>? current]) async {
+    final initial = AppData.text(current?['items_text']);
+    final value = await showEventContributionDialog(context, initial: initial);
+    if (value == null) return;
+    setState(() => saving = true);
+    try {
+      await AppData.saveEventContribution(
+        groupId: widget.group['id'].toString(),
+        eventId: event['id'].toString(),
+        itemsText: value,
+      );
+      reload();
+      if (mounted) await showToast(context, 'Guardado. El grupo ya puede ver qué llevas.');
+    } catch (e) {
+      await showToast(context, humanError(e), danger: true);
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> deleteContribution(Map<String, dynamic> event) async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Quitar lo que llevo'),
+        content: const Text('Se borrará solo tu aportación de este evento.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Volver')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Quitar')),
+        ],
+      ),
+    );
+    if (yes != true) return;
+    setState(() => saving = true);
+    try {
+      await AppData.deleteMyEventContribution(event['id'].toString());
+      reload();
+    } catch (e) {
+      await showToast(context, humanError(e), danger: true);
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   Future<void> editEvent(Map<String, dynamic> event) async {
     final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: widget.group, event: event)));
     if (ok == true) reload();
@@ -645,6 +689,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           const SizedBox(height: 12),
           AttendanceOverviewCard(yes: yes, maybe: maybe, no: no, pending: pending, minPeople: minPeople),
           const SizedBox(height: 18),
+          EventContributionsCard(
+            contributions: data.contributions,
+            onAdd: () => saveContribution(event),
+            onEdit: (contribution) => saveContribution(event, contribution),
+            onDeleteMine: () => deleteContribution(event),
+          ),
+          const SizedBox(height: 18),
           SectionHeader(title: 'Asistencia del grupo', action: 'Actualizar', onTap: reload),
           const SizedBox(height: 10),
           EventMemberRoster(event: event, members: data.members),
@@ -667,18 +718,197 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 class _EventDetailData {
   final Map<String, dynamic> event;
   final List<Map<String, dynamic>> members;
-  const _EventDetailData({required this.event, required this.members});
+  final List<Map<String, dynamic>> contributions;
+  const _EventDetailData({required this.event, required this.members, required this.contributions});
 
   static Future<_EventDetailData> load(String eventId, String groupId) async {
     final results = await Future.wait([
       AppData.eventById(eventId),
       AppData.members(groupId),
+      AppData.eventContributions(eventId),
     ]);
-    return _EventDetailData(event: results[0] as Map<String, dynamic>, members: List<Map<String, dynamic>>.from(results[1] as List));
+    return _EventDetailData(
+      event: results[0] as Map<String, dynamic>,
+      members: List<Map<String, dynamic>>.from(results[1] as List),
+      contributions: List<Map<String, dynamic>>.from(results[2] as List),
+    );
   }
 }
 
+Future<String?> showEventContributionDialog(BuildContext context, {required String initial}) async {
+  final controller = TextEditingController(text: initial);
+  final suggestions = <String>['Bebida', 'Comida', 'Hielo', 'Vasos', 'Pelotas', 'Altavoz', 'Postre', 'Agua'];
+  return showDialog<String>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setLocalState) => AlertDialog(
+        title: Text(initial.trim().isEmpty ? '¿Qué vas a llevar?' : 'Editar lo que llevas'),
+        content: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            const Text('Escribe una frase corta. Por ejemplo: bebida, tortilla, pelotas o altavoz.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.35)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              minLines: 1,
+              maxLines: 3,
+              maxLength: 240,
+              decoration: const InputDecoration(
+                labelText: 'Voy a llevar...',
+                hintText: 'Ej: bebida y hielo',
+                prefixIcon: Icon(Icons.card_giftcard_rounded),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text('Ideas rápidas', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: suggestions.map((suggestion) => ActionChip(
+                label: Text(suggestion),
+                onPressed: () {
+                  final current = controller.text.trim();
+                  final next = current.isEmpty
+                      ? suggestion
+                      : current.toLowerCase().contains(suggestion.toLowerCase())
+                          ? current
+                          : '$current, ${suggestion.toLowerCase()}';
+                  controller.text = next;
+                  controller.selection = TextSelection.collapsed(offset: controller.text.length);
+                  setLocalState(() {});
+                },
+              )).toList(),
+            ),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Volver')),
+          FilledButton(
+            onPressed: () {
+              final value = controller.text.trim().replaceAll(RegExp(r'\s+'), ' ');
+              if (value.length < 2) return;
+              Navigator.pop(dialogContext, value);
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    ),
+  ).whenComplete(controller.dispose);
+}
 
+class EventContributionsCard extends StatelessWidget {
+  final List<Map<String, dynamic>> contributions;
+  final VoidCallback onAdd;
+  final ValueChanged<Map<String, dynamic>> onEdit;
+  final VoidCallback onDeleteMine;
+  const EventContributionsCard({super.key, required this.contributions, required this.onAdd, required this.onEdit, required this.onDeleteMine});
+
+  @override
+  Widget build(BuildContext context) {
+    final currentUserId = AppData.user?.id ?? '';
+    Map<String, dynamic>? mine;
+    for (final contribution in contributions) {
+      if (AppData.text(contribution['user_id']) == currentUserId) {
+        mine = contribution;
+        break;
+      }
+    }
+    final count = contributions.length;
+    return AppCard(
+      color: AppColors.surface,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(color: AppColors.orangeSoft, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0x22D69027))),
+            child: const Icon(Icons.volunteer_activism_rounded, color: AppColors.orange),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Qué llevamos', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 3),
+            Text(
+              count == 0 ? 'Cada persona puede decir qué va a llevar.' : '$count ${count == 1 ? 'persona ha añadido' : 'personas han añadido'} algo.',
+              style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3),
+            ),
+          ])),
+        ]),
+        const SizedBox(height: 14),
+        if (contributions.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: AppColors.lineSoft)),
+            child: const Text(
+              'Todavía nadie ha puesto nada. No es obligatorio, pero ayuda mucho para que no falte nada.',
+              style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.35),
+            ),
+          )
+        else
+          ...contributions.map((contribution) {
+            final isMine = AppData.text(contribution['user_id']) == currentUserId;
+            final profile = AppData.asMap(contribution['profiles']);
+            var name = AppData.text(profile['full_name']);
+            if (name.isEmpty || name == 'Usuario') {
+              final email = AppData.text(profile['email']);
+              name = email.contains('@') ? email.split('@').first : 'Miembro';
+            }
+            final avatar = AppData.text(profile['avatar_url']);
+            final text = AppData.text(contribution['items_text'], 'Algo para el evento');
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: isMine ? const Color(0x330E6B73) : AppColors.lineSoft)),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ProfileAvatar(name: name, avatarUrl: avatar, radius: 20),
+                  const SizedBox(width: 11),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Expanded(child: Text(isMine ? 'Tú' : name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
+                      if (isMine)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(99)),
+                          child: const Text('Tú', style: TextStyle(color: AppColors.teal, fontSize: 11, fontWeight: FontWeight.w900)),
+                        ),
+                    ]),
+                    const SizedBox(height: 4),
+                    Text(text, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, height: 1.25)),
+                    if (isMine) ...[
+                      const SizedBox(height: 8),
+                      Wrap(spacing: 6, runSpacing: 4, children: [
+                        TextButton.icon(
+                          onPressed: () => onEdit(contribution),
+                          icon: const Icon(Icons.edit_rounded, size: 17),
+                          label: const Text('Editar'),
+                        ),
+                        TextButton.icon(
+                          onPressed: onDeleteMine,
+                          icon: const Icon(Icons.close_rounded, size: 17),
+                          label: const Text('Quitar'),
+                        ),
+                      ]),
+                    ],
+                  ])),
+                ]),
+              ),
+            );
+          }),
+        const SizedBox(height: 4),
+        SecondaryButton(
+          label: mine == null ? 'Añadir lo que llevo' : 'Editar lo que llevo',
+          icon: mine == null ? Icons.add_rounded : Icons.edit_rounded,
+          onTap: mine == null ? onAdd : () => onEdit(mine!),
+        ),
+      ]),
+    );
+  }
+}
 
 
 

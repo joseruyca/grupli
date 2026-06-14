@@ -542,6 +542,66 @@ class AppData {
     }, onConflict: 'event_id,user_id');
   }
 
+  static Future<List<Map<String, dynamic>>> eventContributions(String eventId) async {
+    final cleanEventId = eventId.trim();
+    if (cleanEventId.isEmpty) return [];
+    try {
+      final res = await sb
+          .from('event_contributions')
+          .select('id,event_id,group_id,user_id,items_text,created_at,updated_at,profiles(id,email,full_name,avatar_url)')
+          .eq('event_id', cleanEventId)
+          .order('updated_at', ascending: false);
+      return asList(res);
+    } catch (e) {
+      if (e.toString().toLowerCase().contains('event_contributions')) return [];
+      rethrow;
+    }
+  }
+
+  static Future<void> saveEventContribution({required String groupId, required String eventId, required String itemsText}) async {
+    final uid = user?.id;
+    if (uid == null) throw Exception('Inicia sesión para decir qué vas a llevar.');
+    final cleanGroupId = groupId.trim();
+    final cleanEventId = eventId.trim();
+    final cleanText = itemsText.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (cleanGroupId.isEmpty || cleanEventId.isEmpty) {
+      throw Exception('No se encontró el evento del grupo.');
+    }
+    if (cleanText.length < 2) {
+      throw Exception('Escribe algo sencillo, por ejemplo: bebida, comida o pelotas.');
+    }
+    if (cleanText.length > 240) {
+      throw Exception('El texto es demasiado largo. Déjalo en una frase corta.');
+    }
+    try {
+      await sb.from('event_contributions').upsert({
+        'group_id': cleanGroupId,
+        'event_id': cleanEventId,
+        'user_id': uid,
+        'items_text': cleanText,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'event_id,user_id');
+    } catch (e) {
+      if (e.toString().toLowerCase().contains('event_contributions')) {
+        throw Exception('Falta actualizar la base de datos con el SQL v16.22.');
+      }
+      rethrow;
+    }
+  }
+
+  static Future<void> deleteMyEventContribution(String eventId) async {
+    final uid = user?.id;
+    if (uid == null) throw Exception('Inicia sesión para cambiar lo que llevas.');
+    final cleanEventId = eventId.trim();
+    if (cleanEventId.isEmpty) return;
+    try {
+      await sb.from('event_contributions').delete().eq('event_id', cleanEventId).eq('user_id', uid);
+    } catch (e) {
+      if (e.toString().toLowerCase().contains('event_contributions')) return;
+      rethrow;
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> expenses(String groupId) async {
     final res = await sb.from('expenses').select('*, profiles!expenses_paid_by_fkey(id,email,full_name,avatar_url), expense_participants(user_id,share_amount,paid)').eq('group_id', groupId).order('created_at', ascending: false);
     return asList(res);
