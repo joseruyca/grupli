@@ -120,7 +120,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v16.22.1';
+  static const appVersion = 'v16.22.3';
   static const enableRealtimeSubscriptions = false;
 
   // Security baseline:
