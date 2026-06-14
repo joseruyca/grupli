@@ -242,3 +242,8 @@ Grupli no debe hardcodear secrets ni claves reales en frontend. Ejecuta `scripts
 ## v16.22.2
 
 Fix de `vercel_build.sh` para despliegue web en Vercel sin quality gate ni auditoría en build.
+
+
+## v16.22.5
+
+Fix Vercel env alias compatibility. Vercel variables named EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY are mapped at build time to Flutter dart-defines SUPABASE_URL and SUPABASE_ANON_KEY. No secrets or service_role keys are hardcoded in frontend.

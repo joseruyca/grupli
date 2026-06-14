@@ -16,19 +16,42 @@ if (-not (Test-Path ".\android")) {
   Remove-Item ".\test" -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-$Keys = @(
-  "SUPABASE_URL",
-  "SUPABASE_ANON_KEY",
-  "APP_BASE_URL",
-  "OSM_GEOCODER_ENDPOINT",
-  "FIREBASE_API_KEY",
-  "FIREBASE_APP_ID",
-  "FIREBASE_MESSAGING_SENDER_ID",
-  "FIREBASE_PROJECT_ID",
-  "FIREBASE_VAPID_KEY"
-)
+$EnvAliases = @{
+  "SUPABASE_URL" = @(
+    "SUPABASE_URL",
+    "EXPO_PUBLIC_SUPABASE_URL",
+    "VITE_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "FLUTTER_SUPABASE_URL"
+  )
+  "SUPABASE_ANON_KEY" = @(
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_PUBLISHABLE_KEY",
+    "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+    "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    "VITE_SUPABASE_ANON_KEY",
+    "VITE_SUPABASE_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    "SUPABASE_KEY",
+    "FLUTTER_SUPABASE_ANON_KEY",
+    "FLUTTER_SUPABASE_PUBLISHABLE_KEY"
+  )
+  "APP_BASE_URL" = @(
+    "APP_BASE_URL",
+    "EXPO_PUBLIC_APP_BASE_URL",
+    "VITE_APP_BASE_URL",
+    "NEXT_PUBLIC_APP_BASE_URL"
+  )
+  "OSM_GEOCODER_ENDPOINT" = @("OSM_GEOCODER_ENDPOINT", "EXPO_PUBLIC_OSM_GEOCODER_ENDPOINT", "VITE_OSM_GEOCODER_ENDPOINT", "NEXT_PUBLIC_OSM_GEOCODER_ENDPOINT")
+  "FIREBASE_API_KEY" = @("FIREBASE_API_KEY", "EXPO_PUBLIC_FIREBASE_API_KEY", "VITE_FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_API_KEY")
+  "FIREBASE_APP_ID" = @("FIREBASE_APP_ID", "EXPO_PUBLIC_FIREBASE_APP_ID", "VITE_FIREBASE_APP_ID", "NEXT_PUBLIC_FIREBASE_APP_ID")
+  "FIREBASE_MESSAGING_SENDER_ID" = @("FIREBASE_MESSAGING_SENDER_ID", "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID", "VITE_FIREBASE_MESSAGING_SENDER_ID", "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID")
+  "FIREBASE_PROJECT_ID" = @("FIREBASE_PROJECT_ID", "EXPO_PUBLIC_FIREBASE_PROJECT_ID", "VITE_FIREBASE_PROJECT_ID", "NEXT_PUBLIC_FIREBASE_PROJECT_ID")
+  "FIREBASE_VAPID_KEY" = @("FIREBASE_VAPID_KEY", "EXPO_PUBLIC_FIREBASE_VAPID_KEY", "VITE_FIREBASE_VAPID_KEY", "NEXT_PUBLIC_FIREBASE_VAPID_KEY")
+}
 
-$Defines = @()
+$EnvMap = @{}
 if (Test-Path ".\.env") {
   foreach ($line in Get-Content ".\.env") {
     if ($line -match '^\s*#') { continue }
@@ -38,9 +61,19 @@ if (Test-Path ".\.env") {
       if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
         $value = $value.Substring(1, $value.Length - 2)
       }
-      if ($Keys -contains $key -and $value.Length -gt 0) {
-        $Defines += "--dart-define=$key=$value"
+      if ($value.Length -gt 0) {
+        $EnvMap[$key] = $value
       }
+    }
+  }
+}
+
+$Defines = @()
+foreach ($target in $EnvAliases.Keys) {
+  foreach ($alias in $EnvAliases[$target]) {
+    if ($EnvMap.ContainsKey($alias)) {
+      $Defines += "--dart-define=$target=$($EnvMap[$alias])"
+      break
     }
   }
 }
