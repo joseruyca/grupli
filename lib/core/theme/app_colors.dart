@@ -1,12 +1,12 @@
 part of grupli_app;
 
 class AppColors {
-  static const bgShell = Color(0xFFF6F9FC);
+  static const bgShell = Color(0xFFF7FAFB);
   static const white = Color(0xFFFFFFFF);
   static const ink = Color(0xFF111B2D);
   static const muted = Color(0xFF64748B);
-  static const faint = Color(0xFFF7FAFE);
-  static const surface = Color(0xFFFCFEFF);
+  static const faint = Color(0xFFF8FBFC);
+  static const surface = Color(0xFFFCFEFE);
   static const line = Color(0xFFE2EAF3);
   static const lineSoft = Color(0xFFF0F5FA);
   static const teal = Color(0xFF0E6B73);

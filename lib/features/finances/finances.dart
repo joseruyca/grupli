@@ -205,7 +205,7 @@ class _FinancesTabState extends State<FinancesTab> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
                 children: [
-                  PageHeader(title: 'Finanzas', subtitle: 'Movimientos y saldos claros, sin pestañas de más.', leading: false),
+                  PageHeader(title: 'Finanzas', subtitle: 'Gastos, deudas y pagos del grupo.', leading: false),
                   const SizedBox(height: 14),
                   FinanceHeroCard(summary: summary, onCreate: openCreate),
                   const SizedBox(height: 12),
@@ -215,7 +215,7 @@ class _FinancesTabState extends State<FinancesTab> {
                     SectionHeader(title: 'Movimientos', action: hasMovements ? '${data.expenses.length + data.settlementPayments.length}' : '0'),
                     const SizedBox(height: 8),
                     if (!hasMovements)
-                      EmptyBlock(icon: Icons.receipt_long_rounded, title: 'Aún no hay movimientos', body: 'Añade el primer gasto. Aquí verás gastos y pagos registrados, como en reparto de gastos.')
+                      EmptyBlock(icon: Icons.receipt_long_rounded, title: 'Aún no hay movimientos', body: 'Añade el primer gasto. Aquí verás lo que se ha pagado y si falta algo por liquidar.')
                     else ...[
                       if (data.expenses.isNotEmpty) ...[
                         SectionHeader(title: 'Gastos pagados', action: 'Total ${money(summary.totalExpenses)}'),
@@ -813,9 +813,9 @@ class FinanceHeroCard extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_financeMainTitle(summary), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, letterSpacing: -.25)),
+            Text(_financeMainTitle(summary), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 19.5, fontWeight: FontWeight.w900, letterSpacing: -.25, height: 1.08)),
             const SizedBox(height: 4),
-            Text(clean ? 'Nadie debe dinero.' : '${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} mínimo${summary.settlements.length == 1 ? '' : 's'} para dejar todo a cero', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w700)),
+            Text(clean ? 'Nadie debe dinero.' : '${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} recomendado${summary.settlements.length == 1 ? '' : 's'} para cuadrar el grupo.', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xEFFFFFFF), fontSize: 13, fontWeight: FontWeight.w800, height: 1.25)),
           ])),
           const SizedBox(width: 10),
           SizedBox(
@@ -837,13 +837,13 @@ class FinanceHeroCard extends StatelessWidget {
           )),
           const SizedBox(width: 8),
           Expanded(child: _HeroFinanceMetric(
-            label: 'Pendiente',
+            label: 'Falta',
             value: money(summary.pendingAmount),
             onTap: () => _showMetricInfo(context, 'Pendiente', money(summary.pendingAmount), 'Dinero que todavía queda por compensar entre miembros. Cuando las liquidaciones se registran correctamente, este valor baja hasta cero.'),
           )),
           const SizedBox(width: 8),
           Expanded(child: _HeroFinanceMetric(
-            label: 'A mover',
+            label: 'Mover',
             value: money(summary.settlementAmount),
             onTap: () => _showMetricInfo(context, 'A mover', money(summary.settlementAmount), 'Cantidad mínima recomendada para liquidar el grupo con el menor número de pagos posible.'),
           )),

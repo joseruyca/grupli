@@ -398,7 +398,7 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.fromLTRB(22, 24, 22, 28),
         children: [
           Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-            Expanded(child: PageHeader(title: 'Mis grupos 👋', subtitle: 'Hola, $name. Organiza planes, gastos y torneos en un solo lugar.')),
+            Expanded(child: PageHeader(title: 'Mis grupos', subtitle: 'Hola, $name. Aquí tienes tus grupos y planes.')),
             const SizedBox(width: 12),
             CircleIconButton(icon: Icons.add_rounded, filled: true, onTap: _openCreateJoin),
           ]),
@@ -417,7 +417,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ]),
                 const SizedBox(height: 10),
                 if (groups.isEmpty) ...[
-                  EmptyBlock(icon: Icons.groups_rounded, title: 'Aún no tienes grupos', body: 'Crea un grupo privado o únete con un código de invitación.'),
+                  EmptyBlock(icon: Icons.groups_rounded, title: 'Aún no tienes grupos', body: 'Crea tu primer grupo o entra con un código.'),
                   const SizedBox(height: 14),
                   PrimaryButton(label: 'Crear grupo', icon: Icons.add_rounded, onTap: _openCreateGroup),
                   const SizedBox(height: 10),
@@ -430,8 +430,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 14),
                   ChoiceBigCard(
                     icon: Icons.add_circle_outline_rounded,
-                    title: 'Crear o unirte a otro grupo',
-                    body: 'Añade otro grupo privado o entra con un código de invitación.',
+                    title: 'Crear o unirme a un grupo',
+                    body: 'Crea uno nuevo o entra con un código.',
                     onTap: _openCreateJoin,
                   ),
                 ],

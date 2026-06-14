@@ -1,19 +1,19 @@
-# Grupli v16.22.6 — instalación local
+# Grupli v16.23 — comandos PowerShell
 
-## Instalar ZIP
+## Instalar ZIP conservando `.env` y `.git`
 
 ```powershell
 $Dest = "$env:USERPROFILE\Desktop\grupliv2"
 
-$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v16.22.6-event-contributions-ux-polish*.zip" |
+$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v16.23-global-ux-simplification*.zip" |
   Sort-Object LastWriteTime -Descending |
   Select-Object -First 1
 
 if (-not $Zip) {
-  throw "No encuentro el ZIP v16.22.6 en Descargas."
+  throw "No encuentro el ZIP v16.23 en Descargas."
 }
 
-$Temp = "$env:TEMP\grupli_extract_v16226"
+$Temp = "$env:TEMP\grupli_extract_v1623"
 $EnvBackup = "$env:TEMP\grupli_env_backup.txt"
 $GitBackup = "$env:TEMP\grupli_git_backup"
 
@@ -75,11 +75,13 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 ```powershell
 Copy-Item `
   "$env:USERPROFILE\Desktop\grupliv2\build\app\outputs\flutter-apk\app-debug.apk" `
-  "$env:USERPROFILE\Desktop\Grupli-v16.22.6.apk" `
+  "$env:USERPROFILE\Desktop\Grupli-v16.23.apk" `
   -Force
 ```
 
-## Subir a GitHub
+## GitHub
+
+Si Git vuelve a intentar usar `C:/`, no añadas `C:/` como safe directory. Usa:
 
 ```powershell
 cd "$env:USERPROFILE\Desktop\grupliv2"
@@ -87,8 +89,19 @@ cd "$env:USERPROFILE\Desktop\grupliv2"
 Remove-Item Env:GIT_DIR -ErrorAction SilentlyContinue
 Remove-Item Env:GIT_WORK_TREE -ErrorAction SilentlyContinue
 
+$SafePath = (Resolve-Path "$env:USERPROFILE\Desktop\grupliv2").Path.Replace('\','/')
+git config --global --add safe.directory $SafePath
+
+git status
+```
+
+Después:
+
+```powershell
+cd "$env:USERPROFILE\Desktop\grupliv2"
+
 git status
 git add -A
-git commit -m "Improve event contributions UX"
+git commit -m "Simplify global UX"
 git push -u origin main
 ```

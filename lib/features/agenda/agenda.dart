@@ -1102,7 +1102,7 @@ class _CalendarTabState extends State<CalendarTab> {
           children: [
             PageHeader(
               title: 'Agenda',
-              subtitle: 'Planes, rutinas y asistencia del grupo.',
+              subtitle: 'Elige un día y crea planes.',
               leading: false,
               action: HeaderCreateButton(
                 label: 'Crear',
@@ -1196,7 +1196,7 @@ class _CalendarTabState extends State<CalendarTab> {
             ],
             const SizedBox(height: 10),
             EventTypeLegend(events: visibleEvents),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             if (selectedEvents.isNotEmpty) ...[
               SectionHeader(title: 'Planes del día', action: '${selectedEvents.length}'),
               const SizedBox(height: 10),

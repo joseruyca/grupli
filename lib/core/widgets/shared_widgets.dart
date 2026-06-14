@@ -124,7 +124,7 @@ class SectionHeader extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
               decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(99), border: Border.all(color: const Color(0x19008F86))),
-              child: Text(action!, style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 12)),
+              child: Text(action!, style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 12.5)),
             ),
           ),
       ]),
@@ -375,7 +375,7 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
           const SizedBox(width: 8),
           Expanded(child: GlassAttendanceButton(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
           const SizedBox(width: 8),
-          Expanded(child: GlassAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
+          Expanded(child: GlassAttendanceButton(label: 'No voy', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
         ]),
       ]),
     );
@@ -438,7 +438,7 @@ class GlassAttendanceButton extends StatelessWidget {
     onTap: onTap,
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 150),
-      height: 42,
+      height: 44,
       decoration: BoxDecoration(
         color: selected ? color : color.withOpacity(.12),
         borderRadius: BorderRadius.circular(15),
@@ -837,19 +837,17 @@ class EventTypeLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-      color: AppColors.white,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: Row(children: [
-          for (int i = 0; i < _orderedKinds.length; i++) ...[
-            EventLegendMiniChip(event: {'kind': _orderedKinds[i], 'title': _orderedKinds[i]}),
-            if (i != _orderedKinds.length - 1) const SizedBox(width: 7),
-          ],
-        ]),
-      ),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(children: [
+        const Text('Tipos', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12)),
+        const SizedBox(width: 8),
+        for (int i = 0; i < _orderedKinds.length; i++) ...[
+          EventLegendMiniChip(event: {'kind': _orderedKinds[i], 'title': _orderedKinds[i]}),
+          if (i != _orderedKinds.length - 1) const SizedBox(width: 6),
+        ],
+      ]),
     );
   }
 }
@@ -862,16 +860,16 @@ class EventLegendMiniChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = eventKindColor(event);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: color.withOpacity(.09),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withOpacity(.22)),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(eventKindIcon(event), color: color, size: 13),
+        Icon(eventKindIcon(event), color: color, size: 12),
         const SizedBox(width: 5),
-        Text(eventKindLabel(event), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11)),
+        Text(eventKindLabel(event), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 10.5)),
       ]),
     );
   }
@@ -995,7 +993,7 @@ class EventScopeCard extends StatelessWidget {
     color: AppColors.violetSoft,
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.repeat_rounded, color: AppColors.violet)),
+        Container(width: 42, height: 44, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.repeat_rounded, color: AppColors.violet)),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title, style: Theme.of(context).textTheme.titleMedium),
@@ -1167,7 +1165,7 @@ class EventFormPreviewCard extends StatelessWidget {
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
             width: 54,
-            height: 54,
+            height: 56,
             decoration: BoxDecoration(color: Colors.white.withOpacity(.18), borderRadius: BorderRadius.circular(18)),
             child: Icon(isRoutine ? Icons.repeat_rounded : icon, color: Colors.white, size: 27),
           ),
@@ -1222,7 +1220,7 @@ class PremiumEventDetailHero extends StatelessWidget {
     final ok = yes >= minPeople;
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(26),
         gradient: LinearGradient(
           colors: ok ? const [Color(0xFF0D8F72), Color(0xFF15B38C)] : const [Color(0xFF006B69), Color(0xFF00998E)],
           begin: Alignment.topLeft,
@@ -1293,12 +1291,14 @@ class AttendanceOverviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ok = yes >= minPeople;
     final total = max(1, yes + maybe + no + pending);
+    final answered = yes + maybe + no;
+    final missingForMinimum = max(0, minPeople - yes);
     final progress = (yes / max(1, minPeople)).clamp(0.0, 1.0).toDouble();
     return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Icon(ok ? Icons.check_circle_rounded : Icons.info_rounded, color: ok ? AppColors.green : AppColors.amber),
         const SizedBox(width: 9),
-        Expanded(child: Text(ok ? 'El evento ya es viable' : 'Todavía falta gente', style: Theme.of(context).textTheme.titleMedium)),
+        Expanded(child: Text(ok ? 'Todo listo' : 'Falta $missingForMinimum ${missingForMinimum == 1 ? 'persona' : 'personas'}', style: Theme.of(context).textTheme.titleMedium)),
         Text('$yes/$minPeople', style: TextStyle(color: ok ? AppColors.green : AppColors.amber, fontWeight: FontWeight.w900)),
       ]),
       const SizedBox(height: 10),
@@ -1315,11 +1315,11 @@ class AttendanceOverviewCard extends StatelessWidget {
       Row(children: [
         Expanded(child: _AttendanceMiniStat(label: 'Van', value: yes, color: AppColors.green)),
         Expanded(child: _AttendanceMiniStat(label: 'Duda', value: maybe, color: AppColors.amber)),
-        Expanded(child: _AttendanceMiniStat(label: 'No', value: no, color: AppColors.red)),
-        Expanded(child: _AttendanceMiniStat(label: 'Pend.', value: pending, color: AppColors.muted)),
+        Expanded(child: _AttendanceMiniStat(label: 'No van', value: no, color: AppColors.red)),
+        Expanded(child: _AttendanceMiniStat(label: 'Faltan', value: pending, color: AppColors.muted)),
       ]),
       const SizedBox(height: 8),
-      Text('Total de miembros considerados: $total', style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+      Text('Han respondido $answered de $total personas.', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w800)),
     ]));
   }
 }
@@ -1413,7 +1413,7 @@ class SecondaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
     width: double.infinity,
-    height: 52,
+    height: 54,
     child: OutlinedButton.icon(
       style: OutlinedButton.styleFrom(
         backgroundColor: AppColors.white,
@@ -1454,14 +1454,14 @@ class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(13),
+    this.padding = const EdgeInsets.all(15),
     this.onTap,
     this.color = AppColors.white,
   });
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(24);
+    final radius = BorderRadius.circular(22);
     final card = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
@@ -1471,7 +1471,7 @@ class AppCard extends StatelessWidget {
         borderRadius: radius,
         border: Border.all(color: AppColors.lineSoft),
         boxShadow: const [
-          BoxShadow(color: Color(0x0B0B1B2E), blurRadius: 24, offset: Offset(0, 10)),
+          BoxShadow(color: Color(0x080B1B2E), blurRadius: 18, offset: Offset(0, 8)),
         ],
       ),
       child: child,
@@ -1489,7 +1489,7 @@ class RoundBackButton extends StatelessWidget {
   const RoundBackButton({super.key, this.onTap});
   @override Widget build(BuildContext context) => Container(
     width: 42,
-    height: 42,
+    height: 44,
     decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.line), boxShadow: const [BoxShadow(color: Color(0x08111B34), blurRadius: 12, offset: Offset(0, 4))]),
     child: IconButton(icon: const Icon(Icons.arrow_back_rounded, size: 20), onPressed: onTap ?? () => Navigator.of(context).maybePop()),
   );
@@ -1513,7 +1513,7 @@ class OwnProfileButton extends StatelessWidget {
           onTap: onTap,
           child: Container(
             width: 42,
-            height: 42,
+            height: 44,
             padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
               color: AppColors.white,
@@ -1534,7 +1534,7 @@ class CircleIconButton extends StatelessWidget {
   const CircleIconButton({super.key, required this.icon, required this.onTap, this.filled = false});
   @override Widget build(BuildContext context) => Container(
     width: 42,
-    height: 42,
+    height: 44,
     decoration: BoxDecoration(
       color: filled ? AppColors.navHome : AppColors.white,
       shape: BoxShape.circle,
@@ -1606,14 +1606,14 @@ class GroupHomeCard extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           onTap: onTap,
           child: Container(
-            height: 122,
+            height: 116,
             decoration: BoxDecoration(
               color: AppColors.navHome,
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(26),
               boxShadow: const [BoxShadow(color: Color(0x26053A59), blurRadius: 28, offset: Offset(0, 14))],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(26),
               child: Stack(children: [
                 Positioned.fill(
                   child: hasCover
@@ -1661,15 +1661,13 @@ class GroupHomeCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 22,
+                            fontSize: 23,
                             fontWeight: FontWeight.w900,
                             letterSpacing: -.35,
                             shadows: [Shadow(color: Color(0x88000000), blurRadius: 12, offset: Offset(0, 3))],
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle)),
                     ]),
                     const SizedBox(height: 6),
                     Row(children: [
@@ -1685,10 +1683,12 @@ class GroupHomeCard extends StatelessWidget {
                       ),
                     ]),
                     const Spacer(),
-                    Wrap(spacing: 6, runSpacing: 6, children: [
-                      _MiniChip(text: events == 0 ? 'Sin eventos' : '$events ${events == 1 ? 'evento' : 'eventos'}', color: AppColors.teal),
-                      const _MiniChip(text: 'Invitación', color: AppColors.violet),
-                    ]),
+                    Text(
+                      events == 0 ? 'Sin planes próximos' : '$events ${events == 1 ? 'plan próximo' : 'planes próximos'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Color(0xEFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w800, shadows: [Shadow(color: Color(0x66000000), blurRadius: 8, offset: Offset(0, 2))]),
+                    ),
                   ]),
                 ),
                 Positioned(
@@ -1826,10 +1826,10 @@ class PageHeader extends StatelessWidget {
   Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
     if (leading) ...[RoundBackButton(onTap: () => Navigator.of(context).maybePop()), const SizedBox(width: 12)],
     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.headlineMedium),
+      Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.headlineMedium),
       if (subtitle.trim().isNotEmpty) ...[
         const SizedBox(height: 5),
-        Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+        Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.32, fontSize: 14)),
       ],
     ])),
     if (action != null) ...[
@@ -2096,7 +2096,7 @@ class AgendaPremiumHero extends StatelessWidget {
           ])),
           const SizedBox(width: 8),
           SizedBox(
-            height: 42,
+            height: 44,
             child: TextButton.icon(
               onPressed: onCreate,
               style: TextButton.styleFrom(
@@ -2202,7 +2202,7 @@ class _AgendaSwitchItem extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        height: 42,
+        height: 44,
         decoration: BoxDecoration(
           color: selected ? AppColors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
@@ -2798,7 +2798,7 @@ class AgendaNoMorePlansCard extends StatelessWidget {
     child: Row(children: [
       Container(
         width: 42,
-        height: 42,
+        height: 44,
         decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(15)),
         child: const Icon(Icons.event_available_rounded, color: AppColors.orange, size: 20),
       ),
@@ -3464,7 +3464,7 @@ class RoleInfoCard extends StatelessWidget {
     return AppCard(
       color: AppColors.surface,
       child: Row(children: [
-        Container(width: 42, height: 42, decoration: BoxDecoration(color: color.withOpacity(.12), borderRadius: BorderRadius.circular(15)), child: Icon(isOwner ? Icons.workspace_premium_rounded : isAdmin ? Icons.admin_panel_settings_rounded : Icons.person_rounded, color: color)),
+        Container(width: 42, height: 44, decoration: BoxDecoration(color: color.withOpacity(.12), borderRadius: BorderRadius.circular(15)), child: Icon(isOwner ? Icons.workspace_premium_rounded : isAdmin ? Icons.admin_panel_settings_rounded : Icons.person_rounded, color: color)),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title, style: Theme.of(context).textTheme.titleMedium),
@@ -3780,7 +3780,7 @@ class MonthGrid extends StatelessWidget {
           final mainColor = hasEvents ? eventKindColor(dayEvents.first) : AppColors.line;
           return Expanded(
             child: SizedBox(
-              height: 42,
+              height: 44,
               child: InkWell(
                 onTap: () => onSelect(day),
                 borderRadius: BorderRadius.circular(14),

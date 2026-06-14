@@ -102,7 +102,7 @@ if ($LASTEXITCODE -ne 0 -or $AnalyzeText -match '(?m)^\s*error\s+-') {
 }
 
 Write-Host "Creando build web RELEASE..." -ForegroundColor Cyan
-flutter build web --release --no-tree-shake-icons @Defines
+flutter build web --release --no-tree-shake-icons --no-wasm-dry-run @Defines
 
 $IndexPath = Join-Path $ProjectRoot "build\web\index.html"
 if (Test-Path $IndexPath) {

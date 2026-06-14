@@ -1169,7 +1169,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                       ErrorBlock(message: snapshot.error.toString(), onRetry: reload)
                     else ...[
                       SectionHeader(
-                        title: 'Próximo plan',
+                        title: 'Lo próximo',
                         action: nextEvent == null ? 'Crear' : 'Calendario',
                         onTap: nextEvent == null ? openCreateEvent : () => widget.onNavigateTab?.call(1),
                       ),
@@ -1177,15 +1177,15 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                       if (nextEvent == null)
                         EmptySlim(
                           icon: Icons.event_available_rounded,
-                          title: 'Sin quedadas',
-                          body: 'Crea un plan para que el grupo pueda confirmar asistencia.',
+                          title: 'Sin planes todavía',
+                          body: 'Crea un plan y el grupo podrá decir si va.',
                         )
                       else if (nextDayEvents.length > 1)
                         DashboardUpcomingEventsCard(events: nextDayEvents, group: group, onChanged: reload)
                       else
                         DashboardEventCard(event: nextEvent, group: group, onChanged: reload),
                       const SizedBox(height: 16),
-                      SectionHeader(title: 'Actividad reciente', action: 'Calendario', onTap: () => widget.onNavigateTab?.call(1)),
+                      SectionHeader(title: 'Último del grupo', action: 'Ver agenda', onTap: () => widget.onNavigateTab?.call(1)),
                       const SizedBox(height: 8),
                       DashboardActivityCard(
                         events: events,
@@ -1271,7 +1271,7 @@ class GroupMoreTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
         children: [
-          PageHeader(title: 'Más', subtitle: 'Invitaciones, miembros y ajustes de $name', leading: false),
+          PageHeader(title: 'Más', subtitle: 'Miembros, invitaciones y ajustes.', leading: false),
           const SizedBox(height: 14),
           InviteAccessCard(groupName: name, code: code),
           const SizedBox(height: 14),

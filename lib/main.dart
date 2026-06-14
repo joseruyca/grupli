@@ -120,7 +120,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v16.22.6';
+  static const appVersion = 'v16.23';
   static const enableRealtimeSubscriptions = false;
 
   // Security baseline:
@@ -362,7 +362,7 @@ class GrupliApp extends StatelessWidget {
         scaffoldBackgroundColor: AppColors.white,
         fontFamily: 'Roboto',
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, surface: AppColors.white),
-        visualDensity: VisualDensity.compact,
+        visualDensity: VisualDensity.standard,
         dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1, space: 1),
         chipTheme: ChipThemeData(
           backgroundColor: AppColors.surface,
@@ -372,22 +372,22 @@ class GrupliApp extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         ),
         textTheme: const TextTheme(
-          headlineLarge: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.02, letterSpacing: -0.9),
-          headlineMedium: TextStyle(fontSize: 23.5, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.06, letterSpacing: -0.55),
-          titleLarge: TextStyle(fontSize: 18.5, fontWeight: FontWeight.w900, color: AppColors.ink, letterSpacing: -0.25),
-          titleMedium: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.18),
-          bodyLarge: TextStyle(fontSize: 15, color: AppColors.ink, height: 1.35),
-          bodyMedium: TextStyle(fontSize: 13.2, color: AppColors.muted, height: 1.36, fontWeight: FontWeight.w600),
-          labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+          headlineLarge: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.04, letterSpacing: -0.85),
+          headlineMedium: TextStyle(fontSize: 24.5, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.08, letterSpacing: -0.45),
+          titleLarge: TextStyle(fontSize: 19.5, fontWeight: FontWeight.w900, color: AppColors.ink, letterSpacing: -0.2),
+          titleMedium: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.22),
+          bodyLarge: TextStyle(fontSize: 16, color: AppColors.ink, height: 1.42),
+          bodyMedium: TextStyle(fontSize: 14.2, color: AppColors.muted, height: 1.42, fontWeight: FontWeight.w600),
+          labelLarge: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: AppColors.surface,
           hintStyle: const TextStyle(color: Color(0xFF9AA4B5)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.line)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.line)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.teal, width: 1.4)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: AppColors.line)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: AppColors.line)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: AppColors.teal, width: 1.4)),
         ),
       ),
       locale: const Locale('es'),

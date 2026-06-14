@@ -1,6 +1,6 @@
 # Grupli
 
-Versión actual: v16.22.6 — mejoras UX en “Qué llevamos”
+Versión actual: v16.23 — simplificación UX global
 
 Esta versión rehace la app desde cero a nivel de interfaz Flutter.
 
@@ -238,6 +238,11 @@ Fix de compilación de Torneos: tabla usa `goalDifference` en lugar de `diff`.
 
 Grupli no debe hardcodear secrets ni claves reales en frontend. Ejecuta `scripts/security_audit_v16_21.ps1` antes de generar builds. `SUPABASE_URL` y `SUPABASE_ANON_KEY` deben llegar por `.env` local o variables de entorno del despliegue.
 
+
+
+## v16.23
+
+Simplificación UX global: textos más claros, menos ruido visual, tarjetas más limpias, botones más grandes, mejor lectura de Inicio, Agenda, Evento y Finanzas. No requiere SQL nuevo.
 
 ## v16.22.2
 
