@@ -11,7 +11,7 @@ class GroupHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasCover = coverUrl.trim().isNotEmpty;
     return Container(
-      height: 148,
+      height: 132,
       decoration: BoxDecoration(
         color: AppColors.navHome,
         borderRadius: BorderRadius.circular(30),
@@ -58,7 +58,7 @@ class GroupHeroCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Planes, gastos y torneos del grupo',
+              'Lo importante del grupo, en un vistazo',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -132,6 +132,83 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
+
+
+class GroupDashboardIntro extends StatelessWidget {
+  final Map<String, dynamic>? nextEvent;
+  final int pendingCount;
+  const GroupDashboardIntro({super.key, required this.nextEvent, required this.pendingCount});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = nextEvent == null
+        ? 'Este grupo todavía no tiene planes próximos.'
+        : pendingCount > 0
+            ? (pendingCount == 1 ? 'Tienes 1 plan pendiente de confirmar.' : 'Tienes $pendingCount planes pendientes de confirmar.')
+            : 'El próximo plan ya está organizado.';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Text(
+        text,
+        style: const TextStyle(color: AppColors.muted, fontSize: 14.5, fontWeight: FontWeight.w800, height: 1.32),
+      ),
+    );
+  }
+}
+
+class DashboardQuickActions extends StatelessWidget {
+  final VoidCallback? onAgenda;
+  final VoidCallback? onFinances;
+  final VoidCallback? onTournaments;
+  final VoidCallback? onMembers;
+  const DashboardQuickActions({super.key, this.onAgenda, this.onFinances, this.onTournaments, this.onMembers});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Expanded(child: _DashboardQuickAction(icon: Icons.calendar_month_rounded, label: 'Agenda', color: AppColors.navAgenda, onTap: onAgenda)),
+      const SizedBox(width: 8),
+      Expanded(child: _DashboardQuickAction(icon: Icons.account_balance_wallet_rounded, label: 'Gastos', color: AppColors.navFinance, onTap: onFinances)),
+      const SizedBox(width: 8),
+      Expanded(child: _DashboardQuickAction(icon: Icons.emoji_events_rounded, label: 'Torneos', color: AppColors.navTournaments, onTap: onTournaments)),
+      const SizedBox(width: 8),
+      Expanded(child: _DashboardQuickAction(icon: Icons.group_rounded, label: 'Miembros', color: AppColors.teal, onTap: onMembers)),
+    ]);
+  }
+}
+
+class _DashboardQuickAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+  const _DashboardQuickAction({required this.icon, required this.label, required this.color, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          height: 78,
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.lineSoft),
+            boxShadow: const [BoxShadow(color: Color(0x070B1B2E), blurRadius: 16, offset: Offset(0, 7))],
+          ),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 7),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 11.5, fontWeight: FontWeight.w900)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
 
 class CompactInsightStrip extends StatelessWidget {
   final int events;
@@ -367,15 +444,24 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
         Row(children: [
           Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 6, backgroundColor: Color(0x30FFFFFF), color: AppColors.green))),
           const SizedBox(width: 10),
-          Text('$yes/$minPeople', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+          Text('$yes/$minPeople van', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
         ]),
+        const SizedBox(height: 7),
+        Text(
+          yes + maybe + no == 0
+              ? 'Nadie ha respondido todavía. Faltan $missing respuestas.'
+              : 'Han respondido ${yes + maybe + no} de $minPeople personas. Faltan $missing.',
+          style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 12),
+        const Text('¿Vas a venir?', style: TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: GlassAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
+          Expanded(child: GlassAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'), showCount: false)),
           const SizedBox(width: 8),
-          Expanded(child: GlassAttendanceButton(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
+          Expanded(child: GlassAttendanceButton(label: 'Quizás', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'), showCount: false)),
           const SizedBox(width: 8),
-          Expanded(child: GlassAttendanceButton(label: 'No voy', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
+          Expanded(child: GlassAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'), showCount: false)),
         ]),
       ]),
     );
@@ -430,7 +516,8 @@ class GlassAttendanceButton extends StatelessWidget {
   final bool selected;
   final Color color;
   final VoidCallback onTap;
-  const GlassAttendanceButton({super.key, required this.label, required this.count, required this.selected, required this.color, required this.onTap});
+  final bool showCount;
+  const GlassAttendanceButton({super.key, required this.label, required this.count, required this.selected, required this.color, required this.onTap, this.showCount = true});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
@@ -451,8 +538,10 @@ class GlassAttendanceButton extends StatelessWidget {
           Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: selected ? Colors.white : color, size: 15),
           const SizedBox(width: 5),
           Text(label, style: TextStyle(color: selected ? Colors.white : color, fontSize: 12.5, fontWeight: FontWeight.w900)),
-          const SizedBox(width: 4),
-          Text(count.toString(), style: TextStyle(color: selected ? Colors.white : color, fontSize: 12.5, fontWeight: FontWeight.w900)),
+          if (showCount) ...[
+            const SizedBox(width: 4),
+            Text(count.toString(), style: TextStyle(color: selected ? Colors.white : color, fontSize: 12.5, fontWeight: FontWeight.w900)),
+          ],
         ]),
       ),
     ),
@@ -516,25 +605,27 @@ class DashboardActivityCard extends StatelessWidget {
       if (date == null) continue;
       final yes = attendanceCount(event, 'yes');
       final minPeople = AppData.intValue(event['min_people'], 1);
+      final missing = max(0, minPeople - yes);
       items.add(_DashboardActivityItem(
         date: date,
         icon: Icons.event_available_rounded,
         color: eventKindColor(event),
-        title: AppData.text(event['title'], 'Quedada'),
-        body: '${shortWeekday(date)} ${date.day} · $yes/$minPeople',
+        title: 'Plan: ${AppData.text(event['title'], 'Quedada')}',
+        body: missing == 0 ? '${shortWeekday(date)} ${date.day} · listo' : '${shortWeekday(date)} ${date.day} · faltan $missing respuestas',
         onTapKind: 'calendar',
       ));
     }
 
     for (final expense in expenses.take(2)) {
       final created = DateTime.tryParse(expense['created_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
-      final status = AppData.text(expense['status'], 'pending') == 'paid' ? 'liquidado' : 'pendiente';
+      final paid = AppData.text(expense['status'], 'pending') == 'paid';
+      final status = paid ? 'Liquidado' : 'Pendiente';
       items.add(_DashboardActivityItem(
         date: created,
         icon: Icons.account_balance_wallet_rounded,
-        color: AppData.text(expense['status'], 'pending') == 'paid' ? AppColors.green : AppColors.amber,
-        title: AppData.text(expense['concept'], 'Gasto'),
-        body: '${money(AppData.doubleValue(expense['amount']))} · $status',
+        color: paid ? AppColors.green : AppColors.amber,
+        title: 'Gasto: ${AppData.text(expense['concept'], 'Gasto')}',
+        body: '$status · ${money(AppData.doubleValue(expense['amount']))}',
         onTapKind: 'finances',
       ));
     }

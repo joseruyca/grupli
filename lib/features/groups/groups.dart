@@ -1162,15 +1162,17 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                       onEdit: openGroupSettings,
                       onMore: openGroupActions,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     if (snapshot.connectionState == ConnectionState.waiting)
                       const CenterLoader(label: 'Cargando resumen...')
                     else if (snapshot.hasError)
                       ErrorBlock(message: snapshot.error.toString(), onRetry: reload)
                     else ...[
+                      GroupDashboardIntro(nextEvent: nextEvent, pendingCount: myDecisionPending.length),
+                      const SizedBox(height: 14),
                       SectionHeader(
                         title: 'Lo próximo',
-                        action: nextEvent == null ? 'Crear' : 'Calendario',
+                        action: nextEvent == null ? 'Crear plan' : 'Ver planes',
                         onTap: nextEvent == null ? openCreateEvent : () => widget.onNavigateTab?.call(1),
                       ),
                       const SizedBox(height: 8),
@@ -1185,7 +1187,16 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                       else
                         DashboardEventCard(event: nextEvent, group: group, onChanged: reload),
                       const SizedBox(height: 16),
-                      SectionHeader(title: 'Último del grupo', action: 'Ver agenda', onTap: () => widget.onNavigateTab?.call(1)),
+                      SectionHeader(title: 'Accesos rápidos'),
+                      const SizedBox(height: 8),
+                      DashboardQuickActions(
+                        onAgenda: () => widget.onNavigateTab?.call(1),
+                        onFinances: () => widget.onNavigateTab?.call(2),
+                        onTournaments: () => widget.onNavigateTab?.call(3),
+                        onMembers: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group))),
+                      ),
+                      const SizedBox(height: 16),
+                      SectionHeader(title: 'Últimos cambios', action: 'Ver todo', onTap: () => widget.onNavigateTab?.call(1)),
                       const SizedBox(height: 8),
                       DashboardActivityCard(
                         events: events,
@@ -1204,7 +1215,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
           Positioned(
             right: 20,
             bottom: 20,
-            child: FloatingActionButton(
+            child: FloatingActionButton.extended(
               heroTag: 'create-event-$groupId',
               backgroundColor: AppColors.teal,
               foregroundColor: Colors.white,
@@ -1212,7 +1223,8 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                 final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: group)));
                 if (ok == true) reload();
               },
-              child: const Icon(Icons.add_rounded),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Crear plan', style: TextStyle(fontWeight: FontWeight.w900)),
             ),
           ),
         ],
