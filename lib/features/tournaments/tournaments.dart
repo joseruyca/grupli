@@ -235,7 +235,6 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         randomizePairings = true;
         courtsCount = max(1, courtsCount);
         americanoRounds = max(5, americanoRounds);
-        if (scoringUsesSetMode(scoringType, scoringConfigForType(scoringType))) bestOf = 1;
         scheduleMatches = true;
         addToAgenda = true;
         name.text = name.text.trim().isEmpty ? 'Americano' : name.text;
@@ -4731,6 +4730,23 @@ Future<void> showTournamentBulkScheduleDialog(
   }
 }
 
+
+int tournamentDefaultSetRowsForSport(String scoringType, [dynamic scoringConfig]) {
+  switch (scoringResultModel(scoringType, scoringConfig)) {
+    case 'sets_games':
+      return 3;
+    case 'sets_points':
+      return 5;
+    default:
+      return scoringUsesSetMode(scoringType, scoringConfig) ? 3 : 1;
+  }
+}
+
+int tournamentInitialSetRowsForSport(String scoringType, [dynamic scoringConfig]) {
+  final maxRows = max(scoringBestOf(scoringType, scoringConfig), tournamentDefaultSetRowsForSport(scoringType, scoringConfig));
+  return max(1, min(maxRows, (maxRows / 2).floor() + 1));
+}
+
 Future<void> showMatchResultDialog(BuildContext context, {required Map<String, dynamic> match, required List<Map<String, dynamic>> teams, required String scoringType, Map<String, dynamic>? scoringConfig, required VoidCallback onChanged}) async {
   final names = teamNameMap(teams);
   final aName = tournamentMatchSideName(match, names, true);
@@ -4740,10 +4756,14 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
   final aController = TextEditingController(text: AppData.text(match['score_a']));
   final bController = TextEditingController(text: AppData.text(match['score_b']));
   final initialSets = matchDetailSets(match);
-  final maxSetRows = max(1, scoringBestOf(scoringType, scoringConfig));
+  final configuredBestOf = scoringBestOf(scoringType, scoringConfig);
+  final maxSetRows = max(configuredBestOf, tournamentDefaultSetRowsForSport(scoringType, scoringConfig));
+  final initialSetRows = tournamentInitialSetRowsForSport(scoringType, scoringConfig);
   final setRows = initialSets.isNotEmpty
       ? initialSets.map((set) => {'a': AppData.intValue(set['a']), 'b': AppData.intValue(set['b'])}).toList()
-      : <Map<String, int>>[{'a': 0, 'b': 0}];
+      : List<Map<String, int>>.generate(initialSetRows, (_) => {'a': 0, 'b': 0});
+  int simpleA = int.tryParse(aController.text.trim()) ?? 0;
+  int simpleB = int.tryParse(bController.text.trim()) ?? 0;
   final played = matchCountsForStandings(match);
   final result = await showDialog<String>(
     context: context,
@@ -4762,8 +4782,8 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
                 const SizedBox(height: 3),
                 Text(
                   setMode
-                      ? 'Toca + o - para poner cada set. No hace falta escribir el resultado a mano.'
-                      : scoringResultInputHelp(scoringType, scoringConfig),
+                      ? 'Toca + o - para poner cada parcial. Puedes añadir los sets que hagan falta hasta completar el partido.'
+                      : 'Toca + o - para poner el marcador. No hace falta escribir números a mano.',
                   style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11.5, height: 1.25),
                 ),
               ])),
@@ -4773,12 +4793,7 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
           if (setMode) ...[
             Row(children: [
               const Expanded(child: Text('Sets del partido', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
-              if (setRows.length < maxSetRows)
-                TextButton.icon(
-                  onPressed: () => setDialogState(() => setRows.add({'a': 0, 'b': 0})),
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('Añadir set'),
-                ),
+              Text('${setRows.length}/$maxSetRows', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12)),
             ]),
             const SizedBox(height: 6),
             ...List.generate(setRows.length, (index) {
@@ -4798,12 +4813,34 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
                 ),
               );
             }),
+            if (setRows.length < maxSetRows) ...[
+              const SizedBox(height: 2),
+              SecondaryButton(
+                label: 'Añadir otro set',
+                icon: Icons.add_rounded,
+                onTap: () => setDialogState(() => setRows.add({'a': 0, 'b': 0})),
+              ),
+            ],
           ] else ...[
-            Row(children: [
-              Expanded(child: TextField(controller: aController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: matchInputLabel(scoringType, true, scoringConfig)))),
-              const SizedBox(width: 10),
-              Expanded(child: TextField(controller: bController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: matchInputLabel(scoringType, false, scoringConfig)))),
-            ]),
+            const Text('Marcador del partido', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+            const SizedBox(height: 6),
+            AppCard(
+              color: AppColors.white,
+              padding: const EdgeInsets.all(10),
+              child: Column(children: [
+                _TournamentScoreStepper(
+                  name: aName,
+                  value: simpleA,
+                  onChanged: (value) => setDialogState(() => simpleA = value),
+                ),
+                const SizedBox(height: 8),
+                _TournamentScoreStepper(
+                  name: bName,
+                  value: simpleB,
+                  onChanged: (value) => setDialogState(() => simpleB = value),
+                ),
+              ]),
+            ),
           ],
         ])),
         actions: [
@@ -4838,7 +4875,7 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
         if (context.mounted) await showToast(context, 'En este deporte no puede quedar empate a sets.', danger: true);
         return;
       }
-      final bestOf = scoringBestOf(scoringType, scoringConfig);
+      final bestOf = maxSetRows;
       final neededSets = (bestOf / 2).floor() + 1;
       final winnerSets = max(setsA, setsB);
       if (parsed.length > bestOf) {
@@ -4867,10 +4904,10 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
         'score_model': scoringResultModel(scoringType, scoringConfig),
       });
     } else {
-      final a = int.tryParse(aController.text.trim());
-      final b = int.tryParse(bController.text.trim());
-      if (a == null || b == null) {
-        if (context.mounted) await showToast(context, 'Introduce dos marcadores válidos.', danger: true);
+      final a = simpleA;
+      final b = simpleB;
+      if (a == 0 && b == 0) {
+        if (context.mounted) await showToast(context, 'Introduce un marcador antes de guardar.', danger: true);
         return;
       }
       if (!scoringAllowDraw(scoringType, scoringConfig) && a == b) {
