@@ -287,14 +287,8 @@ class _AuthedShellState extends State<AuthedShell> {
     ];
     return Scaffold(
       backgroundColor: AppColors.white,
-      body: LazyIndexedStack(index: tab, children: pages),
-      bottomNavigationBar: RootBottomNav(
-        index: tab,
-        onTap: (i) {
-          if (i == tab) return;
-          setState(() => tab = i);
-        },
-      ),
+      body: pages[tab],
+      bottomNavigationBar: RootBottomNav(index: tab, onTap: (i) => setState(() => tab = i)),
     );
   }
 }
