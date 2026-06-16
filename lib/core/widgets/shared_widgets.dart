@@ -1467,31 +1467,42 @@ class PrimaryButton extends StatelessWidget {
   const PrimaryButton({super.key, required this.label, required this.onTap, this.icon, this.loading = false});
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: double.infinity,
-    height: 54,
-    child: DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: const LinearGradient(colors: [AppColors.tealDark, AppColors.teal], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        boxShadow: const [BoxShadow(color: Color(0x22008F86), blurRadius: 18, offset: Offset(0, 8))],
-      ),
-      child: FilledButton.icon(
-        style: FilledButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(18);
+    return PressableScale(
+      onTap: loading ? null : onTap,
+      borderRadius: radius,
+      pressedScale: .975,
+      child: SizedBox(
+        width: double.infinity,
+        height: 54,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            gradient: const LinearGradient(colors: [AppColors.tealDark, AppColors.teal], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            boxShadow: const [BoxShadow(color: Color(0x22008F86), blurRadius: 18, offset: Offset(0, 8))],
+          ),
+          child: Center(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 150),
+              child: loading
+                  ? const SizedBox(key: ValueKey('loading'), width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
+                  : Row(
+                      key: const ValueKey('content'),
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icon ?? Icons.check_rounded, color: Colors.white, size: 20),
+                        const SizedBox(width: 9),
+                        Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: -.1)),
+                      ],
+                    ),
+            ),
+          ),
         ),
-        onPressed: loading ? null : onTap,
-        icon: loading
-            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-            : Icon(icon ?? Icons.check_rounded, size: 20),
-        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: -.1)),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class SecondaryButton extends StatelessWidget {
@@ -1501,21 +1512,28 @@ class SecondaryButton extends StatelessWidget {
   const SecondaryButton({super.key, required this.label, required this.icon, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: double.infinity,
-    height: 54,
-    child: OutlinedButton.icon(
-      style: OutlinedButton.styleFrom(
-        backgroundColor: AppColors.white,
-        foregroundColor: AppColors.teal,
-        side: const BorderSide(color: Color(0x33008F86)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(17);
+    return PressableScale(
+      onTap: onTap,
+      borderRadius: radius,
+      pressedScale: .975,
+      child: Container(
+        width: double.infinity,
+        height: 54,
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: radius,
+          border: Border.all(color: const Color(0x33008F86)),
+        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, size: 20, color: AppColors.teal),
+          const SizedBox(width: 9),
+          Text(label, style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900)),
+        ]),
       ),
-      onPressed: onTap,
-      icon: Icon(icon, size: 20),
-      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
-    ),
-  );
+    );
+  }
 }
 
 class DangerButton extends StatelessWidget {
@@ -1567,9 +1585,10 @@ class AppCard extends StatelessWidget {
       child: child,
     );
     if (onTap == null) return card;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(borderRadius: radius, onTap: onTap, child: card),
+    return PressableScale(
+      onTap: onTap,
+      borderRadius: radius,
+      child: card,
     );
   }
 }
@@ -1637,6 +1656,67 @@ class CircleIconButton extends StatelessWidget {
 
 class OrDivider extends StatelessWidget { const OrDivider({super.key}); @override Widget build(BuildContext context) => Row(children: const [Expanded(child: Divider()), Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('o', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700))), Expanded(child: Divider())]); }
 
+
+void appLightHaptic() {
+  if (kIsWeb) return;
+  try {
+    HapticFeedback.selectionClick();
+  } catch (_) {
+    // Haptic feedback is optional and must never block the UI.
+  }
+}
+
+class PressableScale extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final BorderRadius? borderRadius;
+  final double pressedScale;
+  final bool haptic;
+
+  const PressableScale({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.borderRadius,
+    this.pressedScale = .985,
+    this.haptic = true,
+  });
+
+  @override
+  State<PressableScale> createState() => _PressableScaleState();
+}
+
+class _PressableScaleState extends State<PressableScale> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || !mounted || widget.onTap == null) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: widget.onTap == null ? null : (_) => _setPressed(true),
+      onTapCancel: widget.onTap == null ? null : () => _setPressed(false),
+      onTapUp: widget.onTap == null
+          ? null
+          : (_) {
+              _setPressed(false);
+              if (widget.haptic) appLightHaptic();
+              widget.onTap?.call();
+            },
+      child: AnimatedScale(
+        scale: _pressed ? widget.pressedScale : 1,
+        duration: const Duration(milliseconds: 95),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 class StatCard extends StatelessWidget {
   final IconData icon;
   final String value;
@@ -1692,9 +1772,10 @@ class GroupHomeCard extends StatelessWidget {
       child: Semantics(
         button: true,
         label: 'Abrir grupo $name',
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
+        child: PressableScale(
           onTap: onTap,
+          borderRadius: BorderRadius.circular(26),
+          pressedScale: .985,
           child: Container(
             height: 116,
             decoration: BoxDecoration(
@@ -1875,11 +1956,12 @@ class BottomBar extends StatelessWidget {
       final spec = items[i];
       final color = navColorFor(i, items.length);
       return Expanded(
-        child: InkWell(
+        child: PressableScale(
+          onTap: active ? null : () => onTap(i),
           borderRadius: BorderRadius.circular(20),
-          onTap: () => onTap(i),
+          pressedScale: .94,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: const Duration(milliseconds: 210),
             curve: Curves.easeOutCubic,
             height: 58,
             padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
@@ -1888,16 +1970,21 @@ class BottomBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               boxShadow: active ? [BoxShadow(color: color.withOpacity(.24), blurRadius: 16, offset: const Offset(0, 7))] : null,
             ),
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(spec.icon, size: 22, color: active ? Colors.white : color),
-              const SizedBox(height: 3),
-              Text(
-                spec.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: items.length >= 5 ? 9.4 : 10.2, fontWeight: FontWeight.w900, color: active ? Colors.white : AppColors.muted),
-              ),
-            ]),
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              style: TextStyle(fontSize: items.length >= 5 ? 9.4 : 10.2, fontWeight: FontWeight.w900, color: active ? Colors.white : AppColors.muted),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                AnimatedScale(
+                  scale: active ? 1.06 : 1,
+                  duration: const Duration(milliseconds: 160),
+                  curve: Curves.easeOutCubic,
+                  child: Icon(spec.icon, size: 22, color: active ? Colors.white : color),
+                ),
+                const SizedBox(height: 3),
+                Text(spec.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+              ]),
+            ),
           ),
         ),
       );
