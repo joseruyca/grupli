@@ -99,6 +99,9 @@ Write-Host "Preparando dependencias..." -ForegroundColor Cyan
 flutter clean
 flutter pub get
 
+Write-Host "Revisando codificacion de textos..." -ForegroundColor Cyan
+& "$PSScriptRoot\check_no_mojibake.ps1"
+
 Write-Host "Analizando errores reales antes de crear APK..." -ForegroundColor Cyan
 $AnalyzeOutput = flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1
 $AnalyzeText = ($AnalyzeOutput | Out-String)

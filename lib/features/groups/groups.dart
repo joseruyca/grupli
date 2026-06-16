@@ -1023,8 +1023,15 @@ class _GroupShellState extends State<GroupShell> {
           },
           child: Scaffold(
             backgroundColor: AppColors.white,
-            body: pages[tab],
-            bottomNavigationBar: GroupBottomNav(groupName: name, index: tab, onTap: (i) => setState(() => tab = i)),
+            body: LazyIndexedStack(index: tab, children: pages),
+            bottomNavigationBar: GroupBottomNav(
+              groupName: name,
+              index: tab,
+              onTap: (i) {
+                if (i == tab) return;
+                setState(() => tab = i);
+              },
+            ),
           ),
         );
       },

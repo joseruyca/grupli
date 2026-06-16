@@ -120,7 +120,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v16.23';
+  static const appVersion = 'v16.25';
   static const enableRealtimeSubscriptions = false;
 
   // Security baseline:
@@ -364,6 +364,15 @@ class GrupliApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, surface: AppColors.white),
         visualDensity: VisualDensity.standard,
         dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1, space: 1),
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+            TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+          },
+        ),
         chipTheme: ChipThemeData(
           backgroundColor: AppColors.surface,
           selectedColor: AppColors.tealSoft,

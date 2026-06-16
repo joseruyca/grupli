@@ -269,3 +269,12 @@ Mejora de UX para la función **Qué llevamos** dentro de eventos:
 - Las ideas rápidas cambian según el tipo de evento: deporte, cena, fiesta o reunión.
 - El botón **Quitar lo que llevo** pasa dentro del modal de edición, con confirmación posterior.
 - No requiere SQL nuevo.
+
+
+## v16.26 - Fluidez y microinteracciones
+
+- Mantiene vivas las pestañas visitadas en la navegación principal.
+- Añade transición suave entre pestañas para que la app se sienta menos brusca.
+- Añade microinteracción de pulsación en tarjetas tocables.
+- Mantiene el inicio del grupo limpio y sin accesos rápidos repetidos.
+- No requiere SQL nuevo ni librerías nuevas.
