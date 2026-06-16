@@ -1,4 +1,4 @@
-part of grupli_app;
+﻿part of grupli_app;
 
 class GroupHeroCard extends StatelessWidget {
   final String name;
@@ -11,7 +11,7 @@ class GroupHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasCover = coverUrl.trim().isNotEmpty;
     return Container(
-      height: 132,
+      height: 126,
       decoration: BoxDecoration(
         color: AppColors.navHome,
         borderRadius: BorderRadius.circular(30),
@@ -56,9 +56,9 @@ class GroupHeroCard extends StatelessWidget {
                 shadows: [Shadow(color: Color(0x88000000), blurRadius: 12, offset: Offset(0, 3))],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             const Text(
-              'Lo importante del grupo, en un vistazo',
+              'Lo importante del grupo',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -142,10 +142,10 @@ class GroupDashboardIntro extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = nextEvent == null
-        ? 'Este grupo todavía no tiene planes próximos.'
+        ? 'Este grupo todavÃ­a no tiene planes prÃ³ximos.'
         : pendingCount > 0
             ? (pendingCount == 1 ? 'Tienes 1 plan pendiente de confirmar.' : 'Tienes $pendingCount planes pendientes de confirmar.')
-            : 'El próximo plan ya está organizado.';
+            : 'El prÃ³ximo plan ya estÃ¡ organizado.';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Text(
@@ -296,7 +296,7 @@ class DashboardUpcomingEventsCard extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${ordered.length} planes el mismo día', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, height: 1.05)),
+            Text('${ordered.length} planes el mismo dÃ­a', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, height: 1.05)),
             const SizedBox(height: 5),
             Text(hasTournament ? 'Incluye partidos de liga/torneo' : 'Toca uno para abrir su tarjeta', style: TextStyle(color: hasTournament ? AppColors.amberSoft : const Color(0xDFFFFFFF), fontWeight: FontWeight.w800, fontSize: 12)),
           ])),
@@ -308,7 +308,7 @@ class DashboardUpcomingEventsCard extends StatelessWidget {
         ],
         if (ordered.length > 4) ...[
           const SizedBox(height: 8),
-          Text('+ ${ordered.length - 4} más en Agenda', style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800)),
+          Text('+ ${ordered.length - 4} mÃ¡s en Agenda', style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800)),
         ],
       ]),
     );
@@ -344,7 +344,7 @@ class DashboardUpcomingEventRow extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5)),
             const SizedBox(height: 3),
-            Text('${DateFormat('HH:mm', 'es_ES').format(date)} · $yes/$minPeople van', style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, fontSize: 11.5)),
+            Text('${DateFormat('HH:mm', 'es_ES').format(date)} Â· $yes/$minPeople van', style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, fontSize: 11.5)),
           ])),
           if (isTournament) const TournamentAgendaBadge(),
         ]),
@@ -387,7 +387,6 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
     final maybe = attendanceCount(event, 'maybe');
     final no = attendanceCount(event, 'no');
     final mine = myAttendanceStatus(event);
-    final color = eventKindColor(event);
     final isTournament = eventIsTournamentEvent(event);
     final missing = max(0, minPeople - yes);
     final progress = minPeople <= 0 ? 0.0 : min(1.0, yes / minPeople);
@@ -425,16 +424,16 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
             const SizedBox(height: 7),
             Wrap(spacing: 10, runSpacing: 6, children: [
               Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.schedule_rounded, size: 15, color: color),
+                const Icon(Icons.schedule_rounded, size: 15, color: Colors.white),
                 const SizedBox(width: 4),
                 Text(DateFormat('HH:mm', 'es_ES').format(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
               ]),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 210),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.place_outlined, size: 15, color: color),
+                  const Icon(Icons.place_outlined, size: 15, color: Colors.white),
                   const SizedBox(width: 4),
-                  Flexible(child: Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xDFFFFFFF)))),
+                  Flexible(child: Text(AppData.text(event['location'], 'Sin ubicaciÃ³n'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white))),
                 ]),
               ),
             ]),
@@ -449,17 +448,17 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
         const SizedBox(height: 7),
         Text(
           yes + maybe + no == 0
-              ? 'Nadie ha respondido todavía. Faltan $missing respuestas.'
+              ? 'Nadie ha respondido todavÃ­a. Faltan $missing respuestas.'
               : 'Han respondido ${yes + maybe + no} de $minPeople personas. Faltan $missing.',
           style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 12),
-        const Text('¿Vas a venir?', style: TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w900)),
+        const Text('Â¿Vas a venir?', style: TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w900)),
         const SizedBox(height: 8),
         Row(children: [
           Expanded(child: GlassAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'), showCount: false)),
           const SizedBox(width: 8),
-          Expanded(child: GlassAttendanceButton(label: 'Quizás', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'), showCount: false)),
+          Expanded(child: GlassAttendanceButton(label: 'QuizÃ¡s', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'), showCount: false)),
           const SizedBox(width: 8),
           Expanded(child: GlassAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'), showCount: false)),
         ]),
@@ -611,7 +610,7 @@ class DashboardActivityCard extends StatelessWidget {
         icon: Icons.event_available_rounded,
         color: eventKindColor(event),
         title: 'Plan: ${AppData.text(event['title'], 'Quedada')}',
-        body: missing == 0 ? '${shortWeekday(date)} ${date.day} · listo' : '${shortWeekday(date)} ${date.day} · faltan $missing respuestas',
+        body: missing == 0 ? '${shortWeekday(date)} ${date.day} Â· listo' : '${shortWeekday(date)} ${date.day} Â· faltan $missing respuestas',
         onTapKind: 'calendar',
       ));
     }
@@ -625,7 +624,7 @@ class DashboardActivityCard extends StatelessWidget {
         icon: Icons.account_balance_wallet_rounded,
         color: paid ? AppColors.green : AppColors.amber,
         title: 'Gasto: ${AppData.text(expense['concept'], 'Gasto')}',
-        body: '$status · ${money(AppData.doubleValue(expense['amount']))}',
+        body: '$status Â· ${money(AppData.doubleValue(expense['amount']))}',
         onTapKind: 'finances',
       ));
     }
@@ -637,14 +636,14 @@ class DashboardActivityCard extends StatelessWidget {
         date: created,
         icon: Icons.emoji_events_rounded,
         color: finished ? AppColors.violet : AppColors.orange,
-        title: AppData.text(tournament['name'], 'Competición'),
+        title: AppData.text(tournament['name'], 'CompeticiÃ³n'),
         body: finished ? 'Finalizado' : 'En curso',
         onTapKind: 'tournaments',
       ));
     }
 
     items.sort((a, b) => b.date.compareTo(a.date));
-    return items.take(3).toList();
+    return items.take(2).toList();
   }
 
   @override
@@ -654,8 +653,8 @@ class DashboardActivityCard extends StatelessWidget {
     if (items.isEmpty) {
       return EmptySlim(
         icon: Icons.bolt_rounded,
-        title: 'Sin actividad todavía',
-        body: 'Los próximos planes aparecerán aquí.',
+        title: 'Sin actividad todavÃ­a',
+        body: 'Los prÃ³ximos planes aparecerÃ¡n aquÃ­.',
       );
     }
 
@@ -753,7 +752,7 @@ class CalendarCompactHeader extends StatelessWidget {
     child: Row(children: [
       Expanded(child: _CalendarMiniStat(label: 'Hoy', value: todayEvents.toString(), color: AppColors.teal)),
       Container(width: 1, height: 28, color: AppColors.line),
-      Expanded(child: _CalendarMiniStat(label: '7 días', value: weekEvents.toString(), color: AppColors.blue)),
+      Expanded(child: _CalendarMiniStat(label: '7 dÃ­as', value: weekEvents.toString(), color: AppColors.blue)),
       Container(width: 1, height: 28, color: AppColors.line),
       Expanded(child: _CalendarMiniStat(label: 'Pendientes', value: pendingResponses.toString(), color: AppColors.amber)),
       const SizedBox(width: 6),
@@ -821,7 +820,7 @@ class CalendarSmartHeader extends StatelessWidget {
             Text(
               hasPending
                   ? '$pendingResponses ${pendingResponses == 1 ? 'evento necesita' : 'eventos necesitan'} tu respuesta para organizar mejor el grupo.'
-                  : 'Mira qué hay hoy, qué viene esta semana y crea eventos desde cualquier día.',
+                  : 'Mira quÃ© hay hoy, quÃ© viene esta semana y crea eventos desde cualquier dÃ­a.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ])),
@@ -831,7 +830,7 @@ class CalendarSmartHeader extends StatelessWidget {
         Row(children: [
           Expanded(child: _CalendarMiniStat(label: 'Hoy', value: '$todayEvents', color: AppColors.teal)),
           const SizedBox(width: 8),
-          Expanded(child: _CalendarMiniStat(label: '7 días', value: '$weekEvents', color: AppColors.violet)),
+          Expanded(child: _CalendarMiniStat(label: '7 dÃ­as', value: '$weekEvents', color: AppColors.violet)),
           const SizedBox(width: 8),
           Expanded(child: _CalendarMiniStat(label: 'Pendientes', value: '$pendingResponses', color: AppColors.amber)),
         ]),
@@ -1089,7 +1088,7 @@ class EventScopeCard extends StatelessWidget {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 3),
-          const Text('Elige qué fechas quieres modificar.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+          const Text('Elige quÃ© fechas quieres modificar.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
         ])),
       ]),
       const SizedBox(height: 12),
@@ -1272,7 +1271,7 @@ class EventFormPreviewCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99)),
-                child: Text('Mínimo $minPeople asistentes', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                child: Text('MÃ­nimo $minPeople asistentes', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
               ),
               if (isRoutine)
                 Container(
@@ -1338,7 +1337,7 @@ class PremiumEventDetailHero extends StatelessWidget {
               const SizedBox(height: 8),
               Text(longDateTime(date), style: const TextStyle(color: Color(0xEFFFFFFF), fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
-              Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700)),
+              Text(AppData.text(event['location'], 'Sin ubicaciÃ³n'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700)),
             ])),
           ]),
           if (AppData.text(event['notes']).isNotEmpty) ...[
@@ -1354,7 +1353,7 @@ class PremiumEventDetailHero extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
             decoration: BoxDecoration(color: Colors.white.withOpacity(.16), borderRadius: BorderRadius.circular(99)),
-            child: Text(ok ? 'Mínimo alcanzado · $yes/$minPeople' : 'Faltan ${max(0, minPeople - yes)} · $yes/$minPeople confirmados', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+            child: Text(ok ? 'MÃ­nimo alcanzado Â· $yes/$minPeople' : 'Faltan ${max(0, minPeople - yes)} Â· $yes/$minPeople confirmados', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
           ),
         ]),
       ),
@@ -1766,7 +1765,7 @@ class GroupHomeCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          'Privado · $members $memberLabel',
+                          'Privado Â· $members $memberLabel',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900, shadows: [Shadow(color: Color(0x88000000), blurRadius: 8, offset: Offset(0, 2))]),
@@ -1775,7 +1774,7 @@ class GroupHomeCard extends StatelessWidget {
                     ]),
                     const Spacer(),
                     Text(
-                      events == 0 ? 'Sin planes próximos' : '$events ${events == 1 ? 'plan próximo' : 'planes próximos'}',
+                      events == 0 ? 'Sin planes prÃ³ximos' : '$events ${events == 1 ? 'plan prÃ³ximo' : 'planes prÃ³ximos'}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Color(0xEFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w800, shadows: [Shadow(color: Color(0x66000000), blurRadius: 8, offset: Offset(0, 2))]),
@@ -1827,7 +1826,7 @@ class GroupBottomNav extends StatelessWidget {
           NavSpec(Icons.calendar_month_rounded, 'Agenda'),
           NavSpec(Icons.account_balance_wallet_rounded, 'Finanzas'),
           NavSpec(Icons.emoji_events_rounded, 'Torneos'),
-          NavSpec(Icons.more_horiz_rounded, 'Más'),
+          NavSpec(Icons.more_horiz_rounded, 'MÃ¡s'),
         ],
         index: index,
         onTap: onTap,
@@ -1968,7 +1967,7 @@ class ErrorBlock extends StatelessWidget {
     return AppCard(child: Column(children: [
       Container(width: 58, height: 58, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.redSoft), child: const Icon(Icons.error_outline_rounded, color: AppColors.red, size: 30)),
       const SizedBox(height: 12),
-      Text(sessionProblem ? 'Sesión caducada' : 'Algo no ha cargado bien', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+      Text(sessionProblem ? 'SesiÃ³n caducada' : 'Algo no ha cargado bien', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
       const SizedBox(height: 7),
       Text(humanizeError(message), textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
       const SizedBox(height: 14),
@@ -2052,25 +2051,25 @@ bool looksLikeSessionProblem(String raw) {
 String humanizeError(String raw) {
   final original = raw.replaceAll('Exception: ', '').trim();
   final text = original.toLowerCase();
-  if (text.isEmpty) return 'No se pudo completar la acción. Inténtalo de nuevo.';
-  if (text.contains('invalid login credentials')) return 'Email o contraseña incorrectos.';
-  if (text.contains('email not confirmed')) return 'Confirma tu email antes de iniciar sesión.';
-  if (text.contains('invalid email')) return 'El email no tiene un formato válido.';
-  if (text.contains('weak password')) return 'La contraseña es demasiado débil.';
-  if (text.contains('user already registered') || text.contains('already registered')) return 'Esta cuenta ya existe. Inicia sesión en lugar de registrarte.';
+  if (text.isEmpty) return 'No se pudo completar la acciÃ³n. IntÃ©ntalo de nuevo.';
+  if (text.contains('invalid login credentials')) return 'Email o contraseÃ±a incorrectos.';
+  if (text.contains('email not confirmed')) return 'Confirma tu email antes de iniciar sesiÃ³n.';
+  if (text.contains('invalid email')) return 'El email no tiene un formato vÃ¡lido.';
+  if (text.contains('weak password')) return 'La contraseÃ±a es demasiado dÃ©bil.';
+  if (text.contains('user already registered') || text.contains('already registered')) return 'Esta cuenta ya existe. Inicia sesiÃ³n en lugar de registrarte.';
   if (text.contains('confirmation_required')) return 'Para eliminar la cuenta debes escribir ELIMINAR exactamente.';
-  if (looksLikeSessionProblem(original)) return 'Tu sesión ha caducado. Cierra sesión e inicia sesión de nuevo.';
-  if (text.contains('owner_protected') || text.contains('owner') || text.contains('creador del grupo')) return 'El creador del grupo está protegido. Transfiere o elimina el grupo antes de hacer esa acción.';
-  if (text.contains('member_not_found') || text.contains('not_member')) return 'Ese miembro ya no está disponible en el grupo.';
-  if (text.contains('invalid_role')) return 'Ese rol no es válido.';
-  if (text.contains('settlement_payments') || text.contains('create_settlement_payment_atomic')) return 'Finanzas necesita una actualización interna. Vuelve a intentarlo más tarde.';
-  if (text.contains('tournaments_scoring_type_check')) return 'Torneos necesita una actualización interna. Vuelve a intentarlo más tarde.';
-  if (text.contains('permission') || text.contains('policy') || text.contains('rls') || text.contains('not allowed') || text.contains('denied') || text.contains('violates row-level')) return 'No tienes permiso para hacer esa acción.';
-  if (looksLikeNetworkError(original)) return 'No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.';
-  if (text.contains('duplicate') || text.contains('already') || text.contains('unique constraint')) return 'Parece que esto ya existe o ya se había guardado.';
-  if (text.contains('foreign key') || text.contains('violates') || text.contains('constraint')) return 'No se pudo guardar porque hay datos relacionados. Revisa la acción e inténtalo de nuevo.';
-  if (text.contains('postgrestexception') || text.contains('pgrst') || text.contains('supabase') || text.contains('postgres')) return 'No se pudo completar la acción en la base de datos. Inténtalo otra vez.';
-  if (original.length > 120) return 'No se pudo completar la acción. Inténtalo de nuevo.';
+  if (looksLikeSessionProblem(original)) return 'Tu sesiÃ³n ha caducado. Cierra sesiÃ³n e inicia sesiÃ³n de nuevo.';
+  if (text.contains('owner_protected') || text.contains('owner') || text.contains('creador del grupo')) return 'El creador del grupo estÃ¡ protegido. Transfiere o elimina el grupo antes de hacer esa acciÃ³n.';
+  if (text.contains('member_not_found') || text.contains('not_member')) return 'Ese miembro ya no estÃ¡ disponible en el grupo.';
+  if (text.contains('invalid_role')) return 'Ese rol no es vÃ¡lido.';
+  if (text.contains('settlement_payments') || text.contains('create_settlement_payment_atomic')) return 'Finanzas necesita una actualizaciÃ³n interna. Vuelve a intentarlo mÃ¡s tarde.';
+  if (text.contains('tournaments_scoring_type_check')) return 'Torneos necesita una actualizaciÃ³n interna. Vuelve a intentarlo mÃ¡s tarde.';
+  if (text.contains('permission') || text.contains('policy') || text.contains('rls') || text.contains('not allowed') || text.contains('denied') || text.contains('violates row-level')) return 'No tienes permiso para hacer esa acciÃ³n.';
+  if (looksLikeNetworkError(original)) return 'No se pudo conectar. Revisa tu conexiÃ³n e intÃ©ntalo de nuevo.';
+  if (text.contains('duplicate') || text.contains('already') || text.contains('unique constraint')) return 'Parece que esto ya existe o ya se habÃ­a guardado.';
+  if (text.contains('foreign key') || text.contains('violates') || text.contains('constraint')) return 'No se pudo guardar porque hay datos relacionados. Revisa la acciÃ³n e intÃ©ntalo de nuevo.';
+  if (text.contains('postgrestexception') || text.contains('pgrst') || text.contains('supabase') || text.contains('postgres')) return 'No se pudo completar la acciÃ³n en la base de datos. IntÃ©ntalo otra vez.';
+  if (original.length > 120) return 'No se pudo completar la acciÃ³n. IntÃ©ntalo de nuevo.';
   return original;
 }
 
@@ -2147,7 +2146,7 @@ class AgendaPremiumHero extends StatelessWidget {
     if (next != null) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (nextDayEvents.length > 1)
-          AgendaSameDayCompactCard(events: nextDayEvents, group: group, onChanged: onChanged, title: 'Próximos de ese día')
+          AgendaSameDayCompactCard(events: nextDayEvents, group: group, onChanged: onChanged, title: 'PrÃ³ximos de ese dÃ­a')
         else
           EventAgendaCard(event: next, group: group, onChanged: onChanged),
         const SizedBox(height: 10),
@@ -2176,7 +2175,7 @@ class AgendaPremiumHero extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-            Text('Próximo plan', style: TextStyle(color: Color(0xDFFFFFFF), fontSize: 12, fontWeight: FontWeight.w800)),
+            Text('PrÃ³ximo plan', style: TextStyle(color: Color(0xDFFFFFFF), fontSize: 12, fontWeight: FontWeight.w800)),
             SizedBox(height: 4),
             Text(
               'Crea el primer plan del grupo',
@@ -2203,7 +2202,7 @@ class AgendaPremiumHero extends StatelessWidget {
         ]),
         const SizedBox(height: 12),
         const Text(
-          'Elige un día, crea un evento y el grupo podrá confirmar asistencia desde la Agenda.',
+          'Elige un dÃ­a, crea un evento y el grupo podrÃ¡ confirmar asistencia desde la Agenda.',
           style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.32),
         ),
         const SizedBox(height: 12),
@@ -2224,7 +2223,7 @@ class AgendaMatteStatsRow extends StatelessWidget {
     return Row(children: [
       Expanded(child: MatteStatTile(label: 'Eventos', value: '$events', icon: Icons.calendar_month_rounded, color: AppColors.navAgenda)),
       const SizedBox(width: 8),
-      Expanded(child: MatteStatTile(label: 'Próximos', value: '$upcoming', icon: Icons.event_available_rounded, color: AppColors.teal)),
+      Expanded(child: MatteStatTile(label: 'PrÃ³ximos', value: '$upcoming', icon: Icons.event_available_rounded, color: AppColors.teal)),
       const SizedBox(width: 8),
       Expanded(child: MatteStatTile(label: 'Van / duda', value: attendance, icon: Icons.groups_rounded, color: AppColors.green)),
     ]);
@@ -2324,9 +2323,9 @@ class AgendaWeekHeader extends StatelessWidget {
     final end = start.add(const Duration(days: 6));
     return Row(children: [
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${DateFormat('d MMM', 'es_ES').format(start)} — ${DateFormat('d MMM', 'es_ES').format(end)}', style: Theme.of(context).textTheme.titleMedium),
+        Text('${DateFormat('d MMM', 'es_ES').format(start)} â€” ${DateFormat('d MMM', 'es_ES').format(end)}', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 2),
-        Text('$weekEvents planes en los próximos 7 días', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+        Text('$weekEvents planes en los prÃ³ximos 7 dÃ­as', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
       ])),
       TextButton.icon(onPressed: onToday, icon: const Icon(Icons.today_rounded, size: 17), label: const Text('Hoy')),
     ]);
@@ -2532,7 +2531,7 @@ class AgendaSelectedDayCard extends StatelessWidget {
           Text(longDay(day), maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           Text(
-            hasEvents ? '${events.length} plan${events.length == 1 ? '' : 'es'} · $confirmed van · $maybe duda' : 'Día libre para crear un nuevo plan',
+            hasEvents ? '${events.length} plan${events.length == 1 ? '' : 'es'} Â· $confirmed van Â· $maybe duda' : 'DÃ­a libre para crear un nuevo plan',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12.5, height: 1.25),
@@ -2569,18 +2568,18 @@ class PremiumAgendaEmptyState extends StatelessWidget {
           Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(17)), child: const Icon(Icons.event_available_rounded, color: AppColors.navAgenda)),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(hasAnyEvents ? 'No hay planes este día' : 'Empieza la agenda del grupo', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 16)),
+            Text(hasAnyEvents ? 'No hay planes este dÃ­a' : 'Empieza la agenda del grupo', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 16)),
             const SizedBox(height: 4),
             Text(
               hasAnyEvents
-                  ? 'El ${DateFormat('d MMM', 'es_ES').format(selected)} está libre. Puedes crear un plan o revisar los próximos eventos.'
-                  : 'Crea el primer evento y los miembros podrán confirmar asistencia desde aquí.',
+                  ? 'El ${DateFormat('d MMM', 'es_ES').format(selected)} estÃ¡ libre. Puedes crear un plan o revisar los prÃ³ximos eventos.'
+                  : 'Crea el primer evento y los miembros podrÃ¡n confirmar asistencia desde aquÃ­.',
               style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.32),
             ),
           ])),
         ]),
         const SizedBox(height: 14),
-        SizedBox(width: double.infinity, child: PrimaryButton(label: 'Crear plan para este día', icon: Icons.add_rounded, onTap: onCreate)),
+        SizedBox(width: double.infinity, child: PrimaryButton(label: 'Crear plan para este dÃ­a', icon: Icons.add_rounded, onTap: onCreate)),
       ]),
     );
   }
@@ -2601,7 +2600,7 @@ class AgendaRecoveryCard extends StatelessWidget {
         const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('La agenda no puede quedar en blanco', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
           SizedBox(height: 3),
-          Text('Aunque falle la carga, siempre verás este panel para reintentar o crear un plan.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12, height: 1.25)),
+          Text('Aunque falle la carga, siempre verÃ¡s este panel para reintentar o crear un plan.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12, height: 1.25)),
         ])),
         const SizedBox(width: 8),
         Column(children: [
@@ -2676,7 +2675,7 @@ class CalendarOverviewCard extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(
-                      next == null ? 'Aún no hay planes' : 'Próximo plan',
+                      next == null ? 'AÃºn no hay planes' : 'PrÃ³ximo plan',
                       style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800, fontSize: 12),
                     ),
                     const SizedBox(height: 3),
@@ -2707,15 +2706,15 @@ class CalendarOverviewCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   Wrap(spacing: 8, runSpacing: 8, children: [
                     _WhiteMetaPill(icon: Icons.schedule_rounded, text: nextDate == null ? 'Fecha pendiente' : longDateTime(nextDate)),
-                    _WhiteMetaPill(icon: Icons.place_outlined, text: AppData.text(next['location'], 'Sin ubicación')),
-                    _WhiteMetaPill(icon: Icons.people_alt_rounded, text: "${attendanceCount(next, 'yes')} van · mínimo ${AppData.intValue(next['min_people'], 2)}"),
+                    _WhiteMetaPill(icon: Icons.place_outlined, text: AppData.text(next['location'], 'Sin ubicaciÃ³n')),
+                    _WhiteMetaPill(icon: Icons.people_alt_rounded, text: "${attendanceCount(next, 'yes')} van Â· mÃ­nimo ${AppData.intValue(next['min_people'], 2)}"),
                   ]),
                 ],
                 const SizedBox(height: 13),
                 Row(children: [
                   Expanded(child: _DarkAgendaMetric(label: 'Eventos', value: '$activeEvents')),
                   const SizedBox(width: 8),
-                  Expanded(child: _DarkAgendaMetric(label: 'Próximos', value: '${upcomingEvents.length}')),
+                  Expanded(child: _DarkAgendaMetric(label: 'PrÃ³ximos', value: '${upcomingEvents.length}')),
                   const SizedBox(width: 8),
                   Expanded(child: _DarkAgendaMetric(label: 'Van / duda', value: '$totalYes / $totalMaybe')),
                 ]),
@@ -2788,7 +2787,7 @@ class CalendarDaySummary extends StatelessWidget {
           Text(longDay(day), maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           Text(
-            hasEvents ? '${events.length} plan${events.length == 1 ? '' : 'es'} · $confirmed van · $maybe duda' : 'Día libre',
+            hasEvents ? '${events.length} plan${events.length == 1 ? '' : 'es'} Â· $confirmed van Â· $maybe duda' : 'DÃ­a libre',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12.5),
@@ -2872,7 +2871,7 @@ class AgendaGroupedUpcomingList extends StatelessWidget {
         AppCard(
           color: AppColors.surface,
           padding: const EdgeInsets.all(12),
-          child: Text('+ ${keys.length - 5} días más con planes', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+          child: Text('+ ${keys.length - 5} dÃ­as mÃ¡s con planes', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
         ),
     ]);
   }
@@ -2895,7 +2894,7 @@ class AgendaNoMorePlansCard extends StatelessWidget {
       ),
       const SizedBox(width: 10),
       const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('No hay más planes', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        Text('No hay mÃ¡s planes', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         SizedBox(height: 3),
         Text('Crea un nuevo evento para el grupo.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
       ])),
@@ -2921,7 +2920,7 @@ class AgendaSameDayCompactCard extends StatelessWidget {
   final VoidCallback onChanged;
   final String title;
   final bool compactHeader;
-  const AgendaSameDayCompactCard({super.key, required this.events, required this.group, required this.onChanged, this.title = 'Planes del día', this.compactHeader = false});
+  const AgendaSameDayCompactCard({super.key, required this.events, required this.group, required this.onChanged, this.title = 'Planes del dÃ­a', this.compactHeader = false});
 
   @override
   Widget build(BuildContext context) {
@@ -2957,7 +2956,7 @@ class AgendaSameDayCompactCard extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 15)),
             const SizedBox(height: 3),
-            Text('${ordered.length} evento${ordered.length == 1 ? '' : 's'} · ${DateFormat('d MMM', 'es_ES').format(firstDate).replaceAll('.', '')}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
+            Text('${ordered.length} evento${ordered.length == 1 ? '' : 's'} Â· ${DateFormat('d MMM', 'es_ES').format(firstDate).replaceAll('.', '')}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
           ])),
           if (hasTournament) const TournamentAgendaBadge(),
         ]),
@@ -2973,7 +2972,7 @@ class AgendaSameDayCompactCard extends StatelessWidget {
         ),
         if (ordered.length > 6) ...[
           const SizedBox(height: 8),
-          Text('+ ${ordered.length - 6} más', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
+          Text('+ ${ordered.length - 6} mÃ¡s', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
         ],
       ]),
     );
@@ -3009,7 +3008,7 @@ class AgendaCompactEventRow extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 13)),
             const SizedBox(height: 3),
-            Text('${DateFormat('HH:mm', 'es_ES').format(date)} · $yes/$minPeople van', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11.5)),
+            Text('${DateFormat('HH:mm', 'es_ES').format(date)} Â· $yes/$minPeople van', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11.5)),
           ])),
           const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
         ]),
@@ -3094,7 +3093,7 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
                   const SizedBox(height: 7),
                   Text(AppData.text(event['title'], 'Evento'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 16.5, fontWeight: FontWeight.w900, height: 1.1)),
                   const SizedBox(height: 6),
-                  MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
+                  MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicaciÃ³n')),
                   const SizedBox(height: 7),
                   Row(children: [
                     Expanded(
@@ -3113,7 +3112,7 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
                   ]),
                   const SizedBox(height: 6),
                   Text(
-                    viable ? 'Plan viable · mínimo alcanzado' : 'Faltan ${max(0, minPeople - yes)} para alcanzar el mínimo',
+                    viable ? 'Plan viable Â· mÃ­nimo alcanzado' : 'Faltan ${max(0, minPeople - yes)} para alcanzar el mÃ­nimo',
                     style: TextStyle(color: viable ? AppColors.green : AppColors.amber, fontWeight: FontWeight.w900, fontSize: 12),
                   ),
                 ])),
@@ -3169,7 +3168,7 @@ class EventMemberRoster extends StatelessWidget {
   const EventMemberRoster({super.key, required this.event, required this.members});
   @override
   Widget build(BuildContext context) {
-    if (members.isEmpty) return EmptySlim(icon: Icons.groups_rounded, title: 'Sin miembros cargados', body: 'Cuando haya miembros, aquí verás quién va y quién falta por responder.');
+    if (members.isEmpty) return EmptySlim(icon: Icons.groups_rounded, title: 'Sin miembros cargados', body: 'Cuando haya miembros, aquÃ­ verÃ¡s quiÃ©n va y quiÃ©n falta por responder.');
     return Column(children: members.map((m) {
       final userId = AppData.text(m['user_id']);
       final status = eventStatusForUser(event, userId);
@@ -3246,8 +3245,8 @@ class EventCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 5),
-                        MetaLine(icon: Icons.schedule_rounded, text: DateFormat('dd/MM · HH:mm', 'es_ES').format(d)),
-                        MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
+                        MetaLine(icon: Icons.schedule_rounded, text: DateFormat('dd/MM Â· HH:mm', 'es_ES').format(d)),
+                        MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicaciÃ³n')),
                       ])),
                       const SizedBox(width: 8),
                       Column(crossAxisAlignment: CrossAxisAlignment.end, mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -3318,7 +3317,7 @@ class ExpenseCard extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(AppData.text(expense['concept'], 'Gasto'), style: const TextStyle(fontWeight: FontWeight.w900)),
             const SizedBox(height: 2),
-            Text('Pagó ${financeMemberName(paidBy, members)} · $participants participantes', style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+            Text('PagÃ³ ${financeMemberName(paidBy, members)} Â· $participants participantes', style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
             const SizedBox(height: 7),
             _MiniChip(text: settled ? 'Liquidado' : 'Pendiente ${money(unpaid)}', color: settled ? AppColors.green : AppColors.orange),
           ])),
@@ -3361,7 +3360,7 @@ class TournamentCard extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(AppData.text(tournament['name'], 'Torneo'), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 3),
-            Text('${tournamentFormatLabel(format)} · ${teamTypeLabel(AppData.text(tournament['team_type'], 'equipo'))} · ${scoringTypeLabel(scoringType)}', style: Theme.of(context).textTheme.bodyMedium),
+            Text('${tournamentFormatLabel(format)} Â· ${teamTypeLabel(AppData.text(tournament['team_type'], 'equipo'))} Â· ${scoringTypeLabel(scoringType)}', style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 5),
             Wrap(spacing: 6, runSpacing: 6, children: [
               _MiniChip(text: '$teams participantes', color: AppColors.teal),
@@ -3456,7 +3455,7 @@ class InviteAccessCard extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Acceso privado', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 3),
-            Text('Nadie entra al grupo sin recibir este código.', style: Theme.of(context).textTheme.bodyMedium),
+            Text('Nadie entra al grupo sin recibir este cÃ³digo.', style: Theme.of(context).textTheme.bodyMedium),
           ])),
         ]),
         const SizedBox(height: 14),
@@ -3471,7 +3470,7 @@ class InviteAccessCard extends StatelessWidget {
         InviteLinkBox(code: code),
         if (onRegenerate != null) ...[
           const SizedBox(height: 10),
-          DangerButton(label: 'Regenerar código', icon: Icons.refresh_rounded, onTap: onRegenerate!),
+          DangerButton(label: 'Regenerar cÃ³digo', icon: Icons.refresh_rounded, onTap: onRegenerate!),
         ],
       ]),
     );
@@ -3548,7 +3547,7 @@ class RoleInfoCard extends StatelessWidget {
     final color = isOwner ? AppColors.orange : isAdmin ? AppColors.teal : AppColors.violet;
     final title = isOwner ? 'Eres owner del grupo' : isAdmin ? 'Eres admin' : 'Eres miembro';
     final body = isOwner
-        ? 'Puedes nombrar admins, quitar admins y gestionar el grupo. Tu rol está protegido.'
+        ? 'Puedes nombrar admins, quitar admins y gestionar el grupo. Tu rol estÃ¡ protegido.'
         : isAdmin
             ? 'Puedes ayudar a gestionar miembros y mantener el grupo ordenado.'
             : 'Puedes participar en quedadas, gastos y torneos. Los admins gestionan permisos.';
@@ -3582,11 +3581,11 @@ class PermissionMatrixCard extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Permisos claros', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 2),
-            Text('Cada rol tiene límites para evitar errores humanos.', style: Theme.of(context).textTheme.bodyMedium),
+            Text('Cada rol tiene lÃ­mites para evitar errores humanos.', style: Theme.of(context).textTheme.bodyMedium),
           ])),
         ]),
         const SizedBox(height: 12),
-        PermissionLine(role: 'Owner', body: 'Control total, admins, miembros y acciones críticas.', color: AppColors.orange),
+        PermissionLine(role: 'Owner', body: 'Control total, admins, miembros y acciones crÃ­ticas.', color: AppColors.orange),
         PermissionLine(role: 'Admin', body: 'Gestiona miembros y ayuda a mantener el grupo.', color: AppColors.teal),
         PermissionLine(role: 'Miembro', body: 'Participa en eventos, gastos y torneos del grupo.', color: AppColors.violet),
         if (!compact) ...[
@@ -3676,7 +3675,7 @@ Future<void> showMemberProfileSheet(
             EmptySlim(
               icon: Icons.lock_outline_rounded,
               title: 'Sin acciones disponibles',
-              body: role == 'owner' ? 'El owner está protegido.' : 'Solo owner/admins pueden gestionar otros miembros.',
+              body: role == 'owner' ? 'El owner estÃ¡ protegido.' : 'Solo owner/admins pueden gestionar otros miembros.',
             ),
           ],
         ]),
@@ -3710,7 +3709,7 @@ class ManageMemberCard extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Expanded(child: Text(isMe ? '$name (Tú)' : name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900))),
+              Expanded(child: Text(isMe ? '$name (TÃº)' : name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900))),
               RoleBadge(role: role),
             ]),
             const SizedBox(height: 3),
@@ -3967,17 +3966,17 @@ String humanError(Object? error) {
 
 void copyInviteCode(BuildContext context, String code) {
   Clipboard.setData(ClipboardData(text: InviteLinks.normalizeCode(code)));
-  showToast(context, 'Código copiado.');
+  showToast(context, 'CÃ³digo copiado.');
 }
 
 void copyInviteLink(BuildContext context, String code) {
   Clipboard.setData(ClipboardData(text: InviteLinks.joinUrl(code)));
-  showToast(context, 'Link de invitación copiado.');
+  showToast(context, 'Link de invitaciÃ³n copiado.');
 }
 
 String inviteText(String groupName, String code) {
   final clean = InviteLinks.normalizeCode(code);
-  return 'Únete a $groupName en Grupli. Toca este enlace y entrarás directamente al grupo:\n\n${InviteLinks.joinUrl(clean)}\n\nSi tienes la app instalada, se abrirá automáticamente. Código: $clean';
+  return 'Ãšnete a $groupName en Grupli. Toca este enlace y entrarÃ¡s directamente al grupo:\n\n${InviteLinks.joinUrl(clean)}\n\nSi tienes la app instalada, se abrirÃ¡ automÃ¡ticamente. CÃ³digo: $clean';
 }
 
 void showCodeSheet(BuildContext context, String code, String groupName) {
@@ -3987,7 +3986,7 @@ void showCodeSheet(BuildContext context, String code, String groupName) {
     builder: (context) => Padding(
       padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text('Invitación privada', style: Theme.of(context).textTheme.titleLarge),
+        Text('InvitaciÃ³n privada', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 6),
         Text('Comparte este link solo con quien quieras dentro del grupo.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 14),
@@ -4004,3 +4003,4 @@ void showCodeSheet(BuildContext context, String code, String groupName) {
     ),
   );
 }
+

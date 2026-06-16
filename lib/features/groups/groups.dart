@@ -1068,15 +1068,12 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
   @override
   Widget build(BuildContext context) {
     final group = widget.group;
-    final groupId = group['id'].toString();
     final name = AppData.text(group['name'], 'Grupo');
     return SafeArea(
       bottom: false,
-      child: Stack(
-        children: [
-          FutureBuilder<_GroupDashboardData>(
-            future: future,
-            builder: (context, snapshot) {
+      child: FutureBuilder<_GroupDashboardData>(
+        future: future,
+        builder: (context, snapshot) {
               final data = snapshot.data;
               final events = data?.events ?? <Map<String, dynamic>>[];
               final upcoming = data?.upcomingEvents ?? <Map<String, dynamic>>[];
@@ -1130,7 +1127,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                 color: AppColors.teal,
                 onRefresh: () async => reload(),
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 112),
+                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 96),
                   children: [
                     Row(children: [
                       RoundBackButton(onTap: () => Navigator.of(context).pop()),
@@ -1187,16 +1184,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                       else
                         DashboardEventCard(event: nextEvent, group: group, onChanged: reload),
                       const SizedBox(height: 16),
-                      SectionHeader(title: 'Accesos rápidos'),
-                      const SizedBox(height: 8),
-                      DashboardQuickActions(
-                        onAgenda: () => widget.onNavigateTab?.call(1),
-                        onFinances: () => widget.onNavigateTab?.call(2),
-                        onTournaments: () => widget.onNavigateTab?.call(3),
-                        onMembers: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group))),
-                      ),
-                      const SizedBox(height: 16),
-                      SectionHeader(title: 'Últimos cambios', action: 'Ver todo', onTap: () => widget.onNavigateTab?.call(1)),
+                      const SectionHeader(title: 'Últimos cambios'),
                       const SizedBox(height: 8),
                       DashboardActivityCard(
                         events: events,
@@ -1210,24 +1198,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                   ],
                 ),
               );
-            },
-          ),
-          Positioned(
-            right: 20,
-            bottom: 20,
-            child: FloatingActionButton.extended(
-              heroTag: 'create-event-$groupId',
-              backgroundColor: AppColors.teal,
-              foregroundColor: Colors.white,
-              onPressed: () async {
-                final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: group)));
-                if (ok == true) reload();
-              },
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Crear plan', style: TextStyle(fontWeight: FontWeight.w900)),
-            ),
-          ),
-        ],
+        },
       ),
     );
   }
