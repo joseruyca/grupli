@@ -620,10 +620,10 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         color: AppColors.faint,
         padding: const EdgeInsets.all(12),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.sports_score_rounded, color: AppColors.teal, size: 20)),
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 20)),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Motor V2: deporte primero', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+            const Text('Marcador adaptado al deporte', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
             Text(TournamentEngineV2.resultContractText(scoringType, format), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
           ])),
@@ -673,15 +673,24 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         ]),
         TextField(
           controller: participants,
-          minLines: 8,
-          maxLines: 12,
+          minLines: 5,
+          maxLines: 8,
           textCapitalization: TextCapitalization.words,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             hintText: participantHintText(),
-            helperText: participantHelperText(),
+            helperText: 'Un nombre por línea. Ejemplo: Ana / Javi para una pareja.',
           ),
         ),
+        const SizedBox(height: 10),
+        if (participantNames.isEmpty)
+          const Text('Todavía no hay participantes preparados.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12))
+        else
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: participantNames.take(10).map((name) => TournamentRuleChip(label: name)).toList(),
+          ),
         const SizedBox(height: 10),
         Row(children: [
           TournamentRuleChip(label: '${participantNames.length} preparados'),
@@ -1003,12 +1012,9 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         TournamentReviewRow(label: 'Participantes', value: '${names.length} · ${participantTypeTitle()}'),
         TournamentReviewRow(label: 'Partidos previstos', value: '${matches.length}'),
         TournamentReviewRow(label: 'Resultado', value: '${scoringTypeLabel(scoringType)} · ${scoringConfigShortText(scoringType, scoringConfig)}'),
-        TournamentReviewRow(label: 'Motor', value: 'Torneos V2 · deporte primero'),
         TournamentReviewRow(label: 'Calendario', value: scheduleMatches ? '${DateFormat('d MMM', 'es_ES').format(firstMatchDate)} · ${firstMatchTime.format(context)}' : 'Sin fechas'),
         TournamentReviewRow(label: 'Agenda', value: addToAgenda && scheduleMatches ? 'Sí' : 'No'),
       ])),
-      const SizedBox(height: 12),
-      TournamentPremiumMiniCard(),
       const SizedBox(height: 12),
       SectionHeader(title: 'Primeros partidos'),
       const SizedBox(height: 8),
@@ -4733,53 +4739,79 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
   final americano = isAmericanoMatch(match);
   final aController = TextEditingController(text: AppData.text(match['score_a']));
   final bController = TextEditingController(text: AppData.text(match['score_b']));
-  final setsController = TextEditingController(text: matchDetailSets(match).map((set) => '${set['a']}-${set['b']}').join('\n'));
+  final initialSets = matchDetailSets(match);
+  final maxSetRows = max(1, scoringBestOf(scoringType, scoringConfig));
+  final setRows = initialSets.isNotEmpty
+      ? initialSets.map((set) => {'a': AppData.intValue(set['a']), 'b': AppData.intValue(set['b'])}).toList()
+      : <Map<String, int>>[{'a': 0, 'b': 0}];
   final played = matchCountsForStandings(match);
   final result = await showDialog<String>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: Text('$aName vs $bName'),
-      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        AppCard(
-          color: AppColors.faint,
-          padding: const EdgeInsets.all(10),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(scoringEmoji(scoringType), style: const TextStyle(fontSize: 22)),
-            const SizedBox(width: 8),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(scoringResultInputTitle(scoringType, scoringConfig), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 13)),
-              const SizedBox(height: 3),
-              Text(scoringResultInputHelp(scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11.5, height: 1.25)),
-            ])),
-          ]),
-        ),
-        const SizedBox(height: 10),
-        if (setMode) ...[
-          const Text('Parciales', style: TextStyle(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          TextField(
-            controller: setsController,
-            minLines: 4,
-            maxLines: 7,
-            keyboardType: TextInputType.multiline,
-            decoration: InputDecoration(
-              hintText: scoringUsesGameSetMode(scoringType, scoringConfig) ? '6-7\n6-4\n6-0' : '25-21\n22-25\n15-12',
-              helperText: scoringUsesGameSetMode(scoringType, scoringConfig) ? 'Cada línea es un set con juegos.' : 'Cada línea es un set con puntos.',
-            ),
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        title: Text('$aName vs $bName'),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          AppCard(
+            color: AppColors.faint,
+            padding: const EdgeInsets.all(10),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(scoringEmoji(scoringType), style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 8),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(scoringResultInputTitle(scoringType, scoringConfig), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 13)),
+                const SizedBox(height: 3),
+                Text(
+                  setMode
+                      ? 'Toca + o - para poner cada set. No hace falta escribir el resultado a mano.'
+                      : scoringResultInputHelp(scoringType, scoringConfig),
+                  style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11.5, height: 1.25),
+                ),
+              ])),
+            ]),
           ),
-        ] else ...[
-          Row(children: [
-            Expanded(child: TextField(controller: aController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: matchInputLabel(scoringType, true, scoringConfig)))),
-            const SizedBox(width: 10),
-            Expanded(child: TextField(controller: bController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: matchInputLabel(scoringType, false, scoringConfig)))),
-          ]),
+          const SizedBox(height: 10),
+          if (setMode) ...[
+            Row(children: [
+              const Expanded(child: Text('Sets del partido', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
+              if (setRows.length < maxSetRows)
+                TextButton.icon(
+                  onPressed: () => setDialogState(() => setRows.add({'a': 0, 'b': 0})),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Añadir set'),
+                ),
+            ]),
+            const SizedBox(height: 6),
+            ...List.generate(setRows.length, (index) {
+              final row = setRows[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _TournamentSetScoreEditor(
+                  label: 'Set ${index + 1}',
+                  aName: aName,
+                  bName: bName,
+                  aScore: row['a'] ?? 0,
+                  bScore: row['b'] ?? 0,
+                  canRemove: setRows.length > 1,
+                  onRemove: () => setDialogState(() => setRows.removeAt(index)),
+                  onChangedA: (value) => setDialogState(() => row['a'] = value),
+                  onChangedB: (value) => setDialogState(() => row['b'] = value),
+                ),
+              );
+            }),
+          ] else ...[
+            Row(children: [
+              Expanded(child: TextField(controller: aController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: matchInputLabel(scoringType, true, scoringConfig)))),
+              const SizedBox(width: 10),
+              Expanded(child: TextField(controller: bController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: matchInputLabel(scoringType, false, scoringConfig)))),
+            ]),
+          ],
+        ])),
+        actions: [
+          if (played) TextButton(onPressed: () => Navigator.pop(context, 'reopen'), child: const Text('Borrar resultado')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, 'save'), child: const Text('Guardar')),
         ],
-      ])),
-      actions: [
-        if (played) TextButton(onPressed: () => Navigator.pop(context, 'reopen'), child: const Text('Borrar resultado')),
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        FilledButton(onPressed: () => Navigator.pop(context, 'save'), child: const Text('Guardar')),
-      ],
+      ),
     ),
   );
   final matchId = match['id'].toString();
@@ -4791,7 +4823,7 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
     }
     if (result != 'save') return;
     if (setMode) {
-      final parsed = parseSetScoreInput(setsController.text);
+      final parsed = setRows.where((set) => (set['a'] ?? 0) > 0 || (set['b'] ?? 0) > 0).map((set) => {'a': set['a'] ?? 0, 'b': set['b'] ?? 0}).toList();
       if (parsed.isEmpty) {
         if (context.mounted) await showToast(context, 'Introduce al menos un set válido.', danger: true);
         return;
@@ -4853,7 +4885,108 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
   } finally {
     aController.dispose();
     bController.dispose();
-    setsController.dispose();
+  }
+}
+
+
+class _TournamentSetScoreEditor extends StatelessWidget {
+  final String label;
+  final String aName;
+  final String bName;
+  final int aScore;
+  final int bScore;
+  final bool canRemove;
+  final VoidCallback onRemove;
+  final ValueChanged<int> onChangedA;
+  final ValueChanged<int> onChangedB;
+
+  const _TournamentSetScoreEditor({
+    required this.label,
+    required this.aName,
+    required this.bName,
+    required this.aScore,
+    required this.bScore,
+    required this.canRemove,
+    required this.onRemove,
+    required this.onChangedA,
+    required this.onChangedB,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.lineSoft),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text(label, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+          if (canRemove)
+            IconButton(
+              tooltip: 'Quitar set',
+              visualDensity: VisualDensity.compact,
+              onPressed: onRemove,
+              icon: const Icon(Icons.close_rounded, size: 18),
+            ),
+        ]),
+        const SizedBox(height: 8),
+        _TournamentScoreStepper(
+          name: aName,
+          value: aScore,
+          onChanged: onChangedA,
+        ),
+        const SizedBox(height: 8),
+        _TournamentScoreStepper(
+          name: bName,
+          value: bScore,
+          onChanged: onChangedB,
+        ),
+      ]),
+    );
+  }
+}
+
+class _TournamentScoreStepper extends StatelessWidget {
+  final String name;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  const _TournamentScoreStepper({required this.name, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Expanded(
+        child: Text(
+          name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800),
+        ),
+      ),
+      IconButton.filledTonal(
+        visualDensity: VisualDensity.compact,
+        onPressed: value <= 0 ? null : () => onChanged(value - 1),
+        icon: const Icon(Icons.remove_rounded, size: 18),
+      ),
+      SizedBox(
+        width: 46,
+        child: Text(
+          value.toString(),
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w900),
+        ),
+      ),
+      IconButton.filled(
+        visualDensity: VisualDensity.compact,
+        style: IconButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white),
+        onPressed: () => onChanged(value + 1),
+        icon: const Icon(Icons.add_rounded, size: 18),
+      ),
+    ]);
   }
 }
 
