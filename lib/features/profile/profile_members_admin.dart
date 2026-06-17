@@ -406,12 +406,119 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         SecondaryButton(label: 'Guardar reglas', icon: Icons.rule_rounded, onTap: saveInfo),
       ])),
       const SizedBox(height: 16),
+      SectionHeader(title: 'Premium'),
+      const SizedBox(height: 8),
+      PremiumGroupPreviewCard(group: group),
+      const SizedBox(height: 16),
       SectionHeader(title: 'Administración'),
       const SizedBox(height: 8),
       SettingsRow(icon: Icons.groups_rounded, title: 'Miembros y roles', subtitle: 'Owner, admins y miembros', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
       SettingsRow(icon: Icons.verified_user_rounded, title: 'Permisos', subtitle: 'Qué puede hacer cada rol', onTap: () => showPermissionSheet(context)),
       SettingsRow(icon: Icons.delete_outline_rounded, title: 'Eliminar grupo', subtitle: 'Solo owner · elimina eventos, gastos y torneos', danger: true, onTap: deleteGroupFlow),
     ]));
+  }
+}
+
+class PremiumGroupPreviewCard extends StatelessWidget {
+  final Map<String, dynamic> group;
+  const PremiumGroupPreviewCard({super.key, required this.group});
+
+  @override
+  Widget build(BuildContext context) {
+    final entitlement = GrupliPremium.entitlementForGroup(group);
+    return AppCard(
+      color: entitlement.active ? AppColors.tealSoft : AppColors.faint,
+      padding: const EdgeInsets.all(14),
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PremiumGroupScreen(group: group))),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)), child: Icon(entitlement.active ? Icons.workspace_premium_rounded : Icons.workspace_premium_rounded, color: entitlement.active ? AppColors.teal : AppColors.orange)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(entitlement.active ? 'Grupli Premium activo' : 'Grupli Premium preparado', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text(entitlement.active ? 'Este grupo tiene activadas las funciones Premium.' : 'Pagos aún desactivados. Dejamos lista la estructura para activar Premium por grupo más adelante.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 12)),
+        ])),
+        const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+      ]),
+    );
+  }
+}
+
+class PremiumGroupScreen extends StatelessWidget {
+  final Map<String, dynamic> group;
+  const PremiumGroupScreen({super.key, required this.group});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = AppData.text(group['name'], 'Grupo');
+    final entitlement = GrupliPremium.entitlementForGroup(group);
+    return DirectPage(child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PageHeader(title: 'Grupli Premium', subtitle: 'Premium será por grupo: si se activa aquí, todos los miembros de $name lo disfrutan.', leading: true),
+        const SizedBox(height: 16),
+        AppCard(
+          color: entitlement.active ? AppColors.tealSoft : AppColors.orangeSoft,
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(width: 48, height: 48, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17)), child: Icon(entitlement.active ? Icons.verified_rounded : Icons.lock_clock_rounded, color: entitlement.active ? AppColors.teal : AppColors.orange)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(entitlement.label, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 18)),
+                const SizedBox(height: 4),
+                Text(GrupliPremium.billingEnabled ? 'Los pagos estarán conectados al backend y a las stores.' : 'Los pagos todavía no están activos. Esta versión solo prepara permisos y experiencia.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25)),
+              ])),
+            ]),
+            const SizedBox(height: 14),
+            StatusNotice(
+              icon: Icons.shield_outlined,
+              title: 'Sin trampas locales',
+              body: 'Cuando se activen pagos, la app consultará al backend si el grupo tiene Premium. El frontend no decidirá solo.',
+            ),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        SectionHeader(title: 'Gratis debe seguir siendo útil'),
+        const SizedBox(height: 8),
+        AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Incluido gratis', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          ...GrupliPremium.freeTournamentPrinciples.map((item) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 18),
+              const SizedBox(width: 8),
+              Expanded(child: Text(item, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, height: 1.25))),
+            ]),
+          )),
+        ])),
+        const SizedBox(height: 16),
+        SectionHeader(title: 'Premium futuro'),
+        const SizedBox(height: 8),
+        ...GrupliPremium.features.map((feature) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: AppCard(
+            padding: const EdgeInsets.all(13),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(14)), child: Icon(feature.icon, color: AppColors.orange, size: 21)),
+              const SizedBox(width: 11),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(feature.title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 3),
+                Text(feature.description, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 12)),
+              ])),
+            ]),
+          ),
+        )),
+        const SizedBox(height: 8),
+        PrimaryButton(
+          label: GrupliPremium.billingEnabled ? 'Activar Premium' : 'Pagos todavía desactivados',
+          icon: Icons.workspace_premium_rounded,
+          onTap: () => showToast(context, GrupliPremium.billingEnabled ? 'El pago se conectará con la store.' : 'Premium está preparado, pero los pagos reales se activarán en una fase posterior.'),
+        ),
+      ],
+    ));
   }
 }
 

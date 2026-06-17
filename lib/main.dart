@@ -24,6 +24,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 part 'core/theme/app_colors.dart';
 part 'core/app_data/app_data.dart';
+part 'core/premium/group_premium.dart';
 part 'features/onboarding/onboarding.dart';
 part 'features/auth/auth.dart';
 part 'features/groups/groups.dart';
@@ -120,7 +121,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v16.26';
+  static const appVersion = 'v16.32';
   static const enableRealtimeSubscriptions = false;
 
   // Security baseline:
@@ -1158,16 +1159,54 @@ String tournamentCourtNameForIndex(Map<String, dynamic>? cfg, int orderInsideRou
 
 String tournamentMatchAgendaNotes(Map<String, dynamic> match) {
   final roundName = AppData.text(match['round_name'], 'Jornada ${AppData.intValue(match['round'], 1)}');
+  final status = AppData.text(match['status'], 'pending');
   final courtLine = AppData.text(match['court_name']).isEmpty ? '' : '\nPista/Mesa: ${AppData.text(match['court_name'])}';
+  final statusLine = status == 'postponed'
+      ? '\nEstado: partido aplazado'
+      : status == 'played'
+          ? '\nEstado: resultado registrado'
+          : '';
   final notes = AppData.text(match['notes']);
   final notesLine = notes.isEmpty ? '' : '\n\n$notes';
-  return 'Partido de torneo · $roundName$courtLine$notesLine';
+  return 'Partido de torneo · $roundName$statusLine$courtLine$notesLine';
 }
 
 String tournamentMatchAgendaTitle(String tournamentName, Map<String, dynamic> match, Map<String, String> names) {
   final a = tournamentMatchSideName(match, names, true);
   final b = tournamentMatchSideName(match, names, false);
-  return '$tournamentName: $a vs $b';
+  final base = '$tournamentName: $a vs $b';
+  return AppData.text(match['status']) == 'postponed' ? 'Aplazado · $base' : base;
+}
+
+bool tournamentMatchHasAgendaEvent(Map<String, dynamic> match) => AppData.text(match['event_id']).isNotEmpty;
+
+bool tournamentMatchHasScheduledDate(Map<String, dynamic> match) => AppData.text(match['scheduled_at']).isNotEmpty;
+
+String tournamentMatchAgendaSyncLabel(Map<String, dynamic> match) {
+  final status = AppData.text(match['status'], 'pending');
+  if (status == 'cancelled') return 'Agenda cancelada';
+  if (status == 'bye') return 'Descanso';
+  if (tournamentMatchHasAgendaEvent(match)) return 'En Agenda';
+  if (tournamentMatchHasScheduledDate(match)) return 'Falta Agenda';
+  return 'Sin fecha';
+}
+
+IconData tournamentMatchAgendaSyncIcon(Map<String, dynamic> match) {
+  final status = AppData.text(match['status'], 'pending');
+  if (status == 'cancelled') return Icons.event_busy_rounded;
+  if (status == 'bye') return Icons.weekend_rounded;
+  if (tournamentMatchHasAgendaEvent(match)) return Icons.event_available_rounded;
+  if (tournamentMatchHasScheduledDate(match)) return Icons.event_note_rounded;
+  return Icons.event_rounded;
+}
+
+Color tournamentMatchAgendaSyncColor(Map<String, dynamic> match) {
+  final status = AppData.text(match['status'], 'pending');
+  if (status == 'cancelled') return AppColors.red;
+  if (status == 'bye') return AppColors.violet;
+  if (tournamentMatchHasAgendaEvent(match)) return AppColors.green;
+  if (tournamentMatchHasScheduledDate(match)) return AppColors.amber;
+  return AppColors.muted;
 }
 
 String eliminationRoundName(int round, int size) {
@@ -1823,27 +1862,7 @@ String scoringValidationText(String type, [dynamic raw]) {
   }
 }
 
-class GrupliPremium {
-  static const bool enabled = false;
-  static const int freeActiveTournamentsPerGroup = 1;
-  static const int freePlayersPerTournament = 16;
-  static const int freeRoundsPerTournament = 8;
-}
-
-bool tournamentFeatureIsPremium(String feature) {
-  return const {
-    'advanced_stats',
-    'groups_playoff',
-    'double_elimination',
-    'swiss',
-    'exports',
-    'public_page',
-    'smart_reminders',
-    'saved_templates',
-    'advanced_americano',
-    'result_confirmation',
-  }.contains(feature);
-}
+bool tournamentFeatureIsPremium(String feature) => GrupliPremium.isPremiumFeature(feature);
 
 String scoringConfigShortText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
@@ -1955,6 +1974,64 @@ String standingMetricText(TeamStanding standing, String scoringType, [dynamic sc
   return 'PTS · ${scoringRankingLabel(scoringType, scoringConfig)} ${standing.goalDifference}';
 }
 
+
+String standingMainStatLabel(String scoringType, [dynamic scoringConfig]) {
+  if (scoringUsesGameSetMode(scoringType, scoringConfig)) return 'Sets';
+  if (scoringUsesPointSetMode(scoringType, scoringConfig)) return 'Sets';
+  if (scoringResultModel(scoringType, scoringConfig) == 'goals') return 'Goles';
+  if (scoringResultModel(scoringType, scoringConfig) == 'total_points') return 'Puntos';
+  return scoringScoreLabel(scoringType, scoringConfig);
+}
+
+String standingSecondaryStatLabel(String scoringType, [dynamic scoringConfig]) {
+  if (scoringUsesGameSetMode(scoringType, scoringConfig)) return 'Juegos';
+  if (scoringUsesPointSetMode(scoringType, scoringConfig)) return 'Puntos de set';
+  if (scoringResultModel(scoringType, scoringConfig) == 'goals') return 'Diferencia de goles';
+  if (scoringResultModel(scoringType, scoringConfig) == 'total_points') return 'Diferencia de puntos';
+  return 'Diferencia';
+}
+
+String standingForAgainstText(TeamStanding standing, String scoringType, [dynamic scoringConfig]) {
+  if (standing.americanoRawScore) {
+    final unit = scoringUsesGameSetMode(scoringType, scoringConfig)
+        ? 'juegos'
+        : scoringUsesPointSetMode(scoringType, scoringConfig)
+            ? 'puntos'
+            : scoringScoreLabel(scoringType, scoringConfig);
+    return '$unit ${standing.goalsFor}-${standing.goalsAgainst}';
+  }
+  if (scoringUsesSetMode(scoringType, scoringConfig)) {
+    final secondary = scoringUsesGameSetMode(scoringType, scoringConfig) ? 'juegos' : 'puntos';
+    return 'sets ${standing.goalsFor}-${standing.goalsAgainst} · $secondary ${standing.secondaryFor}-${standing.secondaryAgainst}';
+  }
+  final model = scoringResultModel(scoringType, scoringConfig);
+  if (model == 'goals') return 'GF ${standing.goalsFor} · GC ${standing.goalsAgainst} · DG ${standing.goalDifference}';
+  if (model == 'total_points') return 'PF ${standing.goalsFor} · PC ${standing.goalsAgainst} · DP ${standing.goalDifference}';
+  return '${scoringScoreLabel(scoringType, scoringConfig)} ${standing.goalsFor}-${standing.goalsAgainst} · DIF ${standing.goalDifference}';
+}
+
+String standingWinRateText(TeamStanding standing) {
+  if (standing.played <= 0) return '0%';
+  final value = ((standing.wins / standing.played) * 100).round();
+  return '$value%';
+}
+
+String tournamentStatsIntroText(String scoringType, [dynamic scoringConfig]) {
+  if (scoringUsesGameSetMode(scoringType, scoringConfig)) {
+    return 'La tabla usa puntos, victorias, sets y juegos reales para ordenar la clasificación.';
+  }
+  if (scoringUsesPointSetMode(scoringType, scoringConfig)) {
+    return 'La tabla usa puntos, victorias, sets y puntos de parcial para ordenar la clasificación.';
+  }
+  if (scoringResultModel(scoringType, scoringConfig) == 'goals') {
+    return 'La tabla usa puntos, victorias, empates, goles a favor, goles en contra y diferencia.';
+  }
+  if (scoringResultModel(scoringType, scoringConfig) == 'total_points') {
+    return 'La tabla usa victorias, puntos a favor, puntos en contra y diferencia.';
+  }
+  return 'La tabla usa puntos, victorias y diferencia según el marcador configurado.';
+}
+
 String matchInputLabel(String type, bool local, [dynamic raw]) {
   final side = local ? 'Local' : 'Visitante';
   switch (scoringResultModel(type, raw)) {
@@ -1991,7 +2068,7 @@ int matchSetGamesFor(Map<String, dynamic> match, bool local) {
 String matchPrimaryScoreText(Map<String, dynamic> match, String type, [dynamic raw]) {
   final a = AppData.intValue(match['score_a']);
   final b = AppData.intValue(match['score_b']);
-  if (scoringUsesSetMode(type, raw)) {
+  if (scoringUsesSetMode(type, raw) && matchDetailSets(match).isNotEmpty) {
     return 'Sets $a - $b';
   }
   return '$a - $b';
@@ -2285,8 +2362,13 @@ String standingsOrderTextForScoring(List<String> tieBreakers, String scoringType
 
 String standingRankReason(int index, List<TeamStanding> standings, List<String> tieBreakers, String scoringType, Map<String, dynamic>? scoringConfig) {
   final current = standings[index];
+  final diffLabel = scoringTableDifferenceLabel(scoringType, scoringConfig);
+  final diffValue = current.goalDifference >= 0 ? '+${current.goalDifference}' : '${current.goalDifference}';
   if (index == 0) {
-    return 'Lidera con ${current.points} pts · ${current.wins} victorias · ${current.goalDifference >= 0 ? '+' : ''}${current.goalDifference} de diferencia.';
+    if (current.americanoRawScore) {
+      return 'Lidera el ranking individual con ${current.points} pts acumulados y ${current.wins} victorias.';
+    }
+    return 'Lidera con ${current.points} pts · ${current.wins} victorias · $diffLabel $diffValue.';
   }
   final previous = standings[index - 1];
   if (current.points != previous.points) {
@@ -2295,14 +2377,21 @@ String standingRankReason(int index, List<TeamStanding> standings, List<String> 
   for (final breaker in tieBreakers) {
     if (breaker == 'points') continue;
     if (breaker == 'wins' && current.wins != previous.wins) return 'Desempate por victorias: ${previous.wins} vs ${current.wins}.';
-    if ((breaker == 'difference') && current.goalDifference != previous.goalDifference) return 'Desempate por diferencia: ${previous.goalDifference} vs ${current.goalDifference}.';
-    if (breaker == 'for' && current.goalsFor != previous.goalsFor) return 'Desempate por puntos a favor: ${previous.goalsFor} vs ${current.goalsFor}.';
-    if (breaker == 'set_difference' && current.goalDifference != previous.goalDifference) return 'Desempate por diferencia de sets: ${previous.goalDifference} vs ${current.goalDifference}.';
-    if (breaker == 'game_difference' && current.secondaryDifference != previous.secondaryDifference) return 'Desempate por ${tieBreakerLabel(breaker)}: ${previous.secondaryDifference} vs ${current.secondaryDifference}.';
-    if (breaker == 'games_for' && current.secondaryFor != previous.secondaryFor) return 'Desempate por juegos/puntos a favor: ${previous.secondaryFor} vs ${current.secondaryFor}.';
+    if ((breaker == 'difference' || breaker == 'set_difference') && current.goalDifference != previous.goalDifference) {
+      return 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalDifference} vs ${current.goalDifference}.';
+    }
+    if (breaker == 'for' && current.goalsFor != previous.goalsFor) {
+      return 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalsFor} vs ${current.goalsFor}.';
+    }
+    if (breaker == 'game_difference' && current.secondaryDifference != previous.secondaryDifference) {
+      return 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryDifference} vs ${current.secondaryDifference}.';
+    }
+    if (breaker == 'games_for' && current.secondaryFor != previous.secondaryFor) {
+      return 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryFor} vs ${current.secondaryFor}.';
+    }
     if (breaker == 'direct') return 'Mismo puntaje: se revisa enfrentamiento directo antes de seguir con la diferencia.';
   }
-  return 'Mismo puntaje. Se aplica el siguiente criterio configurado o el orden manual.';
+  return 'Mismo puntaje. Se aplica el siguiente criterio configurado o el orden alfabético.';
 }
 
 String matchHistoryEntryText(Map<String, dynamic> item) {
@@ -2350,8 +2439,18 @@ List<TeamStanding> calculateStandings(
         row.americanoRawScore = true;
       }
 
-      final americanoScoreA = setMode ? matchSetGamesFor(match, true) : scoreA;
-      final americanoScoreB = setMode ? matchSetGamesFor(match, false) : scoreB;
+      final hasSetDetails = matchDetailSets(match).isNotEmpty;
+      final hasRoundScoreDetails = details.containsKey('round_score_a') || details.containsKey('round_score_b') || AppData.text(details['score_model']) == 'americano_round';
+      final americanoScoreA = hasRoundScoreDetails
+          ? AppData.intValue(details['round_score_a'], scoreA)
+          : setMode && hasSetDetails
+              ? matchSetGamesFor(match, true)
+              : scoreA;
+      final americanoScoreB = hasRoundScoreDetails
+          ? AppData.intValue(details['round_score_b'], scoreB)
+          : setMode && hasSetDetails
+              ? matchSetGamesFor(match, false)
+              : scoreB;
 
       for (final row in aRows) {
         row.played++;
@@ -2364,7 +2463,7 @@ List<TeamStanding> calculateStandings(
         row.goalsAgainst += americanoScoreA;
       }
 
-      if (setMode) {
+      if (setMode && hasSetDetails) {
         for (final row in aRows) {
           row.secondaryFor += scoreA;
           row.secondaryAgainst += scoreB;
@@ -2375,7 +2474,7 @@ List<TeamStanding> calculateStandings(
         }
       }
 
-      if (scoreA > scoreB) {
+      if (americanoScoreA > americanoScoreB) {
         for (final row in aRows) {
           row.wins++;
           row.points += americanoScoreA;
@@ -2384,7 +2483,7 @@ List<TeamStanding> calculateStandings(
           row.losses++;
           row.points += americanoScoreB;
         }
-      } else if (scoreA < scoreB) {
+      } else if (americanoScoreA < americanoScoreB) {
         for (final row in bRows) {
           row.wins++;
           row.points += americanoScoreB;
@@ -2485,6 +2584,7 @@ class TeamStanding {
 
   int get goalDifference => goalsFor - goalsAgainst;
   int get secondaryDifference => secondaryFor - secondaryAgainst;
+  double get winRate => played <= 0 ? 0 : wins / played;
 }
 
 Future<void> showToast(BuildContext context, String message, {bool danger = false}) async {

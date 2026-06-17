@@ -1,7 +1,174 @@
 part of grupli_app;
 
 class TournamentEngineV2 {
-  static const int version = 18;
+  static const int version = 20;
+  static const String architectureKey = 'tournaments_final_architecture_v1';
+
+  static const List<TournamentSportSpec> sportSpecs = [
+    TournamentSportSpec(
+      key: 'football',
+      label: 'Fútbol',
+      emoji: '⚽',
+      resultMode: 'score',
+      resultLabel: 'Goles',
+      participantLabel: 'Equipos',
+      freeStats: ['PJ', 'G', 'E', 'P', 'GF', 'GC', 'DG', 'PTS'],
+      premiumStats: ['Rachas', 'Historial', 'Rendimiento por rival'],
+    ),
+    TournamentSportSpec(
+      key: 'basketball',
+      label: 'Basket',
+      emoji: '🏀',
+      resultMode: 'score',
+      resultLabel: 'Puntos',
+      participantLabel: 'Equipos',
+      freeStats: ['PJ', 'G', 'P', 'PF', 'PC', 'DIF', 'PTS'],
+      premiumStats: ['Rachas', 'Evolución', 'Comparativas'],
+    ),
+    TournamentSportSpec(
+      key: 'tennis_padel',
+      label: 'Tenis / Pádel',
+      emoji: '🎾',
+      resultMode: 'sets_games',
+      resultLabel: 'Sets y juegos',
+      participantLabel: 'Jugadores o parejas',
+      freeStats: ['PJ', 'V', 'P', 'SF', 'SC', 'DS', 'JF', 'JC', 'DJ', 'PTS'],
+      premiumStats: ['Mejor pareja', 'Rachas', 'Ranking histórico'],
+    ),
+    TournamentSportSpec(
+      key: 'volleyball',
+      label: 'Voleibol',
+      emoji: '🏐',
+      resultMode: 'sets_points',
+      resultLabel: 'Sets y puntos de set',
+      participantLabel: 'Equipos',
+      freeStats: ['PJ', 'G', 'P', 'SF', 'SC', 'PF', 'PC', 'PTS'],
+      premiumStats: ['Rachas', 'Historial', 'Comparativas'],
+    ),
+    TournamentSportSpec(
+      key: 'ping_pong',
+      label: 'Ping pong',
+      emoji: '🏓',
+      resultMode: 'sets_points',
+      resultLabel: 'Sets y puntos',
+      participantLabel: 'Jugadores o parejas',
+      freeStats: ['PJ', 'G', 'P', 'SF', 'SC', 'PF', 'PC', 'PTS'],
+      premiumStats: ['Rachas', 'Ranking histórico', 'Rendimiento por rival'],
+    ),
+    TournamentSportSpec(
+      key: 'cards_mus',
+      label: 'Cartas / Mus',
+      emoji: '🃏',
+      resultMode: 'score',
+      resultLabel: 'Partidas o tantos',
+      participantLabel: 'Jugadores o parejas',
+      freeStats: ['PJ', 'G', 'P', 'Puntos', 'DIF'],
+      premiumStats: ['Historial', 'Rachas', 'Ranking del grupo'],
+    ),
+    TournamentSportSpec(
+      key: 'darts',
+      label: 'Dardos',
+      emoji: '🎯',
+      resultMode: 'score',
+      resultLabel: 'Puntos o legs',
+      participantLabel: 'Jugadores o equipos',
+      freeStats: ['PJ', 'G', 'P', 'PF', 'PC', 'DIF'],
+      premiumStats: ['Historial', 'Rachas', 'Comparativas'],
+    ),
+    TournamentSportSpec(
+      key: 'billiards',
+      label: 'Billar',
+      emoji: '🎱',
+      resultMode: 'score',
+      resultLabel: 'Partidas',
+      participantLabel: 'Jugadores o equipos',
+      freeStats: ['PJ', 'G', 'P', 'Puntos', 'DIF'],
+      premiumStats: ['Historial', 'Rachas', 'Ranking del grupo'],
+    ),
+    TournamentSportSpec(
+      key: 'esports',
+      label: 'Gaming',
+      emoji: '🎮',
+      resultMode: 'score',
+      resultLabel: 'Mapas o rondas',
+      participantLabel: 'Equipos',
+      freeStats: ['PJ', 'G', 'P', 'PF', 'PC', 'DIF'],
+      premiumStats: ['Mapas favoritos', 'Rachas', 'Historial'],
+    ),
+    TournamentSportSpec(
+      key: 'custom',
+      label: 'Libre',
+      emoji: '⭐',
+      resultMode: 'score',
+      resultLabel: 'Marcador simple',
+      participantLabel: 'Participantes',
+      freeStats: ['PJ', 'G', 'P', 'Puntos'],
+      premiumStats: ['Historial', 'Rachas', 'Ranking del grupo'],
+    ),
+    TournamentSportSpec(
+      key: 'general',
+      label: 'General',
+      emoji: '🏆',
+      resultMode: 'score',
+      resultLabel: 'Marcador simple',
+      participantLabel: 'Participantes',
+      freeStats: ['PJ', 'G', 'P', 'Puntos'],
+      premiumStats: ['Historial', 'Rachas', 'Ranking del grupo'],
+    ),
+  ];
+
+  static const List<TournamentPremiumFeature> premiumFeatures = [
+    TournamentPremiumFeature('unlimited_active_tournaments', 'Torneos activos ilimitados', 'Para grupos que organizan varias competiciones a la vez.'),
+    TournamentPremiumFeature('advanced_americano', 'Americano avanzado', 'Rotaciones inteligentes, descansos equilibrados y menos repeticiones.'),
+    TournamentPremiumFeature('smart_multi_courts', 'Múltiples pistas inteligentes', 'Reparte partidos por pista o mesa de forma automática.'),
+    TournamentPremiumFeature('advanced_calendar', 'Calendario automático avanzado', 'Reorganiza fechas, detecta conflictos y prepara jornadas.'),
+    TournamentPremiumFeature('move_matchdays', 'Mover jornadas completas', 'Cambia una jornada entera sin editar partido por partido.'),
+    TournamentPremiumFeature('advanced_stats', 'Estadísticas avanzadas', 'Rachas, evolución, comparativas e historial.'),
+    TournamentPremiumFeature('custom_tiebreakers', 'Desempates configurables', 'Cambia el orden de desempates según el grupo.'),
+    TournamentPremiumFeature('exports', 'Exportar clasificación', 'Crea PDF, imagen o archivo para compartir.'),
+    TournamentPremiumFeature('beautiful_share', 'Compartir resumen bonito', 'Resumen visual para WhatsApp o redes.'),
+    TournamentPremiumFeature('duplicate_tournaments', 'Duplicar torneo', 'Repite una liga o torneo con la misma estructura.'),
+    TournamentPremiumFeature('saved_templates', 'Plantillas guardadas', 'Guarda formatos habituales del grupo.'),
+    TournamentPremiumFeature('seeding', 'Cabezas de serie', 'Ordena favoritos o usa ranking para el cuadro.'),
+    TournamentPremiumFeature('historical_group_ranking', 'Ranking histórico del grupo', 'Ranking acumulado entre torneos y temporadas.'),
+  ];
+
+  static TournamentSportSpec sportSpec(String sport) {
+    return sportSpecs.firstWhere((spec) => spec.key == sport, orElse: () => sportSpecs.last);
+  }
+
+  static Map<String, dynamic> defaultPermissionsConfig(String sport, String format) => {
+    'version': version,
+    'architecture': architectureKey,
+    'billing_enabled': false,
+    'premium_scope': 'group',
+    'large_groups_free': true,
+    'participants_limited': false,
+    'third_place_free': true,
+    'free_active_tournament_limit': GrupliPremium.freeActiveTournamentsPerGroup,
+    'free_features': [
+      'large_groups',
+      'basic_league',
+      'basic_elimination',
+      'basic_manual',
+      'basic_americano',
+      'basic_standings',
+      'sport_results',
+      'basic_agenda_link',
+      'third_place',
+      'simple_share',
+    ],
+    'premium_features': GrupliPremium.features.map((feature) => feature.key).toList(),
+    'current_sport': sport,
+    'current_format': format,
+  };
+
+  static String sportStatsSummary(String sport, {bool premium = false}) {
+    final spec = sportSpec(sport);
+    final items = premium ? spec.premiumStats : spec.freeStats;
+    return items.join(' · ');
+  }
+
 
   static const Map<String, List<String>> _formatsBySport = {
     'football': ['liga', 'eliminatoria', 'manual'],
@@ -198,3 +365,34 @@ class TournamentEngineV2 {
     return null;
   }
 }
+
+class TournamentSportSpec {
+  final String key;
+  final String label;
+  final String emoji;
+  final String resultMode;
+  final String resultLabel;
+  final String participantLabel;
+  final List<String> freeStats;
+  final List<String> premiumStats;
+
+  const TournamentSportSpec({
+    required this.key,
+    required this.label,
+    required this.emoji,
+    required this.resultMode,
+    required this.resultLabel,
+    required this.participantLabel,
+    required this.freeStats,
+    required this.premiumStats,
+  });
+}
+
+class TournamentPremiumFeature {
+  final String key;
+  final String title;
+  final String description;
+
+  const TournamentPremiumFeature(this.key, this.title, this.description);
+}
+

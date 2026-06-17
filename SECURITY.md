@@ -25,3 +25,8 @@
 - `key.properties`
 - `*.p8`
 - `*.pem`
+
+## Premium y pagos futuros
+
+La fase v16.32 solo prepara la experiencia Premium. No valida pagos reales en frontend.
+Cuando se activen suscripciones, el estado Premium deberá venir de backend/Supabase y de las stores. El cliente móvil/web no debe decidir localmente si un grupo tiene Premium activo.

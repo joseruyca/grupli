@@ -1696,6 +1696,7 @@ class _PressableScaleState extends State<PressableScale> {
 
   @override
   Widget build(BuildContext context) {
+    final radius = widget.borderRadius ?? BorderRadius.circular(18);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: widget.onTap == null ? null : (_) => _setPressed(true),
