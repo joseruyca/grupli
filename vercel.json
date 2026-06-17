@@ -1,5 +1,5 @@
 {
-  "installCommand": "bash vercel_build.sh install",
+  "installCommand": "echo Skipping install phase",
   "buildCommand": "bash vercel_build.sh build",
   "outputDirectory": "build/web",
   "rewrites": [
