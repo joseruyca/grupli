@@ -8,16 +8,16 @@ if [ "$COMMAND" = "install" ]; then
   exit 0
 fi
 
+if [ "$COMMAND" != "build" ]; then
+  echo "ERROR: Unknown command: $COMMAND"
+  exit 1
+fi
+
 export FLUTTER_HOME="$HOME/flutter"
 export PATH="$FLUTTER_HOME/bin:$PATH"
 export PUB_CACHE="$HOME/.pub-cache"
 export FLUTTER_SUPPRESS_ANALYTICS=true
 export CI=true
-
-if [ "$COMMAND" != "build" ]; then
-  echo "ERROR: Unknown command: $COMMAND"
-  exit 1
-fi
 
 echo "Installing Flutter stable for Vercel..."
 if [ ! -x "$FLUTTER_HOME/bin/flutter" ]; then
@@ -29,7 +29,6 @@ flutter --version
 flutter config --enable-web --no-analytics
 
 echo "Preparing Dart defines..."
-
 DART_DEFINES=()
 
 add_define_from_aliases() {
