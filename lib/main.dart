@@ -15,8 +15,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -38,20 +36,6 @@ part 'core/widgets/shared_widgets.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
-@pragma('vm:entry-point')
-Future<void> grupliFirebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  try {
-    if (Firebase.apps.isEmpty) {
-      if (AppConfig.firebaseConfigured) {
-        await Firebase.initializeApp(options: PushNotificationService.firebaseOptions);
-      } else {
-        await Firebase.initializeApp();
-      }
-    }
-  } catch (_) {
-    // El handler de background nunca debe bloquear la recepción del mensaje.
-  }
-}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,9 +53,6 @@ Future<void> main() async {
 }
 
 Future<void> _bootstrapGrupli() async {
-  if (!kIsWeb) {
-    FirebaseMessaging.onBackgroundMessage(grupliFirebaseMessagingBackgroundHandler);
-  }
 
   // Android 15+ activa el modo edge-to-edge por defecto.
   // Mantenemos las barras del sistema limpias y usamos SafeArea global abajo
@@ -138,7 +119,7 @@ Future<void> _bootstrapGrupli() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v16.32.7';
+  static const appVersion = 'v16.32.8';
   static const enableRealtimeSubscriptions = false;
 
   // Security baseline:
@@ -677,17 +658,11 @@ class DirectPage extends StatelessWidget {
 // core/app_data/app_data.dart moved to part file.
 
 class PushNotificationService {
-  static bool _initializing = false;
-  static bool _configured = false;
-  static bool _listenersReady = false;
-
-  static FirebaseOptions get firebaseOptions => const FirebaseOptions(
-    apiKey: AppConfig.firebaseApiKey,
-    appId: AppConfig.firebaseAppId,
-    messagingSenderId: AppConfig.firebaseMessagingSenderId,
-    projectId: AppConfig.firebaseProjectId,
-  );
-
+  // Push notifications are intentionally disabled in this build.
+  // Reason: firebase_messaging_web was crashing the web runtime before Grupli could render.
+  // The app must stay usable first; real push notifications will be reintroduced later
+  // with a backend-validated setup and platform-specific QA.
+  static bool get pushEnabled => false;
   static String get platformLabel {
     if (kIsWeb) return 'web';
     return switch (defaultTargetPlatform) {
@@ -700,121 +675,24 @@ class PushNotificationService {
     };
   }
 
-  static Future<bool> configureIfPossible() async {
-    if (_configured) return true;
-    if (_initializing) return false;
-    if (kIsWeb && !AppConfig.firebaseConfigured) return false;
-    _initializing = true;
-    try {
-      if (Firebase.apps.isEmpty) {
-        if (AppConfig.firebaseConfigured) {
-          await Firebase.initializeApp(options: firebaseOptions);
-        } else {
-          await Firebase.initializeApp();
-        }
-      }
-      _configured = true;
-      _wireListenersOnce();
-      return true;
-    } catch (_) {
-      _configured = false;
-      return false;
-    } finally {
-      _initializing = false;
-    }
-  }
+  static Future<bool> configureIfPossible() async => false;
 
-  static void _wireListenersOnce() {
-    if (_listenersReady) return;
-    _listenersReady = true;
-
-    FirebaseMessaging.onMessage.listen((message) async {
-      // En foreground no duplicamos banners: la campana de Avisos lee las filas de Supabase.
-      // Android/iOS mostrarán la notificación automáticamente cuando llegue en background/killed.
-      await AppData.logQualityEvent(
-        'push_foreground_received',
-        screen: 'push',
-        message: message.notification?.title ?? AppData.text(message.data['title'], 'Push recibido'),
-        metadata: message.data,
-      );
-    });
-
-    FirebaseMessaging.onMessageOpenedApp.listen(handleMessageTap);
-    FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
-      await AppData.registerDeviceToken(token, platformLabel);
-      await AppData.logQualityEvent('push_token_refresh', screen: 'push', message: 'Token actualizado');
-    });
-
-    FirebaseMessaging.instance.getInitialMessage().then((message) {
-      if (message != null) handleMessageTap(message);
-    });
-  }
-
-  static Future<void> handleMessageTap(RemoteMessage message) async {
-    final notificationId = AppData.text(message.data['notification_id']);
-    final groupId = AppData.text(message.data['group_id']);
-    if (notificationId.isNotEmpty) {
-      try {
-        await AppData.markNotificationRead(notificationId);
-      } catch (_) {}
-    }
-    final nav = appNavigatorKey.currentState;
-    if (nav == null) return;
-    if (groupId.isNotEmpty) {
-      final tab = notificationGroupTabFromValues(
-        AppData.text(message.data['route_type']),
-        AppData.text(message.data['type']),
-      );
-      await nav.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId, initialTab: tab)),
-        (route) => route.isFirst,
-      );
-    } else {
-      await nav.push(MaterialPageRoute(builder: (_) => NotificationsScreen(onChanged: () {})));
-    }
+  static Future<void> tryRegisterSilently() async {
+    // No-op. Keeps startup safe on web and mobile until push is configured again.
   }
 
   static Future<String?> enableForCurrentDevice() async {
-    final ready = await configureIfPossible();
-    if (!ready) return null;
-    final messaging = FirebaseMessaging.instance;
-    final settings = await messaging.requestPermission(alert: true, badge: true, sound: true);
-    if (settings.authorizationStatus == AuthorizationStatus.denied) {
-      await AppData.logQualityEvent('push_permission_denied', screen: 'push', message: 'Permiso denegado');
-      return null;
-    }
-    final token = await messaging.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
-    if (token != null && token.trim().isNotEmpty) {
-      await AppData.registerDeviceToken(token, platformLabel);
-      await AppData.logQualityEvent('push_token_registered', screen: 'push', message: 'Token registrado', metadata: {'platform': platformLabel});
-    }
-    return token;
-  }
-
-  static Future<void> tryRegisterSilently() async {
-    try {
-      final ready = await configureIfPossible();
-      if (!ready) return;
-      final settings = await FirebaseMessaging.instance.getNotificationSettings();
-      if (settings.authorizationStatus == AuthorizationStatus.denied || settings.authorizationStatus == AuthorizationStatus.notDetermined) return;
-      final token = await FirebaseMessaging.instance.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
-      if (token != null && token.trim().isNotEmpty) {
-        await AppData.registerDeviceToken(token, platformLabel);
-      }
-    } catch (_) {
-      // No bloquear la app si Firebase todavía no está configurado.
-    }
+    await AppData.logQualityEvent(
+      'push_disabled_runtime',
+      screen: 'push',
+      message: 'Las notificaciones push todavía no están activadas en esta versión.',
+      metadata: {'platform': platformLabel},
+    );
+    return null;
   }
 
   static Future<void> disableForCurrentDevice() async {
-    try {
-      final ready = await configureIfPossible();
-      if (!ready) return;
-      final token = await FirebaseMessaging.instance.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
-      if (token != null && token.trim().isNotEmpty) {
-        await AppData.disableCurrentDeviceToken(token);
-      }
-    } catch (_) {}
+    // No-op while push is disabled.
   }
 }
 
