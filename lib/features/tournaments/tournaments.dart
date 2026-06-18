@@ -101,7 +101,8 @@ class _TournamentsTabState extends State<TournamentsTab> {
   Widget build(BuildContext context) {
     final active = tournaments.where((t) => !['finished', 'cancelled'].contains(AppData.text(t['status'], 'active'))).toList();
     final finished = tournaments.where((t) => ['finished', 'cancelled'].contains(AppData.text(t['status'], 'active'))).toList();
-    final results = _allMatches(played: true).reversed.take(4).toList();
+    final nextMatches = _allMatches(played: false).take(3).toList();
+    final results = _allMatches(played: true).reversed.take(3).toList();
 
     return SafeArea(
       bottom: false,
@@ -114,8 +115,6 @@ class _TournamentsTabState extends State<TournamentsTab> {
             TournamentGroupHeader(
               subtitle: AppData.text(widget.group['name'], 'Grupo'),
             ),
-            const SizedBox(height: 10),
-            TournamentPremiumBanner(),
             const SizedBox(height: 14),
             if (loading)
               const CenterLoader(label: 'Cargando torneos...')
@@ -124,24 +123,31 @@ class _TournamentsTabState extends State<TournamentsTab> {
             else if (tournaments.isEmpty)
               TournamentCleanEmptyState(onCreate: openCreate)
             else ...[
-              TournamentSectionHeader(title: 'Torneos activos', action: active.isEmpty ? null : 'Ver todos'),
-              const SizedBox(height: 8),
-              ...active.take(4).map((t) => TournamentActiveCard(tournament: t, onTap: () => openTournament(t))),
-              const SizedBox(height: 16),
-              TournamentSectionHeader(title: 'Últimos resultados'),
-              const SizedBox(height: 8),
-              if (results.isEmpty)
-                EmptySlim(icon: Icons.sports_score_rounded, title: 'Aún no hay resultados', body: 'Cuando registres marcadores aparecerán aquí.')
-              else
+              PrimaryButton(label: 'Crear torneo o liga', icon: Icons.add_rounded, onTap: openCreate),
+              if (active.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                TournamentSectionHeader(title: active.length == 1 ? 'Competición activa' : 'Competiciones activas'),
+                const SizedBox(height: 8),
+                ...active.take(4).map((t) => TournamentActiveCard(tournament: t, onTap: () => openTournament(t))),
+              ],
+              if (nextMatches.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                TournamentSectionHeader(title: nextMatches.length == 1 ? 'Próximo partido' : 'Próximos partidos'),
+                const SizedBox(height: 8),
+                ...nextMatches.map((m) => TournamentDashboardMatchCard(item: m, onTap: () => openTournament(m.tournament))),
+              ],
+              if (results.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const TournamentSectionHeader(title: 'Últimos resultados'),
+                const SizedBox(height: 8),
                 ...results.map((m) => TournamentDashboardMatchCard(item: m, onTap: () => openTournament(m.tournament))),
+              ],
               if (finished.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                TournamentSectionHeader(title: 'Finalizados'),
+                const TournamentSectionHeader(title: 'Finalizados'),
                 const SizedBox(height: 8),
                 ...finished.take(3).map((t) => TournamentActiveCard(tournament: t, onTap: () => openTournament(t), compact: true)),
               ],
-              const SizedBox(height: 18),
-              PrimaryButton(label: 'Crear torneo o liga', icon: Icons.add_rounded, onTap: openCreate),
             ],
           ],
         ),
@@ -229,7 +235,6 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         randomizePairings = true;
         courtsCount = max(1, courtsCount);
         americanoRounds = max(5, americanoRounds);
-        if (scoringUsesSetMode(scoringType, scoringConfigForType(scoringType))) bestOf = 1;
         scheduleMatches = true;
         addToAgenda = true;
         name.text = name.text.trim().isEmpty ? 'Americano' : name.text;
@@ -614,10 +619,10 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         color: AppColors.faint,
         padding: const EdgeInsets.all(12),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.sports_score_rounded, color: AppColors.teal, size: 20)),
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 20)),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Motor V2: deporte primero', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+            const Text('Marcador adaptado al deporte', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
             Text(TournamentEngineV2.resultContractText(scoringType, format), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
           ])),
@@ -667,15 +672,24 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         ]),
         TextField(
           controller: participants,
-          minLines: 8,
-          maxLines: 12,
+          minLines: 5,
+          maxLines: 8,
           textCapitalization: TextCapitalization.words,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             hintText: participantHintText(),
-            helperText: participantHelperText(),
+            helperText: 'Un nombre por línea. Ejemplo: Ana / Javi para una pareja.',
           ),
         ),
+        const SizedBox(height: 10),
+        if (participantNames.isEmpty)
+          const Text('Todavía no hay participantes preparados.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12))
+        else
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: participantNames.take(10).map((name) => TournamentRuleChip(label: name)).toList(),
+          ),
         const SizedBox(height: 10),
         Row(children: [
           TournamentRuleChip(label: '${participantNames.length} preparados'),
@@ -997,12 +1011,9 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         TournamentReviewRow(label: 'Participantes', value: '${names.length} · ${participantTypeTitle()}'),
         TournamentReviewRow(label: 'Partidos previstos', value: '${matches.length}'),
         TournamentReviewRow(label: 'Resultado', value: '${scoringTypeLabel(scoringType)} · ${scoringConfigShortText(scoringType, scoringConfig)}'),
-        TournamentReviewRow(label: 'Motor', value: 'Torneos V2 · deporte primero'),
         TournamentReviewRow(label: 'Calendario', value: scheduleMatches ? '${DateFormat('d MMM', 'es_ES').format(firstMatchDate)} · ${firstMatchTime.format(context)}' : 'Sin fechas'),
         TournamentReviewRow(label: 'Agenda', value: addToAgenda && scheduleMatches ? 'Sí' : 'No'),
       ])),
-      const SizedBox(height: 12),
-      TournamentPremiumMiniCard(),
       const SizedBox(height: 12),
       SectionHeader(title: 'Primeros partidos'),
       const SizedBox(height: 8),
@@ -1523,16 +1534,24 @@ class TournamentGroupHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AppCard(
     color: AppColors.navyDeep,
-    padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-    child: Row(children: [
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+      Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(18)),
+        child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 25),
+      ),
+      const SizedBox(width: 12),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Torneos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 23, letterSpacing: -.5)),
-        const SizedBox(height: 2),
-        Row(children: [
-          Flexible(child: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700))),
-          const SizedBox(width: 4),
-          const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 18),
-        ]),
+        const Text('Torneos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -.6)),
+        const SizedBox(height: 4),
+        Text(
+          'Competiciones de $subtitle',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800, fontSize: 13),
+        ),
       ])),
     ]),
   );
@@ -1544,7 +1563,9 @@ class TournamentSectionHeader extends StatelessWidget {
   const TournamentSectionHeader({super.key, required this.title, this.action});
   @override
   Widget build(BuildContext context) => Row(children: [
-    Expanded(child: Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 15))),
+    Container(width: 4, height: 18, decoration: BoxDecoration(color: AppColors.red, borderRadius: BorderRadius.circular(99))),
+    const SizedBox(width: 8),
+    Expanded(child: Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 16))),
     if (action != null) Text(action!, style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w800, fontSize: 12)),
   ]);
 }
@@ -1563,30 +1584,48 @@ class TournamentActiveCard extends StatelessWidget {
     final status = AppData.text(tournament['status'], 'active');
     final progress = matches.isEmpty ? 0.0 : (played / matches.length).clamp(0.0, 1.0);
     final scoring = AppData.text(tournament['scoring_type'], 'general');
+    final names = teamNameMap(teams);
+    final pendingMatches = matches.where((m) => AppData.text(m['status'], 'pending') != 'played').toList()
+      ..sort((a, b) {
+        final dateA = AppData.text(a['scheduled_at']);
+        final dateB = AppData.text(b['scheduled_at']);
+        if (dateA.isNotEmpty || dateB.isNotEmpty) return dateA.compareTo(dateB);
+        return AppData.intValue(a['round']).compareTo(AppData.intValue(b['round']));
+      });
+    final next = pendingMatches.isNotEmpty ? pendingMatches.first : null;
+    final nextText = matches.isEmpty
+        ? 'Sin partidos creados todavía'
+        : next == null
+            ? 'Todos los partidos jugados'
+            : 'Próximo: ${tournamentMatchSideName(next, names, true)} vs ${tournamentMatchSideName(next, names, false)}';
+    final progressText = matches.isEmpty ? '${teams.length} participantes' : '$played de ${matches.length} partidos jugados';
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: AppCard(
         onTap: onTap,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(13),
         child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
           TournamentIconBadge(scoringType: scoring, finished: status == 'finished'),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(AppData.text(tournament['name'], 'Competición'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05)),
-            const SizedBox(height: 5),
+            Text(AppData.text(tournament['name'], 'Competición'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 15.5, height: 1.08)),
+            const SizedBox(height: 6),
+            Text(nextText, maxLines: compact ? 1 : 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12.5, height: 1.22)),
+            const SizedBox(height: 7),
             Row(children: [
               Container(width: 6, height: 6, decoration: BoxDecoration(color: tournamentStatusColor(status), shape: BoxShape.circle)),
               const SizedBox(width: 5),
-              Expanded(child: Text(tournamentStatusLabel(status), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: tournamentStatusColor(status), fontWeight: FontWeight.w800, fontSize: 12))),
-              Text('Jornada ${currentTournamentRound(matches)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11)),
+              Expanded(child: Text(tournamentStatusLabel(status), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: tournamentStatusColor(status), fontWeight: FontWeight.w900, fontSize: 11.5))),
+              Text(progressText, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11.5)),
             ]),
-            if (!compact) ...[
+            if (!compact && matches.isNotEmpty) ...[
               const SizedBox(height: 8),
               ClipRRect(borderRadius: BorderRadius.circular(999), child: LinearProgressIndicator(value: progress, minHeight: 4, color: AppColors.green, backgroundColor: AppColors.lineSoft)),
             ],
           ])),
-          const SizedBox(width: 8),
-          Text('${teams.length}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12)),
+          const SizedBox(width: 6),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
         ]),
       ),
     );
@@ -1655,32 +1694,18 @@ class TournamentCleanEmptyState extends StatelessWidget {
   const TournamentCleanEmptyState({super.key, required this.onCreate});
 
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    AppCard(
-      padding: const EdgeInsets.all(18),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(width: 58, height: 58, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(20)), child: const Icon(Icons.emoji_events_rounded, color: AppColors.teal, size: 29)),
-        const SizedBox(height: 14),
-        const Text('Crea tu primera competición', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 19, letterSpacing: -.2)),
-        const SizedBox(height: 6),
-        const Text('Organiza una liga, eliminatoria, americano o partidos manuales. La app te crea partidos, tabla, resultados y agenda.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.35)),
-        const SizedBox(height: 16),
-        PrimaryButton(label: 'Crear torneo o liga', icon: Icons.add_rounded, onTap: onCreate),
-      ]),
-    ),
-    const SizedBox(height: 12),
-    AppCard(
-      padding: const EdgeInsets.all(14),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-        Text('Elige según tu grupo', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-        SizedBox(height: 10),
-        TournamentEmptyTip(icon: Icons.table_chart_rounded, title: 'Liga', body: 'Varias jornadas con clasificación.'),
-        TournamentEmptyTip(icon: Icons.account_tree_rounded, title: 'Eliminatoria', body: 'Copa rápida con rondas.'),
-        TournamentEmptyTip(icon: Icons.edit_calendar_rounded, title: 'Manual', body: 'Tú decides los cruces y fechas.'),
-        TournamentEmptyTip(icon: Icons.shuffle_rounded, title: 'Americano', body: 'Rondas rotativas para pádel o tenis.'),
-      ]),
-    ),
-  ]);
+  Widget build(BuildContext context) => AppCard(
+    padding: const EdgeInsets.all(18),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(width: 58, height: 58, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(20)), child: const Icon(Icons.emoji_events_rounded, color: AppColors.teal, size: 29)),
+      const SizedBox(height: 14),
+      const Text('Todavía no hay competiciones', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 19, letterSpacing: -.2)),
+      const SizedBox(height: 6),
+      const Text('Crea una liga, una eliminatoria o un torneo manual. Grupli te ayudará con los partidos, resultados y clasificación.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.35)),
+      const SizedBox(height: 16),
+      PrimaryButton(label: 'Crear torneo o liga', icon: Icons.add_rounded, onTap: onCreate),
+    ]),
+  );
 }
 
 class TournamentEmptyTip extends StatelessWidget {
@@ -4705,6 +4730,23 @@ Future<void> showTournamentBulkScheduleDialog(
   }
 }
 
+
+int tournamentDefaultSetRowsForSport(String scoringType, [dynamic scoringConfig]) {
+  switch (scoringResultModel(scoringType, scoringConfig)) {
+    case 'sets_games':
+      return 3;
+    case 'sets_points':
+      return 5;
+    default:
+      return scoringUsesSetMode(scoringType, scoringConfig) ? 3 : 1;
+  }
+}
+
+int tournamentInitialSetRowsForSport(String scoringType, [dynamic scoringConfig]) {
+  final maxRows = max(scoringBestOf(scoringType, scoringConfig), tournamentDefaultSetRowsForSport(scoringType, scoringConfig));
+  return max(1, min(maxRows, (maxRows / 2).floor() + 1));
+}
+
 Future<void> showMatchResultDialog(BuildContext context, {required Map<String, dynamic> match, required List<Map<String, dynamic>> teams, required String scoringType, Map<String, dynamic>? scoringConfig, required VoidCallback onChanged}) async {
   final names = teamNameMap(teams);
   final aName = tournamentMatchSideName(match, names, true);
@@ -4713,53 +4755,100 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
   final americano = isAmericanoMatch(match);
   final aController = TextEditingController(text: AppData.text(match['score_a']));
   final bController = TextEditingController(text: AppData.text(match['score_b']));
-  final setsController = TextEditingController(text: matchDetailSets(match).map((set) => '${set['a']}-${set['b']}').join('\n'));
+  final initialSets = matchDetailSets(match);
+  final configuredBestOf = scoringBestOf(scoringType, scoringConfig);
+  final maxSetRows = max(configuredBestOf, tournamentDefaultSetRowsForSport(scoringType, scoringConfig));
+  final initialSetRows = tournamentInitialSetRowsForSport(scoringType, scoringConfig);
+  final setRows = initialSets.isNotEmpty
+      ? initialSets.map((set) => {'a': AppData.intValue(set['a']), 'b': AppData.intValue(set['b'])}).toList()
+      : List<Map<String, int>>.generate(initialSetRows, (_) => {'a': 0, 'b': 0});
+  int simpleA = int.tryParse(aController.text.trim()) ?? 0;
+  int simpleB = int.tryParse(bController.text.trim()) ?? 0;
   final played = matchCountsForStandings(match);
   final result = await showDialog<String>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: Text('$aName vs $bName'),
-      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        AppCard(
-          color: AppColors.faint,
-          padding: const EdgeInsets.all(10),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(scoringEmoji(scoringType), style: const TextStyle(fontSize: 22)),
-            const SizedBox(width: 8),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(scoringResultInputTitle(scoringType, scoringConfig), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 13)),
-              const SizedBox(height: 3),
-              Text(scoringResultInputHelp(scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11.5, height: 1.25)),
-            ])),
-          ]),
-        ),
-        const SizedBox(height: 10),
-        if (setMode) ...[
-          const Text('Parciales', style: TextStyle(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          TextField(
-            controller: setsController,
-            minLines: 4,
-            maxLines: 7,
-            keyboardType: TextInputType.multiline,
-            decoration: InputDecoration(
-              hintText: scoringUsesGameSetMode(scoringType, scoringConfig) ? '6-7\n6-4\n6-0' : '25-21\n22-25\n15-12',
-              helperText: scoringUsesGameSetMode(scoringType, scoringConfig) ? 'Cada línea es un set con juegos.' : 'Cada línea es un set con puntos.',
-            ),
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        title: Text('$aName vs $bName'),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          AppCard(
+            color: AppColors.faint,
+            padding: const EdgeInsets.all(10),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(scoringEmoji(scoringType), style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 8),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(scoringResultInputTitle(scoringType, scoringConfig), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 13)),
+                const SizedBox(height: 3),
+                Text(
+                  setMode
+                      ? 'Toca + o - para poner cada parcial. Puedes añadir los sets que hagan falta hasta completar el partido.'
+                      : 'Toca + o - para poner el marcador. No hace falta escribir números a mano.',
+                  style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11.5, height: 1.25),
+                ),
+              ])),
+            ]),
           ),
-        ] else ...[
-          Row(children: [
-            Expanded(child: TextField(controller: aController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: matchInputLabel(scoringType, true, scoringConfig)))),
-            const SizedBox(width: 10),
-            Expanded(child: TextField(controller: bController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: matchInputLabel(scoringType, false, scoringConfig)))),
-          ]),
+          const SizedBox(height: 10),
+          if (setMode) ...[
+            Row(children: [
+              const Expanded(child: Text('Sets del partido', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
+              Text('${setRows.length}/$maxSetRows', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12)),
+            ]),
+            const SizedBox(height: 6),
+            ...List.generate(setRows.length, (index) {
+              final row = setRows[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _TournamentSetScoreEditor(
+                  label: 'Set ${index + 1}',
+                  aName: aName,
+                  bName: bName,
+                  aScore: row['a'] ?? 0,
+                  bScore: row['b'] ?? 0,
+                  canRemove: setRows.length > 1,
+                  onRemove: () => setDialogState(() => setRows.removeAt(index)),
+                  onChangedA: (value) => setDialogState(() => row['a'] = value),
+                  onChangedB: (value) => setDialogState(() => row['b'] = value),
+                ),
+              );
+            }),
+            if (setRows.length < maxSetRows) ...[
+              const SizedBox(height: 2),
+              SecondaryButton(
+                label: 'Añadir otro set',
+                icon: Icons.add_rounded,
+                onTap: () => setDialogState(() => setRows.add({'a': 0, 'b': 0})),
+              ),
+            ],
+          ] else ...[
+            const Text('Marcador del partido', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+            const SizedBox(height: 6),
+            AppCard(
+              color: AppColors.white,
+              padding: const EdgeInsets.all(10),
+              child: Column(children: [
+                _TournamentScoreStepper(
+                  name: aName,
+                  value: simpleA,
+                  onChanged: (value) => setDialogState(() => simpleA = value),
+                ),
+                const SizedBox(height: 8),
+                _TournamentScoreStepper(
+                  name: bName,
+                  value: simpleB,
+                  onChanged: (value) => setDialogState(() => simpleB = value),
+                ),
+              ]),
+            ),
+          ],
+        ])),
+        actions: [
+          if (played) TextButton(onPressed: () => Navigator.pop(context, 'reopen'), child: const Text('Borrar resultado')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, 'save'), child: const Text('Guardar')),
         ],
-      ])),
-      actions: [
-        if (played) TextButton(onPressed: () => Navigator.pop(context, 'reopen'), child: const Text('Borrar resultado')),
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        FilledButton(onPressed: () => Navigator.pop(context, 'save'), child: const Text('Guardar')),
-      ],
+      ),
     ),
   );
   final matchId = match['id'].toString();
@@ -4771,7 +4860,7 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
     }
     if (result != 'save') return;
     if (setMode) {
-      final parsed = parseSetScoreInput(setsController.text);
+      final parsed = setRows.where((set) => (set['a'] ?? 0) > 0 || (set['b'] ?? 0) > 0).map((set) => {'a': set['a'] ?? 0, 'b': set['b'] ?? 0}).toList();
       if (parsed.isEmpty) {
         if (context.mounted) await showToast(context, 'Introduce al menos un set válido.', danger: true);
         return;
@@ -4786,7 +4875,7 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
         if (context.mounted) await showToast(context, 'En este deporte no puede quedar empate a sets.', danger: true);
         return;
       }
-      final bestOf = scoringBestOf(scoringType, scoringConfig);
+      final bestOf = maxSetRows;
       final neededSets = (bestOf / 2).floor() + 1;
       final winnerSets = max(setsA, setsB);
       if (parsed.length > bestOf) {
@@ -4815,10 +4904,10 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
         'score_model': scoringResultModel(scoringType, scoringConfig),
       });
     } else {
-      final a = int.tryParse(aController.text.trim());
-      final b = int.tryParse(bController.text.trim());
-      if (a == null || b == null) {
-        if (context.mounted) await showToast(context, 'Introduce dos marcadores válidos.', danger: true);
+      final a = simpleA;
+      final b = simpleB;
+      if (a == 0 && b == 0) {
+        if (context.mounted) await showToast(context, 'Introduce un marcador antes de guardar.', danger: true);
         return;
       }
       if (!scoringAllowDraw(scoringType, scoringConfig) && a == b) {
@@ -4833,7 +4922,108 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
   } finally {
     aController.dispose();
     bController.dispose();
-    setsController.dispose();
+  }
+}
+
+
+class _TournamentSetScoreEditor extends StatelessWidget {
+  final String label;
+  final String aName;
+  final String bName;
+  final int aScore;
+  final int bScore;
+  final bool canRemove;
+  final VoidCallback onRemove;
+  final ValueChanged<int> onChangedA;
+  final ValueChanged<int> onChangedB;
+
+  const _TournamentSetScoreEditor({
+    required this.label,
+    required this.aName,
+    required this.bName,
+    required this.aScore,
+    required this.bScore,
+    required this.canRemove,
+    required this.onRemove,
+    required this.onChangedA,
+    required this.onChangedB,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.lineSoft),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text(label, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+          if (canRemove)
+            IconButton(
+              tooltip: 'Quitar set',
+              visualDensity: VisualDensity.compact,
+              onPressed: onRemove,
+              icon: const Icon(Icons.close_rounded, size: 18),
+            ),
+        ]),
+        const SizedBox(height: 8),
+        _TournamentScoreStepper(
+          name: aName,
+          value: aScore,
+          onChanged: onChangedA,
+        ),
+        const SizedBox(height: 8),
+        _TournamentScoreStepper(
+          name: bName,
+          value: bScore,
+          onChanged: onChangedB,
+        ),
+      ]),
+    );
+  }
+}
+
+class _TournamentScoreStepper extends StatelessWidget {
+  final String name;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  const _TournamentScoreStepper({required this.name, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Expanded(
+        child: Text(
+          name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800),
+        ),
+      ),
+      IconButton.filledTonal(
+        visualDensity: VisualDensity.compact,
+        onPressed: value <= 0 ? null : () => onChanged(value - 1),
+        icon: const Icon(Icons.remove_rounded, size: 18),
+      ),
+      SizedBox(
+        width: 46,
+        child: Text(
+          value.toString(),
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w900),
+        ),
+      ),
+      IconButton.filled(
+        visualDensity: VisualDensity.compact,
+        style: IconButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white),
+        onPressed: () => onChanged(value + 1),
+        icon: const Icon(Icons.add_rounded, size: 18),
+      ),
+    ]);
   }
 }
 

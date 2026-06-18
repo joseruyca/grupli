@@ -1,6 +1,6 @@
 # Grupli
 
-Versión actual: v16.24 — inicio del grupo más claro
+Versión actual: v16.26.1 — restauración web segura desde v16.26
 
 Esta versión rehace la app desde cero a nivel de interfaz Flutter.
 
@@ -269,3 +269,8 @@ Mejora de UX para la función **Qué llevamos** dentro de eventos:
 - Las ideas rápidas cambian según el tipo de evento: deporte, cena, fiesta o reunión.
 - El botón **Quitar lo que llevo** pasa dentro del modal de edición, con confirmación posterior.
 - No requiere SQL nuevo.
+
+
+## v16.26.1 Web Safe Restore
+
+Restauración basada en la versión v16.26 que se indicó como funcional. Para aislar el error de página blanca en web, se desactivan temporalmente Firebase Messaging y App Links, evitando plugins externos durante el arranque web. No cambia SQL ni Supabase.
