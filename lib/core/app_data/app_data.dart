@@ -18,7 +18,7 @@ class AppData {
     final current = sb.auth.currentSession;
     if (current == null) return null;
     try {
-      final refreshed = await sb.auth.refreshSession().timeout(const Duration(seconds: 8));
+      final refreshed = await sb.auth.refreshSession();
       return refreshed.session ?? sb.auth.currentSession;
     } catch (e) {
       final raw = e.toString();
@@ -1298,18 +1298,11 @@ class AppData {
     }
   }
 
-  static Future<int> createAgendaEventsForTournament(String groupId, String tournamentId, String tournamentName) async {
+  static Future<void> createAgendaEventsForTournament(String groupId, String tournamentId, String tournamentName) async {
     final data = await tournament(tournamentId);
     final teams = tournamentTeams(data);
     final names = teamNameMap(teams);
-    final matches = tournamentMatches(data).where((m) {
-      final status = AppData.text(m['status'], 'pending');
-      return AppData.text(m['scheduled_at']).isNotEmpty &&
-          AppData.text(m['event_id']).isEmpty &&
-          status != 'cancelled' &&
-          status != 'bye';
-    }).take(120).toList();
-    var createdCount = 0;
+    final matches = tournamentMatches(data).where((m) => AppData.text(m['scheduled_at']).isNotEmpty && AppData.text(m['event_id']).isEmpty).take(80).toList();
     for (final match in matches) {
       final start = DateTime.tryParse(AppData.text(match['scheduled_at']))?.toLocal();
       if (start == null) continue;
@@ -1322,9 +1315,7 @@ class AppData {
         2,
       );
       await sb.from('matches').update({'event_id': eventId, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', match['id']);
-      createdCount++;
     }
-    return createdCount;
   }
 
   static Future<void> generateMatches(
@@ -1676,11 +1667,7 @@ class AppData {
   }
 
   static Future<void> updateMatchStatus(String matchId, String status) async {
-    final current = asMap(await sb
-        .from('matches')
-        .select('id,event_id,tournament_id,team_a,team_b,round,round_name,scheduled_at,duration_minutes,location,court_name,notes,status,score_a,score_b,result_details')
-        .eq('id', matchId)
-        .single());
+    final current = asMap(await sb.from('matches').select('id,event_id,status,score_a,score_b,result_details').eq('id', matchId).single());
     final nextDetails = Map<String, dynamic>.from(asMap(current['result_details']));
     nextDetails['history'] = matchHistoryWithEntry(current, 'Estado cambiado', matchStatusLabel(status));
     final payload = {
@@ -1689,27 +1676,14 @@ class AppData {
       'updated_by': user?.id,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
-    final eventId = text(current['event_id']);
     if (status == 'cancelled') {
+      final eventId = text(current['event_id']);
       if (eventId.isNotEmpty) {
         try { await cancelEvent(eventId); } catch (_) {}
       }
       payload['event_id'] = null;
     }
     await sb.from('matches').update(payload).eq('id', matchId);
-
-    if (eventId.isNotEmpty && status != 'cancelled') {
-      try {
-        final start = DateTime.tryParse(text(current['scheduled_at']))?.toLocal();
-        if (start != null) {
-          final tournamentData = await tournament(text(current['tournament_id']));
-          final names = teamNameMap(tournamentTeams(tournamentData));
-          final updatedMatch = Map<String, dynamic>.from(current)..['status'] = status;
-          final title = tournamentMatchAgendaTitle(text(tournamentData['name'], 'Torneo'), updatedMatch, names);
-          await updateEvent(eventId, title, start, text(current['location']), tournamentMatchAgendaNotes(updatedMatch), 2);
-        }
-      } catch (_) {}
-    }
   }
 
   static Future<void> syncMatchAgendaEvent({
@@ -1818,18 +1792,6 @@ class AppData {
       courtName: courtName,
       syncAgenda: syncAgenda,
     );
-  }
-
-  static Future<Map<String, dynamic>?> tournamentMatchByEventId(String eventId) async {
-    final clean = eventId.trim();
-    if (clean.isEmpty) return null;
-    final rows = asList(await sb
-        .from('matches')
-        .select('id,tournament_id,group_id,event_id,status,round,round_name,scheduled_at')
-        .eq('event_id', clean)
-        .limit(1));
-    if (rows.isEmpty) return null;
-    return asMap(rows.first);
   }
 
   static Future<List<Map<String, dynamic>>> notifications() async {

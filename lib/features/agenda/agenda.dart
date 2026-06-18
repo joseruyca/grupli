@@ -645,28 +645,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
   }
 
-
-  Future<void> openLinkedTournament(Map<String, dynamic> event) async {
-    setState(() => saving = true);
-    try {
-      final match = await AppData.tournamentMatchByEventId(event['id'].toString());
-      if (!mounted) return;
-      final tournamentId = AppData.text(match?['tournament_id']);
-      if (tournamentId.isEmpty) {
-        await showToast(context, 'Este evento de Agenda no encuentra su torneo vinculado.', danger: true);
-        return;
-      }
-      await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => TournamentDetailSimpleScreen(tournamentId: tournamentId, group: widget.group),
-      ));
-      reload();
-    } catch (e) {
-      if (mounted) await showToast(context, humanError(e), danger: true);
-    } finally {
-      if (mounted) setState(() => saving = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_EventDetailData>(
@@ -693,20 +671,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           PageHeader(title: AppData.text(event['title'], 'Evento'), subtitle: AppData.text(widget.group['name'], 'Grupo'), leading: true),
           const SizedBox(height: 12),
           PremiumEventDetailHero(event: event, date: date, yes: yes, minPeople: minPeople),
-          if (eventIsTournamentEvent(event)) ...[
-            const SizedBox(height: 12),
-            AppCard(
-              color: AppColors.surface,
-              padding: const EdgeInsets.all(12),
-              child: Row(children: [
-                Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.amber.withOpacity(.16), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.emoji_events_rounded, color: AppColors.amber)),
-                const SizedBox(width: 10),
-                const Expanded(child: Text('Este plan viene de Torneos. Puedes abrir la competición para cambiar resultado, fecha o jornada.', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.25))),
-              ]),
-            ),
-            const SizedBox(height: 8),
-            SecondaryButton(label: 'Abrir torneo', icon: Icons.open_in_new_rounded, onTap: saving ? () {} : () => openLinkedTournament(event)),
-          ],
           if (AppData.text(event['location']).isNotEmpty) ...[
             const SizedBox(height: 12),
             EventLocationMapCard(address: AppData.text(event['location'])),

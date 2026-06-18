@@ -15,6 +15,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -22,7 +24,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 part 'core/theme/app_colors.dart';
 part 'core/app_data/app_data.dart';
-part 'core/premium/group_premium.dart';
 part 'features/onboarding/onboarding.dart';
 part 'features/auth/auth.dart';
 part 'features/groups/groups.dart';
@@ -36,23 +37,27 @@ part 'core/widgets/shared_widgets.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+@pragma('vm:entry-point')
+Future<void> grupliFirebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
-    await _bootstrapGrupli();
-  } catch (error, stackTrace) {
-    FlutterError.reportError(FlutterErrorDetails(
-      exception: error,
-      stack: stackTrace,
-      library: 'grupli startup',
-      context: ErrorDescription('while starting Grupli'),
-    ));
-    runApp(GrupliStartupErrorApp(error: error));
+    if (Firebase.apps.isEmpty) {
+      if (AppConfig.firebaseConfigured) {
+        await Firebase.initializeApp(options: PushNotificationService.firebaseOptions);
+      } else {
+        await Firebase.initializeApp();
+      }
+    }
+  } catch (_) {
+    // El handler de background nunca debe bloquear la recepción del mensaje.
   }
 }
 
-Future<void> _bootstrapGrupli() async {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (!kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(grupliFirebaseMessagingBackgroundHandler);
+  }
+
 
   // Android 15+ activa el modo edge-to-edge por defecto.
   // Mantenemos las barras del sistema limpias y usamos SafeArea global abajo
@@ -98,11 +103,7 @@ Future<void> _bootstrapGrupli() async {
   };
 
   Intl.defaultLocale = 'es_ES';
-  try {
-    await initializeDateFormatting('es_ES').timeout(const Duration(seconds: 6));
-  } catch (_) {
-    // La localización no debe dejar la web en blanco. La app puede seguir con los formatos por defecto.
-  }
+  await initializeDateFormatting('es_ES');
 
   if (!AppConfig.hasSupabaseRuntimeConfig) {
     runApp(const GrupliConfigurationMissingApp());
@@ -113,13 +114,13 @@ Future<void> _bootstrapGrupli() async {
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
     authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce),
-  ).timeout(const Duration(seconds: 12));
+  );
 
   runApp(const GrupliApp());
 }
 
 class AppConfig {
-  static const appVersion = 'v16.32.8';
+  static const appVersion = 'v16.23';
   static const enableRealtimeSubscriptions = false;
 
   // Security baseline:
@@ -157,72 +158,6 @@ class AppConfig {
       firebaseAppId.trim().isNotEmpty &&
       firebaseMessagingSenderId.trim().isNotEmpty &&
       firebaseProjectId.trim().isNotEmpty;
-}
-
-class GrupliStartupErrorApp extends StatelessWidget {
-  final Object error;
-  const GrupliStartupErrorApp({super.key, required this.error});
-
-  @override
-  Widget build(BuildContext context) {
-    final visibleDetail = kDebugMode ? error.toString() : 'Revisa las variables de entorno del despliegue y vuelve a cargar.';
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        backgroundColor: const Color(0xFFF7FBFA),
-        body: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 430),
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFFE4EFEE)),
-                  boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 24, offset: Offset(0, 12))],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.warning_amber_rounded, color: Color(0xFF087A78), size: 44),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Grupli no ha podido arrancar',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF12263A)),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'La página ha cargado, pero la app encontró un problema al iniciar. Esto evita la pantalla blanca y permite ver que el despliegue responde.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF2F7F6),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE4EFEE)),
-                      ),
-                      child: Text(
-                        visibleDetail,
-                        textAlign: TextAlign.left,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class GrupliConfigurationMissingApp extends StatelessWidget {
@@ -552,12 +487,7 @@ class _AppRootState extends State<AppRoot> {
     final prefs = await SharedPreferences.getInstance();
     final introSeen = prefs.getBool(OnboardingStore.seenKey) ?? false;
     final hasInvite = InviteLinks.currentCode != null;
-    Session? validSession;
-    try {
-      validSession = await AppData.recoverStoredSession().timeout(const Duration(seconds: 8), onTimeout: () => null);
-    } catch (_) {
-      validSession = null;
-    }
+    final validSession = await AppData.recoverStoredSession();
     if (!mounted) return;
     setState(() {
       _session = validSession;
@@ -658,11 +588,17 @@ class DirectPage extends StatelessWidget {
 // core/app_data/app_data.dart moved to part file.
 
 class PushNotificationService {
-  // Push notifications are intentionally disabled in this build.
-  // Reason: firebase_messaging_web was crashing the web runtime before Grupli could render.
-  // The app must stay usable first; real push notifications will be reintroduced later
-  // with a backend-validated setup and platform-specific QA.
-  static bool get pushEnabled => false;
+  static bool _initializing = false;
+  static bool _configured = false;
+  static bool _listenersReady = false;
+
+  static FirebaseOptions get firebaseOptions => const FirebaseOptions(
+    apiKey: AppConfig.firebaseApiKey,
+    appId: AppConfig.firebaseAppId,
+    messagingSenderId: AppConfig.firebaseMessagingSenderId,
+    projectId: AppConfig.firebaseProjectId,
+  );
+
   static String get platformLabel {
     if (kIsWeb) return 'web';
     return switch (defaultTargetPlatform) {
@@ -675,24 +611,121 @@ class PushNotificationService {
     };
   }
 
-  static Future<bool> configureIfPossible() async => false;
+  static Future<bool> configureIfPossible() async {
+    if (_configured) return true;
+    if (_initializing) return false;
+    if (kIsWeb && !AppConfig.firebaseConfigured) return false;
+    _initializing = true;
+    try {
+      if (Firebase.apps.isEmpty) {
+        if (AppConfig.firebaseConfigured) {
+          await Firebase.initializeApp(options: firebaseOptions);
+        } else {
+          await Firebase.initializeApp();
+        }
+      }
+      _configured = true;
+      _wireListenersOnce();
+      return true;
+    } catch (_) {
+      _configured = false;
+      return false;
+    } finally {
+      _initializing = false;
+    }
+  }
 
-  static Future<void> tryRegisterSilently() async {
-    // No-op. Keeps startup safe on web and mobile until push is configured again.
+  static void _wireListenersOnce() {
+    if (_listenersReady) return;
+    _listenersReady = true;
+
+    FirebaseMessaging.onMessage.listen((message) async {
+      // En foreground no duplicamos banners: la campana de Avisos lee las filas de Supabase.
+      // Android/iOS mostrarán la notificación automáticamente cuando llegue en background/killed.
+      await AppData.logQualityEvent(
+        'push_foreground_received',
+        screen: 'push',
+        message: message.notification?.title ?? AppData.text(message.data['title'], 'Push recibido'),
+        metadata: message.data,
+      );
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen(handleMessageTap);
+    FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
+      await AppData.registerDeviceToken(token, platformLabel);
+      await AppData.logQualityEvent('push_token_refresh', screen: 'push', message: 'Token actualizado');
+    });
+
+    FirebaseMessaging.instance.getInitialMessage().then((message) {
+      if (message != null) handleMessageTap(message);
+    });
+  }
+
+  static Future<void> handleMessageTap(RemoteMessage message) async {
+    final notificationId = AppData.text(message.data['notification_id']);
+    final groupId = AppData.text(message.data['group_id']);
+    if (notificationId.isNotEmpty) {
+      try {
+        await AppData.markNotificationRead(notificationId);
+      } catch (_) {}
+    }
+    final nav = appNavigatorKey.currentState;
+    if (nav == null) return;
+    if (groupId.isNotEmpty) {
+      final tab = notificationGroupTabFromValues(
+        AppData.text(message.data['route_type']),
+        AppData.text(message.data['type']),
+      );
+      await nav.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId, initialTab: tab)),
+        (route) => route.isFirst,
+      );
+    } else {
+      await nav.push(MaterialPageRoute(builder: (_) => NotificationsScreen(onChanged: () {})));
+    }
   }
 
   static Future<String?> enableForCurrentDevice() async {
-    await AppData.logQualityEvent(
-      'push_disabled_runtime',
-      screen: 'push',
-      message: 'Las notificaciones push todavía no están activadas en esta versión.',
-      metadata: {'platform': platformLabel},
-    );
-    return null;
+    final ready = await configureIfPossible();
+    if (!ready) return null;
+    final messaging = FirebaseMessaging.instance;
+    final settings = await messaging.requestPermission(alert: true, badge: true, sound: true);
+    if (settings.authorizationStatus == AuthorizationStatus.denied) {
+      await AppData.logQualityEvent('push_permission_denied', screen: 'push', message: 'Permiso denegado');
+      return null;
+    }
+    final token = await messaging.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
+    if (token != null && token.trim().isNotEmpty) {
+      await AppData.registerDeviceToken(token, platformLabel);
+      await AppData.logQualityEvent('push_token_registered', screen: 'push', message: 'Token registrado', metadata: {'platform': platformLabel});
+    }
+    return token;
+  }
+
+  static Future<void> tryRegisterSilently() async {
+    try {
+      final ready = await configureIfPossible();
+      if (!ready) return;
+      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      if (settings.authorizationStatus == AuthorizationStatus.denied || settings.authorizationStatus == AuthorizationStatus.notDetermined) return;
+      final token = await FirebaseMessaging.instance.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
+      if (token != null && token.trim().isNotEmpty) {
+        await AppData.registerDeviceToken(token, platformLabel);
+      }
+    } catch (_) {
+      // No bloquear la app si Firebase todavía no está configurado.
+    }
   }
 
   static Future<void> disableForCurrentDevice() async {
-    // No-op while push is disabled.
+    try {
+      final ready = await configureIfPossible();
+      if (!ready) return;
+      final token = await FirebaseMessaging.instance.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
+      if (token != null && token.trim().isNotEmpty) {
+        await AppData.disableCurrentDeviceToken(token);
+      }
+    } catch (_) {}
   }
 }
 
@@ -1115,54 +1148,16 @@ String tournamentCourtNameForIndex(Map<String, dynamic>? cfg, int orderInsideRou
 
 String tournamentMatchAgendaNotes(Map<String, dynamic> match) {
   final roundName = AppData.text(match['round_name'], 'Jornada ${AppData.intValue(match['round'], 1)}');
-  final status = AppData.text(match['status'], 'pending');
   final courtLine = AppData.text(match['court_name']).isEmpty ? '' : '\nPista/Mesa: ${AppData.text(match['court_name'])}';
-  final statusLine = status == 'postponed'
-      ? '\nEstado: partido aplazado'
-      : status == 'played'
-          ? '\nEstado: resultado registrado'
-          : '';
   final notes = AppData.text(match['notes']);
   final notesLine = notes.isEmpty ? '' : '\n\n$notes';
-  return 'Partido de torneo · $roundName$statusLine$courtLine$notesLine';
+  return 'Partido de torneo · $roundName$courtLine$notesLine';
 }
 
 String tournamentMatchAgendaTitle(String tournamentName, Map<String, dynamic> match, Map<String, String> names) {
   final a = tournamentMatchSideName(match, names, true);
   final b = tournamentMatchSideName(match, names, false);
-  final base = '$tournamentName: $a vs $b';
-  return AppData.text(match['status']) == 'postponed' ? 'Aplazado · $base' : base;
-}
-
-bool tournamentMatchHasAgendaEvent(Map<String, dynamic> match) => AppData.text(match['event_id']).isNotEmpty;
-
-bool tournamentMatchHasScheduledDate(Map<String, dynamic> match) => AppData.text(match['scheduled_at']).isNotEmpty;
-
-String tournamentMatchAgendaSyncLabel(Map<String, dynamic> match) {
-  final status = AppData.text(match['status'], 'pending');
-  if (status == 'cancelled') return 'Agenda cancelada';
-  if (status == 'bye') return 'Descanso';
-  if (tournamentMatchHasAgendaEvent(match)) return 'En Agenda';
-  if (tournamentMatchHasScheduledDate(match)) return 'Falta Agenda';
-  return 'Sin fecha';
-}
-
-IconData tournamentMatchAgendaSyncIcon(Map<String, dynamic> match) {
-  final status = AppData.text(match['status'], 'pending');
-  if (status == 'cancelled') return Icons.event_busy_rounded;
-  if (status == 'bye') return Icons.weekend_rounded;
-  if (tournamentMatchHasAgendaEvent(match)) return Icons.event_available_rounded;
-  if (tournamentMatchHasScheduledDate(match)) return Icons.event_note_rounded;
-  return Icons.event_rounded;
-}
-
-Color tournamentMatchAgendaSyncColor(Map<String, dynamic> match) {
-  final status = AppData.text(match['status'], 'pending');
-  if (status == 'cancelled') return AppColors.red;
-  if (status == 'bye') return AppColors.violet;
-  if (tournamentMatchHasAgendaEvent(match)) return AppColors.green;
-  if (tournamentMatchHasScheduledDate(match)) return AppColors.amber;
-  return AppColors.muted;
+  return '$tournamentName: $a vs $b';
 }
 
 String eliminationRoundName(int round, int size) {
@@ -1818,7 +1813,27 @@ String scoringValidationText(String type, [dynamic raw]) {
   }
 }
 
-bool tournamentFeatureIsPremium(String feature) => GrupliPremium.isPremiumFeature(feature);
+class GrupliPremium {
+  static const bool enabled = false;
+  static const int freeActiveTournamentsPerGroup = 1;
+  static const int freePlayersPerTournament = 16;
+  static const int freeRoundsPerTournament = 8;
+}
+
+bool tournamentFeatureIsPremium(String feature) {
+  return const {
+    'advanced_stats',
+    'groups_playoff',
+    'double_elimination',
+    'swiss',
+    'exports',
+    'public_page',
+    'smart_reminders',
+    'saved_templates',
+    'advanced_americano',
+    'result_confirmation',
+  }.contains(feature);
+}
 
 String scoringConfigShortText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
@@ -1930,64 +1945,6 @@ String standingMetricText(TeamStanding standing, String scoringType, [dynamic sc
   return 'PTS · ${scoringRankingLabel(scoringType, scoringConfig)} ${standing.goalDifference}';
 }
 
-
-String standingMainStatLabel(String scoringType, [dynamic scoringConfig]) {
-  if (scoringUsesGameSetMode(scoringType, scoringConfig)) return 'Sets';
-  if (scoringUsesPointSetMode(scoringType, scoringConfig)) return 'Sets';
-  if (scoringResultModel(scoringType, scoringConfig) == 'goals') return 'Goles';
-  if (scoringResultModel(scoringType, scoringConfig) == 'total_points') return 'Puntos';
-  return scoringScoreLabel(scoringType, scoringConfig);
-}
-
-String standingSecondaryStatLabel(String scoringType, [dynamic scoringConfig]) {
-  if (scoringUsesGameSetMode(scoringType, scoringConfig)) return 'Juegos';
-  if (scoringUsesPointSetMode(scoringType, scoringConfig)) return 'Puntos de set';
-  if (scoringResultModel(scoringType, scoringConfig) == 'goals') return 'Diferencia de goles';
-  if (scoringResultModel(scoringType, scoringConfig) == 'total_points') return 'Diferencia de puntos';
-  return 'Diferencia';
-}
-
-String standingForAgainstText(TeamStanding standing, String scoringType, [dynamic scoringConfig]) {
-  if (standing.americanoRawScore) {
-    final unit = scoringUsesGameSetMode(scoringType, scoringConfig)
-        ? 'juegos'
-        : scoringUsesPointSetMode(scoringType, scoringConfig)
-            ? 'puntos'
-            : scoringScoreLabel(scoringType, scoringConfig);
-    return '$unit ${standing.goalsFor}-${standing.goalsAgainst}';
-  }
-  if (scoringUsesSetMode(scoringType, scoringConfig)) {
-    final secondary = scoringUsesGameSetMode(scoringType, scoringConfig) ? 'juegos' : 'puntos';
-    return 'sets ${standing.goalsFor}-${standing.goalsAgainst} · $secondary ${standing.secondaryFor}-${standing.secondaryAgainst}';
-  }
-  final model = scoringResultModel(scoringType, scoringConfig);
-  if (model == 'goals') return 'GF ${standing.goalsFor} · GC ${standing.goalsAgainst} · DG ${standing.goalDifference}';
-  if (model == 'total_points') return 'PF ${standing.goalsFor} · PC ${standing.goalsAgainst} · DP ${standing.goalDifference}';
-  return '${scoringScoreLabel(scoringType, scoringConfig)} ${standing.goalsFor}-${standing.goalsAgainst} · DIF ${standing.goalDifference}';
-}
-
-String standingWinRateText(TeamStanding standing) {
-  if (standing.played <= 0) return '0%';
-  final value = ((standing.wins / standing.played) * 100).round();
-  return '$value%';
-}
-
-String tournamentStatsIntroText(String scoringType, [dynamic scoringConfig]) {
-  if (scoringUsesGameSetMode(scoringType, scoringConfig)) {
-    return 'La tabla usa puntos, victorias, sets y juegos reales para ordenar la clasificación.';
-  }
-  if (scoringUsesPointSetMode(scoringType, scoringConfig)) {
-    return 'La tabla usa puntos, victorias, sets y puntos de parcial para ordenar la clasificación.';
-  }
-  if (scoringResultModel(scoringType, scoringConfig) == 'goals') {
-    return 'La tabla usa puntos, victorias, empates, goles a favor, goles en contra y diferencia.';
-  }
-  if (scoringResultModel(scoringType, scoringConfig) == 'total_points') {
-    return 'La tabla usa victorias, puntos a favor, puntos en contra y diferencia.';
-  }
-  return 'La tabla usa puntos, victorias y diferencia según el marcador configurado.';
-}
-
 String matchInputLabel(String type, bool local, [dynamic raw]) {
   final side = local ? 'Local' : 'Visitante';
   switch (scoringResultModel(type, raw)) {
@@ -2024,7 +1981,7 @@ int matchSetGamesFor(Map<String, dynamic> match, bool local) {
 String matchPrimaryScoreText(Map<String, dynamic> match, String type, [dynamic raw]) {
   final a = AppData.intValue(match['score_a']);
   final b = AppData.intValue(match['score_b']);
-  if (scoringUsesSetMode(type, raw) && matchDetailSets(match).isNotEmpty) {
+  if (scoringUsesSetMode(type, raw)) {
     return 'Sets $a - $b';
   }
   return '$a - $b';
@@ -2318,13 +2275,8 @@ String standingsOrderTextForScoring(List<String> tieBreakers, String scoringType
 
 String standingRankReason(int index, List<TeamStanding> standings, List<String> tieBreakers, String scoringType, Map<String, dynamic>? scoringConfig) {
   final current = standings[index];
-  final diffLabel = scoringTableDifferenceLabel(scoringType, scoringConfig);
-  final diffValue = current.goalDifference >= 0 ? '+${current.goalDifference}' : '${current.goalDifference}';
   if (index == 0) {
-    if (current.americanoRawScore) {
-      return 'Lidera el ranking individual con ${current.points} pts acumulados y ${current.wins} victorias.';
-    }
-    return 'Lidera con ${current.points} pts · ${current.wins} victorias · $diffLabel $diffValue.';
+    return 'Lidera con ${current.points} pts · ${current.wins} victorias · ${current.goalDifference >= 0 ? '+' : ''}${current.goalDifference} de diferencia.';
   }
   final previous = standings[index - 1];
   if (current.points != previous.points) {
@@ -2333,21 +2285,14 @@ String standingRankReason(int index, List<TeamStanding> standings, List<String> 
   for (final breaker in tieBreakers) {
     if (breaker == 'points') continue;
     if (breaker == 'wins' && current.wins != previous.wins) return 'Desempate por victorias: ${previous.wins} vs ${current.wins}.';
-    if ((breaker == 'difference' || breaker == 'set_difference') && current.goalDifference != previous.goalDifference) {
-      return 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalDifference} vs ${current.goalDifference}.';
-    }
-    if (breaker == 'for' && current.goalsFor != previous.goalsFor) {
-      return 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalsFor} vs ${current.goalsFor}.';
-    }
-    if (breaker == 'game_difference' && current.secondaryDifference != previous.secondaryDifference) {
-      return 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryDifference} vs ${current.secondaryDifference}.';
-    }
-    if (breaker == 'games_for' && current.secondaryFor != previous.secondaryFor) {
-      return 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryFor} vs ${current.secondaryFor}.';
-    }
+    if ((breaker == 'difference') && current.goalDifference != previous.goalDifference) return 'Desempate por diferencia: ${previous.goalDifference} vs ${current.goalDifference}.';
+    if (breaker == 'for' && current.goalsFor != previous.goalsFor) return 'Desempate por puntos a favor: ${previous.goalsFor} vs ${current.goalsFor}.';
+    if (breaker == 'set_difference' && current.goalDifference != previous.goalDifference) return 'Desempate por diferencia de sets: ${previous.goalDifference} vs ${current.goalDifference}.';
+    if (breaker == 'game_difference' && current.secondaryDifference != previous.secondaryDifference) return 'Desempate por ${tieBreakerLabel(breaker)}: ${previous.secondaryDifference} vs ${current.secondaryDifference}.';
+    if (breaker == 'games_for' && current.secondaryFor != previous.secondaryFor) return 'Desempate por juegos/puntos a favor: ${previous.secondaryFor} vs ${current.secondaryFor}.';
     if (breaker == 'direct') return 'Mismo puntaje: se revisa enfrentamiento directo antes de seguir con la diferencia.';
   }
-  return 'Mismo puntaje. Se aplica el siguiente criterio configurado o el orden alfabético.';
+  return 'Mismo puntaje. Se aplica el siguiente criterio configurado o el orden manual.';
 }
 
 String matchHistoryEntryText(Map<String, dynamic> item) {
@@ -2395,18 +2340,8 @@ List<TeamStanding> calculateStandings(
         row.americanoRawScore = true;
       }
 
-      final hasSetDetails = matchDetailSets(match).isNotEmpty;
-      final hasRoundScoreDetails = details.containsKey('round_score_a') || details.containsKey('round_score_b') || AppData.text(details['score_model']) == 'americano_round';
-      final americanoScoreA = hasRoundScoreDetails
-          ? AppData.intValue(details['round_score_a'], scoreA)
-          : setMode && hasSetDetails
-              ? matchSetGamesFor(match, true)
-              : scoreA;
-      final americanoScoreB = hasRoundScoreDetails
-          ? AppData.intValue(details['round_score_b'], scoreB)
-          : setMode && hasSetDetails
-              ? matchSetGamesFor(match, false)
-              : scoreB;
+      final americanoScoreA = setMode ? matchSetGamesFor(match, true) : scoreA;
+      final americanoScoreB = setMode ? matchSetGamesFor(match, false) : scoreB;
 
       for (final row in aRows) {
         row.played++;
@@ -2419,7 +2354,7 @@ List<TeamStanding> calculateStandings(
         row.goalsAgainst += americanoScoreA;
       }
 
-      if (setMode && hasSetDetails) {
+      if (setMode) {
         for (final row in aRows) {
           row.secondaryFor += scoreA;
           row.secondaryAgainst += scoreB;
@@ -2430,7 +2365,7 @@ List<TeamStanding> calculateStandings(
         }
       }
 
-      if (americanoScoreA > americanoScoreB) {
+      if (scoreA > scoreB) {
         for (final row in aRows) {
           row.wins++;
           row.points += americanoScoreA;
@@ -2439,7 +2374,7 @@ List<TeamStanding> calculateStandings(
           row.losses++;
           row.points += americanoScoreB;
         }
-      } else if (americanoScoreA < americanoScoreB) {
+      } else if (scoreA < scoreB) {
         for (final row in bRows) {
           row.wins++;
           row.points += americanoScoreB;
@@ -2540,7 +2475,6 @@ class TeamStanding {
 
   int get goalDifference => goalsFor - goalsAgainst;
   int get secondaryDifference => secondaryFor - secondaryAgainst;
-  double get winRate => played <= 0 ? 0 : wins / played;
 }
 
 Future<void> showToast(BuildContext context, String message, {bool danger = false}) async {

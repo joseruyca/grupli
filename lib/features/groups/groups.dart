@@ -867,12 +867,6 @@ class _GroupShellState extends State<GroupShell> {
 
   void refresh() => _refreshGroupAndAll();
 
-  void selectTab(int nextTab) {
-    if (nextTab == tab) return;
-    appLightHaptic();
-    setState(() => tab = nextTab);
-  }
-
   void _refreshGroupAndAll() {
     if (!mounted) return;
     setState(() {
@@ -1013,7 +1007,7 @@ class _GroupShellState extends State<GroupShell> {
         final group = snapshot.data ?? _cachedGroup ?? <String, dynamic>{'id': widget.groupId, 'name': 'Grupo'};
         final name = AppData.text(group['name'], 'Grupo');
         final pages = [
-          GroupDashboardTab(group: group, refreshSeed: dashboardRefreshKey, onNavigateTab: selectTab, onGroupChanged: refresh),
+          GroupDashboardTab(group: group, refreshSeed: dashboardRefreshKey, onNavigateTab: (i) => setState(() => tab = i), onGroupChanged: refresh),
           CalendarTab(groupId: widget.groupId, group: group, refreshSeed: calendarRefreshKey),
           FinancesTab(group: group, refreshSeed: financeRefreshKey),
           TournamentsTab(group: group, refreshSeed: tournamentsRefreshKey),
@@ -1022,15 +1016,15 @@ class _GroupShellState extends State<GroupShell> {
         return WillPopScope(
           onWillPop: () async {
             if (tab != 0) {
-              selectTab(0);
+              setState(() => tab = 0);
               return false;
             }
             return true;
           },
           child: Scaffold(
             backgroundColor: AppColors.white,
-            body: IndexedStack(index: tab, children: pages),
-            bottomNavigationBar: GroupBottomNav(groupName: name, index: tab, onTap: selectTab),
+            body: pages[tab],
+            bottomNavigationBar: GroupBottomNav(groupName: name, index: tab, onTap: (i) => setState(() => tab = i)),
           ),
         );
       },

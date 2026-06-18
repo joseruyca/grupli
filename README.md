@@ -1,7 +1,5 @@
 # Grupli
 
-Versión interna: v16.32.3 — Vercel Cupertino import fix
-
 Versión actual: v16.24 — inicio del grupo más claro
 
 Esta versión rehace la app desde cero a nivel de interfaz Flutter.
@@ -24,40 +22,6 @@ Esta versión rehace la app desde cero a nivel de interfaz Flutter.
 ## SQL
 
 Para esta versión se recomienda ejecutar `supabase/all_in_one.sql` porque es una base limpia.
-
-
-
-## v16.32 — Premium preparado
-
-- Premium preparado como capa de permisos por grupo, sin pagos reales todavía.
-- Pantalla Premium añadida en Ajustes del grupo.
-- Bloqueos suaves preparados para funciones avanzadas futuras.
-- Grupos grandes y participantes amplios siguen siendo gratis.
-- Tercer puesto sigue siendo gratis.
-- No se añade SQL nuevo, pagos ni librerías.
-
-## v16.31 — Agenda integrada
-
-- Los partidos de torneo muestran claramente si están vinculados a Agenda, si les falta evento o si no tienen fecha.
-- La pestaña Partidos incorpora un resumen de Agenda del torneo.
-- Se pueden crear eventos de Agenda faltantes para partidos ya programados.
-- Cambiar fecha/pista de un partido crea o actualiza su evento de Agenda si corresponde.
-- Al cancelar un partido se cancela también su evento vinculado.
-- Desde un evento de Agenda que viene de Torneos se puede abrir la competición vinculada.
-- No añade SQL ni pagos.
-
-## v16.30 — Clasificación y estadísticas
-
-- Resumen superior en tabla de torneos.
-- Estadísticas adaptadas por deporte.
-- Desempates explicados con textos humanos.
-- Ranking americano tratado como ranking individual.
-- Base lista para estadísticas premium futuras, sin pagos reales.
-
-## v16.29 — Resultados perfectos por deporte
-
-Mejora controlada del asistente de creación de torneos: participantes visuales, botones para elegir miembros, crear parejas, añadir equipos o invitados, lista preparada con eliminación rápida y pegado manual como opción secundaria. No requiere SQL nuevo.
-
 
 ## v16.24 — Inicio del grupo más claro
 
@@ -305,25 +269,3 @@ Mejora de UX para la función **Qué llevamos** dentro de eventos:
 - Las ideas rápidas cambian según el tipo de evento: deporte, cena, fiesta o reunión.
 - El botón **Quitar lo que llevo** pasa dentro del modal de edición, con confirmación posterior.
 - No requiere SQL nuevo.
-
-
-## v16.29 — Resultados perfectos por deporte
-
-- Marcador de resultado adaptado al tipo de deporte.
-- Tenis y pádel registran sets completos con juegos.
-- Voleibol y ping pong registran parciales con puntos.
-- Fútbol y basket usan marcador simple por goles/puntos.
-- Americano usa marcador de ronda y ranking individual por puntos/juegos conseguidos.
-- El usuario no escribe resultados en un cuadro libre: usa controles + / -.
-- Sin SQL, sin pagos y sin librerías nuevas.
-
-
-## v16.32.2
-
-Vercel build fijado a Flutter 3.35.7 para evitar diferencias entre local y despliegue.
-
-
-## v16.32.3
-
-- Corrección Vercel: import explícito de `package:flutter/cupertino.dart` para `CupertinoPageTransitionsBuilder`.
-- No toca SQL, pagos, Supabase ni `.env`.
