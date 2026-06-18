@@ -6,7 +6,6 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:app_links/app_links.dart';
@@ -122,7 +121,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v16.32.5';
+  static const appVersion = 'v16.32.6';
   static const enableRealtimeSubscriptions = false;
 
   // Security baseline:
@@ -431,16 +430,6 @@ class GrupliApp extends StatelessWidget {
         fontFamily: 'Roboto',
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, surface: AppColors.white),
         visualDensity: VisualDensity.standard,
-        pageTransitionsTheme: const PageTransitionsTheme(
-          builders: {
-            TargetPlatform.android: ZoomPageTransitionsBuilder(),
-            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-            TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-            TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
-            TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
-            TargetPlatform.fuchsia: FadeUpwardsPageTransitionsBuilder(),
-          },
-        ),
         dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1, space: 1),
         chipTheme: ChipThemeData(
           backgroundColor: AppColors.surface,

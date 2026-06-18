@@ -1,32 +1,48 @@
-# Flutter / Dart
+# Local environment
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.push.example
+
+# Flutter/Dart
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
 .pub-cache/
-.pub/
 build/
+coverage/
 
-# Local environment files
-.env
-.env.*
-!.env.example
-!.env.push.example
-
-# Android / IDE
+# Android generated/local
 android/.gradle/
-android/build/
-*.iml
-.idea/
-
-# Secrets / keys
+android/local.properties
+android/**/outputs/
+android/app/google-services.json
 *.jks
 *.keystore
-*.p8
-*.p12
-*.pem
-*.key
+key.properties
 
-# OS
+# iOS generated/local
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Runner/GoogleService-Info.plist
+
+# IDE/OS
+.idea/
+.vscode/
+*.iml
 .DS_Store
 Thumbs.db
+
+# Security / local secrets
+*.env
+*.p8
+*.pem
+*.cer
+*.mobileprovision
+supabase/.temp/
+.supabase/
