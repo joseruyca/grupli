@@ -1,8 +1,10 @@
 {
-  "installCommand": "bash vercel_build.sh install",
+  "version": 2,
+  "installCommand": "echo Skipping install phase",
   "buildCommand": "bash vercel_build.sh build",
   "outputDirectory": "build/web",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/index.html" }
   ]
 }

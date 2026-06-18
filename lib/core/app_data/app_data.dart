@@ -18,7 +18,7 @@ class AppData {
     final current = sb.auth.currentSession;
     if (current == null) return null;
     try {
-      final refreshed = await sb.auth.refreshSession();
+      final refreshed = await sb.auth.refreshSession().timeout(const Duration(seconds: 8));
       return refreshed.session ?? sb.auth.currentSession;
     } catch (e) {
       final raw = e.toString();

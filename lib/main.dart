@@ -55,10 +55,23 @@ Future<void> grupliFirebaseMessagingBackgroundHandler(RemoteMessage message) asy
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await _bootstrapGrupli();
+  } catch (error, stackTrace) {
+    FlutterError.reportError(FlutterErrorDetails(
+      exception: error,
+      stack: stackTrace,
+      library: 'grupli startup',
+      context: ErrorDescription('while starting Grupli'),
+    ));
+    runApp(GrupliStartupErrorApp(error: error));
+  }
+}
+
+Future<void> _bootstrapGrupli() async {
   if (!kIsWeb) {
     FirebaseMessaging.onBackgroundMessage(grupliFirebaseMessagingBackgroundHandler);
   }
-
 
   // Android 15+ activa el modo edge-to-edge por defecto.
   // Mantenemos las barras del sistema limpias y usamos SafeArea global abajo
@@ -104,7 +117,11 @@ Future<void> main() async {
   };
 
   Intl.defaultLocale = 'es_ES';
-  await initializeDateFormatting('es_ES');
+  try {
+    await initializeDateFormatting('es_ES').timeout(const Duration(seconds: 6));
+  } catch (_) {
+    // La localización no debe dejar la web en blanco. La app puede seguir con los formatos por defecto.
+  }
 
   if (!AppConfig.hasSupabaseRuntimeConfig) {
     runApp(const GrupliConfigurationMissingApp());
@@ -115,13 +132,13 @@ Future<void> main() async {
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
     authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce),
-  );
+  ).timeout(const Duration(seconds: 12));
 
   runApp(const GrupliApp());
 }
 
 class AppConfig {
-  static const appVersion = 'v16.32.6';
+  static const appVersion = 'v16.32.7';
   static const enableRealtimeSubscriptions = false;
 
   // Security baseline:
@@ -554,7 +571,12 @@ class _AppRootState extends State<AppRoot> {
     final prefs = await SharedPreferences.getInstance();
     final introSeen = prefs.getBool(OnboardingStore.seenKey) ?? false;
     final hasInvite = InviteLinks.currentCode != null;
-    final validSession = await AppData.recoverStoredSession();
+    Session? validSession;
+    try {
+      validSession = await AppData.recoverStoredSession().timeout(const Duration(seconds: 8), onTimeout: () => null);
+    } catch (_) {
+      validSession = null;
+    }
     if (!mounted) return;
     setState(() {
       _session = validSession;
