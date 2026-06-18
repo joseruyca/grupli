@@ -6,6 +6,7 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:app_links/app_links.dart';
@@ -121,7 +122,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v16.32';
+  static const appVersion = 'v16.32.3';
   static const enableRealtimeSubscriptions = false;
 
   // Security baseline:
