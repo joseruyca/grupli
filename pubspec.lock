@@ -577,10 +577,10 @@ packages:
     dependency: transitive
     description:
       name: passkeys_doctor
-      sha256: "2198f73517c772684b7b804278a382294a68ed4d28bd13391a42f7403ba01112"
+      sha256: "83cbed79bff4b63b54a3f3b5d80aa8f68c9009b6a85fb432b5bb7918bb47c681"
       url: "https://pub.dev"
     source: hosted
-    version: "1.4.0"
+    version: "1.4.1"
   passkeys_platform_interface:
     dependency: transitive
     description:

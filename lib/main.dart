@@ -122,7 +122,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v16.32.3';
+  static const appVersion = 'v16.32.5';
   static const enableRealtimeSubscriptions = false;
 
   // Security baseline:
@@ -160,6 +160,72 @@ class AppConfig {
       firebaseAppId.trim().isNotEmpty &&
       firebaseMessagingSenderId.trim().isNotEmpty &&
       firebaseProjectId.trim().isNotEmpty;
+}
+
+class GrupliStartupErrorApp extends StatelessWidget {
+  final Object error;
+  const GrupliStartupErrorApp({super.key, required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleDetail = kDebugMode ? error.toString() : 'Revisa las variables de entorno del despliegue y vuelve a cargar.';
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFFF7FBFA),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 430),
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFE4EFEE)),
+                  boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 24, offset: Offset(0, 12))],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Color(0xFF087A78), size: 44),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Grupli no ha podido arrancar',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF12263A)),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'La página ha cargado, pero la app encontró un problema al iniciar. Esto evita la pantalla blanca y permite ver que el despliegue responde.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF2F7F6),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE4EFEE)),
+                      ),
+                      child: Text(
+                        visibleDetail,
+                        textAlign: TextAlign.left,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class GrupliConfigurationMissingApp extends StatelessWidget {

@@ -1,6 +1,6 @@
 # Grupli
 
-Versión interna: v16.32 — Premium preparado
+Versión interna: v16.32.3 — Vercel Cupertino import fix
 
 Versión actual: v16.24 — inicio del grupo más claro
 
@@ -316,3 +316,14 @@ Mejora de UX para la función **Qué llevamos** dentro de eventos:
 - Americano usa marcador de ronda y ranking individual por puntos/juegos conseguidos.
 - El usuario no escribe resultados en un cuadro libre: usa controles + / -.
 - Sin SQL, sin pagos y sin librerías nuevas.
+
+
+## v16.32.2
+
+Vercel build fijado a Flutter 3.35.7 para evitar diferencias entre local y despliegue.
+
+
+## v16.32.3
+
+- Corrección Vercel: import explícito de `package:flutter/cupertino.dart` para `CupertinoPageTransitionsBuilder`.
+- No toca SQL, pagos, Supabase ni `.env`.
