@@ -1,24 +1,18 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
 COMMAND="${1:-build}"
 
-# Grupli web recovery baseline:
-# Pin Flutter instead of tracking moving "stable".
-# This avoids Vercel changing runtime when Flutter stable advances.
-FLUTTER_VERSION="${FLUTTER_VERSION:-3.41.6}"
-export FLUTTER_HOME="$HOME/flutter-$FLUTTER_VERSION"
+export FLUTTER_HOME="$HOME/flutter"
 export PATH="$FLUTTER_HOME/bin:$PATH"
 export PUB_CACHE="$HOME/.pub-cache"
 export FLUTTER_SUPPRESS_ANALYTICS=true
 export CI=true
 
-if [ ! -x "$FLUTTER_HOME/bin/flutter" ]; then
-  echo "Installing Flutter $FLUTTER_VERSION..."
+if [ ! -d "$FLUTTER_HOME/.git" ]; then
+  echo "Installing Flutter stable..."
   rm -rf "$FLUTTER_HOME"
-  git clone https://github.com/flutter/flutter.git -b "$FLUTTER_VERSION" --depth 1 "$FLUTTER_HOME"
-else
-  echo "Using cached Flutter $FLUTTER_VERSION..."
+  git clone https://github.com/flutter/flutter.git -b stable --depth 1 "$FLUTTER_HOME"
 fi
 
 flutter --version
@@ -76,8 +70,7 @@ if [ "$COMMAND" = "build" ]; then
 
   rm -rf build .dart_tool
   flutter pub get
-
-  flutter build web --release --no-tree-shake-icons "${DART_DEFINES[@]}"
+  flutter build web --release --no-tree-shake-icons --no-wasm-dry-run "${DART_DEFINES[@]}"
 
   if [ ! -f "build/web/index.html" ]; then
     echo "ERROR: build/web/index.html was not generated."
