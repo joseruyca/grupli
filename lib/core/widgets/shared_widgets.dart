@@ -11,7 +11,7 @@ class GroupHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasCover = coverUrl.trim().isNotEmpty;
     return Container(
-      height: 126,
+      height: 148,
       decoration: BoxDecoration(
         color: AppColors.navHome,
         borderRadius: BorderRadius.circular(30),
@@ -56,9 +56,9 @@ class GroupHeroCard extends StatelessWidget {
                 shadows: [Shadow(color: Color(0x88000000), blurRadius: 12, offset: Offset(0, 3))],
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             const Text(
-              'Lo importante del grupo',
+              'Planes, gastos y torneos del grupo',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -132,83 +132,6 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-
-
-class GroupDashboardIntro extends StatelessWidget {
-  final Map<String, dynamic>? nextEvent;
-  final int pendingCount;
-  const GroupDashboardIntro({super.key, required this.nextEvent, required this.pendingCount});
-
-  @override
-  Widget build(BuildContext context) {
-    final text = nextEvent == null
-        ? 'Este grupo todavía no tiene planes próximos.'
-        : pendingCount > 0
-            ? (pendingCount == 1 ? 'Tienes 1 plan pendiente de confirmar.' : 'Tienes $pendingCount planes pendientes de confirmar.')
-            : 'El próximo plan ya está organizado.';
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Text(
-        text,
-        style: const TextStyle(color: AppColors.muted, fontSize: 14.5, fontWeight: FontWeight.w800, height: 1.32),
-      ),
-    );
-  }
-}
-
-class DashboardQuickActions extends StatelessWidget {
-  final VoidCallback? onAgenda;
-  final VoidCallback? onFinances;
-  final VoidCallback? onTournaments;
-  final VoidCallback? onMembers;
-  const DashboardQuickActions({super.key, this.onAgenda, this.onFinances, this.onTournaments, this.onMembers});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(children: [
-      Expanded(child: _DashboardQuickAction(icon: Icons.calendar_month_rounded, label: 'Agenda', color: AppColors.navAgenda, onTap: onAgenda)),
-      const SizedBox(width: 8),
-      Expanded(child: _DashboardQuickAction(icon: Icons.account_balance_wallet_rounded, label: 'Gastos', color: AppColors.navFinance, onTap: onFinances)),
-      const SizedBox(width: 8),
-      Expanded(child: _DashboardQuickAction(icon: Icons.emoji_events_rounded, label: 'Torneos', color: AppColors.navTournaments, onTap: onTournaments)),
-      const SizedBox(width: 8),
-      Expanded(child: _DashboardQuickAction(icon: Icons.group_rounded, label: 'Miembros', color: AppColors.teal, onTap: onMembers)),
-    ]);
-  }
-}
-
-class _DashboardQuickAction extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback? onTap;
-  const _DashboardQuickAction({required this.icon, required this.label, required this.color, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Container(
-          height: 78,
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.lineSoft),
-            boxShadow: const [BoxShadow(color: Color(0x070B1B2E), blurRadius: 16, offset: Offset(0, 7))],
-          ),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 7),
-            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 11.5, fontWeight: FontWeight.w900)),
-          ]),
-        ),
-      ),
-    );
-  }
-}
 
 class CompactInsightStrip extends StatelessWidget {
   final int events;
@@ -387,6 +310,7 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
     final maybe = attendanceCount(event, 'maybe');
     final no = attendanceCount(event, 'no');
     final mine = myAttendanceStatus(event);
+    final color = eventKindColor(event);
     final isTournament = eventIsTournamentEvent(event);
     final missing = max(0, minPeople - yes);
     final progress = minPeople <= 0 ? 0.0 : min(1.0, yes / minPeople);
@@ -424,16 +348,16 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
             const SizedBox(height: 7),
             Wrap(spacing: 10, runSpacing: 6, children: [
               Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.schedule_rounded, size: 15, color: Colors.white),
+                Icon(Icons.schedule_rounded, size: 15, color: color),
                 const SizedBox(width: 4),
                 Text(DateFormat('HH:mm', 'es_ES').format(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
               ]),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 210),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.place_outlined, size: 15, color: Colors.white),
+                  Icon(Icons.place_outlined, size: 15, color: color),
                   const SizedBox(width: 4),
-                  Flexible(child: Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white))),
+                  Flexible(child: Text(AppData.text(event['location'], 'Sin ubicación'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xDFFFFFFF)))),
                 ]),
               ),
             ]),
@@ -443,24 +367,15 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
         Row(children: [
           Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: progress, minHeight: 6, backgroundColor: Color(0x30FFFFFF), color: AppColors.green))),
           const SizedBox(width: 10),
-          Text('$yes/$minPeople van', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+          Text('$yes/$minPeople', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
         ]),
-        const SizedBox(height: 7),
-        Text(
-          yes + maybe + no == 0
-              ? 'Nadie ha respondido todavía. Faltan $missing respuestas.'
-              : 'Han respondido ${yes + maybe + no} de $minPeople personas. Faltan $missing.',
-          style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12.5, fontWeight: FontWeight.w800),
-        ),
         const SizedBox(height: 12),
-        const Text('¿Vas a venir?', style: TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: GlassAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'), showCount: false)),
+          Expanded(child: GlassAttendanceButton(label: 'Voy', count: yes, selected: mine == 'yes', color: AppColors.green, onTap: saving ? () {} : () => setStatus('yes'))),
           const SizedBox(width: 8),
-          Expanded(child: GlassAttendanceButton(label: 'Quizás', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'), showCount: false)),
+          Expanded(child: GlassAttendanceButton(label: 'Duda', count: maybe, selected: mine == 'maybe', color: AppColors.amber, onTap: saving ? () {} : () => setStatus('maybe'))),
           const SizedBox(width: 8),
-          Expanded(child: GlassAttendanceButton(label: 'No', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'), showCount: false)),
+          Expanded(child: GlassAttendanceButton(label: 'No voy', count: no, selected: mine == 'no', color: AppColors.red, onTap: saving ? () {} : () => setStatus('no'))),
         ]),
       ]),
     );
@@ -515,8 +430,7 @@ class GlassAttendanceButton extends StatelessWidget {
   final bool selected;
   final Color color;
   final VoidCallback onTap;
-  final bool showCount;
-  const GlassAttendanceButton({super.key, required this.label, required this.count, required this.selected, required this.color, required this.onTap, this.showCount = true});
+  const GlassAttendanceButton({super.key, required this.label, required this.count, required this.selected, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
@@ -537,10 +451,8 @@ class GlassAttendanceButton extends StatelessWidget {
           Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: selected ? Colors.white : color, size: 15),
           const SizedBox(width: 5),
           Text(label, style: TextStyle(color: selected ? Colors.white : color, fontSize: 12.5, fontWeight: FontWeight.w900)),
-          if (showCount) ...[
-            const SizedBox(width: 4),
-            Text(count.toString(), style: TextStyle(color: selected ? Colors.white : color, fontSize: 12.5, fontWeight: FontWeight.w900)),
-          ],
+          const SizedBox(width: 4),
+          Text(count.toString(), style: TextStyle(color: selected ? Colors.white : color, fontSize: 12.5, fontWeight: FontWeight.w900)),
         ]),
       ),
     ),
@@ -604,27 +516,25 @@ class DashboardActivityCard extends StatelessWidget {
       if (date == null) continue;
       final yes = attendanceCount(event, 'yes');
       final minPeople = AppData.intValue(event['min_people'], 1);
-      final missing = max(0, minPeople - yes);
       items.add(_DashboardActivityItem(
         date: date,
         icon: Icons.event_available_rounded,
         color: eventKindColor(event),
-        title: 'Plan: ${AppData.text(event['title'], 'Quedada')}',
-        body: missing == 0 ? '${shortWeekday(date)} ${date.day} · listo' : '${shortWeekday(date)} ${date.day} · faltan $missing respuestas',
+        title: AppData.text(event['title'], 'Quedada'),
+        body: '${shortWeekday(date)} ${date.day} · $yes/$minPeople',
         onTapKind: 'calendar',
       ));
     }
 
     for (final expense in expenses.take(2)) {
       final created = DateTime.tryParse(expense['created_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
-      final paid = AppData.text(expense['status'], 'pending') == 'paid';
-      final status = paid ? 'Liquidado' : 'Pendiente';
+      final status = AppData.text(expense['status'], 'pending') == 'paid' ? 'liquidado' : 'pendiente';
       items.add(_DashboardActivityItem(
         date: created,
         icon: Icons.account_balance_wallet_rounded,
-        color: paid ? AppColors.green : AppColors.amber,
-        title: 'Gasto: ${AppData.text(expense['concept'], 'Gasto')}',
-        body: '$status · ${money(AppData.doubleValue(expense['amount']))}',
+        color: AppData.text(expense['status'], 'pending') == 'paid' ? AppColors.green : AppColors.amber,
+        title: AppData.text(expense['concept'], 'Gasto'),
+        body: '${money(AppData.doubleValue(expense['amount']))} · $status',
         onTapKind: 'finances',
       ));
     }
@@ -643,7 +553,7 @@ class DashboardActivityCard extends StatelessWidget {
     }
 
     items.sort((a, b) => b.date.compareTo(a.date));
-    return items.take(2).toList();
+    return items.take(3).toList();
   }
 
   @override
@@ -1467,42 +1377,31 @@ class PrimaryButton extends StatelessWidget {
   const PrimaryButton({super.key, required this.label, required this.onTap, this.icon, this.loading = false});
 
   @override
-  Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(18);
-    return PressableScale(
-      onTap: loading ? null : onTap,
-      borderRadius: radius,
-      pressedScale: .975,
-      child: SizedBox(
-        width: double.infinity,
-        height: 54,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            gradient: const LinearGradient(colors: [AppColors.tealDark, AppColors.teal], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            boxShadow: const [BoxShadow(color: Color(0x22008F86), blurRadius: 18, offset: Offset(0, 8))],
-          ),
-          child: Center(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 150),
-              child: loading
-                  ? const SizedBox(key: ValueKey('loading'), width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
-                  : Row(
-                      key: const ValueKey('content'),
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(icon ?? Icons.check_rounded, color: Colors.white, size: 20),
-                        const SizedBox(width: 9),
-                        Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: -.1)),
-                      ],
-                    ),
-            ),
-          ),
-        ),
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    height: 54,
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(colors: [AppColors.tealDark, AppColors.teal], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        boxShadow: const [BoxShadow(color: Color(0x22008F86), blurRadius: 18, offset: Offset(0, 8))],
       ),
-    );
-  }
+      child: FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        ),
+        onPressed: loading ? null : onTap,
+        icon: loading
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : Icon(icon ?? Icons.check_rounded, size: 20),
+        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: -.1)),
+      ),
+    ),
+  );
 }
 
 class SecondaryButton extends StatelessWidget {
@@ -1512,28 +1411,21 @@ class SecondaryButton extends StatelessWidget {
   const SecondaryButton({super.key, required this.label, required this.icon, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(17);
-    return PressableScale(
-      onTap: onTap,
-      borderRadius: radius,
-      pressedScale: .975,
-      child: Container(
-        width: double.infinity,
-        height: 54,
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: radius,
-          border: Border.all(color: const Color(0x33008F86)),
-        ),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 20, color: AppColors.teal),
-          const SizedBox(width: 9),
-          Text(label, style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900)),
-        ]),
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    height: 54,
+    child: OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        backgroundColor: AppColors.white,
+        foregroundColor: AppColors.teal,
+        side: const BorderSide(color: Color(0x33008F86)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
       ),
-    );
-  }
+      onPressed: onTap,
+      icon: Icon(icon, size: 20),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
+    ),
+  );
 }
 
 class DangerButton extends StatelessWidget {
@@ -1585,10 +1477,9 @@ class AppCard extends StatelessWidget {
       child: child,
     );
     if (onTap == null) return card;
-    return PressableScale(
-      onTap: onTap,
-      borderRadius: radius,
-      child: card,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(borderRadius: radius, onTap: onTap, child: card),
     );
   }
 }
@@ -1656,68 +1547,6 @@ class CircleIconButton extends StatelessWidget {
 
 class OrDivider extends StatelessWidget { const OrDivider({super.key}); @override Widget build(BuildContext context) => Row(children: const [Expanded(child: Divider()), Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('o', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700))), Expanded(child: Divider())]); }
 
-
-void appLightHaptic() {
-  if (kIsWeb) return;
-  try {
-    HapticFeedback.selectionClick();
-  } catch (_) {
-    // Haptic feedback is optional and must never block the UI.
-  }
-}
-
-class PressableScale extends StatefulWidget {
-  final Widget child;
-  final VoidCallback? onTap;
-  final BorderRadius? borderRadius;
-  final double pressedScale;
-  final bool haptic;
-
-  const PressableScale({
-    super.key,
-    required this.child,
-    this.onTap,
-    this.borderRadius,
-    this.pressedScale = .985,
-    this.haptic = true,
-  });
-
-  @override
-  State<PressableScale> createState() => _PressableScaleState();
-}
-
-class _PressableScaleState extends State<PressableScale> {
-  bool _pressed = false;
-
-  void _setPressed(bool value) {
-    if (_pressed == value || !mounted || widget.onTap == null) return;
-    setState(() => _pressed = value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final radius = widget.borderRadius ?? BorderRadius.circular(18);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: widget.onTap == null ? null : (_) => _setPressed(true),
-      onTapCancel: widget.onTap == null ? null : () => _setPressed(false),
-      onTapUp: widget.onTap == null
-          ? null
-          : (_) {
-              _setPressed(false);
-              if (widget.haptic) appLightHaptic();
-              widget.onTap?.call();
-            },
-      child: AnimatedScale(
-        scale: _pressed ? widget.pressedScale : 1,
-        duration: const Duration(milliseconds: 95),
-        curve: Curves.easeOutCubic,
-        child: widget.child,
-      ),
-    );
-  }
-}
-
 class StatCard extends StatelessWidget {
   final IconData icon;
   final String value;
@@ -1773,10 +1602,9 @@ class GroupHomeCard extends StatelessWidget {
       child: Semantics(
         button: true,
         label: 'Abrir grupo $name',
-        child: PressableScale(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: onTap,
-          borderRadius: BorderRadius.circular(26),
-          pressedScale: .985,
           child: Container(
             height: 116,
             decoration: BoxDecoration(
@@ -1957,12 +1785,11 @@ class BottomBar extends StatelessWidget {
       final spec = items[i];
       final color = navColorFor(i, items.length);
       return Expanded(
-        child: PressableScale(
-          onTap: active ? null : () => onTap(i),
+        child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          pressedScale: .94,
+          onTap: () => onTap(i),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 210),
+            duration: const Duration(milliseconds: 180),
             curve: Curves.easeOutCubic,
             height: 58,
             padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
@@ -1971,21 +1798,16 @@ class BottomBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               boxShadow: active ? [BoxShadow(color: color.withOpacity(.24), blurRadius: 16, offset: const Offset(0, 7))] : null,
             ),
-            child: AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOutCubic,
-              style: TextStyle(fontSize: items.length >= 5 ? 9.4 : 10.2, fontWeight: FontWeight.w900, color: active ? Colors.white : AppColors.muted),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                AnimatedScale(
-                  scale: active ? 1.06 : 1,
-                  duration: const Duration(milliseconds: 160),
-                  curve: Curves.easeOutCubic,
-                  child: Icon(spec.icon, size: 22, color: active ? Colors.white : color),
-                ),
-                const SizedBox(height: 3),
-                Text(spec.label, maxLines: 1, overflow: TextOverflow.ellipsis),
-              ]),
-            ),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(spec.icon, size: 22, color: active ? Colors.white : color),
+              const SizedBox(height: 3),
+              Text(
+                spec.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: items.length >= 5 ? 9.4 : 10.2, fontWeight: FontWeight.w900, color: active ? Colors.white : AppColors.muted),
+              ),
+            ]),
           ),
         ),
       );

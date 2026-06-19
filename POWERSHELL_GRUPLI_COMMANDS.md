@@ -1,19 +1,19 @@
-# Grupli v16.24 — comandos PowerShell
+# Grupli v16.23 — comandos PowerShell
 
 ## Instalar ZIP conservando `.env` y `.git`
 
 ```powershell
 $Dest = "$env:USERPROFILE\Desktop\grupliv2"
 
-$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v16.24-group-home-clarity*.zip" |
+$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v16.23-global-ux-simplification*.zip" |
   Sort-Object LastWriteTime -Descending |
   Select-Object -First 1
 
 if (-not $Zip) {
-  throw "No encuentro el ZIP v16.24 en Descargas."
+  throw "No encuentro el ZIP v16.23 en Descargas."
 }
 
-$Temp = "$env:TEMP\grupli_extract_v1624"
+$Temp = "$env:TEMP\grupli_extract_v1623"
 $EnvBackup = "$env:TEMP\grupli_env_backup.txt"
 $GitBackup = "$env:TEMP\grupli_git_backup"
 
@@ -75,7 +75,7 @@ Set-ExecutionPolicy -Scope Process Bypass -Force
 ```powershell
 Copy-Item `
   "$env:USERPROFILE\Desktop\grupliv2\build\app\outputs\flutter-apk\app-debug.apk" `
-  "$env:USERPROFILE\Desktop\Grupli-v16.24.apk" `
+  "$env:USERPROFILE\Desktop\Grupli-v16.23.apk" `
   -Force
 ```
 
@@ -102,6 +102,6 @@ cd "$env:USERPROFILE\Desktop\grupliv2"
 
 git status
 git add -A
-git commit -m "Improve group home clarity"
+git commit -m "Simplify global UX"
 git push -u origin main
 ```

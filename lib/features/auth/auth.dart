@@ -259,12 +259,6 @@ class _AuthedShellState extends State<AuthedShell> {
 
   void refresh() => setState(() => refreshKey++);
 
-  void selectTab(int nextTab) {
-    if (nextTab == tab) return;
-    appLightHaptic();
-    setState(() => tab = nextTab);
-  }
-
   Future<void> _handleGroupNavigationResult(dynamic result) async {
     if (!mounted || result == null) return;
     final shouldRefresh = result == true || result is Map;
@@ -289,12 +283,12 @@ class _AuthedShellState extends State<AuthedShell> {
     final pages = [
       HomeScreen(key: ValueKey('home-$refreshKey'), onChanged: refresh),
       NotificationsScreen(onChanged: refresh),
-      ProfileScreen(onChanged: refresh, onNavigateRoot: selectTab),
+      ProfileScreen(onChanged: refresh, onNavigateRoot: (i) => setState(() => tab = i)),
     ];
     return Scaffold(
       backgroundColor: AppColors.white,
-      body: IndexedStack(index: tab, children: pages),
-      bottomNavigationBar: RootBottomNav(index: tab, onTap: selectTab),
+      body: pages[tab],
+      bottomNavigationBar: RootBottomNav(index: tab, onTap: (i) => setState(() => tab = i)),
     );
   }
 }

@@ -1,6 +1,6 @@
 # Grupli
 
-Versión actual: v16.24 — inicio del grupo más claro
+Versión actual: v16.23 — simplificación UX global
 
 Esta versión rehace la app desde cero a nivel de interfaz Flutter.
 
@@ -22,10 +22,6 @@ Esta versión rehace la app desde cero a nivel de interfaz Flutter.
 ## SQL
 
 Para esta versión se recomienda ejecutar `supabase/all_in_one.sql` porque es una base limpia.
-
-## v16.24 — Inicio del grupo más claro
-
-Pulido de la pantalla de inicio del grupo cuando hay un evento próximo: banner más compacto, frase de contexto, sección `Lo próximo` más humana, botones cortos `Voy / Quizás / No`, resumen de respuestas fuera de los botones, accesos rápidos grandes y `Últimos cambios` más claro. No requiere SQL nuevo.
 
 ## v12.2 — Corrección de producto
 
