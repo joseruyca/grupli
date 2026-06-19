@@ -1,6 +1,0 @@
-*.sh text eol=lf
-*.dart text eol=lf
-*.json text eol=lf
-*.yaml text eol=lf
-*.yml text eol=lf
-*.md text eol=lf
