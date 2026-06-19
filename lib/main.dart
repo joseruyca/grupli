@@ -8,12 +8,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:app_links/app_links.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -34,8 +37,27 @@ part 'core/widgets/shared_widgets.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
+@pragma('vm:entry-point')
+Future<void> grupliFirebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    if (Firebase.apps.isEmpty) {
+      if (AppConfig.firebaseConfigured) {
+        await Firebase.initializeApp(options: PushNotificationService.firebaseOptions);
+      } else {
+        await Firebase.initializeApp();
+      }
+    }
+  } catch (_) {
+    // El handler de background nunca debe bloquear la recepción del mensaje.
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (!kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(grupliFirebaseMessagingBackgroundHandler);
+  }
+
 
   // Android 15+ activa el modo edge-to-edge por defecto.
   // Mantenemos las barras del sistema limpias y usamos SafeArea global abajo
@@ -98,7 +120,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v16.25.3-web-safe';
+  static const appVersion = 'v16.26';
   static const enableRealtimeSubscriptions = false;
 
   // Security baseline:
@@ -341,6 +363,16 @@ class GrupliApp extends StatelessWidget {
         fontFamily: 'Roboto',
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, surface: AppColors.white),
         visualDensity: VisualDensity.standard,
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: ZoomPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+            TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+            TargetPlatform.fuchsia: FadeUpwardsPageTransitionsBuilder(),
+          },
+        ),
         dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1, space: 1),
         chipTheme: ChipThemeData(
           backgroundColor: AppColors.surface,
@@ -415,9 +447,21 @@ class _AppRootState extends State<AppRoot> {
   }
 
   Future<void> _startAppLinkListener() async {
-    // Rescate web: deep links externos quedan desactivados temporalmente.
-    // La app puede seguir aceptando codigos manuales/enlaces copiados sin cargar plugins web.
-    return;
+    if (kIsWeb) return;
+    final links = AppLinks();
+    try {
+      final initial = await links.getInitialLink();
+      if (initial != null) {
+        await _handleIncomingInviteLink(initial, source: 'initial');
+      }
+    } catch (_) {
+      // Los enlaces externos nunca deben impedir que la app arranque.
+    }
+
+    _appLinksSub = links.uriLinkStream.listen(
+      (uri) => _handleIncomingInviteLink(uri, source: 'stream'),
+      onError: (_) {},
+    );
   }
 
   Future<void> _handleIncomingInviteLink(Uri uri, {required String source}) async {
@@ -554,7 +598,16 @@ class DirectPage extends StatelessWidget {
 // core/app_data/app_data.dart moved to part file.
 
 class PushNotificationService {
-  static bool get _pushUnavailable => true;
+  static bool _initializing = false;
+  static bool _configured = false;
+  static bool _listenersReady = false;
+
+  static FirebaseOptions get firebaseOptions => const FirebaseOptions(
+    apiKey: AppConfig.firebaseApiKey,
+    appId: AppConfig.firebaseAppId,
+    messagingSenderId: AppConfig.firebaseMessagingSenderId,
+    projectId: AppConfig.firebaseProjectId,
+  );
 
   static String get platformLabel {
     if (kIsWeb) return 'web';
@@ -569,21 +622,120 @@ class PushNotificationService {
   }
 
   static Future<bool> configureIfPossible() async {
-    // Rescate estable: no inicializamos Firebase ni Firebase Messaging.
-    // Evita el crash web "Cannot read properties of undefined (reading 'init')".
-    return false;
+    if (_configured) return true;
+    if (_initializing) return false;
+    if (kIsWeb && !AppConfig.firebaseConfigured) return false;
+    _initializing = true;
+    try {
+      if (Firebase.apps.isEmpty) {
+        if (AppConfig.firebaseConfigured) {
+          await Firebase.initializeApp(options: firebaseOptions);
+        } else {
+          await Firebase.initializeApp();
+        }
+      }
+      _configured = true;
+      _wireListenersOnce();
+      return true;
+    } catch (_) {
+      _configured = false;
+      return false;
+    } finally {
+      _initializing = false;
+    }
+  }
+
+  static void _wireListenersOnce() {
+    if (_listenersReady) return;
+    _listenersReady = true;
+
+    FirebaseMessaging.onMessage.listen((message) async {
+      // En foreground no duplicamos banners: la campana de Avisos lee las filas de Supabase.
+      // Android/iOS mostrarán la notificación automáticamente cuando llegue en background/killed.
+      await AppData.logQualityEvent(
+        'push_foreground_received',
+        screen: 'push',
+        message: message.notification?.title ?? AppData.text(message.data['title'], 'Push recibido'),
+        metadata: message.data,
+      );
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen(handleMessageTap);
+    FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
+      await AppData.registerDeviceToken(token, platformLabel);
+      await AppData.logQualityEvent('push_token_refresh', screen: 'push', message: 'Token actualizado');
+    });
+
+    FirebaseMessaging.instance.getInitialMessage().then((message) {
+      if (message != null) handleMessageTap(message);
+    });
+  }
+
+  static Future<void> handleMessageTap(RemoteMessage message) async {
+    final notificationId = AppData.text(message.data['notification_id']);
+    final groupId = AppData.text(message.data['group_id']);
+    if (notificationId.isNotEmpty) {
+      try {
+        await AppData.markNotificationRead(notificationId);
+      } catch (_) {}
+    }
+    final nav = appNavigatorKey.currentState;
+    if (nav == null) return;
+    if (groupId.isNotEmpty) {
+      final tab = notificationGroupTabFromValues(
+        AppData.text(message.data['route_type']),
+        AppData.text(message.data['type']),
+      );
+      await nav.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId, initialTab: tab)),
+        (route) => route.isFirst,
+      );
+    } else {
+      await nav.push(MaterialPageRoute(builder: (_) => NotificationsScreen(onChanged: () {})));
+    }
   }
 
   static Future<String?> enableForCurrentDevice() async {
-    return null;
+    final ready = await configureIfPossible();
+    if (!ready) return null;
+    final messaging = FirebaseMessaging.instance;
+    final settings = await messaging.requestPermission(alert: true, badge: true, sound: true);
+    if (settings.authorizationStatus == AuthorizationStatus.denied) {
+      await AppData.logQualityEvent('push_permission_denied', screen: 'push', message: 'Permiso denegado');
+      return null;
+    }
+    final token = await messaging.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
+    if (token != null && token.trim().isNotEmpty) {
+      await AppData.registerDeviceToken(token, platformLabel);
+      await AppData.logQualityEvent('push_token_registered', screen: 'push', message: 'Token registrado', metadata: {'platform': platformLabel});
+    }
+    return token;
   }
 
   static Future<void> tryRegisterSilently() async {
-    return;
+    try {
+      final ready = await configureIfPossible();
+      if (!ready) return;
+      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      if (settings.authorizationStatus == AuthorizationStatus.denied || settings.authorizationStatus == AuthorizationStatus.notDetermined) return;
+      final token = await FirebaseMessaging.instance.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
+      if (token != null && token.trim().isNotEmpty) {
+        await AppData.registerDeviceToken(token, platformLabel);
+      }
+    } catch (_) {
+      // No bloquear la app si Firebase todavía no está configurado.
+    }
   }
 
   static Future<void> disableForCurrentDevice() async {
-    return;
+    try {
+      final ready = await configureIfPossible();
+      if (!ready) return;
+      final token = await FirebaseMessaging.instance.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
+      if (token != null && token.trim().isNotEmpty) {
+        await AppData.disableCurrentDeviceToken(token);
+      }
+    } catch (_) {}
   }
 }
 
