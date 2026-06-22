@@ -867,6 +867,12 @@ class _GroupShellState extends State<GroupShell> {
 
   void refresh() => _refreshGroupAndAll();
 
+  void selectTab(int nextTab) {
+    if (nextTab == tab) return;
+    appLightHaptic();
+    setState(() => tab = nextTab);
+  }
+
   void _refreshGroupAndAll() {
     if (!mounted) return;
     setState(() {
@@ -1007,7 +1013,7 @@ class _GroupShellState extends State<GroupShell> {
         final group = snapshot.data ?? _cachedGroup ?? <String, dynamic>{'id': widget.groupId, 'name': 'Grupo'};
         final name = AppData.text(group['name'], 'Grupo');
         final pages = [
-          GroupDashboardTab(group: group, refreshSeed: dashboardRefreshKey, onNavigateTab: (i) => setState(() => tab = i), onGroupChanged: refresh),
+          GroupDashboardTab(group: group, refreshSeed: dashboardRefreshKey, onNavigateTab: selectTab, onGroupChanged: refresh),
           CalendarTab(groupId: widget.groupId, group: group, refreshSeed: calendarRefreshKey),
           FinancesTab(group: group, refreshSeed: financeRefreshKey),
           TournamentsTab(group: group, refreshSeed: tournamentsRefreshKey),
@@ -1016,15 +1022,15 @@ class _GroupShellState extends State<GroupShell> {
         return WillPopScope(
           onWillPop: () async {
             if (tab != 0) {
-              setState(() => tab = 0);
+              selectTab(0);
               return false;
             }
             return true;
           },
           child: Scaffold(
             backgroundColor: AppColors.white,
-            body: pages[tab],
-            bottomNavigationBar: GroupBottomNav(groupName: name, index: tab, onTap: (i) => setState(() => tab = i)),
+            body: IndexedStack(index: tab, children: pages),
+            bottomNavigationBar: GroupBottomNav(groupName: name, index: tab, onTap: selectTab),
           ),
         );
       },
@@ -1068,15 +1074,12 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
   @override
   Widget build(BuildContext context) {
     final group = widget.group;
-    final groupId = group['id'].toString();
     final name = AppData.text(group['name'], 'Grupo');
     return SafeArea(
       bottom: false,
-      child: Stack(
-        children: [
-          FutureBuilder<_GroupDashboardData>(
-            future: future,
-            builder: (context, snapshot) {
+      child: FutureBuilder<_GroupDashboardData>(
+        future: future,
+        builder: (context, snapshot) {
               final data = snapshot.data;
               final events = data?.events ?? <Map<String, dynamic>>[];
               final upcoming = data?.upcomingEvents ?? <Map<String, dynamic>>[];
@@ -1130,7 +1133,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                 color: AppColors.teal,
                 onRefresh: () async => reload(),
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 112),
+                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 96),
                   children: [
                     Row(children: [
                       RoundBackButton(onTap: () => Navigator.of(context).pop()),
@@ -1162,15 +1165,17 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                       onEdit: openGroupSettings,
                       onMore: openGroupActions,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     if (snapshot.connectionState == ConnectionState.waiting)
                       const CenterLoader(label: 'Cargando resumen...')
                     else if (snapshot.hasError)
                       ErrorBlock(message: snapshot.error.toString(), onRetry: reload)
                     else ...[
+                      GroupDashboardIntro(nextEvent: nextEvent, pendingCount: myDecisionPending.length),
+                      const SizedBox(height: 14),
                       SectionHeader(
                         title: 'Lo próximo',
-                        action: nextEvent == null ? 'Crear' : 'Calendario',
+                        action: nextEvent == null ? 'Crear plan' : 'Ver planes',
                         onTap: nextEvent == null ? openCreateEvent : () => widget.onNavigateTab?.call(1),
                       ),
                       const SizedBox(height: 8),
@@ -1185,7 +1190,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                       else
                         DashboardEventCard(event: nextEvent, group: group, onChanged: reload),
                       const SizedBox(height: 16),
-                      SectionHeader(title: 'Último del grupo', action: 'Ver agenda', onTap: () => widget.onNavigateTab?.call(1)),
+                      const SectionHeader(title: 'Últimos cambios'),
                       const SizedBox(height: 8),
                       DashboardActivityCard(
                         events: events,
@@ -1199,23 +1204,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                   ],
                 ),
               );
-            },
-          ),
-          Positioned(
-            right: 20,
-            bottom: 20,
-            child: FloatingActionButton(
-              heroTag: 'create-event-$groupId',
-              backgroundColor: AppColors.teal,
-              foregroundColor: Colors.white,
-              onPressed: () async {
-                final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => CreateEventScreen(group: group)));
-                if (ok == true) reload();
-              },
-              child: const Icon(Icons.add_rounded),
-            ),
-          ),
-        ],
+        },
       ),
     );
   }

@@ -1,21 +1,31 @@
-# Grupli v16.23 — comandos PowerShell
+# Grupli v16.32.3 — comandos PowerShell
 
-## Instalar ZIP conservando `.env` y `.git`
+Versión basada en v16.32.2 con el fix web probado:
+
+- `supabase_flutter: 2.8.3`
+- `app_links: 6.4.1`
+
+## Instalar conservando `.env` y `.git`
 
 ```powershell
+$ErrorActionPreference = "Stop"
+
 $Dest = "$env:USERPROFILE\Desktop\grupliv2"
 
-$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v16.23-global-ux-simplification*.zip" |
+$Zip = Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "grupli-flutter-v16.32.3-web-working-deps*.zip" |
   Sort-Object LastWriteTime -Descending |
   Select-Object -First 1
 
 if (-not $Zip) {
-  throw "No encuentro el ZIP v16.23 en Descargas."
+  throw "No encuentro el ZIP grupli-flutter-v16.32.3-web-working-deps en Descargas."
 }
 
-$Temp = "$env:TEMP\grupli_extract_v1623"
-$EnvBackup = "$env:TEMP\grupli_env_backup.txt"
-$GitBackup = "$env:TEMP\grupli_git_backup"
+$Temp = Join-Path $env:TEMP ("grupli_extract_v16323_" + [guid]::NewGuid().ToString("N"))
+$EnvBackup = Join-Path $env:TEMP "grupli_env_backup.txt"
+$GitBackup = Join-Path $env:TEMP "grupli_git_backup"
+
+Remove-Item $Temp -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Path $Temp -Force | Out-Null
 
 if (Test-Path "$Dest\.env") {
   Copy-Item "$Dest\.env" $EnvBackup -Force
@@ -26,16 +36,22 @@ if (Test-Path "$Dest\.git") {
   Copy-Item "$Dest\.git" $GitBackup -Recurse -Force
 }
 
-Remove-Item $Temp -Recurse -Force -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Path $Temp -Force | Out-Null
-
 Expand-Archive -Path $Zip.FullName -DestinationPath $Temp -Force
+
+$Pubspec = Get-ChildItem $Temp -Recurse -Filter "pubspec.yaml" -File | Sort-Object { $_.FullName.Length } | Select-Object -First 1
+if (-not $Pubspec) {
+  throw "El ZIP no contiene pubspec.yaml."
+}
+
+$SourceRoot = $Pubspec.Directory.FullName
 
 Get-ChildItem $Dest -Force | Where-Object {
   $_.Name -ne ".env" -and $_.Name -ne ".git"
 } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
-Get-ChildItem $Temp -Force | Copy-Item -Destination $Dest -Recurse -Force
+Get-ChildItem $SourceRoot -Force | Where-Object {
+  $_.Name -ne ".env" -and $_.Name -ne ".git" -and $_.Name -ne ".dart_tool" -and $_.Name -ne "build"
+} | Copy-Item -Destination $Dest -Recurse -Force
 
 if (Test-Path $EnvBackup) {
   Copy-Item $EnvBackup "$Dest\.env" -Force
@@ -48,60 +64,33 @@ if (Test-Path $GitBackup) {
 
 Remove-Item $Temp -Recurse -Force -ErrorAction SilentlyContinue
 cd $Dest
+
+git status --short
 ```
 
-## Comprobar, APK y web
+## Subir a GitHub
 
 ```powershell
-cd "$env:USERPROFILE\Desktop\grupliv2"
-
-Remove-Item ".\test" -Recurse -Force -ErrorAction SilentlyContinue
-
-flutter clean
-Remove-Item ".\.dart_tool" -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item ".\build" -Recurse -Force -ErrorAction SilentlyContinue
-
-flutter pub get
-flutter analyze --no-fatal-infos --no-fatal-warnings
-
-Set-ExecutionPolicy -Scope Process Bypass -Force
-.\scripts\build_android_debug_apk.ps1
-
-.\scripts\build_web_release.ps1
-```
-
-## Copiar APK
-
-```powershell
-Copy-Item `
-  "$env:USERPROFILE\Desktop\grupliv2\build\app\outputs\flutter-apk\app-debug.apk" `
-  "$env:USERPROFILE\Desktop\Grupli-v16.23.apk" `
-  -Force
-```
-
-## GitHub
-
-Si Git vuelve a intentar usar `C:/`, no añadas `C:/` como safe directory. Usa:
-
-```powershell
-cd "$env:USERPROFILE\Desktop\grupliv2"
-
-Remove-Item Env:GIT_DIR -ErrorAction SilentlyContinue
-Remove-Item Env:GIT_WORK_TREE -ErrorAction SilentlyContinue
-
-$SafePath = (Resolve-Path "$env:USERPROFILE\Desktop\grupliv2").Path.Replace('\','/')
-git config --global --add safe.directory $SafePath
-
-git status
-```
-
-Después:
-
-```powershell
+$ErrorActionPreference = "Stop"
 cd "$env:USERPROFILE\Desktop\grupliv2"
 
 git status
+
 git add -A
-git commit -m "Simplify global UX"
+git commit -m "Restore v16.32.3 with working web dependencies"
 git push -u origin main
+```
+
+## Comprobar dependencias clave antes de subir
+
+```powershell
+cd "$env:USERPROFILE\Desktop\grupliv2"
+Select-String -Path ".\pubspec.yaml" -Pattern "supabase_flutter|app_links"
+```
+
+Debe salir:
+
+```text
+supabase_flutter: 2.8.3
+app_links: 6.4.1
 ```
