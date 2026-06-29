@@ -325,3 +325,10 @@ Mejora de UX para la función **Qué llevamos** dentro de eventos:
 ## v16.32.2
 
 Vercel build fijado a Flutter 3.35.7 para evitar diferencias entre local y despliegue.
+
+
+## v16.39.0 — Loading cleanup + agenda compile fix
+
+- Loader estándar y centrado.
+- Corrección null-safety en Agenda para build web.
+- Dependencias web estables conservadas.

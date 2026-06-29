@@ -601,7 +601,7 @@ class _AppRootState extends State<AppRoot> {
   @override
   Widget build(BuildContext context) {
     final child = !_ready
-        ? const Scaffold(backgroundColor: AppColors.white, body: CenterLoader(label: 'Preparando Grupli...'))
+        ? const Scaffold(backgroundColor: AppColors.white, body: CenterLoader(label: 'Cargando...'))
         : _session == null
             ? (_showOnboarding ? OnboardingScreen(onFinish: _finishOnboarding) : WelcomeScreen(onShowIntro: _restartOnboarding))
             : const AuthedShell();

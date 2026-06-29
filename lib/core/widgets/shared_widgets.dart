@@ -2101,37 +2101,27 @@ class CenterLoader extends StatelessWidget {
   const CenterLoader({super.key, required this.label});
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 42),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const SizedBox(width: 58, height: 58, child: CustomPaint(painter: GrupliLoadingMarkPainter())),
-          const SizedBox(height: 14),
-          Text(label, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.35)),
-        ]),
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 34),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 34,
+                height: 34,
+                child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.teal),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.35),
+              ),
+            ],
+          ),
+        ),
       );
-}
-
-class GrupliLoadingMarkPainter extends CustomPainter {
-  const GrupliLoadingMarkPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bg = Paint()..color = AppColors.tealSoft;
-    final line = Paint()
-      ..color = AppColors.teal
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4
-      ..strokeCap = StrokeCap.round;
-    canvas.drawRRect(RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(18)), bg);
-    final path = Path()
-      ..moveTo(size.width * .24, size.height * .56)
-      ..quadraticBezierTo(size.width * .38, size.height * .32, size.width * .52, size.height * .52)
-      ..quadraticBezierTo(size.width * .64, size.height * .70, size.width * .78, size.height * .42);
-    canvas.drawPath(path, line);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class ErrorBlock extends StatelessWidget {
