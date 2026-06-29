@@ -1295,7 +1295,7 @@ class AgendaHumanFocusCard extends StatelessWidget {
     final needsAnswer = upcoming.where((event) {
       final mine = myAttendanceStatus(event);
       final minPeople = AppData.intValue(event['min_people'], 2);
-      return mine.isEmpty || attendanceCount(event, 'yes') < minPeople;
+      return (mine == null || mine.isEmpty) || attendanceCount(event, 'yes') < minPeople;
     }).length;
     final next = upcoming.isNotEmpty ? upcoming.first : null;
     final nextDate = next == null ? null : DateTime.tryParse(AppData.text(next['starts_at']))?.toLocal();
