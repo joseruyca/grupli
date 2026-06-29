@@ -86,13 +86,13 @@ Future<void> main() async {
                 Icon(Icons.error_outline_rounded, color: Color(0xFF087A78), size: 42),
                 SizedBox(height: 14),
                 Text(
-                  'Algo no ha ido bien',
+                  'La conexión titubeó',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF12263A)),
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Cierra esta pantalla y vuelve a intentarlo. Si se repite, envíanos un reporte desde Ayuda.',
+                  'No pasa nada. Vuelve atrás, inténtalo otra vez y Grupli recuperará el hilo.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
                 ),
@@ -127,7 +127,7 @@ Future<void> main() async {
 }
 
 class AppConfig {
-  static const appVersion = 'v16.33';
+  static const appVersion = 'v16.34';
   static const enableRealtimeSubscriptions = false;
 
   // Security baseline:
@@ -257,13 +257,13 @@ class GrupliStartupErrorApp extends StatelessWidget {
                     Icon(Icons.sync_problem_rounded, color: Color(0xFF087A78), size: 42),
                     SizedBox(height: 14),
                     Text(
-                      'No se ha podido arrancar Grupli',
+                      'Grupli no ha encontrado el camino',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF12263A)),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'Hay un problema temporal cargando la configuración segura. Actualiza la página o vuelve a abrir la app.',
+                      'La configuración segura no respondió a tiempo. Actualiza la página o vuelve a abrir la app.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
                     ),
@@ -422,9 +422,9 @@ class GrupliApp extends StatelessWidget {
       },
       theme: ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: AppColors.white,
+        scaffoldBackgroundColor: AppColors.bgShell,
         fontFamily: 'Roboto',
-        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, surface: AppColors.white),
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, surface: AppColors.surface),
         visualDensity: VisualDensity.standard,
         pageTransitionsTheme: PageTransitionsTheme(
           builders: {
@@ -445,12 +445,12 @@ class GrupliApp extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         ),
         textTheme: const TextTheme(
-          headlineLarge: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.04, letterSpacing: -0.85),
-          headlineMedium: TextStyle(fontSize: 24.5, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.08, letterSpacing: -0.45),
+          headlineLarge: TextStyle(fontSize: 31.2, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.02, letterSpacing: -1.05),
+          headlineMedium: TextStyle(fontSize: 25.6, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.06, letterSpacing: -0.55),
           titleLarge: TextStyle(fontSize: 19.5, fontWeight: FontWeight.w900, color: AppColors.ink, letterSpacing: -0.2),
           titleMedium: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.22),
           bodyLarge: TextStyle(fontSize: 16, color: AppColors.ink, height: 1.42),
-          bodyMedium: TextStyle(fontSize: 14.2, color: AppColors.muted, height: 1.42, fontWeight: FontWeight.w600),
+          bodyMedium: TextStyle(fontSize: 14.6, color: AppColors.muted, height: 1.44, fontWeight: FontWeight.w600),
           labelLarge: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900),
         ),
         inputDecorationTheme: InputDecorationTheme(
@@ -458,9 +458,9 @@ class GrupliApp extends StatelessWidget {
           fillColor: AppColors.surface,
           hintStyle: const TextStyle(color: Color(0xFF9AA4B5)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: AppColors.line)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: AppColors.line)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: AppColors.teal, width: 1.4)),
+          border: OutlineInputBorder(borderRadius: AppColors.humanRadius, borderSide: const BorderSide(color: AppColors.line)),
+          enabledBorder: OutlineInputBorder(borderRadius: AppColors.humanRadius, borderSide: const BorderSide(color: AppColors.line)),
+          focusedBorder: OutlineInputBorder(borderRadius: AppColors.humanRadius, borderSide: const BorderSide(color: AppColors.teal, width: 1.6)),
         ),
       ),
       locale: const Locale('es'),
@@ -615,27 +615,55 @@ class AppSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFF8FAFC), Color(0xFFEEF6F5)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 430),
-        child: Container(
-          decoration: const BoxDecoration(
-            color: AppColors.white,
-            boxShadow: [BoxShadow(color: Color(0x10111B34), blurRadius: 32, offset: Offset(0, 10))],
+    return DecoratedBox(
+      decoration: const BoxDecoration(color: AppColors.bgShell),
+      child: Stack(
+        children: [
+          const Positioned.fill(child: CustomPaint(painter: GrupliAmbientPainter())),
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: AppColors.white,
+                  boxShadow: [BoxShadow(color: AppColors.softShadow, blurRadius: 34, offset: Offset(0, 12))],
+                ),
+                child: child,
+              ),
+            ),
           ),
-          child: child,
-        ),
+        ],
       ),
     );
   }
+}
+
+class GrupliAmbientPainter extends CustomPainter {
+  const GrupliAmbientPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    paint.color = AppColors.tealSoft.withOpacity(.55);
+    canvas.drawOval(Rect.fromLTWH(-size.width * .28, size.height * .05, size.width * .62, size.height * .28), paint);
+    paint.color = AppColors.orangeSoft.withOpacity(.62);
+    canvas.drawOval(Rect.fromLTWH(size.width * .58, size.height * .16, size.width * .52, size.height * .22), paint);
+    paint.color = AppColors.violetSoft.withOpacity(.48);
+    canvas.drawOval(Rect.fromLTWH(size.width * .12, size.height * .72, size.width * .78, size.height * .2), paint);
+
+    final dot = Paint()..color = const Color(0x08062133);
+    const step = 18.0;
+    for (double y = 0; y < size.height; y += step) {
+      final offset = ((y / step).round().isEven ? 0.0 : 7.0);
+      for (double x = offset; x < size.width; x += step) {
+        canvas.drawCircle(Offset(x, y), .45, dot);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class DirectPage extends StatelessWidget {

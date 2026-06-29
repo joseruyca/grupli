@@ -1459,7 +1459,7 @@ class FieldLabel extends StatelessWidget {
   @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 7), child: Text(text, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)));
 }
 
-class PrimaryButton extends StatelessWidget {
+class PrimaryButton extends StatefulWidget {
   final String label;
   final IconData? icon;
   final VoidCallback onTap;
@@ -1467,36 +1467,55 @@ class PrimaryButton extends StatelessWidget {
   const PrimaryButton({super.key, required this.label, required this.onTap, this.icon, this.loading = false});
 
   @override
+  State<PrimaryButton> createState() => _PrimaryButtonState();
+}
+
+class _PrimaryButtonState extends State<PrimaryButton> {
+  bool hovering = false;
+
+  @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(18);
-    return PressableScale(
-      onTap: loading ? null : onTap,
-      borderRadius: radius,
-      pressedScale: .975,
-      child: SizedBox(
-        width: double.infinity,
-        height: 54,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            gradient: const LinearGradient(colors: [AppColors.tealDark, AppColors.teal], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            boxShadow: const [BoxShadow(color: Color(0x22008F86), blurRadius: 18, offset: Offset(0, 8))],
-          ),
-          child: Center(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 150),
-              child: loading
-                  ? const SizedBox(key: ValueKey('loading'), width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
-                  : Row(
-                      key: const ValueKey('content'),
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(icon ?? Icons.check_rounded, color: Colors.white, size: 20),
-                        const SizedBox(width: 9),
-                        Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: -.1)),
-                      ],
-                    ),
+    final radius = AppColors.humanRadius;
+    return MouseRegion(
+      onEnter: (_) => setState(() => hovering = true),
+      onExit: (_) => setState(() => hovering = false),
+      child: AnimatedSlide(
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOutCubic,
+        offset: hovering ? const Offset(0, -.025) : Offset.zero,
+        child: PressableScale(
+          onTap: widget.loading ? null : widget.onTap,
+          borderRadius: radius,
+          pressedScale: .975,
+          child: SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              decoration: BoxDecoration(
+                borderRadius: radius,
+                color: AppColors.tealDark,
+                border: Border.all(color: hovering ? AppColors.humanAccent : AppColors.teal, width: hovering ? 2.4 : 1.2),
+                boxShadow: const [BoxShadow(color: AppColors.mediumShadow, blurRadius: 22, offset: Offset(0, 10))],
+              ),
+              child: Center(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 150),
+                  child: widget.loading
+                      ? const SizedBox(key: ValueKey('loading'), width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
+                      : Row(
+                          key: const ValueKey('content'),
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(widget.icon ?? Icons.check_rounded, color: Colors.white, size: 20),
+                            const SizedBox(width: 9),
+                            Text(widget.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: -.15)),
+                          ],
+                        ),
+                ),
+              ),
             ),
           ),
         ),
@@ -1505,32 +1524,50 @@ class PrimaryButton extends StatelessWidget {
   }
 }
 
-class SecondaryButton extends StatelessWidget {
+class SecondaryButton extends StatefulWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
   const SecondaryButton({super.key, required this.label, required this.icon, required this.onTap});
 
   @override
+  State<SecondaryButton> createState() => _SecondaryButtonState();
+}
+
+class _SecondaryButtonState extends State<SecondaryButton> {
+  bool hovering = false;
+
+  @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(17);
-    return PressableScale(
-      onTap: onTap,
-      borderRadius: radius,
-      pressedScale: .975,
-      child: Container(
-        width: double.infinity,
-        height: 54,
-        decoration: BoxDecoration(
-          color: AppColors.white,
+    final radius = AppColors.humanRadius;
+    return MouseRegion(
+      onEnter: (_) => setState(() => hovering = true),
+      onExit: (_) => setState(() => hovering = false),
+      child: AnimatedSlide(
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOutCubic,
+        offset: hovering ? const Offset(0, -.018) : Offset.zero,
+        child: PressableScale(
+          onTap: widget.onTap,
           borderRadius: radius,
-          border: Border.all(color: const Color(0x33008F86)),
+          pressedScale: .975,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            width: double.infinity,
+            height: 54,
+            decoration: BoxDecoration(
+              color: AppColors.paper,
+              borderRadius: radius,
+              border: Border.all(color: hovering ? AppColors.teal : const Color(0x330E6B73), width: hovering ? 2 : 1),
+            ),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(widget.icon, size: 20, color: AppColors.teal),
+              const SizedBox(width: 9),
+              Text(widget.label, style: const TextStyle(color: AppColors.tealDark, fontWeight: FontWeight.w900)),
+            ]),
+          ),
         ),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 20, color: AppColors.teal),
-          const SizedBox(width: 9),
-          Text(label, style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900)),
-        ]),
       ),
     );
   }
@@ -1554,41 +1591,59 @@ class SocialButton extends StatelessWidget {
   @override Widget build(BuildContext context) => SizedBox(width: double.infinity, height: 46, child: OutlinedButton(style: OutlinedButton.styleFrom(foregroundColor: AppColors.ink, side: const BorderSide(color: AppColors.line), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: onTap, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text(icon, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const SizedBox(width: 12), Text(label, style: const TextStyle(fontWeight: FontWeight.w800))])));
 }
 
-class AppCard extends StatelessWidget {
+class AppCard extends StatefulWidget {
   final Widget child;
   final EdgeInsets padding;
   final VoidCallback? onTap;
   final Color color;
+  final Color? accentColor;
   const AppCard({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(15),
     this.onTap,
     this.color = AppColors.white,
+    this.accentColor,
   });
 
   @override
+  State<AppCard> createState() => _AppCardState();
+}
+
+class _AppCardState extends State<AppCard> {
+  bool hovering = false;
+
+  @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(22);
+    final radius = AppColors.softRadius;
+    final accent = widget.accentColor;
     final card = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      padding: padding,
+      transform: Matrix4.translationValues(0, hovering && widget.onTap != null ? -2 : 0, 0),
+      padding: widget.padding,
       decoration: BoxDecoration(
-        color: color,
+        color: widget.color,
         borderRadius: radius,
-        border: Border.all(color: AppColors.lineSoft),
-        boxShadow: const [
-          BoxShadow(color: Color(0x080B1B2E), blurRadius: 18, offset: Offset(0, 8)),
-        ],
+        border: Border.all(color: hovering && widget.onTap != null ? AppColors.teal.withOpacity(.42) : AppColors.lineSoft, width: hovering && widget.onTap != null ? 1.6 : 1),
+        boxShadow: const [BoxShadow(color: AppColors.softShadow, blurRadius: 18, offset: Offset(0, 8))],
       ),
-      child: child,
+      child: accent == null
+          ? widget.child
+          : Stack(children: [
+              Positioned(left: 0, top: 1, bottom: 1, child: Container(width: 3, decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(99)))),
+              Padding(padding: const EdgeInsets.only(left: 15), child: widget.child),
+            ]),
     );
-    if (onTap == null) return card;
-    return PressableScale(
-      onTap: onTap,
-      borderRadius: radius,
-      child: card,
+    if (widget.onTap == null) return card;
+    return MouseRegion(
+      onEnter: (_) => setState(() => hovering = true),
+      onExit: (_) => setState(() => hovering = false),
+      child: PressableScale(
+        onTap: widget.onTap,
+        borderRadius: radius,
+        child: card,
+      ),
     );
   }
 }
@@ -2041,7 +2096,43 @@ class HeaderCreateButton extends StatelessWidget {
   );
 }
 
-class CenterLoader extends StatelessWidget { final String label; const CenterLoader({super.key, required this.label}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 40), child: Column(children: [const CircularProgressIndicator(color: AppColors.teal), const SizedBox(height: 12), Text(label, style: Theme.of(context).textTheme.bodyMedium)])); }
+class CenterLoader extends StatelessWidget {
+  final String label;
+  const CenterLoader({super.key, required this.label});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 42),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(width: 58, height: 58, child: CustomPaint(painter: GrupliLoadingMarkPainter())),
+          const SizedBox(height: 14),
+          Text(label, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.35)),
+        ]),
+      );
+}
+
+class GrupliLoadingMarkPainter extends CustomPainter {
+  const GrupliLoadingMarkPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bg = Paint()..color = AppColors.tealSoft;
+    final line = Paint()
+      ..color = AppColors.teal
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4
+      ..strokeCap = StrokeCap.round;
+    canvas.drawRRect(RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(18)), bg);
+    final path = Path()
+      ..moveTo(size.width * .24, size.height * .56)
+      ..quadraticBezierTo(size.width * .38, size.height * .32, size.width * .52, size.height * .52)
+      ..quadraticBezierTo(size.width * .64, size.height * .70, size.width * .78, size.height * .42);
+    canvas.drawPath(path, line);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
 
 class ErrorBlock extends StatelessWidget {
   final String message;
@@ -2051,60 +2142,108 @@ class ErrorBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sessionProblem = looksLikeSessionProblem(message);
-    return AppCard(child: Column(children: [
-      Container(width: 58, height: 58, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.redSoft), child: const Icon(Icons.error_outline_rounded, color: AppColors.red, size: 30)),
-      const SizedBox(height: 12),
-      Text(sessionProblem ? 'Sesión caducada' : 'Algo no ha cargado bien', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-      const SizedBox(height: 7),
-      Text(humanizeError(message), textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
-      const SizedBox(height: 14),
-      if (sessionProblem) ...[
-        PrimaryButton(
-          label: 'Salir y volver a entrar',
-          icon: Icons.logout_rounded,
-          onTap: () async {
-            await AppData.clearLocalSession();
-            onRetry();
-          },
-        ),
-        const SizedBox(height: 10),
-      ],
-      SecondaryButton(label: 'Reintentar', icon: Icons.refresh_rounded, onTap: onRetry),
-    ]));
+    final title = sessionProblem ? 'Sesión pausada' : 'La conexión titubeó';
+    final body = sessionProblem ? 'Vuelve a entrar y dejamos todo en su sitio.' : humanizeError(message);
+    return AppCard(
+      color: AppColors.surfaceWarm,
+      accentColor: sessionProblem ? AppColors.amber : AppColors.humanAccent,
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+      child: Column(children: [
+        const SizedBox(width: 76, height: 58, child: CustomPaint(painter: GrupliErrorMarkPainter())),
+        const SizedBox(height: 14),
+        Text(title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.ink)),
+        const SizedBox(height: 8),
+        Text(body, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.38)),
+        const SizedBox(height: 16),
+        if (sessionProblem) ...[
+          PrimaryButton(
+            label: 'Salir y volver a entrar',
+            icon: Icons.logout_rounded,
+            onTap: () async {
+              await AppData.clearLocalSession();
+              onRetry();
+            },
+          ),
+          const SizedBox(height: 10),
+        ],
+        SecondaryButton(label: 'Reintentar', icon: Icons.refresh_rounded, onTap: onRetry),
+      ]),
+    );
   }
 }
 
+class GrupliErrorMarkPainter extends CustomPainter {
+  const GrupliErrorMarkPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fill = Paint()..color = AppColors.humanAccentSoft;
+    final stroke = Paint()
+      ..color = AppColors.humanAccent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final blob = RRect.fromRectAndRadius(Rect.fromLTWH(size.width * .05, size.height * .12, size.width * .9, size.height * .72), const Radius.circular(22));
+    canvas.drawRRect(blob, fill);
+    final path = Path()
+      ..moveTo(size.width * .22, size.height * .54)
+      ..cubicTo(size.width * .34, size.height * .30, size.width * .46, size.height * .76, size.width * .58, size.height * .52)
+      ..cubicTo(size.width * .64, size.height * .38, size.width * .70, size.height * .37, size.width * .78, size.height * .48);
+    canvas.drawPath(path, stroke);
+    canvas.drawCircle(Offset(size.width * .80, size.height * .30), 2.4, Paint()..color = AppColors.humanAccent);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class EmptyBlock extends StatelessWidget {
-  final IconData icon; final String title; final String body;
+  final IconData icon;
+  final String title;
+  final String body;
   const EmptyBlock({super.key, required this.icon, required this.title, required this.body});
-  @override Widget build(BuildContext context) => AppCard(
-    color: AppColors.surface,
-    padding: const EdgeInsets.fromLTRB(18, 22, 18, 22),
-    child: Column(children: [
-      Container(width: 68, height: 68, decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft, border: Border.all(color: const Color(0x220B6B8F))), child: Icon(icon, color: AppColors.teal, size: 32)),
-      const SizedBox(height: 14),
-      Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
-      const SizedBox(height: 7),
-      Text(body, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.35)),
-    ]),
-  );
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+        color: AppColors.surfaceWarm,
+        accentColor: AppColors.teal,
+        padding: const EdgeInsets.fromLTRB(18, 22, 18, 22),
+        child: Column(children: [
+          Container(
+            width: 72,
+            height: 66,
+            decoration: BoxDecoration(color: AppColors.tealMist, borderRadius: AppColors.humanRadius, border: Border.all(color: const Color(0x220E6B73))),
+            child: Icon(icon, color: AppColors.teal, size: 31),
+          ),
+          const SizedBox(height: 14),
+          Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 7),
+          Text(body, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.38)),
+        ]),
+      );
 }
 
 class EmptySlim extends StatelessWidget {
-  final IconData icon; final String title; final String body;
+  final IconData icon;
+  final String title;
+  final String body;
   const EmptySlim({super.key, required this.icon, required this.title, this.body = ''});
-  @override Widget build(BuildContext context) => AppCard(
-    color: AppColors.surface,
-    padding: const EdgeInsets.all(14),
-    child: Row(children: [
-      Container(width: 40, height: 40, decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft, border: Border.all(color: const Color(0x1A0B6B8F))), child: Icon(icon, color: AppColors.teal, size: 20)),
-      const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
-        if (body.trim().isNotEmpty) ...[const SizedBox(height: 4), Text(body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25))],
-      ])),
-    ]),
-  );
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+        color: AppColors.surfaceWarm,
+        padding: const EdgeInsets.all(14),
+        accentColor: AppColors.teal,
+        child: Row(children: [
+          Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.tealMist, borderRadius: AppColors.humanRadius, border: Border.all(color: const Color(0x1A0E6B73))), child: Icon(icon, color: AppColors.teal, size: 20)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+            if (body.trim().isNotEmpty) ...[const SizedBox(height: 4), Text(body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.28))],
+          ])),
+        ]),
+      );
 }
 
 bool looksLikeNetworkError(String raw) {
@@ -2161,7 +2300,46 @@ String humanizeError(String raw) {
 }
 
 class HomeLoading extends StatelessWidget { const HomeLoading({super.key}); @override Widget build(BuildContext context) => Column(children: [Row(children: const [Expanded(child: GhostBox(height: 90)), SizedBox(width: 10), Expanded(child: GhostBox(height: 90)), SizedBox(width: 10), Expanded(child: GhostBox(height: 90))]), const SizedBox(height: 24), const GhostBox(height: 100), const SizedBox(height: 10), const GhostBox(height: 100)]); }
-class GhostBox extends StatelessWidget { final double height; const GhostBox({super.key, required this.height}); @override Widget build(BuildContext context) => Container(height: height, decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(18), border: Border.all(color: AppColors.line))); }
+class GhostBox extends StatelessWidget {
+  final double height;
+  const GhostBox({super.key, required this.height});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        height: height,
+        decoration: BoxDecoration(
+          borderRadius: AppColors.softRadius,
+          border: Border.all(color: AppColors.hairline),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.surfaceWarm, AppColors.faint, AppColors.tealMist],
+            stops: [0, .58, 1],
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: AppColors.softRadius,
+          child: CustomPaint(painter: GrupliSkeletonPainter()),
+        ),
+      );
+}
+
+class GrupliSkeletonPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(.46)
+      ..strokeWidth = 10
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(size.width * .12, size.height * .36), Offset(size.width * .68, size.height * .36), paint);
+    paint.strokeWidth = 8;
+    paint.color = Colors.white.withOpacity(.36);
+    canvas.drawLine(Offset(size.width * .12, size.height * .58), Offset(size.width * .48, size.height * .58), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
 
 class ChoiceBigCard extends StatelessWidget { final IconData icon; final String title; final String body; final VoidCallback onTap; const ChoiceBigCard({super.key, required this.icon, required this.title, required this.body, required this.onTap}); @override Widget build(BuildContext context) => AppCard(onTap: onTap, child: Row(children: [Container(width: 48, height: 48, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft), child: Icon(icon, color: AppColors.teal)), const SizedBox(width: 14), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.titleMedium), Text(body, style: Theme.of(context).textTheme.bodyMedium)])), const Icon(Icons.chevron_right_rounded, color: AppColors.muted)])); }
 
