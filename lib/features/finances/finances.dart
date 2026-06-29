@@ -209,6 +209,13 @@ class _FinancesTabState extends State<FinancesTab> {
                   const SizedBox(height: 14),
                   FinanceHeroCard(summary: summary, onCreate: openCreate),
                   const SizedBox(height: 12),
+                  FinanceHumanNextStepCard(
+                    summary: summary,
+                    expensesCount: data.expenses.length,
+                    settledCount: data.settlementPayments.length,
+                    onCreate: openCreate,
+                  ),
+                  const SizedBox(height: 12),
                   FinanceSegmentedTabs(index: financeSection, onChanged: (i) => setState(() => financeSection = i > 1 ? 1 : i)),
                   const SizedBox(height: 14),
                   if (financeSection == 0) ...[
@@ -1671,5 +1678,78 @@ class ChoicePill extends StatelessWidget {
       decoration: BoxDecoration(color: active ? AppColors.teal : Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: active ? AppColors.teal : AppColors.line)),
       child: Text(label, style: TextStyle(color: active ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900)),
     ),
+  );
+}
+
+
+class FinanceHumanNextStepCard extends StatelessWidget {
+  final FinanceSummary summary;
+  final int expensesCount;
+  final int settledCount;
+  final VoidCallback onCreate;
+  const FinanceHumanNextStepCard({super.key, required this.summary, required this.expensesCount, required this.settledCount, required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) {
+    final clean = summary.pendingAmount <= 0.01;
+    final firstDebt = summary.settlements.isEmpty ? null : summary.settlements.first;
+    final title = clean
+        ? 'Las cuentas respiran'
+        : firstDebt != null
+            ? 'Siguiente pago claro'
+            : 'Hay saldo pendiente';
+    final body = clean
+        ? expensesCount == 0
+            ? 'Aún no hay gastos. Cuando alguien pague algo, Grupli te dirá exactamente quién debe qué.'
+            : '$expensesCount ${expensesCount == 1 ? 'movimiento registrado' : 'movimientos registrados'} y ningún pago pendiente.'
+        : firstDebt != null
+            ? '${firstDebt.fromName} paga a ${firstDebt.toName} ${money(firstDebt.amount)}. Con eso el grupo se acerca a cero.'
+            : 'Revisa los saldos para entender qué queda por compensar.';
+    return AppCard(
+      color: AppColors.surfaceWarm,
+      accentColor: clean ? AppColors.green : AppColors.navFinance,
+      padding: const EdgeInsets.fromLTRB(16, 16, 14, 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(width: 46, height: 46, decoration: BoxDecoration(color: clean ? AppColors.greenSoft : AppColors.tealMist, borderRadius: AppColors.humanRadius, border: Border.all(color: const Color(0x160E6B73))), child: Icon(clean ? Icons.verified_rounded : Icons.swap_horiz_rounded, color: clean ? AppColors.green : AppColors.navFinance, size: 24)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17.5, height: 1.08, letterSpacing: -.2)),
+            const SizedBox(height: 5),
+            Text(body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.32, fontSize: 13.2)),
+          ])),
+        ]),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: FinanceFocusMetric(label: 'Pendiente', value: money(summary.pendingAmount), color: clean ? AppColors.green : AppColors.amber)),
+          const SizedBox(width: 8),
+          Expanded(child: FinanceFocusMetric(label: 'A mover', value: money(summary.settlementAmount), color: AppColors.navFinance)),
+          const SizedBox(width: 8),
+          Expanded(child: FinanceFocusMetric(label: 'Liquidado', value: '$settledCount', color: AppColors.blue)),
+        ]),
+        if (expensesCount == 0) ...[
+          const SizedBox(height: 14),
+          SecondaryButton(label: 'Añadir primer gasto', icon: Icons.add_rounded, onTap: onCreate),
+        ],
+      ]),
+    );
+  }
+}
+
+class FinanceFocusMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const FinanceFocusMetric({super.key, required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+    decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: AppColors.humanRadius, border: Border.all(color: color.withOpacity(.17))),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 15.5, height: 1)),
+      const SizedBox(height: 3),
+      Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 10.5)),
+    ]),
   );
 }

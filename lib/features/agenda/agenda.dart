@@ -1147,6 +1147,13 @@ class _CalendarTabState extends State<CalendarTab> {
               ),
             ),
             const SizedBox(height: 12),
+            AgendaHumanFocusCard(
+              events: visibleEvents,
+              upcoming: upcomingEvents,
+              selected: selected,
+              onCreate: () => createFor(selected),
+            ),
+            const SizedBox(height: 12),
             if (loading && events.isEmpty) ...[
               const CenterLoader(label: 'Cargando agenda...'),
               const SizedBox(height: 12),
@@ -1261,3 +1268,94 @@ class _CalendarTabState extends State<CalendarTab> {
     );
   }
 }
+
+
+class AgendaHumanFocusCard extends StatelessWidget {
+  final List<Map<String, dynamic>> events;
+  final List<Map<String, dynamic>> upcoming;
+  final DateTime selected;
+  final VoidCallback onCreate;
+  const AgendaHumanFocusCard({super.key, required this.events, required this.upcoming, required this.selected, required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selectedDay = DateTime(selected.year, selected.month, selected.day);
+    final todayEvents = events.where((event) {
+      final date = DateTime.tryParse(AppData.text(event['starts_at']))?.toLocal();
+      if (date == null) return false;
+      return calendarDayKey(date) == calendarDayKey(today);
+    }).toList();
+    final selectedEvents = events.where((event) {
+      final date = DateTime.tryParse(AppData.text(event['starts_at']))?.toLocal();
+      if (date == null) return false;
+      return calendarDayKey(date) == calendarDayKey(selectedDay);
+    }).toList();
+    final needsAnswer = upcoming.where((event) {
+      final mine = myAttendanceStatus(event);
+      final minPeople = AppData.intValue(event['min_people'], 2);
+      return mine.isEmpty || attendanceCount(event, 'yes') < minPeople;
+    }).length;
+    final next = upcoming.isNotEmpty ? upcoming.first : null;
+    final nextDate = next == null ? null : DateTime.tryParse(AppData.text(next['starts_at']))?.toLocal();
+    final title = next == null
+        ? 'La agenda está tranquila'
+        : nextDate != null && isSameCalendarDay(nextDate, today)
+            ? 'Hoy hay plan'
+            : 'Lo próximo está localizado';
+    final body = next == null
+        ? 'No hay eventos próximos. Crea uno para que el grupo tenga claro dónde mirar.'
+        : nextDate == null
+            ? AppData.text(next['title'], 'Evento')
+            : '${AppData.text(next['title'], 'Evento')} · ${dateLabel(nextDate)}';
+    return AppCard(
+      color: AppColors.surfaceWarm,
+      accentColor: AppColors.navAgenda,
+      padding: const EdgeInsets.fromLTRB(16, 16, 14, 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(width: 48, height: 48, decoration: BoxDecoration(color: AppColors.amberSoft, borderRadius: AppColors.humanRadius, border: Border.all(color: const Color(0x20DFA22E))), child: const Icon(Icons.calendar_month_rounded, color: AppColors.navAgenda, size: 24)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17.5, height: 1.08, letterSpacing: -.2)),
+            const SizedBox(height: 5),
+            Text(body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.32, fontSize: 13.2)),
+          ])),
+        ]),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: AgendaFocusMetric(label: 'Hoy', value: '${todayEvents.length}', color: AppColors.navAgenda)),
+          const SizedBox(width: 8),
+          Expanded(child: AgendaFocusMetric(label: 'Día elegido', value: '${selectedEvents.length}', color: AppColors.teal)),
+          const SizedBox(width: 8),
+          Expanded(child: AgendaFocusMetric(label: 'Por confirmar', value: '$needsAnswer', color: AppColors.humanAccent)),
+        ]),
+        if (next == null) ...[
+          const SizedBox(height: 14),
+          SecondaryButton(label: 'Crear evento', icon: Icons.add_rounded, onTap: onCreate),
+        ],
+      ]),
+    );
+  }
+}
+
+class AgendaFocusMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const AgendaFocusMetric({super.key, required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+    decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: AppColors.humanRadius, border: Border.all(color: color.withOpacity(.17))),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 17, height: 1)),
+      const SizedBox(height: 3),
+      Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 10.5)),
+    ]),
+  );
+}
+
+bool isSameCalendarDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;

@@ -1,3 +1,7 @@
+# Grupli v16.38.0
+
+Versión acumulada con UX mejorada en Torneos, Agenda/Eventos y Finanzas, manteniendo dependencias web estables.
+
 # Grupli
 
 Versión interna: v16.32 — Premium preparado

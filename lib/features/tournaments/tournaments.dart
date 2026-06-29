@@ -123,7 +123,13 @@ class _TournamentsTabState extends State<TournamentsTab> {
             else if (tournaments.isEmpty)
               TournamentCleanEmptyState(onCreate: openCreate)
             else ...[
-              PrimaryButton(label: 'Crear torneo o liga', icon: Icons.add_rounded, onTap: openCreate),
+              TournamentUxCommandCenter(
+                activeCount: active.length,
+                finishedCount: finished.length,
+                nextCount: nextMatches.length,
+                latestResults: results.length,
+                onCreate: openCreate,
+              ),
               if (active.isNotEmpty) ...[
                 const SizedBox(height: 18),
                 TournamentSectionHeader(title: active.length == 1 ? 'Competición activa' : 'Competiciones activas'),
@@ -1508,6 +1514,16 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
           onGenerate: regenerate,
         ),
         const SizedBox(height: 12),
+        TournamentDetailNextStepCard(
+          matches: matches,
+          teams: teams,
+          standings: standings,
+          format: format,
+          onGenerate: regenerate,
+          onAddParticipants: addParticipants,
+          onBulkSchedule: reprogramTournamentCalendar,
+        ),
+        const SizedBox(height: 12),
         TournamentTabsBar(index: tab, format: format, onChanged: (i) => setState(() => tab = i)),
         const SizedBox(height: 14),
         if (tab == 0)
@@ -1691,6 +1707,195 @@ class TournamentSectionHeader extends StatelessWidget {
     Expanded(child: Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 16))),
     if (action != null) Text(action!, style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w800, fontSize: 12)),
   ]);
+}
+
+
+class TournamentUxCommandCenter extends StatelessWidget {
+  final int activeCount;
+  final int finishedCount;
+  final int nextCount;
+  final int latestResults;
+  final VoidCallback onCreate;
+  const TournamentUxCommandCenter({
+    super.key,
+    required this.activeCount,
+    required this.finishedCount,
+    required this.nextCount,
+    required this.latestResults,
+    required this.onCreate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasActivity = activeCount > 0 || nextCount > 0 || latestResults > 0;
+    final title = hasActivity ? 'Qué toca ahora' : 'Empieza una competición clara';
+    final body = nextCount > 0
+        ? '$nextCount ${nextCount == 1 ? 'partido pendiente' : 'partidos pendientes'} para revisar. Lo importante queda arriba, sin esconderlo entre tablas.'
+        : activeCount > 0
+            ? '$activeCount ${activeCount == 1 ? 'competición activa' : 'competiciones activas'} en marcha. Entra para registrar resultados o ajustar jornadas.'
+            : 'Crea una liga, eliminatoria, americano o manual. Grupli ordena partidos, tabla y resultados sin hacerlo pesado.';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: AppCard(
+        color: AppColors.surfaceWarm,
+        accentColor: AppColors.navTournaments,
+        padding: const EdgeInsets.fromLTRB(16, 16, 14, 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(color: AppColors.redSoft, borderRadius: AppColors.humanRadius, border: Border.all(color: const Color(0x18C75B4C))),
+              child: const Icon(Icons.emoji_events_rounded, color: AppColors.navTournaments, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17.5, height: 1.08, letterSpacing: -.2)),
+              const SizedBox(height: 5),
+              Text(body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.32, fontSize: 13.2)),
+            ])),
+          ]),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: TournamentMiniMetric(label: 'Activas', value: '$activeCount', color: AppColors.navTournaments)),
+            const SizedBox(width: 8),
+            Expanded(child: TournamentMiniMetric(label: 'Pendientes', value: '$nextCount', color: AppColors.amber)),
+            const SizedBox(width: 8),
+            Expanded(child: TournamentMiniMetric(label: 'Finalizadas', value: '$finishedCount', color: AppColors.blue)),
+          ]),
+          const SizedBox(height: 14),
+          PrimaryButton(label: 'Crear torneo o liga', icon: Icons.add_rounded, onTap: onCreate),
+        ]),
+      ),
+    );
+  }
+}
+
+class TournamentMiniMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const TournamentMiniMetric({super.key, required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+    decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: AppColors.humanRadius, border: Border.all(color: color.withOpacity(.18))),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w900, height: 1)),
+      const SizedBox(height: 3),
+      Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 10.5, fontWeight: FontWeight.w800)),
+    ]),
+  );
+}
+
+class TournamentDetailNextStepCard extends StatelessWidget {
+  final List<Map<String, dynamic>> matches;
+  final List<Map<String, dynamic>> teams;
+  final List<TeamStanding> standings;
+  final String format;
+  final VoidCallback onGenerate;
+  final VoidCallback onAddParticipants;
+  final VoidCallback onBulkSchedule;
+  const TournamentDetailNextStepCard({
+    super.key,
+    required this.matches,
+    required this.teams,
+    required this.standings,
+    required this.format,
+    required this.onGenerate,
+    required this.onAddParticipants,
+    required this.onBulkSchedule,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final played = matches.where(matchCountsForStandings).length;
+    final pending = matches.length - played;
+    final unscheduled = matches.where((m) => AppData.text(m['scheduled_at']).isEmpty).length;
+    final needsTeams = teams.length < 2;
+    final title = needsTeams
+        ? 'Faltan participantes'
+        : matches.isEmpty
+            ? 'Falta crear el calendario'
+            : unscheduled > 0
+                ? 'Faltan fechas por poner'
+                : pending > 0
+                    ? 'Hay resultados pendientes'
+                    : 'Competición lista para revisar';
+    final body = needsTeams
+        ? 'Añade al menos dos participantes para poder generar partidos sin confusión.'
+        : matches.isEmpty
+            ? 'Genera partidos cuando tengas equipos y reglas claras. Si es manual, podrás ajustarlos después.'
+            : unscheduled > 0
+                ? '$unscheduled ${unscheduled == 1 ? 'partido no tiene fecha' : 'partidos no tienen fecha'}. Mueve la jornada completa o ajusta fechas en bloque.'
+                : pending > 0
+                    ? '$pending ${pending == 1 ? 'partido espera resultado' : 'partidos esperan resultado'}. Entra en Partidos y registra solo lo necesario.'
+                    : standings.isEmpty ? 'No hay tabla disponible todavía.' : 'El líder actual es ${standings.first.name}. Revisa tabla, stats o finaliza cuando esté todo claro.';
+    final icon = needsTeams
+        ? Icons.group_add_rounded
+        : matches.isEmpty
+            ? Icons.auto_awesome_motion_rounded
+            : unscheduled > 0
+                ? Icons.event_repeat_rounded
+                : pending > 0
+                    ? Icons.sports_score_rounded
+                    : Icons.verified_rounded;
+    final actionLabel = needsTeams
+        ? 'Añadir participantes'
+        : matches.isEmpty
+            ? 'Generar partidos'
+            : unscheduled > 0
+                ? 'Programar fechas'
+                : pending > 0
+                    ? 'Ver partidos'
+                    : 'Revisar tabla';
+    final action = needsTeams
+        ? onAddParticipants
+        : matches.isEmpty
+            ? onGenerate
+            : unscheduled > 0
+                ? onBulkSchedule
+                : () {};
+    return AppCard(
+      color: AppColors.surfaceWarm,
+      accentColor: AppColors.navTournaments,
+      padding: const EdgeInsets.fromLTRB(15, 15, 15, 15),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(width: 44, height: 44, decoration: BoxDecoration(color: AppColors.redSoft, borderRadius: AppColors.humanRadius), child: Icon(icon, color: AppColors.navTournaments, size: 22)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 15.5, height: 1.1)),
+          const SizedBox(height: 5),
+          Text(body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.32, fontSize: 12.8)),
+          const SizedBox(height: 10),
+          Wrap(spacing: 7, runSpacing: 7, children: [
+            _TournamentSignalChip(label: '${teams.length} participantes', color: AppColors.blue),
+            _TournamentSignalChip(label: '${matches.length} partidos', color: AppColors.navTournaments),
+            _TournamentSignalChip(label: '$pending pendientes', color: AppColors.amber),
+            _TournamentSignalChip(label: tournamentFormatLabel(format), color: AppColors.teal),
+          ]),
+        ])),
+        const SizedBox(width: 8),
+        if (!needsTeams && matches.isNotEmpty && unscheduled == 0)
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted)
+        else
+          TextButton(onPressed: action, child: Text(actionLabel, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
+      ]),
+    );
+  }
+}
+
+class _TournamentSignalChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _TournamentSignalChip({required this.label, required this.color});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+    decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(999), border: Border.all(color: color.withOpacity(.14))),
+    child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 10.5)),
+  );
 }
 
 class TournamentActiveCard extends StatelessWidget {
