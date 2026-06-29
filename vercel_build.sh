@@ -2,7 +2,7 @@
 set -eo pipefail
 
 COMMAND="${1:-build}"
-FLUTTER_VERSION="${FLUTTER_VERSION:-3.35.7}"
+FLUTTER_VERSION="${FLUTTER_VERSION:-3.41.6}"
 export FLUTTER_HOME="$HOME/flutter"
 export PATH="$FLUTTER_HOME/bin:$PATH"
 export PUB_CACHE="$HOME/.pub-cache"
