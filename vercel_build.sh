@@ -1,31 +1,17 @@
 #!/usr/bin/env bash
-set -eo pipefail
+set -euo pipefail
 
 COMMAND="${1:-build}"
 FLUTTER_VERSION="${FLUTTER_VERSION:-3.41.6}"
-export FLUTTER_HOME="$HOME/flutter"
-export PATH="$FLUTTER_HOME/bin:$PATH"
+export FLUTTER_HOME="$HOME/flutter-$FLUTTER_VERSION"
+export PATH="$FLUTTER_HOME/bin:$FLUTTER_HOME/bin/cache/dart-sdk/bin:$PATH"
 export PUB_CACHE="$HOME/.pub-cache"
 export FLUTTER_SUPPRESS_ANALYTICS=true
 export CI=true
 
 install_flutter() {
-  echo "Installing pinned Flutter $FLUTTER_VERSION..."
+  echo "Installing Flutter $FLUTTER_VERSION from official Git tag..."
   rm -rf "$FLUTTER_HOME"
-
-  ARCHIVE_URL="https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
-  TMP_ARCHIVE="/tmp/flutter_${FLUTTER_VERSION}.tar.xz"
-
-  if command -v curl >/dev/null 2>&1; then
-    echo "Downloading Flutter SDK archive..."
-    if curl -fL --retry 3 --retry-delay 2 -o "$TMP_ARCHIVE" "$ARCHIVE_URL"; then
-      tar -xf "$TMP_ARCHIVE" -C "$HOME"
-      rm -f "$TMP_ARCHIVE"
-      return 0
-    fi
-  fi
-
-  echo "Archive download failed. Falling back to Git tag $FLUTTER_VERSION..."
   git clone https://github.com/flutter/flutter.git --depth 1 --branch "$FLUTTER_VERSION" "$FLUTTER_HOME"
 }
 
@@ -36,7 +22,7 @@ ensure_flutter() {
   fi
 
   if ! "$FLUTTER_HOME/bin/flutter" --version | grep -q "Flutter $FLUTTER_VERSION"; then
-    echo "Cached Flutter version does not match $FLUTTER_VERSION. Reinstalling..."
+    echo "Cached Flutter version mismatch. Reinstalling Flutter $FLUTTER_VERSION..."
     install_flutter
   fi
 }
@@ -46,13 +32,13 @@ flutter --version
 flutter config --enable-web --no-analytics
 
 if [ "$COMMAND" = "install" ]; then
-  echo "Installing Flutter dependencies..."
-  flutter pub get
+  echo "Installing Flutter dependencies with committed pubspec.lock..."
+  flutter pub get --enforce-lockfile
   exit 0
 fi
 
 if [ "$COMMAND" = "build" ]; then
-  echo "Building Grupli web for Vercel with pinned Flutter $FLUTTER_VERSION..."
+  echo "Building Grupli web with Flutter $FLUTTER_VERSION and locked dependencies..."
   echo "Vercel env check: only variable names are printed; values stay hidden."
 
   DART_DEFINES=()
@@ -105,25 +91,30 @@ if [ "$COMMAND" = "build" ]; then
 
   rm -rf build .dart_tool
   flutter clean
-  flutter pub get
+  flutter pub get --enforce-lockfile
 
-  echo "Running Flutter analyze in Vercel..."
+  echo "Running Flutter analyze..."
   flutter analyze --no-fatal-infos --no-fatal-warnings
 
-  echo "Trying Flutter web build with --no-wasm-dry-run..."
+  echo "Building Flutter web..."
   set +e
   flutter build web --release --no-tree-shake-icons --no-wasm-dry-run "${DART_DEFINES[@]}"
   build_status=$?
   set -e
 
   if [ "$build_status" -ne 0 ]; then
-    echo "First web build failed. Retrying without --no-wasm-dry-run..."
+    echo "Build with --no-wasm-dry-run failed. Retrying without it..."
     rm -rf build
     flutter build web --release --no-tree-shake-icons "${DART_DEFINES[@]}"
   fi
 
   if [ ! -f "build/web/index.html" ]; then
     echo "ERROR: build/web/index.html was not generated."
+    exit 1
+  fi
+
+  if [ ! -f "build/web/main.dart.js" ]; then
+    echo "ERROR: build/web/main.dart.js was not generated."
     exit 1
   fi
 
