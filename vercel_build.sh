@@ -27,18 +27,28 @@ ensure_flutter() {
   fi
 }
 
+pub_get_reproducible() {
+  if [ -f "pubspec.lock" ]; then
+    echo "Using committed pubspec.lock."
+    flutter pub get --enforce-lockfile
+  else
+    echo "WARNING: pubspec.lock not found. Running flutter pub get without lockfile."
+    flutter pub get
+  fi
+}
+
 ensure_flutter
 flutter --version
 flutter config --enable-web --no-analytics
 
 if [ "$COMMAND" = "install" ]; then
-  echo "Installing Flutter dependencies with committed pubspec.lock..."
-  flutter pub get --enforce-lockfile
+  echo "Installing Flutter dependencies..."
+  pub_get_reproducible
   exit 0
 fi
 
 if [ "$COMMAND" = "build" ]; then
-  echo "Building Grupli web with Flutter $FLUTTER_VERSION and locked dependencies..."
+  echo "Building Grupli web with Flutter $FLUTTER_VERSION..."
   echo "Vercel env check: only variable names are printed; values stay hidden."
 
   DART_DEFINES=()
@@ -91,7 +101,7 @@ if [ "$COMMAND" = "build" ]; then
 
   rm -rf build .dart_tool
   flutter clean
-  flutter pub get --enforce-lockfile
+  pub_get_reproducible
 
   echo "Running Flutter analyze..."
   flutter analyze --no-fatal-infos --no-fatal-warnings

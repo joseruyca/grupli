@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -111,17 +112,22 @@ Future<void> main() async {
     return;
   }
 
-  await Supabase.initialize(
-    url: AppConfig.supabaseUrl,
-    anonKey: AppConfig.supabaseAnonKey,
-    authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce),
-  );
+  try {
+    await Supabase.initialize(
+      url: AppConfig.supabaseUrl,
+      anonKey: AppConfig.supabaseAnonKey,
+      authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce),
+    );
+  } catch (_) {
+    runApp(const GrupliStartupErrorApp());
+    return;
+  }
 
   runApp(const GrupliApp());
 }
 
 class AppConfig {
-  static const appVersion = 'v16.32';
+  static const appVersion = 'v16.33';
   static const enableRealtimeSubscriptions = false;
 
   // Security baseline:
@@ -202,6 +208,62 @@ class GrupliConfigurationMissingApp extends StatelessWidget {
                     SizedBox(height: 8),
                     Text(
                       'La app necesita su configuración segura de entorno para arrancar. Revisa el archivo .env local o las variables del entorno de despliegue.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+class GrupliStartupErrorApp extends StatelessWidget {
+  const GrupliStartupErrorApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFFF7FBFA),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 420),
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFE4EFEE)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x14000000),
+                      blurRadius: 24,
+                      offset: Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.sync_problem_rounded, color: Color(0xFF087A78), size: 42),
+                    SizedBox(height: 14),
+                    Text(
+                      'No se ha podido arrancar Grupli',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF12263A)),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Hay un problema temporal cargando la configuración segura. Actualiza la página o vuelve a abrir la app.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
                     ),
@@ -364,7 +426,7 @@ class GrupliApp extends StatelessWidget {
         fontFamily: 'Roboto',
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, surface: AppColors.white),
         visualDensity: VisualDensity.standard,
-        pageTransitionsTheme: const PageTransitionsTheme(
+        pageTransitionsTheme: PageTransitionsTheme(
           builders: {
             TargetPlatform.android: ZoomPageTransitionsBuilder(),
             TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
@@ -495,18 +557,27 @@ class _AppRootState extends State<AppRoot> {
   }
 
   Future<void> _loadFirstRunState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final introSeen = prefs.getBool(OnboardingStore.seenKey) ?? false;
-    final hasInvite = InviteLinks.currentCode != null;
-    final validSession = await AppData.recoverStoredSession();
-    if (!mounted) return;
-    setState(() {
-      _session = validSession;
-      _showOnboarding = _session == null && !introSeen && !hasInvite;
-      _ready = true;
-    });
-    if (_session != null) {
-      PushNotificationService.tryRegisterSilently();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final introSeen = prefs.getBool(OnboardingStore.seenKey) ?? false;
+      final hasInvite = InviteLinks.currentCode != null;
+      final validSession = await AppData.recoverStoredSession();
+      if (!mounted) return;
+      setState(() {
+        _session = validSession;
+        _showOnboarding = _session == null && !introSeen && !hasInvite;
+        _ready = true;
+      });
+      if (_session != null) {
+        unawaited(PushNotificationService.tryRegisterSilently());
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _session = Supabase.instance.client.auth.currentSession;
+        _showOnboarding = _session == null;
+        _ready = true;
+      });
     }
   }
 

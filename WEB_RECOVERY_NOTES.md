@@ -1,10 +1,14 @@
-# Grupli v16.32.4 - stable recovered baseline
+# Grupli web recovery baseline
 
-This package keeps the v16.32.2 app code and tournament/premium improvements, and applies the proven web dependency compatibility fix:
+Baseline estable v16.33:
+- Flutter validado localmente: 3.41.6
+- supabase_flutter: 2.8.3
+- app_links: 6.4.1
+- Vercel debe usar `vercel_build.sh`
+- Generar y commitear `pubspec.lock` antes de desplegar
 
-- `supabase_flutter: 2.8.3`
-- `app_links: 6.4.1`
-
-It also keeps the Vercel build hardening from v16.32.2.
-
-No application logic, Supabase SQL, Firebase code, tournament code, or Vercel environment variables were changed in this recovery package.
+Reglas:
+- No actualizar `supabase_flutter` y `app_links` por separado.
+- No borrar `pubspec.lock` después de generarlo.
+- No hacer `git push --force`.
+- No subir `.env`.

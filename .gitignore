@@ -30,3 +30,6 @@ android/build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local diagnostics
+.diagnostics/
