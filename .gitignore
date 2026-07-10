@@ -16,8 +16,12 @@ build/
 # Android / IDE
 android/.gradle/
 android/build/
+android/app/google-services.json
 *.iml
 .idea/
+
+# iOS / Xcode
+ios/Runner/GoogleService-Info.plist
 
 # Secrets / keys
 *.jks
@@ -26,6 +30,7 @@ android/build/
 *.p12
 *.pem
 *.key
+key.properties
 
 # OS
 .DS_Store
