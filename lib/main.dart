@@ -1583,7 +1583,7 @@ String scoringTypeLabel(String type) {
     case 'billiards':
       return 'Billar';
     case 'esports':
-      return 'Videojuegos';
+      return 'Esports';
     case 'custom':
       return 'Personalizado';
     default:
@@ -1921,7 +1921,7 @@ String scoringCreationHelp(String type, [dynamic raw]) {
     case 'sets_points':
       return 'Voleibol/Ping pong: introduces sets completos. Tabla: victorias, sets, puntos y desempates.';
     case 'total_points':
-      return 'Basket: marcador por puntos. Tabla: victorias, puntos a favor/en contra y diferencia.';
+      return 'Baloncesto: marcador por puntos. Tabla: victorias, puntos a favor/en contra y diferencia.';
     default:
       return scoringConfigFullText(type, raw);
   }
@@ -1954,7 +1954,7 @@ String scoringValidationText(String type, [dynamic raw]) {
     case 'sets_points':
       return 'Sets: cada parcial guarda puntos. No hay empate a sets.';
     case 'total_points':
-      return 'Basket: puntos totales, sin empate, diferencia de puntos.';
+      return 'Baloncesto: puntos totales, sin empate, diferencia de puntos.';
     default:
       if (!scoringAllowDraw(type, cfg)) return 'Validación: el marcador no puede quedar empatado.';
       return 'Validación: permite empate y calcula puntos/diferencia automáticamente.';
@@ -1976,6 +1976,56 @@ String scoringConfigShortText(String type, [dynamic raw]) {
       return 'Puntos totales · diferencia';
     default:
       return 'Victoria ${scoringWinPoints(type, cfg)} · empate ${scoringDrawPoints(type, cfg)} · derrota ${scoringLossPoints(type, cfg)}';
+  }
+}
+
+String tournamentClassificationTitle(String format, String scoringType, [dynamic scoringConfig]) {
+  if (format == 'americano') return 'Ranking individual';
+  if (format == 'eliminatoria') return 'Cuadro de eliminatoria';
+  switch (scoringResultModel(scoringType, scoringConfig)) {
+    case 'goals':
+      return 'Clasificacion por goles';
+    case 'sets_games':
+      return 'Clasificacion por sets y juegos';
+    case 'sets_points':
+      return 'Clasificacion por sets y puntos';
+    case 'total_points':
+      return 'Clasificacion por puntos';
+    default:
+      return 'Clasificacion del torneo';
+  }
+}
+
+String tournamentClassificationSummary(
+  String format,
+  String scoringType, {
+  dynamic scoringConfig,
+  List<String>? tieBreakers,
+}) {
+  final breakers = tieBreakers ?? TournamentEngineV2.defaultTieBreakers(scoringType, format);
+  final order = standingsOrderTextForScoring(breakers, scoringType, scoringConfig);
+  if (format == 'americano') {
+    final unit = scoringUsesGameSetMode(scoringType, scoringConfig)
+        ? 'juegos'
+        : scoringUsesPointSetMode(scoringType, scoringConfig)
+            ? 'puntos'
+            : scoringScoreLabel(scoringType, scoringConfig);
+    return 'Ranking individual: cada jugador suma $unit aunque cambie de pareja. Orden: $order.';
+  }
+  if (format == 'eliminatoria') {
+    return 'Cuadro directo: cada partido decide quien avanza. El desempate sigue este orden: $order.';
+  }
+  switch (scoringResultModel(scoringType, scoringConfig)) {
+    case 'goals':
+      return 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de goles, goles a favor y no presentados. Orden: $order.';
+    case 'sets_games':
+      return 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de sets, diferencia de juegos y juegos a favor. Orden: $order.';
+    case 'sets_points':
+      return 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de sets, diferencia de puntos y puntos a favor. Orden: $order.';
+    case 'total_points':
+      return 'La tabla prioriza victorias, diferencia de puntos y puntos a favor. Orden: $order.';
+    default:
+      return 'La tabla usa la configuracion de puntos y los desempates definidos para este torneo. Orden: $order.';
   }
 }
 
@@ -2821,4 +2871,3 @@ class PendingInviteStore {
 
 
 // core/widgets/shared_widgets.dart moved to part file.
-

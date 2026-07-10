@@ -17,7 +17,7 @@ class TournamentEngineV2 {
     ),
     TournamentSportSpec(
       key: 'basketball',
-      label: 'Basket',
+      label: 'Baloncesto',
       emoji: '🏀',
       resultMode: 'score',
       resultLabel: 'Puntos',
@@ -87,7 +87,7 @@ class TournamentEngineV2 {
     ),
     TournamentSportSpec(
       key: 'esports',
-      label: 'Gaming',
+      label: 'Esports',
       emoji: '🎮',
       resultMode: 'score',
       resultLabel: 'Mapas o rondas',
@@ -395,4 +395,3 @@ class TournamentPremiumFeature {
 
   const TournamentPremiumFeature(this.key, this.title, this.description);
 }
-

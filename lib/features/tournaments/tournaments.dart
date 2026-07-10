@@ -708,7 +708,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         onChanged: (value) => setState(() => applyScoringDefaults(value)),
       ),
       const SizedBox(height: 10),
-      TournamentValidationCard(scoringType: scoringType, scoringConfig: scoringConfig),
+      TournamentValidationCard(format: format, scoringType: scoringType, scoringConfig: scoringConfig),
       const SizedBox(height: 10),
       AppCard(
         color: AppColors.faint,
@@ -1552,7 +1552,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
           )
         else if (tab == 2)
           format == 'eliminatoria'
-              ? TournamentEliminationBracketPanel(
+          ? TournamentEliminationBracketPanel(
                   tournament: t ?? {},
                   group: widget.group,
                   matches: matches,
@@ -1563,9 +1563,9 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
                   onThirdPlace: thirdPlace,
                   onChanged: () => load(soft: true),
                 )
-              : TournamentStandingsPanel(standings: standings, matches: matches, tieBreakers: tieBreakers, scoringType: scoringType, scoringConfig: scoringConfig)
+              : TournamentStandingsPanel(standings: standings, matches: matches, tieBreakers: tieBreakers, format: format, scoringType: scoringType, scoringConfig: scoringConfig)
         else if (tab == 3)
-          TournamentStatsPanel(standings: standings, matches: matches, teams: teams, scoringType: scoringType, scoringConfig: scoringConfig)
+          TournamentStatsPanel(standings: standings, matches: matches, teams: teams, format: format, scoringType: scoringType, scoringConfig: scoringConfig)
         else if (tab == 4)
           TournamentTeamsPanel(
             teams: teams,
@@ -2263,9 +2263,11 @@ class TournamentSimpleFormatSummary extends StatelessWidget {
       Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: Center(child: Text(scoringEmoji(scoringType), style: const TextStyle(fontSize: 23)))),
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${tournamentFormatLabel(format)} · ${teamTypeLabel(teamType)}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        Text('${scoringTypeLabel(scoringType)} · ${tournamentFormatLabel(format)} · ${teamTypeLabel(teamType)}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         const SizedBox(height: 4),
-        Text('${scoringTypeLabel(scoringType)} · ${tournamentFormatSubtitle(format)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 12)),
+        Text(tournamentFormatSubtitle(format), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 12)),
+        const SizedBox(height: 4),
+        Text(tournamentClassificationSummary(format, scoringType), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 11.5)),
       ])),
     ]),
   );
@@ -2316,13 +2318,13 @@ class TournamentSportEmojiPicker extends StatelessWidget {
   static const presets = [
     TournamentSportPreset('football', '⚽', 'Fútbol', 'Goles'),
     TournamentSportPreset('tennis_padel', '🎾', 'Pádel/Tenis', 'Sets'),
-    TournamentSportPreset('basketball', '🏀', 'Basket', 'Puntos'),
+    TournamentSportPreset('basketball', '🏀', 'Baloncesto', 'Puntos'),
     TournamentSportPreset('volleyball', '🏐', 'Voleibol', 'Sets'),
     TournamentSportPreset('ping_pong', '🏓', 'Ping pong', 'A 11'),
     TournamentSportPreset('cards_mus', '🃏', 'Mus/Cartas', 'Tantos'),
     TournamentSportPreset('darts', '🎯', 'Dardos', '301/501'),
     TournamentSportPreset('billiards', '🎱', 'Billar', 'Partidas'),
-    TournamentSportPreset('esports', '🎮', 'Gaming', 'Mapas'),
+    TournamentSportPreset('esports', '🎮', 'Esports', 'Mapas'),
     TournamentSportPreset('custom', '✨', 'Libre', 'Avanzado'),
   ];
 
@@ -2358,9 +2360,10 @@ class TournamentSportEmojiPicker extends StatelessWidget {
 }
 
 class TournamentValidationCard extends StatelessWidget {
+  final String format;
   final String scoringType;
   final Map<String, dynamic> scoringConfig;
-  const TournamentValidationCard({super.key, required this.scoringType, required this.scoringConfig});
+  const TournamentValidationCard({super.key, required this.format, required this.scoringType, required this.scoringConfig});
 
   @override
   Widget build(BuildContext context) => AppCard(
@@ -2370,7 +2373,9 @@ class TournamentValidationCard extends StatelessWidget {
       Container(width: 36, height: 36, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.verified_rounded, color: AppColors.blue, size: 20)),
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${scoringEmoji(scoringType)} ${scoringTypeLabel(scoringType)}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        Text(tournamentClassificationTitle(format, scoringType, scoringConfig), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 4),
+        Text(tournamentClassificationSummary(format, scoringType, scoringConfig: scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 11.5)),
         const SizedBox(height: 4),
         Text(scoringValidationText(scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
       ])),
@@ -3960,9 +3965,10 @@ class TournamentStandingsPanel extends StatelessWidget {
   final List<TeamStanding> standings;
   final List<Map<String, dynamic>> matches;
   final List<String> tieBreakers;
+  final String format;
   final String scoringType;
   final Map<String, dynamic> scoringConfig;
-  const TournamentStandingsPanel({super.key, required this.standings, required this.matches, required this.tieBreakers, required this.scoringType, required this.scoringConfig});
+  const TournamentStandingsPanel({super.key, required this.standings, required this.matches, required this.tieBreakers, required this.format, required this.scoringType, required this.scoringConfig});
 
   List<DataColumn> _columns(bool isAmericano, bool setMode) {
     if (isAmericano) {
@@ -4056,11 +4062,11 @@ class TournamentStandingsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (standings.isEmpty) return EmptySlim(icon: Icons.table_chart_rounded, title: 'Sin tabla todavía', body: 'Registra resultados para calcular la clasificación.');
+    if (standings.isEmpty) return EmptySlim(icon: Icons.table_chart_rounded, title: 'Sin clasificacion todavia', body: 'Registra resultados para calcular la clasificacion.');
     final isAmericano = matches.any(isAmericanoMatch);
     final setMode = scoringUsesSetMode(scoringType, scoringConfig);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SectionHeader(title: isAmericano ? 'Ranking individual' : 'Tabla completa'),
+      SectionHeader(title: tournamentClassificationTitle(format, scoringType, scoringConfig)),
       const SizedBox(height: 8),
       AppCard(
         color: AppColors.faint,
@@ -4069,9 +4075,12 @@ class TournamentStandingsPanel extends StatelessWidget {
           Text(scoringEmoji(scoringType), style: const TextStyle(fontSize: 22)),
           const SizedBox(width: 8),
           Expanded(child: Text(
-            isAmericano
-                ? 'Americano: ranking individual. Cada jugador suma lo conseguido con parejas rotativas.'
-                : tournamentStatsIntroText(scoringType, scoringConfig),
+            tournamentClassificationSummary(
+              format,
+              scoringType,
+              scoringConfig: scoringConfig,
+              tieBreakers: tieBreakers,
+            ),
             style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12, height: 1.25),
           )),
         ]),
@@ -4157,7 +4166,7 @@ class TournamentTieBreakersCompactCard extends StatelessWidget {
       Container(width: 32, height: 32, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.rule_rounded, color: AppColors.teal, size: 18)),
       const SizedBox(width: 9),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Desempates', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12)),
+        const Text('Orden de clasificacion', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12)),
         const SizedBox(height: 3),
         Text(standingsOrderTextForScoring(tieBreakers, scoringType, scoringConfig), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 11.5)),
       ])),
@@ -4179,7 +4188,7 @@ class TournamentTieBreakersInfoCard extends StatelessWidget {
       Container(width: 36, height: 36, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.rule_rounded, color: AppColors.blue, size: 20)),
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Criterios de desempate', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        const Text('Orden de clasificacion', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         const SizedBox(height: 4),
         Text(standingsOrderTextForScoring(tieBreakers, scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25)),
       ])),
@@ -4254,9 +4263,10 @@ class TournamentStatsPanel extends StatelessWidget {
   final List<TeamStanding> standings;
   final List<Map<String, dynamic>> matches;
   final List<Map<String, dynamic>> teams;
+  final String format;
   final String scoringType;
   final Map<String, dynamic> scoringConfig;
-  const TournamentStatsPanel({super.key, required this.standings, required this.matches, required this.teams, required this.scoringType, required this.scoringConfig});
+  const TournamentStatsPanel({super.key, required this.standings, required this.matches, required this.teams, required this.format, required this.scoringType, required this.scoringConfig});
 
   @override
   Widget build(BuildContext context) {
@@ -4277,10 +4287,8 @@ class TournamentStatsPanel extends StatelessWidget {
     final secondaryDiff = scoringUsesSetMode(scoringType, scoringConfig) ? bestSecondaryDifference(standings) : null;
     final secondaryFor = scoringUsesSetMode(scoringType, scoringConfig) ? bestSecondaryFor(standings) : null;
     final rate = bestWinRate(standings);
-    final isAmericano = matches.any(isAmericanoMatch);
-
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SectionHeader(title: isAmericano ? 'Ranking y estadísticas individuales' : 'Estadísticas del torneo'),
+      SectionHeader(title: tournamentClassificationTitle(format, scoringType, scoringConfig)),
       const SizedBox(height: 8),
       AppCard(
         color: AppColors.faint,
@@ -4289,9 +4297,7 @@ class TournamentStatsPanel extends StatelessWidget {
           Container(width: 36, height: 36, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.insights_rounded, color: AppColors.teal, size: 20)),
           const SizedBox(width: 10),
           Expanded(child: Text(
-            isAmericano
-                ? 'En americano el ranking es individual: cada jugador suma puntos/juegos aunque cambie de pareja.'
-                : tournamentStatsIntroText(scoringType, scoringConfig),
+            tournamentClassificationSummary(format, scoringType, scoringConfig: scoringConfig),
             style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25),
           )),
         ]),
@@ -4464,6 +4470,7 @@ class TournamentSettingsPanel extends StatelessWidget {
     final scoringConfig = resolvedScoringConfig(scoringType, tournament['scoring_config']);
     final formatConfig = tournamentFormatConfig(tournament);
     final scheduleConfig = tournamentScheduleConfig(tournament);
+    final tieBreakers = tournamentTieBreakers(tournament, scoringType);
     final status = AppData.text(tournament['status'], 'active');
     final scheduled = matches.where((m) => AppData.text(m['scheduled_at']).isNotEmpty).length;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -4474,6 +4481,8 @@ class TournamentSettingsPanel extends StatelessWidget {
         TournamentReviewRow(label: 'Formato', value: tournamentFormatLabel(format)),
         TournamentReviewRow(label: 'Participantes', value: teamTypeLabel(AppData.text(tournament['team_type'], 'equipo'))),
         TournamentReviewRow(label: 'Puntuación', value: scoringConfigShortText(scoringType, scoringConfig)),
+        TournamentReviewRow(label: 'Clasificación', value: tournamentClassificationTitle(format, scoringType, scoringConfig)),
+        TournamentReviewRow(label: 'Orden', value: standingsOrderTextForScoring(tieBreakers, scoringType, scoringConfig)),
         TournamentReviewRow(label: 'Jornadas límite', value: AppData.intValue(formatConfig['max_rounds']) == 0 ? 'Todas' : '${AppData.intValue(formatConfig['max_rounds'])}'),
         TournamentReviewRow(label: 'Vueltas', value: '${AppData.intValue(formatConfig['legs'], 1)}'),
         TournamentReviewRow(label: 'Partidos con fecha', value: '$scheduled/${matches.length}'),
@@ -4572,7 +4581,7 @@ class TournamentTeamsPanel extends StatelessWidget {
             ? 'Cada fila es una pareja. Mantén el formato Ana / Javi.'
             : teamType == 'individual'
                 ? 'Cada fila es un jugador.'
-                : 'Cada fila es un equipo. Ideal para fútbol, basket, volley o esports.';
+                : 'Cada fila es un equipo. Ideal para fútbol, baloncesto, voleibol o esports.';
     final emptyBody = isAmericano
         ? 'Añade jugadores individuales. Las parejas se crearán automáticamente en cada ronda.'
         : teamType == 'pareja'
@@ -5356,7 +5365,7 @@ String tournamentResultHelpForMatch(Map<String, dynamic> match, String scoringTy
     case 'sets_points':
       return 'Voleibol/Ping pong: registra cada parcial completo. La app calcula sets y puntos de set.';
     case 'total_points':
-      return 'Basket: marcador final por puntos. La app calcula puntos a favor, en contra y diferencia.';
+      return 'Baloncesto: marcador final por puntos. La app calcula puntos a favor, en contra y diferencia.';
     case 'target_points':
       return 'Dardos: pon los puntos o legs ganados según cómo juguéis. El marcador queda guardado para la tabla.';
     case 'games':
