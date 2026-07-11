@@ -2987,8 +2987,11 @@ class TournamentDetailHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final progress = total <= 0 ? 0.0 : (played / total).clamp(0.0, 1.0);
     final scoringType = AppData.text(tournament['scoring_type'], 'general');
+    final format = AppData.text(tournament['format'], 'liga');
+    final classificationTitle = tournamentClassificationTitle(format, scoringType, tournament['scoring_config']);
     return AppCard(
       color: AppColors.navyDeep,
+      accentColor: leader == null ? AppColors.teal : AppColors.orange,
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -3002,6 +3005,8 @@ class TournamentDetailHero extends StatelessWidget {
             ]),
             const SizedBox(height: 4),
             Text(total == 0 ? 'Genera los partidos para empezar.' : '$played de $total resultados registrados', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
+            const SizedBox(height: 5),
+            Text(classificationTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800, fontSize: 12)),
           ])),
           FilledButton.icon(onPressed: total == 0 ? onGenerate : onAdd, icon: Icon(total == 0 ? Icons.auto_awesome_motion_rounded : Icons.group_add_rounded, size: 18), label: Text(total == 0 ? 'Generar' : 'Añadir'), style: FilledButton.styleFrom(backgroundColor: AppColors.red, foregroundColor: Colors.white)),
         ]),
@@ -3050,7 +3055,7 @@ class TournamentTabsBar extends StatelessWidget {
       const ('Resumen', Icons.dashboard_rounded),
       const ('Partidos', Icons.sports_score_rounded),
       (format == 'eliminatoria' ? 'Cuadro' : 'Tabla', format == 'eliminatoria' ? Icons.account_tree_rounded : Icons.table_chart_rounded),
-      const ('Stats', Icons.query_stats_rounded),
+      const ('Estadísticas', Icons.query_stats_rounded),
       const ('Equipos', Icons.groups_rounded),
       const ('Ajustes', Icons.tune_rounded),
     ];
@@ -3820,6 +3825,7 @@ class TournamentSimpleMatchCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
+        accentColor: played ? AppColors.green : statusColor,
         onTap: () => showMatchResultDialog(context, match: match, teams: teams, scoringType: scoringType, scoringConfig: scoringConfig, onChanged: onChanged),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -3911,10 +3917,10 @@ class TournamentSimpleMatchCard extends StatelessWidget {
           if (group != null && status != 'bye') ...[
             const SizedBox(height: 8),
             Row(children: [
-              Expanded(child: TextButton.icon(
+              Expanded(child: FilledButton.icon(
                 onPressed: () => showMatchResultDialog(context, match: match, teams: teams, scoringType: scoringType, scoringConfig: scoringConfig, onChanged: onChanged),
-                icon: const Icon(Icons.sports_score_rounded, size: 17),
-                label: const Text('Resultado'),
+                icon: Icon(played ? Icons.edit_rounded : Icons.sports_score_rounded, size: 17),
+                label: Text(played ? 'Editar resultado' : 'Registrar resultado'),
               )),
               Expanded(child: TextButton.icon(
                 onPressed: () => showMatchScheduleDialog(context, match: match, group: group, tournamentName: tournamentName, teams: teams, onChanged: onChanged),
@@ -3947,7 +3953,9 @@ class TournamentLatestResultCard extends StatelessWidget {
     final aName = tournamentMatchSideName(match, names, true);
     final bName = tournamentMatchSideName(match, names, false);
     final details = matchDetailScoreText(match, scoringType, scoringConfig);
-    return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return AppCard(accentColor: AppColors.green, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text([AppData.text(match['round_name'], 'Resultado'), tournamentMatchDateText(match)].where((item) => item.isNotEmpty).join(' · '), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 10.5)),
+      const SizedBox(height: 8),
       Row(children: [
         Expanded(child: Text(aName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
         Text(matchPrimaryScoreText(match, scoringType, scoringConfig), style: const TextStyle(color: AppColors.green, fontWeight: FontWeight.w900, fontSize: 16)),
@@ -5427,6 +5435,7 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
   final configuredBestOf = scoringBestOf(scoringType, scoringConfig);
   final maxSetRows = max(configuredBestOf, tournamentDefaultSetRowsForSport(scoringType, scoringConfig));
   final initialSetRows = tournamentInitialSetRowsForSport(scoringType, scoringConfig);
+  final targetScore = AppData.intValue(scoringConfig?['target_score'], scoringUsesGameSetMode(scoringType, scoringConfig) ? 6 : 25);
   final setRows = initialSets.isNotEmpty
       ? initialSets.map((set) => {'a': AppData.intValue(set['a']), 'b': AppData.intValue(set['b'])}).toList()
       : List<Map<String, int>>.generate(initialSetRows, (_) => {'a': 0, 'b': 0});
@@ -5456,6 +5465,39 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
             ]),
           ),
           const SizedBox(height: 10),
+          if (!played) ...[
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              if (setMode) ...[
+                ActionChip(
+                  label: const Text('Local 2-0'),
+                  onPressed: () => setDialogState(() {
+                    setRows
+                      ..clear()
+                      ..addAll(List.generate(2, (_) => {'a': scoringUsesGameSetMode(scoringType, scoringConfig) ? 6 : targetScore, 'b': max(0, (scoringUsesGameSetMode(scoringType, scoringConfig) ? 6 : targetScore) - (scoringUsesGameSetMode(scoringType, scoringConfig) ? 2 : 7))}));
+                  }),
+                ),
+                ActionChip(
+                  label: const Text('Local 2-1'),
+                  onPressed: () => setDialogState(() {
+                    final win = scoringUsesGameSetMode(scoringType, scoringConfig) ? 6 : targetScore;
+                    final lose = max(0, win - (scoringUsesGameSetMode(scoringType, scoringConfig) ? 2 : 7));
+                    setRows
+                      ..clear()
+                      ..addAll([
+                        {'a': win, 'b': lose},
+                        {'a': lose, 'b': win},
+                        {'a': win, 'b': lose},
+                      ]);
+                  }),
+                ),
+              ] else ...[
+                ActionChip(label: const Text('1-0'), onPressed: () => setDialogState(() { simpleA = 1; simpleB = 0; })),
+                ActionChip(label: const Text('2-1'), onPressed: () => setDialogState(() { simpleA = 2; simpleB = 1; })),
+                ActionChip(label: const Text('0-1'), onPressed: () => setDialogState(() { simpleA = 0; simpleB = 1; })),
+              ],
+            ]),
+            const SizedBox(height: 10),
+          ],
           if (setMode) ...[
             Row(children: [
               Expanded(child: Text(tournamentResultSectionTitleForMatch(match, scoringType, scoringConfig), style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),

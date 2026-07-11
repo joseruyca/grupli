@@ -1558,9 +1558,9 @@ String tournamentFormatSubtitle(String format) {
     case 'americano':
       return 'Rondas por pista con parejas rotativas, descansos y ranking individual.';
     case 'manual':
-      return 'Emparejamientos decididos a mano, con máximo control.';
+      return 'Emparejamientos a mano, fechas a medida y control total.';
     default:
-      return 'Todos contra todos con clasificación automática.';
+      return 'Liga todos contra todos con clasificación automática.';
   }
 }
 
@@ -1613,7 +1613,7 @@ String scoringTypeSubtitle(String type) {
     case 'volleyball':
       return 'Sets a 25 y quinto set corto. Ideal para mejor de 3 o 5.';
     case 'ping_pong':
-      return 'Sets rápidos a 11. La app calcula sets y puntos.';
+      return 'Sets rápidos a 11. La app calcula sets y puntos de cada parcial.';
     case 'cards_mus':
       return 'Victoria 1 punto. Sirve para juegos, piedras, manos o rondas.';
     case 'darts':
@@ -1621,7 +1621,7 @@ String scoringTypeSubtitle(String type) {
     case 'billiards':
       return 'Partidas o bolas ganadas con marcador simple.';
     case 'esports':
-      return 'Mapas, rondas o puntos. Flexible para videojuegos.';
+      return 'Mapas, rondas o puntos. Flexible para videojuegos y torneos online.';
     case 'custom':
       return 'Flexible: marcador directo o por sets/rondas, con puntos y unidades editables.';
     default:
@@ -1898,30 +1898,30 @@ String scoringResultInputTitle(String type, [dynamic raw]) {
 String scoringResultInputHelp(String type, [dynamic raw]) {
   switch (scoringResultModel(type, raw)) {
     case 'goals':
-      return 'Escribe los goles de cada equipo. La tabla calcula puntos, goles a favor, goles en contra y diferencia.';
+      return 'Escribe los goles de cada equipo. La tabla actualizará puntos, goles a favor, goles en contra y diferencia.';
     case 'sets_games':
-      return 'Escribe cada set en una línea: 6-7, 6-4, 6-0. La app calcula Sets 2-1, juegos a favor/en contra y desempates.';
+      return 'Escribe cada set en una línea, por ejemplo 6-4 o 7-5. La app calcula sets, juegos y desempates.';
     case 'sets_points':
-      return 'Escribe cada set en una línea: 25-21, 22-25, 15-12. La app calcula sets, puntos de set y diferencia.';
+      return 'Escribe cada parcial en una línea, por ejemplo 25-21 o 15-12. La app calcula sets, puntos y desempates.';
     case 'total_points':
-      return 'Escribe los puntos anotados por cada equipo. La tabla calcula victorias y diferencia de puntos.';
+      return 'Escribe el marcador final de puntos. La tabla calculará victorias y diferencia.';
     case 'games':
       return 'Escribe juegos, partidas o mapas ganados por cada lado.';
     default:
-      return 'Marcador flexible. La clasificación usa las reglas configuradas para esta competición.';
+      return 'Marcador flexible. La clasificación usará las reglas configuradas para este torneo.';
   }
 }
 
 String scoringCreationHelp(String type, [dynamic raw]) {
   switch (scoringResultModel(type, raw)) {
     case 'goals':
-      return 'Fútbol: marcador por goles. Tabla: puntos, GF, GC y DG.';
+      return 'Fútbol: marcador por goles. La tabla usa puntos, GF, GC y DG.';
     case 'sets_games':
-      return 'Tenis/Pádel: introduces sets completos. Tabla: victorias, sets, juegos y desempates.';
+      return 'Tenis/Pádel: introduces sets completos. La tabla usa victorias, sets, juegos y desempates.';
     case 'sets_points':
-      return 'Voleibol/Ping pong: introduces sets completos. Tabla: victorias, sets, puntos y desempates.';
+      return 'Voleibol/Ping pong: introduces sets completos. La tabla usa victorias, sets, puntos y desempates.';
     case 'total_points':
-      return 'Baloncesto: marcador por puntos. Tabla: victorias, puntos a favor/en contra y diferencia.';
+      return 'Baloncesto: marcador por puntos. La tabla usa victorias, puntos a favor/en contra y diferencia.';
     default:
       return scoringConfigFullText(type, raw);
   }
@@ -1950,14 +1950,14 @@ String scoringValidationText(String type, [dynamic raw]) {
     case 'goals':
       return 'Fútbol real: goles, empate permitido, GF/GC/DG y puntos de liga.';
     case 'sets_games':
-      return 'Raqueta: cada set guarda juegos. No se mete solo 2-1; se introducen todos los parciales.';
+      return 'Raqueta: cada set guarda juegos. Introduce todos los parciales para cerrar el partido.';
     case 'sets_points':
-      return 'Sets: cada parcial guarda puntos. No hay empate a sets.';
+      return 'Sets: cada parcial guarda puntos. No puede quedar empate a sets.';
     case 'total_points':
       return 'Baloncesto: puntos totales, sin empate, diferencia de puntos.';
     default:
-      if (!scoringAllowDraw(type, cfg)) return 'Validación: el marcador no puede quedar empatado.';
-      return 'Validación: permite empate y calcula puntos/diferencia automáticamente.';
+      if (!scoringAllowDraw(type, cfg)) return 'El marcador no puede quedar empatado en este sistema.';
+      return 'Este sistema permite empate y calcula puntos y diferencia automáticamente.';
   }
 }
 
