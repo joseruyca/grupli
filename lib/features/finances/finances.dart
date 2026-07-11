@@ -34,6 +34,15 @@ class _FinancesTabState extends State<FinancesTab> {
     if (ok == true) reload();
   }
 
+  Future<void> openFinanceInsights(_FinanceData data) async {
+    final entitlement = GrupliPremium.entitlementForGroup(widget.group);
+    if (!entitlement.canUse('finance_insights')) {
+      await showPremiumFeatureGate(context, group: widget.group, featureKey: 'finance_insights');
+      return;
+    }
+    await showFinanceInsightsSheet(context, data: data);
+  }
+
   Future<void> markSettlementPaid(SettlementDebt debt) async {
     final confirmed = await confirmAction(
       context,
@@ -198,6 +207,7 @@ class _FinancesTabState extends State<FinancesTab> {
             final summary = data.summary;
             final hasMovements = data.expenses.isNotEmpty || data.settlementPayments.isNotEmpty;
             final balanceEntries = summary.sortedBalances;
+            final premium = GrupliPremium.entitlementForGroup(widget.group);
 
             return RefreshIndicator(
               color: AppColors.green,
@@ -215,6 +225,16 @@ class _FinancesTabState extends State<FinancesTab> {
                     settledCount: data.settlementPayments.length,
                     onCreate: openCreate,
                   ),
+                  const SizedBox(height: 12),
+                  premium.canUse('finance_insights')
+                      ? FinanceAdvancedInsightsCard(
+                          summary: summary,
+                          data: data,
+                          onOpen: () => openFinanceInsights(data),
+                        )
+                      : FinancePremiumTeaserCard(
+                          onOpen: () => openFinanceInsights(data),
+                        ),
                   const SizedBox(height: 12),
                   FinanceSegmentedTabs(index: financeSection, onChanged: (i) => setState(() => financeSection = i > 1 ? 1 : i)),
                   const SizedBox(height: 14),
@@ -1503,6 +1523,88 @@ class FinanceSummary {
   }
 }
 
+Future<void> showFinanceInsightsSheet(BuildContext context, {_FinanceData? data}) async {
+  if (data == null) return;
+  final summary = data.summary;
+  final activeExpenses = data.expenses.where((expense) => AppData.text(expense['status']) != 'cancelled').toList();
+  if (activeExpenses.isEmpty) {
+    await showToast(context, 'Añade algún gasto para ver el análisis avanzado.');
+    return;
+  }
+
+  final paidTotals = <String, double>{};
+  Map<String, dynamic>? biggestExpense;
+  for (final expense in activeExpenses) {
+    final paidBy = AppData.text(expense['paid_by']);
+    if (paidBy.isNotEmpty) {
+      paidTotals[paidBy] = (paidTotals[paidBy] ?? 0) + AppData.doubleValue(expense['amount']);
+    }
+    if (biggestExpense == null || AppData.doubleValue(expense['amount']) > AppData.doubleValue(biggestExpense['amount'])) {
+      biggestExpense = expense;
+    }
+  }
+  final topPayer = paidTotals.isEmpty ? null : paidTotals.entries.reduce((a, b) => a.value >= b.value ? a : b);
+  final averageExpense = summary.totalExpenses / activeExpenses.length;
+  final biggestAmount = biggestExpense == null ? 0.0 : AppData.doubleValue(biggestExpense['amount']);
+  final topPayerName = topPayer == null ? 'Sin datos' : financeMemberName(topPayer.key, data.members);
+  final topPayerTotal = topPayer == null ? 0.0 : topPayer.value;
+  final biggestConcept = biggestExpense == null ? 'Gasto' : AppData.text(biggestExpense['concept'], 'Gasto');
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: AppCard(
+          color: AppColors.white,
+          padding: const EdgeInsets.all(18),
+          child: SingleChildScrollView(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(width: 46, height: 46, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.insights_rounded, color: AppColors.teal)),
+                const SizedBox(width: 12),
+                const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Análisis financiero avanzado', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
+                  SizedBox(height: 4),
+                  Text('Lectura extra para grupos que quieren entender mejor sus gastos sin tocar la base gratis.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+                ])),
+              ]),
+              const SizedBox(height: 14),
+              Row(children: [
+                Expanded(child: FinanceFocusMetric(label: 'Gasto medio', value: money(averageExpense), color: AppColors.teal)),
+                const SizedBox(width: 8),
+                Expanded(child: FinanceFocusMetric(label: 'Mayor gasto', value: money(biggestAmount), color: AppColors.orange)),
+                const SizedBox(width: 8),
+                Expanded(child: FinanceFocusMetric(label: 'Pagado más', value: money(topPayerTotal), color: AppColors.green)),
+              ]),
+              const SizedBox(height: 14),
+              AppCard(
+                color: AppColors.faint,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Qué destaca', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 8),
+                  Text('La persona que más ha adelantado es $topPayerName con ${money(topPayerTotal)}.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+                  const SizedBox(height: 6),
+                  Text('El gasto más alto es $biggestConcept por ${money(biggestAmount)}.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+                  const SizedBox(height: 6),
+                  Text('Hay ${summary.peopleWithBalance} personas con saldo y ${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} recomendado${summary.settlements.length == 1 ? '' : 's'} para dejar el grupo a cero.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+                ]),
+              ),
+              const SizedBox(height: 10),
+              const Text('Premium añade este contexto y también quita anuncios de toda la app.', style: TextStyle(color: AppColors.orange, fontWeight: FontWeight.w800, height: 1.25)),
+              const SizedBox(height: 14),
+              SecondaryButton(label: 'Cerrar', icon: Icons.close_rounded, onTap: () => Navigator.pop(sheetContext)),
+            ]),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class SettlementDebt {
   final String fromId;
   final String toId;
@@ -1731,6 +1833,99 @@ class FinanceHumanNextStepCard extends StatelessWidget {
           const SizedBox(height: 14),
           SecondaryButton(label: 'Añadir primer gasto', icon: Icons.add_rounded, onTap: onCreate),
         ],
+      ]),
+    );
+  }
+}
+
+class FinancePremiumTeaserCard extends StatelessWidget {
+  final VoidCallback onOpen;
+  const FinancePremiumTeaserCard({super.key, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    color: AppColors.orangeSoft,
+    accentColor: AppColors.orange,
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(width: 46, height: 46, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.workspace_premium_rounded, color: AppColors.orange, size: 22)),
+        const SizedBox(width: 12),
+        const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Finanzas avanzadas', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
+          SizedBox(height: 4),
+          Text('Premium también quita anuncios y añade un análisis más completo para quien organiza mucho.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+        ])),
+      ]),
+      const SizedBox(height: 10),
+      Wrap(spacing: 8, runSpacing: 8, children: const [
+        TournamentRuleChip(label: 'Sin anuncios'),
+        TournamentRuleChip(label: 'Análisis avanzado'),
+        TournamentRuleChip(label: 'Exportar balances'),
+      ]),
+      const SizedBox(height: 10),
+      SecondaryButton(label: 'Ver Premium', icon: Icons.workspace_premium_rounded, onTap: onOpen),
+    ]),
+  );
+}
+
+class FinanceAdvancedInsightsCard extends StatelessWidget {
+  final FinanceSummary summary;
+  final _FinanceData data;
+  final VoidCallback onOpen;
+  const FinanceAdvancedInsightsCard({super.key, required this.summary, required this.data, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final activeExpenses = data.expenses.where((expense) => AppData.text(expense['status']) != 'cancelled').toList();
+    final total = summary.totalExpenses;
+    final average = activeExpenses.isEmpty ? 0.0 : total / activeExpenses.length;
+    MapEntry<String, double>? topPayer;
+    Map<String, dynamic>? biggestExpense;
+    final paidTotals = <String, double>{};
+    for (final expense in activeExpenses) {
+      final paidBy = AppData.text(expense['paid_by']);
+      if (paidBy.isNotEmpty) {
+        paidTotals[paidBy] = (paidTotals[paidBy] ?? 0) + AppData.doubleValue(expense['amount']);
+      }
+      if (biggestExpense == null || AppData.doubleValue(expense['amount']) > AppData.doubleValue(biggestExpense['amount'])) {
+        biggestExpense = expense;
+      }
+    }
+    if (paidTotals.isNotEmpty) {
+      topPayer = paidTotals.entries.reduce((a, b) => a.value >= b.value ? a : b);
+    }
+    final topPayerLabel = topPayer == null ? 'Sin datos' : '${financeMemberName(topPayer.key, data.members)} · ${money(topPayer.value)}';
+    final biggestLabel = biggestExpense == null ? 'Sin datos' : '${AppData.text(biggestExpense['concept'], 'Gasto')} · ${money(AppData.doubleValue(biggestExpense['amount']))}';
+
+    return AppCard(
+      color: AppColors.tealSoft,
+      accentColor: AppColors.teal,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(width: 46, height: 46, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.insights_rounded, color: AppColors.teal, size: 22)),
+          const SizedBox(width: 12),
+          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Análisis avanzado', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
+            SizedBox(height: 4),
+            Text('Lectura rápida del grupo para quien organiza más de una cuenta o quiere ir un paso más allá.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+          ])),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: FinanceMiniMetric(icon: Icons.functions_rounded, label: 'Gasto medio', value: money(average), color: AppColors.teal)),
+          const SizedBox(width: 8),
+          Expanded(child: FinanceMiniMetric(icon: Icons.receipt_long_rounded, label: 'Mayor gasto', value: biggestExpense == null ? '—' : money(AppData.doubleValue(biggestExpense['amount'])), color: AppColors.orange)),
+          const SizedBox(width: 8),
+          Expanded(child: FinanceMiniMetric(icon: Icons.person_rounded, label: 'Más ha adelantado', value: topPayer == null ? '—' : money(topPayer.value), color: AppColors.green)),
+        ]),
+        const SizedBox(height: 10),
+        Text('Top: $topPayerLabel', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+        const SizedBox(height: 4),
+        Text('Mayor gasto: $biggestLabel', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+        const SizedBox(height: 4),
+        Text('Sin anuncios y con información extra para quien organiza más a menudo.', style: const TextStyle(color: AppColors.orange, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+        const SizedBox(height: 10),
+        SecondaryButton(label: 'Abrir análisis', icon: Icons.insights_rounded, onTap: onOpen),
       ]),
     );
   }

@@ -45,6 +45,7 @@ Este documento define la dirección de la app para que siga siendo muy fácil de
 - Debe ser útil para quien organiza torneos con frecuencia.
 - Debe mejorar análisis, automatización y presentación.
 - Debe eliminar anuncios, pero ese no puede ser el único valor.
+- Debe aportar una mejora real también en contabilidad, sin bloquear el uso gratis.
 
 ## Qué incluirá Premium
 
@@ -61,6 +62,14 @@ Este documento define la dirección de la app para que siga siendo muy fácil de
 - Desempates personalizados.
 - Más automatización de calendario y jornadas.
 
+### Finanzas Premium
+
+- Análisis avanzado de gastos y balances.
+- Lectura rápida de quién adelanta más dinero.
+- Mayor gasto, gasto medio y contexto del grupo.
+- Exportación de balances y movimientos.
+- Vista sin anuncios para la experiencia completa.
+
 ### Premium para grupos grandes
 
 - Más torneos activos a la vez.
@@ -73,6 +82,7 @@ Este documento define la dirección de la app para que siga siendo muy fácil de
 - Resúmenes visuales más bonitos.
 - Compartir resultados con estética mejorada.
 - Branding del grupo o club si encaja más adelante.
+- Sin anuncios en toda la app.
 
 ## Lo que debe seguir gratis
 
@@ -149,4 +159,3 @@ Este documento define la dirección de la app para que siga siendo muy fácil de
 - Gratis: uso completo para la mayoría.
 - Premium: ahorro de tiempo, análisis y presentación avanzada.
 - Ads: discretos, limitados y nunca invasivos.
-

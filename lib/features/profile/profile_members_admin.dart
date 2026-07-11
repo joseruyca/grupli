@@ -455,7 +455,7 @@ class PremiumGroupScreen extends StatelessWidget {
     return DirectPage(child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PageHeader(title: 'Grupli Premium', subtitle: 'Premium será por grupo: si se activa aquí, todos los miembros de $name lo disfrutan.', leading: true),
+        PageHeader(title: 'Grupli Premium', subtitle: 'Premium será por grupo: si se activa aquí, todos los miembros de $name lo disfrutan y la app va sin anuncios.', leading: true),
         const SizedBox(height: 16),
         AppCard(
           color: entitlement.active ? AppColors.tealSoft : AppColors.orangeSoft,
@@ -467,7 +467,7 @@ class PremiumGroupScreen extends StatelessWidget {
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(entitlement.label, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 18)),
                 const SizedBox(height: 4),
-                Text(GrupliPremium.billingEnabled ? 'Los pagos estarán conectados al backend y a las stores.' : 'Los pagos todavía no están activos. Esta versión solo prepara permisos y experiencia.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25)),
+                Text(GrupliPremium.billingEnabled ? 'Los pagos estarán conectados al backend y a las stores.' : 'Los pagos todavía no están activos. Esta versión solo prepara permisos y experiencia, con acceso sin anuncios cuando Premium llegue.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25)),
               ])),
             ]),
             const SizedBox(height: 14),

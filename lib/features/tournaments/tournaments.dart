@@ -2399,7 +2399,7 @@ void showPremiumUpsellDialog(BuildContext context, {String feature = 'Premium de
           const SizedBox(height: 8),
           Text(description, style: const TextStyle(fontWeight: FontWeight.w700, height: 1.3)),
           const SizedBox(height: 10),
-          const Text('Premium será por grupo: todos los miembros disfrutarán las funciones avanzadas de ese grupo. La parte gratis seguirá cubriendo torneos completos, resultados y clasificación.', style: TextStyle(fontWeight: FontWeight.w700, height: 1.3, color: AppColors.muted)),
+          const Text('Premium será por grupo: todos los miembros disfrutarán las funciones avanzadas de ese grupo y la experiencia irá sin anuncios. La parte gratis seguirá cubriendo torneos completos, resultados y clasificación.', style: TextStyle(fontWeight: FontWeight.w700, height: 1.3, color: AppColors.muted)),
           const SizedBox(height: 12),
           ...GrupliPremium.features.take(7).map((item) => Padding(
             padding: const EdgeInsets.only(bottom: 6),
@@ -2473,7 +2473,7 @@ class TournamentPremiumSettingsCard extends StatelessWidget {
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Gratis completo, Premium preparado', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
       const SizedBox(height: 6),
-      const Text('La app ya cubre lo esencial gratis. Cuando activemos Premium, sumará estadísticas avanzadas, exportaciones, ranking histórico y automatización de jornadas.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+      const Text('La app ya cubre lo esencial gratis. Cuando activemos Premium, sumará estadísticas avanzadas, exportaciones, ranking histórico, automatización de jornadas y sin anuncios.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
       const SizedBox(height: 10),
       Wrap(spacing: 8, runSpacing: 8, children: [
         const TournamentRuleChip(label: 'Gratis: crear torneos'),
@@ -2481,6 +2481,7 @@ class TournamentPremiumSettingsCard extends StatelessWidget {
         const TournamentRuleChip(label: 'Premium: stats avanzadas'),
         const TournamentRuleChip(label: 'Premium: exportar'),
         const TournamentRuleChip(label: 'Premium: ranking histórico'),
+        const TournamentRuleChip(label: 'Premium: sin anuncios'),
         const TournamentRuleChip(label: 'Premium: plantillas'),
       ]),
       const SizedBox(height: 10),

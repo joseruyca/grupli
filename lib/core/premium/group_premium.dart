@@ -128,6 +128,18 @@ class GrupliPremium {
       icon: Icons.ios_share_rounded,
     ),
     PremiumFeatureDefinition(
+      key: 'finance_insights',
+      title: 'Finanzas avanzadas',
+      description: 'Análisis más profundo, contexto de gastos y lectura rápida del balance.',
+      icon: Icons.insights_rounded,
+    ),
+    PremiumFeatureDefinition(
+      key: 'ad_free',
+      title: 'Sin anuncios',
+      description: 'Quita la publicidad de toda la app para una experiencia más limpia.',
+      icon: Icons.do_not_disturb_rounded,
+    ),
+    PremiumFeatureDefinition(
       key: 'beautiful_share',
       title: 'Compartir resumen bonito',
       description: 'Crea una imagen clara para WhatsApp, Instagram o el grupo.',
@@ -228,7 +240,7 @@ Future<bool> showPremiumFeatureGate(
             const SizedBox(height: 12),
             Text(feature.description, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, height: 1.3)),
             const SizedBox(height: 10),
-            const Text('Los pagos aún no están activos. Esta pantalla deja preparada la experiencia para activar Premium por grupo más adelante.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+            const Text('Los pagos aún no están activos. Esta pantalla deja preparada la experiencia para activar Premium por grupo más adelante, y Premium también quitará anuncios de la app.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
             const SizedBox(height: 14),
             Row(children: [
               Expanded(child: SecondaryButton(label: 'Ahora no', icon: Icons.close_rounded, onTap: () => Navigator.pop(sheetContext, false))),
