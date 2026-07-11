@@ -721,7 +721,9 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
             const SizedBox(height: 4),
             Text(TournamentEngineV2.resultContractText(scoringType, format), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
             const SizedBox(height: 8),
-            Text('Estadísticas gratis: ${TournamentEngineV2.sportStatsSummary(scoringType)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+            Text('Incluido gratis: ${TournamentEngineV2.sportStatsSummary(scoringType)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+            const SizedBox(height: 4),
+            const Text('Premium más adelante: estadísticas avanzadas, exportación y comparativas históricas.', style: TextStyle(color: AppColors.orange, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
           ])),
         ]),
       ),
@@ -2397,7 +2399,7 @@ void showPremiumUpsellDialog(BuildContext context, {String feature = 'Premium de
           const SizedBox(height: 8),
           Text(description, style: const TextStyle(fontWeight: FontWeight.w700, height: 1.3)),
           const SizedBox(height: 10),
-          const Text('Premium será por grupo: todos los miembros disfrutan las funciones avanzadas de ese grupo. Los grupos grandes, los participantes amplios y el tercer puesto seguirán siendo gratis.', style: TextStyle(fontWeight: FontWeight.w700, height: 1.3, color: AppColors.muted)),
+          const Text('Premium será por grupo: todos los miembros disfrutarán las funciones avanzadas de ese grupo. La parte gratis seguirá cubriendo torneos completos, resultados y clasificación.', style: TextStyle(fontWeight: FontWeight.w700, height: 1.3, color: AppColors.muted)),
           const SizedBox(height: 12),
           ...GrupliPremium.features.take(7).map((item) => Padding(
             padding: const EdgeInsets.only(bottom: 6),
@@ -2408,7 +2410,7 @@ void showPremiumUpsellDialog(BuildContext context, {String feature = 'Premium de
             ]),
           )),
           const SizedBox(height: 8),
-          const Text('Pagos reales todavía desactivados. Esta fase solo prepara permisos, pantalla y bloqueos suaves.', style: TextStyle(fontWeight: FontWeight.w700, height: 1.25, color: AppColors.muted, fontSize: 12)),
+          const Text('Los pagos reales todavía están desactivados. Esta fase prepara permisos, pantalla y bloqueos suaves sin tocar la experiencia gratis.', style: TextStyle(fontWeight: FontWeight.w700, height: 1.25, color: AppColors.muted, fontSize: 12)),
         ]),
       ),
       actions: [
@@ -2434,7 +2436,7 @@ class TournamentPremiumBanner extends StatelessWidget {
     padding: const EdgeInsets.all(12),
     onTap: () => showPremiumUpsellDialog(context),
     child: Row(children: [
-      Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Center(child: Text('👑', style: TextStyle(fontSize: 21)))),
+      Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Center(child: Icon(Icons.workspace_premium_rounded, color: AppColors.orange, size: 20))),
       const SizedBox(width: 10),
       const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Premium de grupo preparado', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
@@ -2454,9 +2456,9 @@ class TournamentPremiumMiniCard extends StatelessWidget {
     color: AppColors.tealSoft,
     padding: const EdgeInsets.all(12),
     child: Row(children: [
-      const Text('👑', style: TextStyle(fontSize: 22)),
+      const Icon(Icons.workspace_premium_rounded, color: AppColors.orange, size: 22),
       const SizedBox(width: 10),
-      const Expanded(child: Text('Premium preparado por grupo: calendario avanzado, exportar, ranking histórico y estadísticas avanzadas.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25))),
+      const Expanded(child: Text('Gratis ahora, Premium preparado para más adelante: calendario avanzado, exportar, ranking histórico y estadísticas avanzadas.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25))),
       TextButton(onPressed: () => showPremiumUpsellDialog(context), child: const Text('Ver')),
     ]),
   );
@@ -2469,13 +2471,17 @@ class TournamentPremiumSettingsCard extends StatelessWidget {
   Widget build(BuildContext context) => AppCard(
     color: AppColors.faint,
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Premium preparado', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+      const Text('Gratis completo, Premium preparado', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
       const SizedBox(height: 6),
-      const Text('La app queda preparada para activar Premium más adelante sin bloquear grupos grandes ni participantes.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+      const Text('La app ya cubre lo esencial gratis. Cuando activemos Premium, sumará estadísticas avanzadas, exportaciones, ranking histórico y automatización de jornadas.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
       const SizedBox(height: 10),
       Wrap(spacing: 8, runSpacing: 8, children: [
-        const TournamentRuleChip(label: 'Participantes gratis'),
-        ...GrupliPremium.features.take(6).map((feature) => TournamentRuleChip(label: feature.title)),
+        const TournamentRuleChip(label: 'Gratis: crear torneos'),
+        const TournamentRuleChip(label: 'Gratis: resultados y clasificación'),
+        const TournamentRuleChip(label: 'Premium: stats avanzadas'),
+        const TournamentRuleChip(label: 'Premium: exportar'),
+        const TournamentRuleChip(label: 'Premium: ranking histórico'),
+        const TournamentRuleChip(label: 'Premium: plantillas'),
       ]),
       const SizedBox(height: 10),
       SecondaryButton(label: 'Ver Premium futuro', icon: Icons.workspace_premium_rounded, onTap: () => showPremiumUpsellDialog(context)),

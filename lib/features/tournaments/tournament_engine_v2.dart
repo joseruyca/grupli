@@ -308,38 +308,48 @@ class TournamentEngineV2 {
   }
 
   static String participantHelp(String sport, String format, String mode) {
-    if (format == 'americano') return 'Solo jugadores individuales. Grupli crea parejas rotativas en cada ronda y la clasificación es individual.';
+    if (format == 'americano') return 'Solo jugadores individuales. Grupli forma parejas rotativas en cada ronda y la clasificación es individual.';
+    if (sport == 'tennis_padel') {
+      if (mode == 'pareja') return 'Una pareja por línea. Escribe Ana / Javi para que todo quede claro.';
+      if (mode == 'individual') return 'Un jugador por línea. La clasificación sigue siendo individual y los cruces se organizan según el formato.';
+      return 'En tenis y pádel, lo normal es organizar parejas. Escribe una pareja por línea o cambia a individual si jugáis uno contra uno.';
+    }
+    if (sport == 'ping_pong') {
+      if (mode == 'pareja') return 'Una pareja por línea. Usa el formato Ana / Javi si jugáis dobles.';
+      if (mode == 'individual') return 'Un jugador por línea. La tabla se calculará de forma individual.';
+      return 'Un jugador por línea. Si jugáis dobles, cambia a parejas para evitar confusiones.';
+    }
     if (mode == 'pareja') return 'Una pareja por línea. Usa el formato Ana / Javi para evitar confusiones.';
     if (mode == 'individual') return 'Un jugador por línea. La tabla y los cruces se calculan de forma individual.';
-    if (sport == 'football') return 'Un equipo por línea. El resultado será por goles, con tabla de GF, GC y DG.';
-    if (sport == 'basketball') return 'Un equipo por línea. El resultado será por puntos totales, con PF, PC y DP.';
-    if (sport == 'volleyball') return 'Un equipo por línea. El resultado será por sets y puntos de set.';
+    if (sport == 'football') return 'Un equipo por línea. El resultado será por goles, con GF, GC y diferencia.';
+    if (sport == 'basketball') return 'Un equipo por línea. El resultado será por puntos, con PF, PC y diferencia.';
+    if (sport == 'volleyball') return 'Un equipo por línea. El resultado se calcula por sets y puntos de set.';
     return 'Un equipo por línea. No añadas jugadores sueltos si esta competición se organiza por equipos.';
   }
 
   static String formatHelp(String sport, String format) {
-    if (format == 'americano') return 'Jugadores individuales, parejas distintas por ronda, descansos equilibrados y ranking acumulado.';
-    if (format == 'eliminatoria') return 'Cuadro directo. El resultado solo decide quién avanza a la siguiente ronda.';
-    if (format == 'manual') return 'Tú decides los partidos uno a uno con selector visual o importación de cruces.';
-    if (sport == 'football') return 'Liga con puntos por victoria/empate, goles a favor, goles en contra y diferencia.';
+    if (format == 'americano') return 'Jugadores individuales, parejas rotativas, descansos equilibrados y ranking acumulado.';
+    if (format == 'eliminatoria') return 'Cuadro directo. Cada partido decide quién avanza.';
+    if (format == 'manual') return 'Tú eliges los partidos uno a uno con selector visual o importando cruces.';
+    if (sport == 'football') return 'Liga con puntos por victoria y empate, goles a favor, goles en contra y diferencia.';
     if (sport == 'tennis_padel') return 'Liga por sets: la tabla usa victorias, sets, juegos y desempates.';
-    if (sport == 'basketball') return 'Liga por puntos totales: victorias, puntos a favor/en contra y diferencia.';
-    if (sport == 'volleyball' || sport == 'ping_pong') return 'Liga por parciales: sets ganados y puntos de set para desempatar.';
+    if (sport == 'basketball') return 'Liga por puntos: victorias, puntos a favor/en contra y diferencia.';
+    if (sport == 'volleyball' || sport == 'ping_pong') return 'Liga por parciales: sets ganados y puntos por set para desempatar.';
     return 'Liga todos contra todos con clasificación automática adaptada al deporte.';
   }
 
   static String resultContractText(String sport, String format) {
     if (format == 'americano') {
       if (sport == 'tennis_padel') return 'Registra el marcador de cada set. El ranking individual suma los juegos reales conseguidos por cada jugador.';
-      if (sport == 'ping_pong') return 'Registra parciales por set. El ranking individual suma los puntos reales de cada jugador.';
+      if (sport == 'ping_pong') return 'Registra los parciales de cada set. El ranking individual suma los puntos reales de cada jugador.';
       return 'Registra el marcador real del partido. Cada jugador suma lo conseguido aunque cambie de pareja.';
     }
-    if (format == 'eliminatoria') return 'El marcador sirve para decidir ganador y avance. La tabla global no es el foco de una eliminatoria.';
-    if (sport == 'football') return 'Marcador por goles. Tabla: PJ, G, E, P, GF, GC, DG y PTS.';
-    if (sport == 'tennis_padel') return 'Marcador por sets. Tabla: PJ, V, P, SF, SC, DS, JF, JC, DJ y PTS.';
-    if (sport == 'volleyball' || sport == 'ping_pong') return 'Marcador por sets y puntos de set. La tabla desempata con sets y puntos acumulados.';
-    if (sport == 'basketball') return 'Marcador por puntos totales. Tabla: PJ, G, P, PF, PC, DP y PTS.';
-    return 'Marcador editable según el deporte, con puntos y desempates configurados.';
+    if (format == 'eliminatoria') return 'El marcador decide quién avanza. La tabla global no es la referencia principal en una eliminatoria.';
+    if (sport == 'football') return 'Marcador por goles. La tabla calcula PJ, G, E, P, GF, GC, diferencia y puntos.';
+    if (sport == 'tennis_padel') return 'Marcador por sets. La tabla calcula PJ, V, P, sets a favor/en contra, juegos y puntos.';
+    if (sport == 'volleyball' || sport == 'ping_pong') return 'Marcador por sets y puntos de set. La tabla usa sets y puntos acumulados para desempatar.';
+    if (sport == 'basketball') return 'Marcador por puntos. La tabla calcula PJ, V, P, PF, PC, diferencia y puntos.';
+    return 'Marcador editable según el deporte, con la clasificación y los desempates ya preparados.';
   }
 
   static List<String> defaultTieBreakers(String sport, String format) {
@@ -354,7 +364,7 @@ class TournamentEngineV2 {
   static String? setupError({required String sport, required String format, required String participantType, required int participantCount, required int manualMatchesCount}) {
     if (!supportsFormat(sport, format)) return '${tournamentFormatLabel(format)} no está disponible para ${scoringTypeLabel(sport)}.';
     final allowedModes = participantChoices(sport, format).map((item) => item.value).toSet();
-    if (!allowedModes.contains(participantType)) return 'El tipo de participante no encaja con este deporte/formato.';
+    if (!allowedModes.contains(participantType)) return 'Ese tipo de participantes no encaja con este deporte y formato.';
     if (format == 'americano') {
       if (participantType != 'individual') return 'El Americano solo admite jugadores individuales.';
       if (participantCount < 4) return 'El Americano necesita al menos 4 jugadores.';
