@@ -5374,19 +5374,19 @@ String tournamentResultHelpForMatch(Map<String, dynamic> match, String scoringTy
   }
   switch (scoringResultModel(scoringType, scoringConfig)) {
     case 'goals':
-      return 'Fútbol: marcador por goles. Puede haber empate si la competición lo permite.';
+      return 'F?tbol: registra el marcador final. Puede haber empate si la competici?n lo permite.';
     case 'sets_games':
-      return 'Tenis/Pádel: registra cada set completo. La app calcula el marcador del partido, sets y juegos para desempates.';
+      return 'Tenis/P?del: registra cada set completo. La app calcula sets, juegos y desempates autom?ticamente.';
     case 'sets_points':
       return 'Voleibol/Ping pong: registra cada parcial completo. La app calcula sets y puntos de set.';
     case 'total_points':
-      return 'Baloncesto: marcador final por puntos. La app calcula puntos a favor, en contra y diferencia.';
+      return 'Baloncesto: introduce el marcador final. La app calcula puntos a favor, en contra y diferencia.';
     case 'target_points':
-      return 'Dardos: pon los puntos o legs ganados según cómo juguéis. El marcador queda guardado para la tabla.';
+      return 'Dardos: escribe los puntos o legs ganados seg?n jugu?is. El marcador queda guardado para la tabla.';
     case 'games':
-      return 'Juegos/partidas: pon las partidas, mapas o juegos ganados por cada lado.';
+      return 'Juegos/partidas: escribe las partidas, mapas o juegos ganados por cada lado.';
     default:
-      return 'Marcador flexible: pon el resultado final de cada lado.';
+      return 'Marcador flexible: escribe el resultado final de cada lado.';
   }
 }
 
@@ -5436,6 +5436,7 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
   final bName = tournamentMatchSideName(match, names, false);
   final americano = isAmericanoMatch(match);
   final setMode = tournamentUsesSetResultInput(match, scoringType, scoringConfig);
+  final allowDraw = !americano && scoringAllowDraw(scoringType, scoringConfig);
   final aController = TextEditingController(text: AppData.text(match['score_a']));
   final bController = TextEditingController(text: AppData.text(match['score_b']));
   final initialSets = matchDetailSets(match);
@@ -5452,7 +5453,53 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
   final result = await showDialog<String>(
     context: context,
     builder: (context) => StatefulBuilder(
-      builder: (context, setDialogState) => AlertDialog(
+      builder: (context, setDialogState) {
+        void setSimpleScore(int a, int b) => setDialogState(() {
+          simpleA = a;
+          simpleB = b;
+        });
+
+        void resetSimpleScore() => setSimpleScore(0, 0);
+
+        void swapSimpleScore() => setDialogState(() {
+          final temp = simpleA;
+          simpleA = simpleB;
+          simpleB = temp;
+        });
+
+        void setSetRows(List<Map<String, int>> rows) => setDialogState(() {
+          setRows
+            ..clear()
+            ..addAll(rows);
+        });
+
+        void resetSetRows() => setSetRows(List.generate(initialSetRows, (_) => {'a': 0, 'b': 0}));
+
+        void swapSetRows() => setDialogState(() {
+          for (final row in setRows) {
+            final temp = row['a'] ?? 0;
+            row['a'] = row['b'] ?? 0;
+            row['b'] = temp;
+          }
+        });
+
+        List<Map<String, int>> quickSetRows({required bool localWins, required bool straight}) {
+          final win = scoringUsesGameSetMode(scoringType, scoringConfig) ? 6 : targetScore;
+          final lose = scoringUsesGameSetMode(scoringType, scoringConfig) ? (straight ? 4 : 5) : max(0, win - (straight ? 4 : 7));
+          if (straight) {
+            return [
+              {'a': localWins ? win : lose, 'b': localWins ? lose : win},
+              {'a': localWins ? win : lose, 'b': localWins ? lose : win},
+            ];
+          }
+          return [
+            {'a': localWins ? win : lose, 'b': localWins ? lose : win},
+            {'a': localWins ? lose : win, 'b': localWins ? win : lose},
+            {'a': localWins ? win : lose, 'b': localWins ? lose : win},
+          ];
+        }
+
+        return AlertDialog(
         title: Text('$aName vs $bName'),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           AppCard(
@@ -5475,33 +5522,20 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
           if (!played) ...[
             Wrap(spacing: 8, runSpacing: 8, children: [
               if (setMode) ...[
-                ActionChip(
-                  label: const Text('Local 2-0'),
-                  onPressed: () => setDialogState(() {
-                    setRows
-                      ..clear()
-                      ..addAll(List.generate(2, (_) => {'a': scoringUsesGameSetMode(scoringType, scoringConfig) ? 6 : targetScore, 'b': max(0, (scoringUsesGameSetMode(scoringType, scoringConfig) ? 6 : targetScore) - (scoringUsesGameSetMode(scoringType, scoringConfig) ? 2 : 7))}));
-                  }),
-                ),
-                ActionChip(
-                  label: const Text('Local 2-1'),
-                  onPressed: () => setDialogState(() {
-                    final win = scoringUsesGameSetMode(scoringType, scoringConfig) ? 6 : targetScore;
-                    final lose = max(0, win - (scoringUsesGameSetMode(scoringType, scoringConfig) ? 2 : 7));
-                    setRows
-                      ..clear()
-                      ..addAll([
-                        {'a': win, 'b': lose},
-                        {'a': lose, 'b': win},
-                        {'a': win, 'b': lose},
-                      ]);
-                  }),
-                ),
+                ActionChip(label: const Text('Local 2-0'), onPressed: () => setSetRows(quickSetRows(localWins: true, straight: true))),
+                ActionChip(label: const Text('Local 2-1'), onPressed: () => setSetRows(quickSetRows(localWins: true, straight: false))),
+                ActionChip(label: const Text('Visitante 0-2'), onPressed: () => setSetRows(quickSetRows(localWins: false, straight: true))),
+                ActionChip(label: const Text('Visitante 1-2'), onPressed: () => setSetRows(quickSetRows(localWins: false, straight: false))),
               ] else ...[
-                ActionChip(label: const Text('1-0'), onPressed: () => setDialogState(() { simpleA = 1; simpleB = 0; })),
-                ActionChip(label: const Text('2-1'), onPressed: () => setDialogState(() { simpleA = 2; simpleB = 1; })),
-                ActionChip(label: const Text('0-1'), onPressed: () => setDialogState(() { simpleA = 0; simpleB = 1; })),
+                ActionChip(label: Text(allowDraw ? 'Local 2-1' : 'Local 2-0'), onPressed: () => setSimpleScore(allowDraw ? 2 : 2, allowDraw ? 1 : 0)),
+                if (allowDraw) ActionChip(label: const Text('Empate 1-1'), onPressed: () => setSimpleScore(1, 1)),
+                ActionChip(label: Text(allowDraw ? 'Visitante 1-2' : 'Visitante 0-2'), onPressed: () => setSimpleScore(allowDraw ? 1 : 0, allowDraw ? 2 : 2)),
               ],
+            ]),
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              ActionChip(label: const Text('Intercambiar lados'), onPressed: setMode ? swapSetRows : swapSimpleScore),
+              ActionChip(label: const Text('Limpiar'), onPressed: setMode ? resetSetRows : resetSimpleScore),
             ]),
             const SizedBox(height: 10),
           ],
@@ -5563,7 +5597,8 @@ Future<void> showMatchResultDialog(BuildContext context, {required Map<String, d
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
           FilledButton(onPressed: () => Navigator.pop(context, 'save'), child: const Text('Guardar')),
         ],
-      ),
+      );
+      },
     ),
   );
   final matchId = match['id'].toString();

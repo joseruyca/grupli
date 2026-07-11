@@ -29,4 +29,14 @@ void main() {
     expect(summary, contains('Ranking individual'));
     expect(summary, contains('pareja'));
   });
+
+  test('result help explains how to enter scores naturally', () {
+    final match = {'result_details': <String, dynamic>{}, 'team_a': 'a', 'team_b': 'b', 'status': 'pending'};
+
+    final footballHelp = tournamentResultHelpForMatch(match, 'football', scoringConfigForType('football'));
+    final tennisHelp = tournamentResultHelpForMatch(match, 'tennis_padel', scoringConfigForType('tennis_padel'));
+
+    expect(footballHelp, contains('marcador final'));
+    expect(tennisHelp, contains('sets, juegos y desempates'));
+  });
 }
