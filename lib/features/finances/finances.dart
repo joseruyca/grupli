@@ -46,9 +46,9 @@ class _FinancesTabState extends State<FinancesTab> {
   Future<void> markSettlementPaid(SettlementDebt debt) async {
     final confirmed = await confirmAction(
       context,
-      title: 'Liquidar pago',
-      body: '${debt.fromName} pagó a ${debt.toName} ${money(debt.amount)}. Esto actualizará el balance neto del grupo.',
-      confirmLabel: 'Liquidar',
+      title: tr(context, es: 'Liquidar pago', en: 'Mark payment as settled'),
+      body: tr(context, es: '${debt.fromName} pagó a ${debt.toName} ${money(debt.amount)}. Esto actualizará el balance neto del grupo.', en: '${debt.fromName} paid ${debt.toName} ${money(debt.amount)}. This updates the group balance.'),
+      confirmLabel: tr(context, es: 'Liquidar', en: 'Settle'),
     );
     if (confirmed != true) return;
 
@@ -56,7 +56,7 @@ class _FinancesTabState extends State<FinancesTab> {
     try {
       await AppData.createSettlementPayment(widget.group['id'].toString(), debt.fromId, debt.toId, debt.amount);
       reload();
-      if (mounted) await showToast(context, 'Liquidación registrada.');
+      if (mounted) await showToast(context, tr(context, es: 'Liquidación registrada.', en: 'Payment settled.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     } finally {
@@ -68,9 +68,9 @@ class _FinancesTabState extends State<FinancesTab> {
     final amount = AppData.doubleValue(payment['amount']);
     final confirmed = await confirmAction(
       context,
-      title: 'Deshacer liquidación',
-      body: 'El pago de ${money(amount)} volverá a contarse como pendiente en el balance del grupo.',
-      confirmLabel: 'Deshacer',
+      title: tr(context, es: 'Deshacer liquidación', en: 'Undo settlement'),
+      body: tr(context, es: 'El pago de ${money(amount)} volverá a contarse como pendiente en el balance del grupo.', en: 'The payment of ${money(amount)} will be marked as pending again in the group balance.'),
+      confirmLabel: tr(context, es: 'Deshacer', en: 'Undo'),
       danger: true,
     );
     if (confirmed != true) return;
@@ -79,7 +79,7 @@ class _FinancesTabState extends State<FinancesTab> {
     try {
       await AppData.cancelSettlementPayment(AppData.text(payment['id']));
       reload();
-      if (mounted) await showToast(context, 'Liquidación deshecha.');
+      if (mounted) await showToast(context, tr(context, es: 'Liquidación deshecha.', en: 'Settlement undone.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     } finally {
@@ -121,14 +121,14 @@ class _FinancesTabState extends State<FinancesTab> {
                 Text(name, style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 3),
                 Text(
-                  balance > .01 ? 'Le deben ${money(balance)}' : balance < -.01 ? 'Debe ${money(balance.abs())}' : 'Está a cero',
+                  balance > .01 ? tr(context, es: 'Le deben ${money(balance)}', en: 'They owe ${money(balance)}') : balance < -.01 ? tr(context, es: 'Debe ${money(balance.abs())}', en: 'Owes ${money(balance.abs())}') : tr(context, es: 'Está a cero', en: 'Settled'),
                   style: TextStyle(color: balance > .01 ? AppColors.green : balance < -.01 ? AppColors.red : AppColors.muted, fontWeight: FontWeight.w900),
                 ),
               ])),
             ]),
             const SizedBox(height: 18),
             if (toPay.isEmpty && toReceive.isEmpty)
-              EmptySlim(icon: Icons.verified_rounded, title: 'Sin pagos pendientes', body: 'Esta persona no tiene que mover dinero ahora mismo.')
+              EmptySlim(icon: Icons.verified_rounded, title: tr(context, es: 'Sin pagos pendientes', en: 'No pending payments'), body: tr(context, es: 'Esta persona no tiene que mover dinero ahora mismo.', en: 'This person does not need to move any money right now.'))
             else ...[
               if (toPay.isNotEmpty) ...[
                 SectionHeader(title: 'Tiene que pagar', action: '${toPay.length}'),
@@ -165,10 +165,10 @@ class _FinancesTabState extends State<FinancesTab> {
                 const SizedBox(height: 14),
               ],
             ],
-            SectionHeader(title: 'Movimientos relacionados', action: '${relatedExpenses.length}'),
+            SectionHeader(title: tr(context, es: 'Movimientos relacionados', en: 'Related activity'), action: '${relatedExpenses.length}'),
             const SizedBox(height: 8),
             if (relatedExpenses.isEmpty)
-              EmptySlim(icon: Icons.receipt_long_rounded, title: 'Sin gastos relacionados', body: 'No aparece en ningún gasto del grupo.')
+              EmptySlim(icon: Icons.receipt_long_rounded, title: tr(context, es: 'Sin gastos relacionados', en: 'No related expenses'), body: tr(context, es: 'No aparece en ningún gasto del grupo.', en: 'They do not appear in any group expense.'))
             else
               ...relatedExpenses.take(8).map((expense) => ExpenseCard(
                 expense: expense,
@@ -194,7 +194,7 @@ class _FinancesTabState extends State<FinancesTab> {
           future: future,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CenterLoader(label: 'Calculando balances...');
+              return CenterLoader(label: tr(context, es: 'Calculando balances...', en: 'Calculating balances...'));
             }
             if (snapshot.hasError) {
               return ListView(
@@ -215,7 +215,7 @@ class _FinancesTabState extends State<FinancesTab> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
                 children: [
-                  PageHeader(title: 'Finanzas', subtitle: 'Gastos, deudas y pagos del grupo.', leading: false),
+                  PageHeader(title: tr(context, es: 'Finanzas', en: 'Finances'), subtitle: tr(context, es: 'Gastos, deudas y pagos del grupo.', en: 'Group spending, debts and payments.'), leading: false),
                   const SizedBox(height: 14),
                   FinanceHeroCard(summary: summary, onCreate: openCreate),
                   const SizedBox(height: 12),
@@ -239,13 +239,13 @@ class _FinancesTabState extends State<FinancesTab> {
                   FinanceSegmentedTabs(index: financeSection, onChanged: (i) => setState(() => financeSection = i > 1 ? 1 : i)),
                   const SizedBox(height: 14),
                   if (financeSection == 0) ...[
-                    SectionHeader(title: 'Movimientos', action: hasMovements ? '${data.expenses.length + data.settlementPayments.length}' : '0'),
+                    SectionHeader(title: tr(context, es: 'Movimientos', en: 'Activity'), action: hasMovements ? '${data.expenses.length + data.settlementPayments.length}' : '0'),
                     const SizedBox(height: 8),
                     if (!hasMovements)
-                      EmptyBlock(icon: Icons.receipt_long_rounded, title: 'Aún no hay movimientos', body: 'Añade el primer gasto. Aquí verás lo que se ha pagado y si falta algo por liquidar.')
+                      EmptyBlock(icon: Icons.receipt_long_rounded, title: tr(context, es: 'Aún no hay movimientos', en: 'No activity yet'), body: tr(context, es: 'Añade el primer gasto. Aquí verás lo que se ha pagado y si falta algo por liquidar.', en: 'Add the first expense. Here you will see what has been paid and whether anything remains to be settled.'))
                     else ...[
                       if (data.expenses.isNotEmpty) ...[
-                        SectionHeader(title: 'Gastos pagados', action: 'Total ${money(summary.totalExpenses)}'),
+                        SectionHeader(title: tr(context, es: 'Gastos pagados', en: 'Paid expenses'), action: '${tr(context, es: 'Total', en: 'Total')} ${money(summary.totalExpenses)}'),
                         const SizedBox(height: 8),
                         ...data.expenses.map((e) => ExpenseCard(
                           expense: e,
@@ -258,7 +258,7 @@ class _FinancesTabState extends State<FinancesTab> {
                       ],
                       if (data.settlementPayments.isNotEmpty) ...[
                         const SizedBox(height: 14),
-                        SectionHeader(title: 'Pagos registrados', action: '${data.settlementPayments.length}'),
+                        SectionHeader(title: tr(context, es: 'Pagos registrados', en: 'Recorded payments'), action: '${data.settlementPayments.length}'),
                         const SizedBox(height: 8),
                         AppCard(
                           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -280,10 +280,10 @@ class _FinancesTabState extends State<FinancesTab> {
                     const SizedBox(height: 12),
                     FinanceBalanceBarsCard(summary: summary),
                     const SizedBox(height: 16),
-                    SectionHeader(title: 'Saldos', action: balanceEntries.isEmpty ? 'Todo a cero' : '${balanceEntries.length} personas'),
+                    SectionHeader(title: tr(context, es: 'Saldos', en: 'Balances'), action: balanceEntries.isEmpty ? tr(context, es: 'Todo a cero', en: 'All settled') : '${balanceEntries.length} ${tr(context, es: 'personas', en: 'people')}'),
                     const SizedBox(height: 8),
                     if (balanceEntries.isEmpty)
-                      EmptyBlock(icon: Icons.verified_rounded, title: 'Todo queda a cero', body: 'No hay deudas pendientes entre miembros.')
+                      EmptyBlock(icon: Icons.verified_rounded, title: tr(context, es: 'Todo queda a cero', en: 'Everything is settled'), body: tr(context, es: 'No hay deudas pendientes entre miembros.', en: 'There are no outstanding debts between members.'))
                     else
                       AppCard(
                         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -301,10 +301,10 @@ class _FinancesTabState extends State<FinancesTab> {
                         ]),
                       ),
                     const SizedBox(height: 14),
-                    SectionHeader(title: 'Pagos recomendados', action: summary.settlements.isEmpty ? '0' : '${summary.settlements.length}'),
+                    SectionHeader(title: tr(context, es: 'Pagos recomendados', en: 'Recommended payments'), action: summary.settlements.isEmpty ? '0' : '${summary.settlements.length}'),
                     const SizedBox(height: 8),
                     if (summary.settlements.isEmpty)
-                      EmptySlim(icon: Icons.verified_rounded, title: 'No hay nada que pagar', body: 'Los saldos del grupo están compensados.')
+                      EmptySlim(icon: Icons.verified_rounded, title: tr(context, es: 'No hay nada que pagar', en: 'Nothing to pay'), body: tr(context, es: 'Los saldos del grupo están compensados.', en: 'The group balances are settled.'))
                     else
                       AppCard(
                         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -754,7 +754,10 @@ class FinanceSegmentedTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const icons = [Icons.receipt_long_rounded, Icons.account_balance_wallet_rounded];
-    const labels = ['Movimientos', 'Saldos'];
+    final labels = [
+      tr(context, es: 'Movimientos', en: 'Activity'),
+      tr(context, es: 'Saldos', en: 'Balances'),
+    ];
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(18), border: Border.all(color: AppColors.line)),
@@ -817,7 +820,7 @@ class FinanceHeroCard extends StatelessWidget {
             const SizedBox(height: 14),
             Text(body, style: const TextStyle(color: AppColors.muted, fontSize: 13.5, height: 1.35, fontWeight: FontWeight.w700)),
             const SizedBox(height: 14),
-            SecondaryButton(label: 'Entendido', icon: Icons.check_rounded, onTap: () => Navigator.pop(context)),
+            SecondaryButton(label: tr(context, es: 'Entendido', en: 'Got it'), icon: Icons.check_rounded, onTap: () => Navigator.pop(context)),
           ]),
         ),
       ),
@@ -842,7 +845,14 @@ class FinanceHeroCard extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(_financeMainTitle(summary), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 19.5, fontWeight: FontWeight.w900, letterSpacing: -.25, height: 1.08)),
             const SizedBox(height: 4),
-            Text(clean ? 'Nadie debe dinero.' : '${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} recomendado${summary.settlements.length == 1 ? '' : 's'} para cuadrar el grupo.', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xEFFFFFFF), fontSize: 13, fontWeight: FontWeight.w800, height: 1.25)),
+            Text(
+              clean
+                  ? tr(context, es: 'Nadie debe dinero.', en: 'Nobody owes money.')
+                  : tr(context, es: '${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} recomendado${summary.settlements.length == 1 ? '' : 's'} para cuadrar el grupo.', en: '${summary.settlements.length} recommended payment${summary.settlements.length == 1 ? '' : 's'} to balance the group.'),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Color(0xEFFFFFFF), fontSize: 13, fontWeight: FontWeight.w800, height: 1.25),
+            ),
           ])),
           const SizedBox(width: 10),
           SizedBox(
@@ -851,28 +861,28 @@ class FinanceHeroCard extends StatelessWidget {
               onPressed: onCreate,
               style: TextButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.greenDark, padding: const EdgeInsets.symmetric(horizontal: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
               icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Gasto', style: TextStyle(fontWeight: FontWeight.w900)),
+              label: Text(tr(context, es: 'Gasto', en: 'Expense'), style: const TextStyle(fontWeight: FontWeight.w900)),
             ),
           ),
         ]),
         const SizedBox(height: 12),
         Row(children: [
           Expanded(child: _HeroFinanceMetric(
-            label: 'Gastado',
+            label: tr(context, es: 'Gastado', en: 'Spent'),
             value: money(summary.totalExpenses),
-            onTap: () => _showMetricInfo(context, 'Gastado', money(summary.totalExpenses), 'Suma de todos los gastos registrados en el grupo. Sirve para entender cuánto se ha movido en total, no lo que debe una persona concreta.'),
+            onTap: () => _showMetricInfo(context, tr(context, es: 'Gastado', en: 'Spent'), money(summary.totalExpenses), tr(context, es: 'Suma de todos los gastos registrados en el grupo. Sirve para entender cuánto se ha movido en total, no lo que debe una persona concreta.', en: 'Total of all expenses recorded in the group. It shows how much has moved overall, not what any one person owes.')),
           )),
           const SizedBox(width: 8),
           Expanded(child: _HeroFinanceMetric(
-            label: 'Falta',
+            label: tr(context, es: 'Falta', en: 'Left'),
             value: money(summary.pendingAmount),
-            onTap: () => _showMetricInfo(context, 'Pendiente', money(summary.pendingAmount), 'Dinero que todavía queda por compensar entre miembros. Cuando las liquidaciones se registran correctamente, este valor baja hasta cero.'),
+            onTap: () => _showMetricInfo(context, tr(context, es: 'Pendiente', en: 'Pending'), money(summary.pendingAmount), tr(context, es: 'Dinero que todavía queda por compensar entre miembros. Cuando las liquidaciones se registran correctamente, este valor baja hasta cero.', en: 'Money that still needs to be settled between members. When settlements are recorded correctly, this value drops to zero.')),
           )),
           const SizedBox(width: 8),
           Expanded(child: _HeroFinanceMetric(
-            label: 'Mover',
+            label: tr(context, es: 'Mover', en: 'Move'),
             value: money(summary.settlementAmount),
-            onTap: () => _showMetricInfo(context, 'A mover', money(summary.settlementAmount), 'Cantidad mínima recomendada para liquidar el grupo con el menor número de pagos posible.'),
+            onTap: () => _showMetricInfo(context, tr(context, es: 'A mover', en: 'To move'), money(summary.settlementAmount), tr(context, es: 'Cantidad mínima recomendada para liquidar el grupo con el menor número de pagos posible.', en: 'Minimum amount recommended to settle the group with the fewest possible payments.')),
           )),
         ]),
       ]),
@@ -925,13 +935,13 @@ class FinanceMyStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = summary.myNet > 0.01 ? AppColors.green : summary.myNet < -0.01 ? AppColors.red : AppColors.teal;
     final title = summary.myNet > 0.01
-        ? 'Te deben ${money(summary.myNet)}'
+        ? tr(context, es: 'Te deben ${money(summary.myNet)}', en: 'You are owed ${money(summary.myNet)}')
         : summary.myNet < -0.01
-            ? 'Debes ${money(-summary.myNet)}'
-            : 'Tú estás a cero';
+            ? tr(context, es: 'Debes ${money(-summary.myNet)}', en: 'You owe ${money(-summary.myNet)}')
+            : tr(context, es: 'Tú estás a cero', en: 'You are settled');
     final body = settlements.isEmpty
-        ? 'No tienes pagos pendientes. Puedes revisar abajo el balance del grupo.'
-        : settlements.map((d) => d.fromId == AppData.user?.id ? 'Pagas a ${d.toName}: ${money(d.amount)}' : '${d.fromName} te paga: ${money(d.amount)}').join(' · ');
+        ? tr(context, es: 'No tienes pagos pendientes. Puedes revisar abajo el balance del grupo.', en: 'You do not have any pending payments. You can review the group balance below.')
+        : settlements.map((d) => d.fromId == AppData.user?.id ? tr(context, es: 'Pagas a ${d.toName}: ${money(d.amount)}', en: 'You pay ${d.toName}: ${money(d.amount)}') : tr(context, es: '${d.fromName} te paga: ${money(d.amount)}', en: '${d.fromName} pays you: ${money(d.amount)}')).join(' · ');
 
     return AppCard(
       padding: const EdgeInsets.all(15),
@@ -945,7 +955,7 @@ class FinanceMyStatusCard extends StatelessWidget {
           Text(body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25)),
         ])),
         const SizedBox(width: 8),
-        IconButton(onPressed: onCreate, icon: Icon(Icons.add_circle_rounded, color: color), tooltip: 'Añadir gasto'),
+        IconButton(onPressed: onCreate, icon: Icon(Icons.add_circle_rounded, color: color), tooltip: tr(context, es: 'Añadir gasto', en: 'Add expense')),
       ]),
     );
   }
@@ -981,10 +991,10 @@ class FinanceOptimizerInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasPending = summary.settlements.isNotEmpty;
-    final title = hasPending ? 'Pagos mínimos para cuadrar el grupo' : 'Sin deudas pendientes';
+    final title = hasPending ? tr(context, es: 'Pagos mínimos para cuadrar el grupo', en: 'Minimum payments to balance the group') : tr(context, es: 'Sin deudas pendientes', en: 'No pending debts');
     final body = hasPending
-        ? 'Hay ${summary.peopleWithBalance} personas con saldo. Grupli calcula el balance neto del grupo y propone ${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} para dejarlo a cero, aunque el grupo tenga muchos miembros.'
-        : 'Todos los balances están compensados. No hace falta mover dinero ahora mismo.';
+        ? tr(context, es: 'Hay ${summary.peopleWithBalance} personas con saldo. Grupli calcula el balance neto del grupo y propone ${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} para dejarlo a cero, aunque el grupo tenga muchos miembros.', en: 'There are ${summary.peopleWithBalance} people with a balance. Grupli computes the net balance for the group and suggests ${summary.settlements.length} payment${summary.settlements.length == 1 ? '' : 's'} to bring it to zero, even in large groups.')
+        : tr(context, es: 'Todos los balances están compensados. No hace falta mover dinero ahora mismo.', en: 'All balances are settled. No money needs to move right now.');
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1254,7 +1264,7 @@ class SettlementHistoryRow extends StatelessWidget {
     final toId = AppData.text(payment['to_user']);
     final amount = AppData.doubleValue(payment['amount']);
     final date = DateTime.tryParse(AppData.text(payment['paid_at']))?.toLocal();
-    final dateText = date == null ? 'Registrado' : DateFormat('d MMM', 'es_ES').format(date).replaceAll('.', '');
+    final dateText = date == null ? 'Registrado' : DateFormat('d MMM', appDateLocale).format(date).replaceAll('.', '');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       child: Row(children: [
@@ -1528,7 +1538,7 @@ Future<void> showFinanceInsightsSheet(BuildContext context, {_FinanceData? data}
   final summary = data.summary;
   final activeExpenses = data.expenses.where((expense) => AppData.text(expense['status']) != 'cancelled').toList();
   if (activeExpenses.isEmpty) {
-    await showToast(context, 'Añade algún gasto para ver el análisis avanzado.');
+    await showToast(context, tr(context, es: 'Añade algún gasto para ver el análisis avanzado.', en: 'Add an expense to see the advanced insights.'));
     return;
   }
 
@@ -1546,9 +1556,9 @@ Future<void> showFinanceInsightsSheet(BuildContext context, {_FinanceData? data}
   final topPayer = paidTotals.isEmpty ? null : paidTotals.entries.reduce((a, b) => a.value >= b.value ? a : b);
   final averageExpense = summary.totalExpenses / activeExpenses.length;
   final biggestAmount = biggestExpense == null ? 0.0 : AppData.doubleValue(biggestExpense['amount']);
-  final topPayerName = topPayer == null ? 'Sin datos' : financeMemberName(topPayer.key, data.members);
+  final topPayerName = topPayer == null ? tr(context, es: 'Sin datos', en: 'No data') : financeMemberName(topPayer.key, data.members);
   final topPayerTotal = topPayer == null ? 0.0 : topPayer.value;
-  final biggestConcept = biggestExpense == null ? 'Gasto' : AppData.text(biggestExpense['concept'], 'Gasto');
+  final biggestConcept = biggestExpense == null ? tr(context, es: 'Gasto', en: 'Expense') : AppData.text(biggestExpense['concept'], 'Expense');
 
   await showModalBottomSheet<void>(
     context: context,
@@ -1566,37 +1576,37 @@ Future<void> showFinanceInsightsSheet(BuildContext context, {_FinanceData? data}
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Container(width: 46, height: 46, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.insights_rounded, color: AppColors.teal)),
                 const SizedBox(width: 12),
-                const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Análisis financiero avanzado', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
-                  SizedBox(height: 4),
-                  Text('Lectura extra para grupos que quieren entender mejor sus gastos sin tocar la base gratis.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(tr(context, es: 'Análisis financiero avanzado', en: 'Advanced financial insights'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
+                  const SizedBox(height: 4),
+                  Text(tr(context, es: 'Lectura extra para grupos que quieren entender mejor sus gastos sin tocar la base gratis.', en: 'Extra context for groups that want a better view of their spending without touching the free core experience.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
                 ])),
               ]),
               const SizedBox(height: 14),
               Row(children: [
-                Expanded(child: FinanceFocusMetric(label: 'Gasto medio', value: money(averageExpense), color: AppColors.teal)),
+                Expanded(child: FinanceFocusMetric(label: tr(context, es: 'Gasto medio', en: 'Average spend'), value: money(averageExpense), color: AppColors.teal)),
                 const SizedBox(width: 8),
-                Expanded(child: FinanceFocusMetric(label: 'Mayor gasto', value: money(biggestAmount), color: AppColors.orange)),
+                Expanded(child: FinanceFocusMetric(label: tr(context, es: 'Mayor gasto', en: 'Largest spend'), value: money(biggestAmount), color: AppColors.orange)),
                 const SizedBox(width: 8),
-                Expanded(child: FinanceFocusMetric(label: 'Pagado más', value: money(topPayerTotal), color: AppColors.green)),
+                Expanded(child: FinanceFocusMetric(label: tr(context, es: 'Pagado más', en: 'Top paid'), value: money(topPayerTotal), color: AppColors.green)),
               ]),
               const SizedBox(height: 14),
               AppCard(
                 color: AppColors.faint,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Qué destaca', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+                  Text(tr(context, es: 'Qué destaca', en: 'What stands out'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 8),
-                  Text('La persona que más ha adelantado es $topPayerName con ${money(topPayerTotal)}.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+                  Text(tr(context, es: 'La persona que más ha adelantado es $topPayerName con ${money(topPayerTotal)}.', en: 'The person who has advanced the most is $topPayerName with ${money(topPayerTotal)}.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
                   const SizedBox(height: 6),
-                  Text('El gasto más alto es $biggestConcept por ${money(biggestAmount)}.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+                  Text(tr(context, es: 'El gasto más alto es $biggestConcept por ${money(biggestAmount)}.', en: 'The largest expense is $biggestConcept for ${money(biggestAmount)}.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
                   const SizedBox(height: 6),
-                  Text('Hay ${summary.peopleWithBalance} personas con saldo y ${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} recomendado${summary.settlements.length == 1 ? '' : 's'} para dejar el grupo a cero.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+                  Text(tr(context, es: 'Hay ${summary.peopleWithBalance} personas con saldo y ${summary.settlements.length} pago${summary.settlements.length == 1 ? '' : 's'} recomendado${summary.settlements.length == 1 ? '' : 's'} para dejar el grupo a cero.', en: 'There are ${summary.peopleWithBalance} people with a balance and ${summary.settlements.length} recommended payment${summary.settlements.length == 1 ? '' : 's'} to bring the group to zero.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
                 ]),
               ),
               const SizedBox(height: 10),
-              const Text('Premium añade este contexto y también quita anuncios de toda la app.', style: TextStyle(color: AppColors.orange, fontWeight: FontWeight.w800, height: 1.25)),
+              Text(tr(context, es: 'Premium añade este contexto y también quita anuncios de toda la app.', en: 'Premium adds this extra context and also removes ads from the whole app.'), style: const TextStyle(color: AppColors.orange, fontWeight: FontWeight.w800, height: 1.25)),
               const SizedBox(height: 14),
-              SecondaryButton(label: 'Cerrar', icon: Icons.close_rounded, onTap: () => Navigator.pop(sheetContext)),
+              SecondaryButton(label: tr(context, es: 'Cerrar', en: 'Close'), icon: Icons.close_rounded, onTap: () => Navigator.pop(sheetContext)),
             ]),
           ),
         ),
@@ -1714,10 +1724,16 @@ String financeMemberName(String userId, List<Map<String, dynamic>> members) {
 }
 
 String _financeMainTitle(FinanceSummary summary) {
-  if (summary.pendingAmount <= 0.01) return 'Todo está cuadrado';
-  if (summary.myNet > 0.01) return 'Te deben ${money(summary.myNet)}';
-  if (summary.myNet < -0.01) return 'Debes ${money(-summary.myNet)}';
-  return 'Hay pagos pendientes';
+  if (summary.pendingAmount <= 0.01) {
+    return appIsEnglish ? 'All settled' : 'Todo está cuadrado';
+  }
+  if (summary.myNet > 0.01) {
+    return appIsEnglish ? 'You are owed ${money(summary.myNet)}' : 'Te deben ${money(summary.myNet)}';
+  }
+  if (summary.myNet < -0.01) {
+    return appIsEnglish ? 'You owe ${money(-summary.myNet)}' : 'Debes ${money(-summary.myNet)}';
+  }
+  return appIsEnglish ? 'There are pending payments' : 'Hay pagos pendientes';
 }
 
 class SettlementRow extends StatelessWidget {
@@ -1796,17 +1812,17 @@ class FinanceHumanNextStepCard extends StatelessWidget {
     final clean = summary.pendingAmount <= 0.01;
     final firstDebt = summary.settlements.isEmpty ? null : summary.settlements.first;
     final title = clean
-        ? 'Las cuentas respiran'
+        ? tr(context, es: 'Las cuentas respiran', en: 'The books are breathing')
         : firstDebt != null
-            ? 'Siguiente pago claro'
-            : 'Hay saldo pendiente';
+            ? tr(context, es: 'Siguiente pago claro', en: 'Clear next payment')
+            : tr(context, es: 'Hay saldo pendiente', en: 'There is still a balance');
     final body = clean
         ? expensesCount == 0
-            ? 'Aún no hay gastos. Cuando alguien pague algo, Grupli te dirá exactamente quién debe qué.'
-            : '$expensesCount ${expensesCount == 1 ? 'movimiento registrado' : 'movimientos registrados'} y ningún pago pendiente.'
+            ? tr(context, es: 'Aún no hay gastos. Cuando alguien pague algo, Grupli te dirá exactamente quién debe qué.', en: 'There are no expenses yet. When someone pays for something, Grupli will tell you exactly who owes what.')
+            : tr(context, es: '$expensesCount ${expensesCount == 1 ? 'movimiento registrado' : 'movimientos registrados'} y ningún pago pendiente.', en: '$expensesCount ${expensesCount == 1 ? 'recorded activity' : 'recorded activities'} and no pending payment.')
         : firstDebt != null
-            ? '${firstDebt.fromName} paga a ${firstDebt.toName} ${money(firstDebt.amount)}. Con eso el grupo se acerca a cero.'
-            : 'Revisa los saldos para entender qué queda por compensar.';
+            ? tr(context, es: '${firstDebt.fromName} paga a ${firstDebt.toName} ${money(firstDebt.amount)}. Con eso el grupo se acerca a cero.', en: '${firstDebt.fromName} pays ${firstDebt.toName} ${money(firstDebt.amount)}. That brings the group closer to zero.')
+            : tr(context, es: 'Revisa los saldos para entender qué queda por compensar.', en: 'Check balances to see what still needs to be settled.');
     return AppCard(
       color: AppColors.surfaceWarm,
       accentColor: clean ? AppColors.green : AppColors.navFinance,
@@ -1823,15 +1839,15 @@ class FinanceHumanNextStepCard extends StatelessWidget {
         ]),
         const SizedBox(height: 14),
         Row(children: [
-          Expanded(child: FinanceFocusMetric(label: 'Pendiente', value: money(summary.pendingAmount), color: clean ? AppColors.green : AppColors.amber)),
+          Expanded(child: FinanceFocusMetric(label: tr(context, es: 'Pendiente', en: 'Pending'), value: money(summary.pendingAmount), color: clean ? AppColors.green : AppColors.amber)),
           const SizedBox(width: 8),
-          Expanded(child: FinanceFocusMetric(label: 'A mover', value: money(summary.settlementAmount), color: AppColors.navFinance)),
+          Expanded(child: FinanceFocusMetric(label: tr(context, es: 'A mover', en: 'To move'), value: money(summary.settlementAmount), color: AppColors.navFinance)),
           const SizedBox(width: 8),
-          Expanded(child: FinanceFocusMetric(label: 'Liquidado', value: '$settledCount', color: AppColors.blue)),
+          Expanded(child: FinanceFocusMetric(label: tr(context, es: 'Liquidado', en: 'Settled'), value: '$settledCount', color: AppColors.blue)),
         ]),
         if (expensesCount == 0) ...[
           const SizedBox(height: 14),
-          SecondaryButton(label: 'Añadir primer gasto', icon: Icons.add_rounded, onTap: onCreate),
+          SecondaryButton(label: tr(context, es: 'Añadir primer gasto', en: 'Add first expense'), icon: Icons.add_rounded, onTap: onCreate),
         ],
       ]),
     );
@@ -1850,20 +1866,20 @@ class FinancePremiumTeaserCard extends StatelessWidget {
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(width: 46, height: 46, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.workspace_premium_rounded, color: AppColors.orange, size: 22)),
         const SizedBox(width: 12),
-        const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Finanzas avanzadas', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
-          SizedBox(height: 4),
-          Text('Premium también quita anuncios y añade un análisis más completo para quien organiza mucho.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(tr(context, es: 'Finanzas avanzadas', en: 'Advanced finances'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
+          const SizedBox(height: 4),
+          Text(tr(context, es: 'Premium también quita anuncios y añade un análisis más completo para quien organiza mucho.', en: 'Premium also removes ads and adds deeper insights for frequent organizers.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
         ])),
       ]),
       const SizedBox(height: 10),
-      Wrap(spacing: 8, runSpacing: 8, children: const [
-        TournamentRuleChip(label: 'Sin anuncios'),
-        TournamentRuleChip(label: 'Análisis avanzado'),
-        TournamentRuleChip(label: 'Exportar balances'),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        TournamentRuleChip(label: tr(context, es: 'Sin anuncios', en: 'No ads')),
+        TournamentRuleChip(label: tr(context, es: 'Análisis avanzado', en: 'Advanced insights')),
+        TournamentRuleChip(label: tr(context, es: 'Exportar balances', en: 'Export balances')),
       ]),
       const SizedBox(height: 10),
-      SecondaryButton(label: 'Ver Premium', icon: Icons.workspace_premium_rounded, onTap: onOpen),
+      SecondaryButton(label: tr(context, es: 'Ver Premium', en: 'See Premium'), icon: Icons.workspace_premium_rounded, onTap: onOpen),
     ]),
   );
 }
@@ -1894,8 +1910,8 @@ class FinanceAdvancedInsightsCard extends StatelessWidget {
     if (paidTotals.isNotEmpty) {
       topPayer = paidTotals.entries.reduce((a, b) => a.value >= b.value ? a : b);
     }
-    final topPayerLabel = topPayer == null ? 'Sin datos' : '${financeMemberName(topPayer.key, data.members)} · ${money(topPayer.value)}';
-    final biggestLabel = biggestExpense == null ? 'Sin datos' : '${AppData.text(biggestExpense['concept'], 'Gasto')} · ${money(AppData.doubleValue(biggestExpense['amount']))}';
+    final topPayerLabel = topPayer == null ? tr(context, es: 'Sin datos', en: 'No data') : '${financeMemberName(topPayer.key, data.members)} · ${money(topPayer.value)}';
+    final biggestLabel = biggestExpense == null ? tr(context, es: 'Sin datos', en: 'No data') : '${AppData.text(biggestExpense['concept'], 'Expense')} · ${money(AppData.doubleValue(biggestExpense['amount']))}';
 
     return AppCard(
       color: AppColors.tealSoft,
@@ -1904,28 +1920,28 @@ class FinanceAdvancedInsightsCard extends StatelessWidget {
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(width: 46, height: 46, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.insights_rounded, color: AppColors.teal, size: 22)),
           const SizedBox(width: 12),
-          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Análisis avanzado', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
-            SizedBox(height: 4),
-            Text('Lectura rápida del grupo para quien organiza más de una cuenta o quiere ir un paso más allá.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(tr(context, es: 'Análisis avanzado', en: 'Advanced insights'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
+            const SizedBox(height: 4),
+            Text(tr(context, es: 'Lectura rápida del grupo para quien organiza más de una cuenta o quiere ir un paso más allá.', en: 'A quick read on the group for anyone managing several balances or wanting more depth.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
           ])),
         ]),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: FinanceMiniMetric(icon: Icons.functions_rounded, label: 'Gasto medio', value: money(average), color: AppColors.teal)),
+          Expanded(child: FinanceMiniMetric(icon: Icons.functions_rounded, label: tr(context, es: 'Gasto medio', en: 'Average spend'), value: money(average), color: AppColors.teal)),
           const SizedBox(width: 8),
-          Expanded(child: FinanceMiniMetric(icon: Icons.receipt_long_rounded, label: 'Mayor gasto', value: biggestExpense == null ? '—' : money(AppData.doubleValue(biggestExpense['amount'])), color: AppColors.orange)),
+          Expanded(child: FinanceMiniMetric(icon: Icons.receipt_long_rounded, label: tr(context, es: 'Mayor gasto', en: 'Largest spend'), value: biggestExpense == null ? '—' : money(AppData.doubleValue(biggestExpense['amount'])), color: AppColors.orange)),
           const SizedBox(width: 8),
-          Expanded(child: FinanceMiniMetric(icon: Icons.person_rounded, label: 'Más ha adelantado', value: topPayer == null ? '—' : money(topPayer.value), color: AppColors.green)),
+          Expanded(child: FinanceMiniMetric(icon: Icons.person_rounded, label: tr(context, es: 'Más ha adelantado', en: 'Top payer'), value: topPayer == null ? '—' : money(topPayer.value), color: AppColors.green)),
         ]),
         const SizedBox(height: 10),
-        Text('Top: $topPayerLabel', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+        Text(tr(context, es: 'Más aporta: $topPayerLabel', en: 'Top contributor: $topPayerLabel'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
         const SizedBox(height: 4),
-        Text('Mayor gasto: $biggestLabel', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+        Text(tr(context, es: 'Mayor gasto: $biggestLabel', en: 'Largest spend: $biggestLabel'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
         const SizedBox(height: 4),
-        Text('Sin anuncios y con información extra para quien organiza más a menudo.', style: const TextStyle(color: AppColors.orange, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+        Text(tr(context, es: 'Sin anuncios y con información extra para quien organiza más a menudo.', en: 'No ads and extra insight for frequent organizers.'), style: const TextStyle(color: AppColors.orange, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
         const SizedBox(height: 10),
-        SecondaryButton(label: 'Abrir análisis', icon: Icons.insights_rounded, onTap: onOpen),
+        SecondaryButton(label: tr(context, es: 'Abrir análisis', en: 'Open insights'), icon: Icons.insights_rounded, onTap: onOpen),
       ]),
     );
   }

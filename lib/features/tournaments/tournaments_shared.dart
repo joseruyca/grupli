@@ -805,7 +805,7 @@ class TournamentSchedulePreviewTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final date = row.scheduledAt == null ? 'Sin fecha' : DateFormat('EEE d MMM · HH:mm', 'es_ES').format(row.scheduledAt!);
+    final date = row.scheduledAt == null ? 'Sin fecha' : DateFormat('EEE d MMM · HH:mm', appDateLocale).format(row.scheduledAt!);
     return Padding(
       padding: const EdgeInsets.only(bottom: 7),
       child: AppCard(
@@ -843,7 +843,7 @@ class TournamentManualDraftRowCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final date = row.scheduledAt == null ? 'Sin fecha individual' : DateFormat('EEE d MMM · HH:mm', 'es_ES').format(row.scheduledAt!);
+    final date = row.scheduledAt == null ? 'Sin fecha individual' : DateFormat('EEE d MMM · HH:mm', appDateLocale).format(row.scheduledAt!);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
@@ -943,8 +943,8 @@ Future<TournamentManualDraftRow?> showTournamentManualDraftDialog(
             title: const Text('Poner fecha individual'),
           ),
           if (useDate) Row(children: [
-            Expanded(child: SecondaryButton(label: DateFormat('d MMM', 'es_ES').format(selectedDate), icon: Icons.calendar_today_rounded, onTap: () async {
-              final picked = await showDatePicker(context: dialogContext, initialDate: selectedDate, firstDate: DateTime.now().subtract(const Duration(days: 365)), lastDate: DateTime.now().add(const Duration(days: 730)), locale: const Locale('es', 'ES'));
+            Expanded(child: SecondaryButton(label: DateFormat('d MMM', appDateLocale).format(selectedDate), icon: Icons.calendar_today_rounded, onTap: () async {
+              final picked = await showDatePicker(context: dialogContext, initialDate: selectedDate, firstDate: DateTime.now().subtract(const Duration(days: 365)), lastDate: DateTime.now().add(const Duration(days: 730)), locale: appLocale);
               if (picked != null) setLocal(() => selectedDate = DateTime(picked.year, picked.month, picked.day, selectedDate.hour, selectedDate.minute));
             })),
             const SizedBox(width: 8),
@@ -1028,8 +1028,8 @@ Future<TournamentMatchEditorResult?> showTournamentMatchEditorDialog(BuildContex
           TextField(controller: roundController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: const InputDecoration(labelText: 'Jornada')),
           CheckboxListTile(value: useDate, onChanged: (v) => setLocal(() => useDate = v == true), contentPadding: EdgeInsets.zero, title: const Text('Programar fecha')),
           if (useDate) Row(children: [
-            Expanded(child: SecondaryButton(label: DateFormat('d MMM', 'es_ES').format(selectedDate), icon: Icons.calendar_today_rounded, onTap: () async {
-              final picked = await showDatePicker(context: dialogContext, initialDate: selectedDate, firstDate: DateTime.now().subtract(const Duration(days: 365)), lastDate: DateTime.now().add(const Duration(days: 730)), locale: const Locale('es', 'ES'));
+            Expanded(child: SecondaryButton(label: DateFormat('d MMM', appDateLocale).format(selectedDate), icon: Icons.calendar_today_rounded, onTap: () async {
+              final picked = await showDatePicker(context: dialogContext, initialDate: selectedDate, firstDate: DateTime.now().subtract(const Duration(days: 365)), lastDate: DateTime.now().add(const Duration(days: 730)), locale: appLocale);
               if (picked != null) setLocal(() => selectedDate = DateTime(picked.year, picked.month, picked.day, selectedTime.hour, selectedTime.minute));
             })),
             const SizedBox(width: 8),

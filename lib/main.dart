@@ -24,6 +24,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 
 part 'core/theme/app_colors.dart';
+part 'core/i18n/i18n.dart';
 part 'core/app_data/app_data.dart';
 part 'core/premium/group_premium.dart';
 part 'core/premium/premium_monetization.dart';
@@ -43,6 +44,7 @@ part 'core/widgets/shared_widgets.dart';
 
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+late Locale appLocale;
 
 @pragma('vm:entry-point')
 Future<void> grupliFirebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -109,8 +111,12 @@ Future<void> main() async {
     );
   };
 
-  Intl.defaultLocale = 'es_ES';
-  await initializeDateFormatting('es_ES');
+  appLocale = resolveAppLocale(ui.PlatformDispatcher.instance.locale);
+  Intl.defaultLocale = appIntlLocale;
+  await Future.wait([
+    initializeDateFormatting('es_ES'),
+    initializeDateFormatting('en_US'),
+  ]);
 
   if (!AppConfig.hasSupabaseRuntimeConfig) {
     runApp(const GrupliConfigurationMissingApp());
@@ -563,7 +569,7 @@ class GrupliApp extends StatelessWidget {
           focusedBorder: OutlineInputBorder(borderRadius: AppColors.humanRadius, borderSide: const BorderSide(color: AppColors.teal, width: 1.6)),
         ),
       ),
-      locale: const Locale('es'),
+      locale: appLocale,
       supportedLocales: const [Locale('es'), Locale('en')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -941,7 +947,7 @@ class PushNotificationService {
 
 
 String dateLabel(DateTime date) {
-  return DateFormat('dd/MM · HH:mm', 'es_ES').format(date.toLocal());
+  return DateFormat('dd/MM · HH:mm', appDateLocale).format(date.toLocal());
 }
 
 String _cap(String value) {
@@ -949,15 +955,14 @@ String _cap(String value) {
   return value.substring(0, 1).toUpperCase() + value.substring(1);
 }
 
-String monthTitle(DateTime date) => _cap(DateFormat('MMMM yyyy', 'es_ES').format(date));
-String longDay(DateTime date) => _cap(DateFormat('EEEE dd MMMM', 'es_ES').format(date));
-String longDateTime(DateTime date) => _cap(DateFormat('EEEE dd MMMM \u00B7 HH:mm', 'es_ES').format(date));
-String shortWeekday(DateTime date) => _cap(DateFormat('EEE', 'es_ES').format(date).replaceAll('.', ''));
+String monthTitle(DateTime date) => _cap(DateFormat('MMMM yyyy', appDateLocale).format(date));
+String longDay(DateTime date) => _cap(DateFormat('EEEE dd MMMM', appDateLocale).format(date));
+String longDateTime(DateTime date) => _cap(DateFormat('EEEE dd MMMM \u00B7 HH:mm', appDateLocale).format(date));
+String shortWeekday(DateTime date) => _cap(DateFormat('EEE', appDateLocale).format(date).replaceAll('.', ''));
 
 String money(double value) {
-  final sign = value < 0 ? '-' : '';
-  final formatted = NumberFormat('#,##0.00', 'es_ES').format(value.abs());
-  return '$sign\u20AC $formatted';
+  final formatted = NumberFormat.currency(locale: appIntlLocale, symbol: '\u20AC', decimalDigits: 2).format(value.abs());
+  return value < 0 ? '-$formatted' : formatted;
 }
 
 String newLocalUuid() {
@@ -1330,7 +1335,7 @@ String tournamentMatchDateText(Map<String, dynamic> match) {
   if (raw.isEmpty) return 'Sin fecha';
   final dt = DateTime.tryParse(raw)?.toLocal();
   if (dt == null) return 'Sin fecha';
-  return DateFormat('EEE d MMM · HH:mm', 'es_ES').format(dt);
+  return DateFormat('EEE d MMM · HH:mm', appDateLocale).format(dt);
 }
 
 DateTime? tournamentScheduledAtForIndex(Map<String, dynamic>? cfg, int round, int orderInsideRound) {
@@ -2648,7 +2653,7 @@ String matchHistoryEntryText(Map<String, dynamic> item) {
   final note = AppData.text(item['note']);
   final raw = AppData.text(item['at']);
   final dt = DateTime.tryParse(raw)?.toLocal();
-  final date = dt == null ? '' : DateFormat('d MMM HH:mm', 'es_ES').format(dt);
+  final date = dt == null ? '' : DateFormat('d MMM HH:mm', appDateLocale).format(dt);
   return [if (date.isNotEmpty) date, action, if (note.isNotEmpty) note].join(' · ');
 }
 

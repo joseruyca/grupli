@@ -57,11 +57,11 @@ class GroupHeroCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Lo importante del grupo',
+            Text(
+              tr(context, es: 'Lo importante del grupo', en: 'What matters in the group'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,
                 fontWeight: FontWeight.w900,
@@ -142,10 +142,12 @@ class GroupDashboardIntro extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = nextEvent == null
-        ? 'Este grupo todavía no tiene planes próximos.'
+        ? tr(context, es: 'Este grupo todavía no tiene planes próximos.', en: 'This group does not have any upcoming plans yet.')
         : pendingCount > 0
-            ? (pendingCount == 1 ? 'Tienes 1 plan pendiente de confirmar.' : 'Tienes $pendingCount planes pendientes de confirmar.')
-            : 'El próximo plan ya está organizado.';
+            ? (pendingCount == 1
+                ? tr(context, es: 'Tienes 1 plan pendiente de confirmar.', en: 'You have 1 plan waiting for confirmation.')
+                : tr(context, es: 'Tienes $pendingCount planes pendientes de confirmar.', en: 'You have $pendingCount plans waiting for confirmation.'))
+            : tr(context, es: 'El próximo plan ya está organizado.', en: 'The next plan is already set.');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Text(
@@ -166,13 +168,13 @@ class DashboardQuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(children: [
-      Expanded(child: _DashboardQuickAction(icon: Icons.calendar_month_rounded, label: 'Agenda', color: AppColors.navAgenda, onTap: onAgenda)),
+      Expanded(child: _DashboardQuickAction(icon: Icons.calendar_month_rounded, label: tr(context, es: 'Agenda', en: 'Agenda'), color: AppColors.navAgenda, onTap: onAgenda)),
       const SizedBox(width: 8),
-      Expanded(child: _DashboardQuickAction(icon: Icons.account_balance_wallet_rounded, label: 'Gastos', color: AppColors.navFinance, onTap: onFinances)),
+      Expanded(child: _DashboardQuickAction(icon: Icons.account_balance_wallet_rounded, label: tr(context, es: 'Gastos', en: 'Expenses'), color: AppColors.navFinance, onTap: onFinances)),
       const SizedBox(width: 8),
-      Expanded(child: _DashboardQuickAction(icon: Icons.emoji_events_rounded, label: 'Torneos', color: AppColors.navTournaments, onTap: onTournaments)),
+      Expanded(child: _DashboardQuickAction(icon: Icons.emoji_events_rounded, label: tr(context, es: 'Torneos', en: 'Tournaments'), color: AppColors.navTournaments, onTap: onTournaments)),
       const SizedBox(width: 8),
-      Expanded(child: _DashboardQuickAction(icon: Icons.group_rounded, label: 'Miembros', color: AppColors.teal, onTap: onMembers)),
+      Expanded(child: _DashboardQuickAction(icon: Icons.group_rounded, label: tr(context, es: 'Miembros', en: 'Members'), color: AppColors.teal, onTap: onMembers)),
     ]);
   }
 }
@@ -291,7 +293,7 @@ class DashboardUpcomingEventsCard extends StatelessWidget {
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               Text(shortWeekday(firstDate).toUpperCase(), style: TextStyle(color: accent, fontSize: 10, fontWeight: FontWeight.w900)),
               Text(firstDate.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 24, fontWeight: FontWeight.w900, height: 1)),
-              Text(DateFormat('MMM', 'es_ES').format(firstDate).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800)),
+              Text(DateFormat('MMM', appDateLocale).format(firstDate).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800)),
             ]),
           ),
           const SizedBox(width: 12),
@@ -344,7 +346,7 @@ class DashboardUpcomingEventRow extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5)),
             const SizedBox(height: 3),
-            Text('${DateFormat('HH:mm', 'es_ES').format(date)} · $yes/$minPeople van', style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, fontSize: 11.5)),
+            Text('${DateFormat('HH:mm', appDateLocale).format(date)} · $yes/$minPeople van', style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, fontSize: 11.5)),
           ])),
           if (isTournament) const TournamentAgendaBadge(),
         ]),
@@ -407,7 +409,7 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               Text(shortWeekday(date).toUpperCase(), style: const TextStyle(color: AppColors.navAgenda, fontSize: 10, fontWeight: FontWeight.w900)),
               Text(date.day.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 24, fontWeight: FontWeight.w900, height: 1)),
-              Text(DateFormat('MMM', 'es_ES').format(date).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800)),
+              Text(DateFormat('MMM', appDateLocale).format(date).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800)),
             ]),
           ),
           const SizedBox(width: 12),
@@ -426,7 +428,7 @@ class _DashboardEventCardState extends State<DashboardEventCard> {
               Row(mainAxisSize: MainAxisSize.min, children: [
                 const Icon(Icons.schedule_rounded, size: 15, color: Colors.white),
                 const SizedBox(width: 4),
-                Text(DateFormat('HH:mm', 'es_ES').format(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
+                Text(DateFormat('HH:mm', appDateLocale).format(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
               ]),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 210),
@@ -1942,7 +1944,11 @@ class GroupHomeCard extends StatelessWidget {
 class RootBottomNav extends StatelessWidget {
   final int index; final ValueChanged<int> onTap;
   const RootBottomNav({super.key, required this.index, required this.onTap});
-  @override Widget build(BuildContext context) => BottomBar(items: const [NavSpec(Icons.home_rounded, 'Inicio'), NavSpec(Icons.notifications_none_rounded, 'Avisos'), NavSpec(Icons.person_outline_rounded, 'Perfil')], index: index, onTap: onTap);
+  @override Widget build(BuildContext context) => BottomBar(items: [
+    NavSpec(Icons.home_rounded, tr(context, es: 'Inicio', en: 'Home')),
+    NavSpec(Icons.notifications_none_rounded, tr(context, es: 'Avisos', en: 'Alerts')),
+    NavSpec(Icons.person_outline_rounded, tr(context, es: 'Perfil', en: 'Profile')),
+  ], index: index, onTap: onTap);
 }
 
 class GroupBottomNav extends StatelessWidget {
@@ -1951,12 +1957,12 @@ class GroupBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => BottomBar(
-    items: const [
-      NavSpec(Icons.home_rounded, 'Inicio'),
-      NavSpec(Icons.calendar_month_rounded, 'Agenda'),
-      NavSpec(Icons.account_balance_wallet_rounded, 'Finanzas'),
-      NavSpec(Icons.emoji_events_rounded, 'Torneos'),
-      NavSpec(Icons.more_horiz_rounded, 'M\u00e1s'),
+    items: [
+      NavSpec(Icons.home_rounded, tr(context, es: 'Inicio', en: 'Home')),
+      NavSpec(Icons.calendar_month_rounded, tr(context, es: 'Agenda', en: 'Agenda')),
+      NavSpec(Icons.account_balance_wallet_rounded, tr(context, es: 'Finanzas', en: 'Finances')),
+      NavSpec(Icons.emoji_events_rounded, tr(context, es: 'Torneos', en: 'Tournaments')),
+      NavSpec(Icons.more_horiz_rounded, tr(context, es: 'Más', en: 'More')),
     ],
     index: index,
     onTap: onTap,
@@ -2419,7 +2425,7 @@ class AgendaPremiumHero extends StatelessWidget {
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               const Text('SIN', style: TextStyle(color: AppColors.navAgenda, fontSize: 10, fontWeight: FontWeight.w900)),
               const Text('+', style: TextStyle(color: AppColors.ink, fontSize: 25, fontWeight: FontWeight.w900, height: 1)),
-              Text(DateFormat('MMM', 'es_ES').format(DateTime.now()).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800)),
+              Text(DateFormat('MMM', appDateLocale).format(DateTime.now()).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800)),
             ]),
           ),
           const SizedBox(width: 12),
@@ -2572,7 +2578,7 @@ class AgendaWeekHeader extends StatelessWidget {
     final end = start.add(const Duration(days: 6));
     return Row(children: [
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${DateFormat('d MMM', 'es_ES').format(start)} — ${DateFormat('d MMM', 'es_ES').format(end)}', style: Theme.of(context).textTheme.titleMedium),
+        Text('${DateFormat('d MMM', appDateLocale).format(start)} — ${DateFormat('d MMM', appDateLocale).format(end)}', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 2),
         Text('$weekEvents planes en los próximos 7 días', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
       ])),
@@ -2821,7 +2827,7 @@ class PremiumAgendaEmptyState extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               hasAnyEvents
-                  ? 'El ${DateFormat('d MMM', 'es_ES').format(selected)} está libre. Puedes crear un plan o revisar los próximos eventos.'
+                  ? 'El ${DateFormat('d MMM', appDateLocale).format(selected)} está libre. Puedes crear un plan o revisar los próximos eventos.'
                   : 'Crea el primer evento y los miembros podrán confirmar asistencia desde aquí.',
               style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.32),
             ),
@@ -3062,7 +3068,7 @@ class CalendarDaySummary extends StatelessWidget {
 String agendaSelectedDayTitle(DateTime day) {
   final today = DateTime.now();
   if (sameDay(day, today)) return 'Hoy';
-  return DateFormat('EEEE d MMM', 'es_ES').format(day).replaceAll('.', '');
+  return DateFormat('EEEE d MMM', appDateLocale).format(day).replaceAll('.', '');
 }
 
 class AgendaGroupedUpcomingList extends StatelessWidget {
@@ -3205,7 +3211,7 @@ class AgendaSameDayCompactCard extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 15)),
             const SizedBox(height: 3),
-            Text('${ordered.length} evento${ordered.length == 1 ? '' : 's'} · ${DateFormat('d MMM', 'es_ES').format(firstDate).replaceAll('.', '')}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
+            Text('${ordered.length} evento${ordered.length == 1 ? '' : 's'} · ${DateFormat('d MMM', appDateLocale).format(firstDate).replaceAll('.', '')}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
           ])),
           if (hasTournament) const TournamentAgendaBadge(),
         ]),
@@ -3257,7 +3263,7 @@ class AgendaCompactEventRow extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 13)),
             const SizedBox(height: 3),
-            Text('${DateFormat('HH:mm', 'es_ES').format(date)} · $yes/$minPeople van', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11.5)),
+            Text('${DateFormat('HH:mm', appDateLocale).format(date)} · $yes/$minPeople van', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11.5)),
           ])),
           const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
         ]),
@@ -3329,7 +3335,7 @@ class _EventAgendaCardState extends State<EventAgendaCard> {
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Icon(eventKindIcon(event), color: color, size: 20),
                     const SizedBox(height: 3),
-                    Text(DateFormat('HH:mm', 'es_ES').format(date), style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900)),
+                    Text(DateFormat('HH:mm', appDateLocale).format(date), style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900)),
                   ]),
                 ),
                 const SizedBox(width: 12),
@@ -3494,7 +3500,7 @@ class EventCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 5),
-                        MetaLine(icon: Icons.schedule_rounded, text: DateFormat('dd/MM · HH:mm', 'es_ES').format(d)),
+                        MetaLine(icon: Icons.schedule_rounded, text: DateFormat('dd/MM · HH:mm', appDateLocale).format(d)),
                         MetaLine(icon: Icons.place_outlined, text: AppData.text(event['location'], 'Sin ubicación')),
                       ])),
                       const SizedBox(width: 8),

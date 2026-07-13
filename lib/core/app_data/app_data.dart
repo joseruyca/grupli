@@ -1660,7 +1660,7 @@ class AppData {
     final action = scheduledAt == null ? 'Fecha eliminada' : 'Fecha actualizada';
     final dateNote = scheduledAt == null
         ? 'El partido queda sin fecha.'
-        : '${DateFormat('d MMM yyyy · HH:mm', 'es_ES').format(scheduledAt.toLocal())}${courtName.trim().isEmpty ? '' : ' · ${courtName.trim()}'}';
+        : '${DateFormat('d MMM yyyy · HH:mm', appDateLocale).format(scheduledAt.toLocal())}${courtName.trim().isEmpty ? '' : ' · ${courtName.trim()}'}';
     nextDetails['history'] = matchHistoryWithEntry(current, action, dateNote);
     await sb.from('matches').update({
       'scheduled_at': scheduledAt?.toUtc().toIso8601String(),
@@ -1793,7 +1793,7 @@ class AppData {
         ..['court_name'] = court
         ..['status'] = 'scheduled';
       final nextDetails = Map<String, dynamic>.from(asMap(match['result_details']));
-      nextDetails['history'] = matchHistoryWithEntry(match, 'Fecha actualizada en lote', '${DateFormat('d MMM yyyy · HH:mm', 'es_ES').format(start.toLocal())}${court.trim().isEmpty ? '' : ' · ${court.trim()}'}');
+      nextDetails['history'] = matchHistoryWithEntry(match, 'Fecha actualizada en lote', '${DateFormat('d MMM yyyy · HH:mm', appDateLocale).format(start.toLocal())}${court.trim().isEmpty ? '' : ' · ${court.trim()}'}');
       await sb.from('matches').update({
         'scheduled_at': start.toUtc().toIso8601String(),
         'duration_minutes': max(15, durationMinutes),

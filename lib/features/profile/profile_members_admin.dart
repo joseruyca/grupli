@@ -1244,7 +1244,7 @@ String notificationTime(DateTime date) {
   if (diff.inMinutes < 60) return '${diff.inMinutes}m';
   if (diff.inHours < 24) return '${diff.inHours}h';
   if (diff.inDays < 7) return '${diff.inDays}d';
-  return DateFormat('dd/MM', 'es_ES').format(date);
+  return DateFormat('dd/MM', appDateLocale).format(date);
 }
 
 

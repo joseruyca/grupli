@@ -2327,13 +2327,13 @@ Future<void> showMatchScheduleDialog(BuildContext context, {required Map<String,
         title: const Text('Fecha del partido'),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Expanded(child: SecondaryButton(label: DateFormat('d MMM', 'es_ES').format(selectedDate), icon: Icons.calendar_today_rounded, onTap: () async {
+            Expanded(child: SecondaryButton(label: DateFormat('d MMM', appDateLocale).format(selectedDate), icon: Icons.calendar_today_rounded, onTap: () async {
               final picked = await showDatePicker(
                 context: dialogContext,
                 initialDate: selectedDate,
                 firstDate: DateTime.now().subtract(const Duration(days: 365)),
                 lastDate: DateTime.now().add(const Duration(days: 730)),
-                locale: const Locale('es', 'ES'),
+                locale: appLocale,
               );
               if (picked != null) setLocal(() { selectedDate = picked; clearDate = false; });
             })),
@@ -2476,7 +2476,7 @@ Future<void> showTournamentBulkScheduleDialog(
       return Padding(
         padding: const EdgeInsets.only(bottom: 7),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: 88, child: Text(DateFormat('EEE d · HH:mm', 'es_ES').format(planned), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11))),
+          SizedBox(width: 88, child: Text(DateFormat('EEE d · HH:mm', appDateLocale).format(planned), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11))),
           Expanded(child: Text('$a vs $b', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12))),
           if (courtLabel.isNotEmpty) ...[
             const SizedBox(width: 6),
@@ -2508,13 +2508,13 @@ Future<void> showTournamentBulkScheduleDialog(
               ),
               const SizedBox(height: 10),
               Row(children: [
-                Expanded(child: SecondaryButton(label: DateFormat('d MMM', 'es_ES').format(selectedDate), icon: Icons.calendar_today_rounded, onTap: () async {
+                Expanded(child: SecondaryButton(label: DateFormat('d MMM', appDateLocale).format(selectedDate), icon: Icons.calendar_today_rounded, onTap: () async {
                   final picked = await showDatePicker(
                     context: dialogContext,
                     initialDate: selectedDate,
                     firstDate: DateTime.now().subtract(const Duration(days: 365)),
                     lastDate: DateTime.now().add(const Duration(days: 730)),
-                    locale: const Locale('es', 'ES'),
+                    locale: appLocale,
                   );
                   if (picked != null) setLocal(() => selectedDate = picked);
                 })),

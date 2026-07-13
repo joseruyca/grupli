@@ -422,10 +422,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         TextField(controller: title, onChanged: (_) => setState(() {}), decoration: const InputDecoration(hintText: 'Ej. Partido semanal')),
         const SizedBox(height: 14),
         Row(children: [
-          Expanded(child: SmallPick(label: 'Fecha', value: DateFormat('dd/MM/yyyy', 'es_ES').format(date), icon: Icons.calendar_month_rounded, onTap: () async {
+          Expanded(child: SmallPick(label: 'Fecha', value: DateFormat('dd/MM/yyyy', appDateLocale).format(date), icon: Icons.calendar_month_rounded, onTap: () async {
             final d = await showDatePicker(
               context: context,
-              locale: const Locale('es'),
+              locale: appLocale,
               initialDate: date,
               firstDate: DateTime.now().subtract(const Duration(days: 1)),
               lastDate: DateTime.now().add(const Duration(days: 730)),

@@ -446,7 +446,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
       initialDate: firstMatchDate,
       firstDate: DateTime.now().subtract(const Duration(days: 1)),
       lastDate: DateTime.now().add(const Duration(days: 730)),
-      locale: const Locale('es', 'ES'),
+      locale: appLocale,
     );
     if (value != null) setState(() => firstMatchDate = value);
   }
@@ -929,7 +929,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         if (scheduleMatches) ...[
           const SizedBox(height: 10),
           Row(children: [
-            Expanded(child: SecondaryButton(label: DateFormat('d MMM', 'es_ES').format(firstMatchDate), icon: Icons.calendar_today_rounded, onTap: pickDate)),
+            Expanded(child: SecondaryButton(label: DateFormat('d MMM', appDateLocale).format(firstMatchDate), icon: Icons.calendar_today_rounded, onTap: pickDate)),
             const SizedBox(width: 10),
             Expanded(child: SecondaryButton(label: firstMatchTime.format(context), icon: Icons.schedule_rounded, onTap: pickTime)),
           ]),
@@ -978,7 +978,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         TournamentReviewRow(label: 'Partidos previstos', value: '${matches.length}'),
         TournamentReviewRow(label: 'Resultado', value: '${scoringTypeLabel(scoringType)} · ${scoringConfigShortText(scoringType, scoringConfig)}'),
         TournamentReviewRow(label: 'Estadísticas', value: TournamentEngineV2.sportStatsSummary(scoringType)),
-        TournamentReviewRow(label: 'Calendario', value: scheduleMatches ? '${DateFormat('d MMM', 'es_ES').format(firstMatchDate)} · ${firstMatchTime.format(context)}' : 'Sin fechas'),
+        TournamentReviewRow(label: 'Calendario', value: scheduleMatches ? '${DateFormat('d MMM', appDateLocale).format(firstMatchDate)} · ${firstMatchTime.format(context)}' : 'Sin fechas'),
         TournamentReviewRow(label: 'Agenda', value: addToAgenda && scheduleMatches ? 'Sí' : 'No'),
       ])),
       const SizedBox(height: 12),
@@ -993,4 +993,3 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
     ]);
   }
 }
-
