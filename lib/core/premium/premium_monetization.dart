@@ -130,6 +130,11 @@ class DisabledPremiumBillingProvider extends PremiumBillingProvider {
 }
 
 class GrupliMonetizationBlueprint {
+  static const bool adsEnabled = false;
+  static const bool adsRespectPremium = true;
+  static const bool adsUseRemoteOverride = true;
+  static const bool adsSoftLaunch = false;
+
   static const List<String> mobileBillingRoutes = [
     'iOS: App Store',
     'Android: Google Play',
@@ -179,6 +184,18 @@ class GrupliMonetizationBlueprint {
     'Pantalla de compra',
   ];
 
+  static const Map<String, bool> screenAdFlags = {
+    'inicio_grupo': true,
+    'agenda': true,
+    'torneos': true,
+    'finanzas': true,
+    'perfil': true,
+    'compra': false,
+    'crear_torneo': false,
+    'registrar_resultado': false,
+    'liquidar_gastos': false,
+  };
+
   static const List<String> monetizationRules = [
     'Una sola suscripción por grupo.',
     'Premium quita anuncios en toda la app.',
@@ -187,4 +204,65 @@ class GrupliMonetizationBlueprint {
   ];
 
   static const PremiumBillingProvider disabledProvider = DisabledPremiumBillingProvider();
+
+  static bool shouldShowAds({
+    required String screenKey,
+    required bool premiumActive,
+    bool remoteOverride = false,
+  }) {
+    final normalized = _normalizeScreenKey(screenKey);
+    final overrideEnabled = adsUseRemoteOverride && remoteOverride;
+    if (!adsEnabled && !adsSoftLaunch && !overrideEnabled) return false;
+    if (adsRespectPremium && premiumActive) return false;
+    if (blockedScreens.contains(screenKey) || blockedScreens.contains(_screenLabelForKey(normalized))) return false;
+    return screenAdFlags[normalized] ?? false;
+  }
+
+  static List<PremiumAdPlacement> placementsForScreen(String screenKey) {
+    final normalized = _normalizeScreenKey(screenKey);
+    return adPlacements.where((placement) => _screenKeyForLabel(placement.screen) == normalized).toList(growable: false);
+  }
+
+  static String _normalizeScreenKey(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'inicio del grupo') return 'inicio_grupo';
+    if (normalized == 'agenda') return 'agenda';
+    if (normalized == 'torneos') return 'torneos';
+    if (normalized == 'finanzas') return 'finanzas';
+    if (normalized == 'perfil') return 'perfil';
+    if (normalized == 'crear torneo') return 'crear_torneo';
+    if (normalized == 'registrar resultado') return 'registrar_resultado';
+    if (normalized == 'liquidar gastos') return 'liquidar_gastos';
+    if (normalized == 'pantalla de compra') return 'compra';
+    return normalized.replaceAll(' ', '_');
+  }
+
+  static String _screenKeyForLabel(String label) {
+    return _normalizeScreenKey(label);
+  }
+
+  static String _screenLabelForKey(String key) {
+    switch (key) {
+      case 'inicio_grupo':
+        return 'Inicio del grupo';
+      case 'agenda':
+        return 'Agenda';
+      case 'torneos':
+        return 'Torneos';
+      case 'finanzas':
+        return 'Finanzas';
+      case 'perfil':
+        return 'Perfil';
+      case 'crear_torneo':
+        return 'Crear torneo';
+      case 'registrar_resultado':
+        return 'Registrar resultado';
+      case 'liquidar_gastos':
+        return 'Liquidar gastos';
+      case 'compra':
+        return 'Pantalla de compra';
+      default:
+        return key.replaceAll('_', ' ');
+    }
+  }
 }

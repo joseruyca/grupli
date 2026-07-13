@@ -197,6 +197,13 @@ Este documento define la dirección de la app para que siga siendo muy fácil de
 - Los anuncios deben poder apagarse con un flag global.
 - El free debe seguir siendo plenamente usable.
 
+### Flags de anuncios
+
+- `adsEnabled`: interruptor global principal.
+- `adsSoftLaunch`: permite abrir anuncios de forma gradual.
+- `adsRespectPremium`: oculta anuncios cuando el grupo es Premium.
+- `screenAdFlags`: activa o desactiva anuncios por pantalla sin tocar la UI.
+
 ### Mapa exacto de anuncios por pantalla
 
 - `Inicio del grupo`: debajo del hero y al final de bloques largos.

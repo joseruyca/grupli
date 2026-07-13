@@ -83,6 +83,25 @@ class GrupliPremium {
   static List<PremiumAdPlacement> get adPlacements => GrupliMonetizationBlueprint.adPlacements;
   static List<String> get blockedAdPlacements => GrupliMonetizationBlueprint.blockedScreens;
   static List<String> get monetizationRules => GrupliMonetizationBlueprint.monetizationRules;
+  static bool get adsEnabled => GrupliMonetizationBlueprint.adsEnabled;
+  static bool get adsRespectPremium => GrupliMonetizationBlueprint.adsRespectPremium;
+  static bool get adsSoftLaunch => GrupliMonetizationBlueprint.adsSoftLaunch;
+
+  static bool shouldShowAds({
+    required String screenKey,
+    required bool premiumActive,
+    bool remoteOverride = false,
+  }) {
+    return GrupliMonetizationBlueprint.shouldShowAds(
+      screenKey: screenKey,
+      premiumActive: premiumActive,
+      remoteOverride: remoteOverride,
+    );
+  }
+
+  static List<PremiumAdPlacement> placementsForScreen(String screenKey) {
+    return GrupliMonetizationBlueprint.placementsForScreen(screenKey);
+  }
 
   static const List<PremiumFeatureDefinition> features = [
     PremiumFeatureDefinition(
