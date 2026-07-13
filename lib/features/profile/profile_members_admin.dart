@@ -117,16 +117,16 @@ class _MembersScreenState extends State<MembersScreen> {
             final isOwner = myRole == 'owner';
             return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Expanded(child: StatCard(icon: Icons.groups_rounded, value: members.length.toString(), label: 'Total', color: AppColors.teal)),
+                Expanded(child: StatCard(icon: Icons.groups_rounded, value: members.length.toString(), label: tr(context, es: 'Total', en: 'Total'), color: AppColors.teal)),
                 const SizedBox(width: 10),
-                Expanded(child: StatCard(icon: Icons.admin_panel_settings_rounded, value: admins.length.toString(), label: 'Admins', color: AppColors.violet)),
+                Expanded(child: StatCard(icon: Icons.admin_panel_settings_rounded, value: admins.length.toString(), label: tr(context, es: 'Admins', en: 'Admins'), color: AppColors.violet)),
                 const SizedBox(width: 10),
                 Expanded(child: StatCard(icon: Icons.person_outline_rounded, value: regular.length.toString(), label: tr(context, es: 'Miembros', en: 'Members'), color: AppColors.orange)),
               ]),
               const SizedBox(height: 16),
               RoleInfoCard(role: myRole),
               const SizedBox(height: 18),
-              SectionHeader(title: 'Owner y administradores'),
+              SectionHeader(title: tr(context, es: 'Owner y administradores', en: 'Owner and admins')),
               const SizedBox(height: 8),
               ...admins.map((m) => ManageMemberCard(member: m, canManage: canManage, onRole: _changeRole, onRemove: _remove)),
               const SizedBox(height: 16),
@@ -251,8 +251,8 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       final framed = await Navigator.of(context).push<Uint8List>(MaterialPageRoute(
         builder: (_) => ImageFrameEditorScreen(
           bytes: raw,
-          title: 'Ajustar portada',
-          helper: 'Arrastra y pellizca la imagen para dejar el banner bien encuadrado.',
+          title: tr(context, es: 'Ajustar portada', en: 'Adjust cover'),
+          helper: tr(context, es: 'Arrastra y pellizca la imagen para dejar el banner bien encuadrado.', en: 'Drag and pinch the image to frame the banner.'),
           aspectRatio: 16 / 7,
           outputWidth: 1600,
         ),
@@ -262,7 +262,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       if (!mounted) return;
       setState(() => group['cover_url'] = url);
       widget.onChanged?.call();
-      await showToast(context, 'Foto del grupo actualizada.');
+      await showToast(context, tr(context, es: 'Foto del grupo actualizada.', en: 'Group photo updated.'));
     } catch (e) {
       if (!mounted) return;
       await showToast(context, humanError(e), danger: true);
@@ -278,7 +278,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       if (!mounted) return;
       setState(() => group['cover_url'] = null);
       widget.onChanged?.call();
-      await showToast(context, 'Foto del grupo eliminada.');
+      await showToast(context, tr(context, es: 'Foto del grupo eliminada.', en: 'Group photo removed.'));
     } catch (e) {
       if (!mounted) return;
       await showToast(context, humanError(e), danger: true);
@@ -290,9 +290,9 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   Future<void> regenerateInviteCode() async {
     final confirm = await showConfirmDialog(
       context,
-      title: 'Regenerar código',
+      title: tr(context, es: 'Regenerar código', en: 'Regenerate code'),
       message: tr(context, es: 'El código anterior dejará de servir para nuevas invitaciones. Los miembros actuales seguirán dentro.', en: 'The previous code will stop working for new invites. Current members will stay in the group.'),
-      confirm: 'Regenerar',
+      confirm: tr(context, es: 'Regenerar', en: 'Regenerate'),
       danger: true,
     );
     if (confirm != true) return;
@@ -302,7 +302,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       if (!mounted) return;
       setState(() => group['invite_code'] = code);
       widget.onChanged?.call();
-      await showToast(context, 'Código regenerado.');
+      await showToast(context, tr(context, es: 'Código regenerado.', en: 'Code regenerated.'));
     } catch (e) {
       if (!mounted) return;
       await showToast(context, humanError(e), danger: true);
@@ -314,7 +314,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   Future<void> deleteGroupFlow() async {
     final isOwner = AppData.text(group['owner_id']) == AppData.user?.id;
     if (!isOwner) {
-      await showToast(context, 'Solo el owner puede eliminar este grupo.', danger: true);
+      await showToast(context, tr(context, es: 'Solo el owner puede eliminar este grupo.', en: 'Only the owner can delete this group.'), danger: true);
       return;
     }
 
@@ -324,7 +324,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       builder: (context) => AlertDialog(
         title: Text(tr(context, es: 'Eliminar grupo', en: 'Delete group')),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Vas a eliminar "${AppData.text(group['name'], 'este grupo')}".'),
+          Text(tr(context, es: 'Vas a eliminar "${AppData.text(group['name'], 'este grupo')}".', en: 'You are about to delete "${AppData.text(group['name'], 'this group')}".')),
           const SizedBox(height: 10),
           Text(tr(context, es: 'Se eliminarán sus miembros, eventos, asistencias, gastos, liquidaciones, torneos y notificaciones relacionadas.', en: 'Its members, events, attendance, expenses, settlements, tournaments and related notifications will be deleted.')),
           const SizedBox(height: 14),
@@ -371,25 +371,25 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           Container(width: 46, height: 46, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.groups_rounded, color: AppColors.teal)),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Información básica', style: Theme.of(context).textTheme.titleMedium),
-            Text('Nombre, descripción, portada y reglas del grupo.', style: Theme.of(context).textTheme.bodyMedium),
+            Text(tr(context, es: 'Información básica', en: 'Basic info'), style: Theme.of(context).textTheme.titleMedium),
+            Text(tr(context, es: 'Nombre, descripción, portada y reglas del grupo.', en: 'Group name, description, cover and rules.'), style: Theme.of(context).textTheme.bodyMedium),
           ])),
         ]),
         const SizedBox(height: 16),
-        FieldLabel('Nombre del grupo'),
-        TextField(controller: nameController, textInputAction: TextInputAction.next, decoration: const InputDecoration(hintText: 'Nombre del grupo')),
+        FieldLabel(tr(context, es: 'Nombre del grupo', en: 'Group name')),
+        TextField(controller: nameController, textInputAction: TextInputAction.next, decoration: InputDecoration(hintText: tr(context, es: 'Nombre del grupo', en: 'Group name'))),
 
         const SizedBox(height: 12),
-        FieldLabel('Descripción'),
-        TextField(controller: descriptionController, maxLines: 3, decoration: const InputDecoration(hintText: 'Explica para qué se usa este grupo')),
+        FieldLabel(tr(context, es: 'Descripción', en: 'Description')),
+        TextField(controller: descriptionController, maxLines: 3, decoration: InputDecoration(hintText: tr(context, es: 'Explica para qué se usa este grupo', en: 'Explain what this group is for'))),
         const SizedBox(height: 12),
         StatusNotice(
           icon: Icons.tune_rounded,
           title: tr(context, es: 'Idioma y moneda', en: 'Language and currency'),
-          body: 'Por ahora Grupli trabaja en español y euros. Estos ajustes se activarán cuando estén cerrados en toda la app.',
+          body: tr(context, es: 'Por ahora Grupli trabaja en español y euros. Estos ajustes se activarán cuando estén cerrados en toda la app.', en: 'For now, Grupli works in Spanish and euros. These settings will be enabled once they are ready across the app.'),
         ),
         const SizedBox(height: 12),
-        FieldLabel('Zona horaria'),
+        FieldLabel(tr(context, es: 'Zona horaria', en: 'Time zone')),
         TextField(controller: timezoneController, decoration: const InputDecoration(prefixIcon: Icon(Icons.schedule_rounded), hintText: 'Europe/Madrid')),
         const SizedBox(height: 12),
         PrimaryButton(label: savingInfo ? tr(context, es: 'Guardando...', en: 'Saving...') : tr(context, es: 'Guardar cambios', en: 'Save changes'), icon: Icons.save_rounded, loading: savingInfo, onTap: saveInfo),
@@ -400,17 +400,17 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       InviteAccessCard(groupName: name, code: code, compact: true, onRegenerate: regeneratingCode ? null : regenerateInviteCode),
       const SizedBox(height: 16),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        FieldLabel('Reglas del grupo'),
-        TextField(controller: rulesController, minLines: 2, maxLines: 5, decoration: const InputDecoration(hintText: 'Ej. Confirmar asistencia antes del jueves, gastos con ticket...')),
+        FieldLabel(tr(context, es: 'Reglas del grupo', en: 'Group rules')),
+        TextField(controller: rulesController, minLines: 2, maxLines: 5, decoration: InputDecoration(hintText: tr(context, es: 'Ej. Confirmar asistencia antes del jueves, gastos con ticket...', en: 'E.g. Confirm attendance before Thursday, expenses with receipt...'))),
         const SizedBox(height: 12),
         SecondaryButton(label: tr(context, es: 'Guardar reglas', en: 'Save rules'), icon: Icons.rule_rounded, onTap: saveInfo),
       ])),
       const SizedBox(height: 16),
-      SectionHeader(title: 'Premium'),
+      SectionHeader(title: tr(context, es: 'Premium', en: 'Premium')),
       const SizedBox(height: 8),
       PremiumGroupPreviewCard(group: group),
       const SizedBox(height: 16),
-      SectionHeader(title: 'Administración'),
+      SectionHeader(title: tr(context, es: 'Administración', en: 'Administration')),
       const SizedBox(height: 8),
       SettingsRow(icon: Icons.groups_rounded, title: tr(context, es: 'Miembros y roles', en: 'Members and roles'), subtitle: tr(context, es: 'Owner, admins y miembros', en: 'Owner, admins and members'), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
       SettingsRow(icon: Icons.verified_user_rounded, title: tr(context, es: 'Permisos', en: 'Permissions'), subtitle: tr(context, es: 'Qué puede hacer cada rol', en: 'What each role can do'), onTap: () => showPermissionSheet(context)),
@@ -434,9 +434,9 @@ class PremiumGroupPreviewCard extends StatelessWidget {
         Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)), child: Icon(entitlement.active ? Icons.workspace_premium_rounded : Icons.workspace_premium_rounded, color: entitlement.active ? AppColors.teal : AppColors.orange)),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(entitlement.active ? 'Grupli Premium activo' : 'Grupli Premium preparado', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+          Text(entitlement.active ? tr(context, es: 'Grupli Premium activo', en: 'Grupli Premium active') : tr(context, es: 'Grupli Premium preparado', en: 'Grupli Premium ready'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
           const SizedBox(height: 4),
-          Text(entitlement.active ? 'Este grupo tiene activadas las funciones Premium.' : 'Pagos aún desactivados. Dejamos lista la estructura para activar Premium por grupo más adelante.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 12)),
+          Text(entitlement.active ? tr(context, es: 'Este grupo tiene activadas las funciones Premium.', en: 'This group has Premium features enabled.') : tr(context, es: 'Pagos aún desactivados. Dejamos lista la estructura para activar Premium por grupo más adelante.', en: 'Payments are still off. We have left the structure ready to enable Premium per group later.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 12)),
         ])),
         const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
       ]),
@@ -457,10 +457,10 @@ class PremiumGroupScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PageHeader(
-            title: 'Grupli Premium',
+            title: tr(context, es: 'Grupli Premium', en: 'Grupli Premium'),
             subtitle: entitlement.active
-                ? 'Premium ya est? activo en $name y toda la app se ver? sin anuncios para este grupo.'
-                : 'Premium es por grupo: una sola compra activa la experiencia para todos los miembros de $name.',
+                ? tr(context, es: 'Premium ya está activo en $name y toda la app se verá sin anuncios para este grupo.', en: 'Premium is already active in $name and the whole app will be ad-free for this group.')
+                : tr(context, es: 'Premium es por grupo: una sola compra activa la experiencia para todos los miembros de $name.', en: 'Premium is per group: one purchase unlocks the experience for all members of $name.'),
             leading: true,
           ),
           const SizedBox(height: 16),
@@ -501,8 +501,8 @@ class PremiumGroupScreen extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             GrupliPremium.billingEnabled
-                                ? 'Pagos conectados y listos para la tienda elegida.'
-                                : 'La capa t?cnica ya est? preparada para conectar compras m?s adelante.',
+                                ? tr(context, es: 'Pagos conectados y listos para la tienda elegida.', en: 'Payments are connected and ready for the chosen store.')
+                                : tr(context, es: 'La capa técnica ya está preparada para conectar compras más adelante.', en: 'The technical layer is ready to connect purchases later.'),
                             style: const TextStyle(
                               color: AppColors.muted,
                               fontWeight: FontWeight.w800,
@@ -517,23 +517,20 @@ class PremiumGroupScreen extends StatelessWidget {
                 const SizedBox(height: 14),
                 StatusNotice(
                   icon: Icons.shield_outlined,
-                  title: 'Acceso centralizado',
-                  body: 'El backend decidir? el estado real del grupo. La interfaz solo mostrar? el resultado, nunca lo inventar?.',
+                  title: tr(context, es: 'Acceso centralizado', en: 'Centralized access'),
+                  body: tr(context, es: 'El backend decidirá el estado real del grupo. La interfaz solo mostrará el resultado, nunca lo inventará.', en: 'The backend will decide the real group status. The interface will only show the result, never invent it.'),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          SectionHeader(title: 'C?mo se vender?'),
+          SectionHeader(title: tr(context, es: 'Cómo se venderá', en: 'How it will be sold')),
           const SizedBox(height: 8),
           AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Pasarelas previstas',
-                  style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900),
-                ),
+                Text(tr(context, es: 'Pasarelas previstas', en: 'Planned gateways'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -543,10 +540,7 @@ class PremiumGroupScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'La web quedar? separada como canal futuro, no mezclada con el flujo de la app m?vil.',
-                  style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25),
-                ),
+                Text(tr(context, es: 'La web quedará separada como canal futuro, no mezclada con el flujo de la app móvil.', en: 'The web will stay separate as a future channel, not mixed into the mobile app flow.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -559,7 +553,7 @@ class PremiumGroupScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          SectionHeader(title: 'D?nde ir?n los anuncios'),
+          SectionHeader(title: tr(context, es: 'Dónde irán los anuncios', en: 'Where ads will go')),
           const SizedBox(height: 8),
           ...GrupliPremium.adPlacements.map(
             (placement) => Padding(
@@ -598,7 +592,7 @@ class PremiumGroupScreen extends StatelessWidget {
                               if (placement.hiddenByPremium)
                                 const Padding(
                                   padding: EdgeInsets.only(left: 8),
-                                  child: TournamentRuleChip(label: 'Sin anuncios con Premium'),
+                                  child: TournamentRuleChip(label: tr(context, es: 'Sin anuncios con Premium', en: 'No ads with Premium')),
                                 ),
                             ],
                           ),
@@ -630,7 +624,7 @@ class PremiumGroupScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          SectionHeader(title: 'Gratis seguir? siendo ?til'),
+          SectionHeader(title: tr(context, es: 'Gratis seguirá siendo útil', en: 'Free will stay useful')),
           const SizedBox(height: 8),
           AppCard(
             child: Column(
@@ -660,7 +654,7 @@ class PremiumGroupScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          SectionHeader(title: 'Premium futuro'),
+          SectionHeader(title: tr(context, es: 'Premium futuro', en: 'Future Premium')),
           const SizedBox(height: 8),
           ...GrupliPremium.features.map(
             (feature) => Padding(
@@ -737,13 +731,13 @@ class PremiumGroupScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           PrimaryButton(
-            label: GrupliPremium.billingEnabled ? 'Gestionar Premium' : 'Premium preparado',
+            label: GrupliPremium.billingEnabled ? tr(context, es: 'Gestionar Premium', en: 'Manage Premium') : tr(context, es: 'Premium preparado', en: 'Premium ready'),
             icon: Icons.workspace_premium_rounded,
             onTap: () => showToast(
               context,
               GrupliPremium.billingEnabled
-                  ? 'Las compras ya pueden gestionarse desde la capa conectada.'
-                  : 'La arquitectura de Premium est? lista para conectar pagos m?s adelante.',
+                  ? tr(context, es: 'Las compras ya pueden gestionarse desde la capa conectada.', en: 'Purchases can now be managed from the connected layer.')
+                  : tr(context, es: 'La arquitectura de Premium está lista para conectar pagos más adelante.', en: 'The Premium architecture is ready to connect payments later.'),
             ),
           ),
         ],
@@ -779,15 +773,15 @@ class GroupCoverSettingsCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Text('Foto del grupo', style: Theme.of(context).textTheme.titleMedium),
+        Text(tr(context, es: 'Foto del grupo', en: 'Group photo'), style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 4),
-        Text('Dale identidad al grupo en Inicio y Mis grupos.', style: Theme.of(context).textTheme.bodyMedium),
+        Text(tr(context, es: 'Dale identidad al grupo en Inicio y Mis grupos.', en: 'Give the group identity in Home and My groups.'), style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: SecondaryButton(label: saving ? 'Guardando...' : 'Cambiar foto', icon: Icons.photo_camera_rounded, onTap: saving ? () {} : onChange)),
+          Expanded(child: SecondaryButton(label: saving ? tr(context, es: 'Guardando...', en: 'Saving...') : tr(context, es: 'Cambiar foto', en: 'Change photo'), icon: Icons.photo_camera_rounded, onTap: saving ? () {} : onChange)),
           if (cover.isNotEmpty) ...[
             const SizedBox(width: 10),
-            Expanded(child: DangerButton(label: 'Quitar', icon: Icons.delete_outline_rounded, onTap: saving ? () {} : onRemove)),
+            Expanded(child: DangerButton(label: tr(context, es: 'Quitar', en: 'Remove'), icon: Icons.delete_outline_rounded, onTap: saving ? () {} : onRemove)),
           ],
         ]),
       ]),
@@ -947,9 +941,9 @@ class GroupAlertsSheet extends StatelessWidget {
               shrinkWrap: true,
               children: [
                 if (!hasContent)
-                  EmptySlim(icon: Icons.notifications_none_rounded, title: 'Sin avisos pendientes', body: 'Cuando haya respuestas, gastos o cambios importantes aparecerán aquí.'),
+                  EmptySlim(icon: Icons.notifications_none_rounded, title: tr(context, es: 'Sin avisos pendientes', en: 'No pending notifications'), body: tr(context, es: 'Cuando haya respuestas, gastos o cambios importantes aparecerán aquí.', en: 'When there are replies, expenses or important changes, they will appear here.')),
                 if (pendingEvents.isNotEmpty) ...[
-                  const _SheetLabel('Respuestas pendientes'),
+                  _SheetLabel(tr(context, es: 'Respuestas pendientes', en: 'Pending replies')),
                   ...pendingEvents.take(6).map((event) => PendingDecisionRow(
                     event: event,
                     onTap: () async {
@@ -960,7 +954,7 @@ class GroupAlertsSheet extends StatelessWidget {
                   const SizedBox(height: 8),
                 ],
                 if (notifications.isNotEmpty) ...[
-                  const _SheetLabel('Notificaciones'),
+                  _SheetLabel(tr(context, es: 'Notificaciones', en: 'Notifications')),
                   AppCard(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Column(children: [
@@ -1078,7 +1072,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
               children: [
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(child: PageHeader(title: 'Avisos', subtitle: unread == 0 ? 'Todo leído en tus grupos.' : '$unread aviso${unread == 1 ? '' : 's'} sin leer', leading: false)),
+                  Expanded(child: PageHeader(title: tr(context, es: 'Avisos', en: 'Notifications'), subtitle: unread == 0 ? tr(context, es: 'Todo leído en tus grupos.', en: 'Everything read in your groups.') : tr(context, es: '$unread aviso${unread == 1 ? '' : 's'} sin leer', en: '$unread unread notification${unread == 1 ? '' : 's'}'), leading: false)),
                   if (unread > 0)
                     TextButton(onPressed: markAll, child: Text(tr(context, es: 'Leer todo', en: 'Mark all read'))),
                 ]),
@@ -1087,21 +1081,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   final token = await PushNotificationService.enableForCurrentDevice();
                   if (!mounted) return;
                   if (token == null) {
-                    await showToast(context, 'No se pudieron activar las notificaciones en este dispositivo.', danger: true);
+                    await showToast(context, tr(context, es: 'No se pudieron activar las notificaciones en este dispositivo.', en: 'Could not enable notifications on this device.'), danger: true);
                   } else {
                       await showToast(context, tr(context, es: 'Notificaciones push activadas en este dispositivo.', en: 'Push notifications enabled on this device.'));
                   }
                 }),
                 const SizedBox(height: 16),
                 if (snapshot.connectionState == ConnectionState.waiting)
-                  const CenterLoader(label: 'Cargando avisos...')
+                  CenterLoader(label: tr(context, es: 'Cargando avisos...', en: 'Loading notifications...'))
                 else if (snapshot.hasError)
-                  ErrorBlock(message: 'No se pudieron cargar los avisos. Inténtalo de nuevo.', onRetry: reload)
+                  ErrorBlock(message: tr(context, es: 'No se pudieron cargar los avisos. Inténtalo de nuevo.', en: 'Could not load notifications. Please try again.'), onRetry: reload)
                 else if (notifications.isEmpty)
                   EmptyBlock(
                     icon: Icons.notifications_none_rounded,
-                    title: 'Sin avisos todavía',
-                    body: 'Cuando alguien cree una quedada, añada un gasto, registre un resultado o entre al grupo, aparecerá aquí.',
+                    title: tr(context, es: 'Sin avisos todavía', en: 'No notifications yet'),
+                    body: tr(context, es: 'Cuando alguien cree una quedada, añada un gasto, registre un resultado o entre al grupo, aparecerá aquí.', en: 'When someone creates an event, adds an expense, records a result or joins the group, it will appear here.'),
                   )
                 else
                   AppCard(
@@ -1140,12 +1134,9 @@ class PushStatusCard extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Notificaciones del dispositivo', style: Theme.of(context).textTheme.titleMedium),
+          Text(tr(context, es: 'Notificaciones del dispositivo', en: 'Device notifications'), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
-          Text(
-            'Activa este dispositivo para recibir avisos importantes de tus grupos.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          Text(tr(context, es: 'Activa este dispositivo para recibir avisos importantes de tus grupos.', en: 'Enable this device to receive important alerts from your groups.'), style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
@@ -1304,7 +1295,7 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
   Widget build(BuildContext context) {
     final groupName = AppData.text(widget.group?['name'], 'Cuenta general');
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: 'Ayuda y soporte', subtitle: 'Reporta errores, dudas o sugerencias sin salir de Grupli.', leading: true),
+      PageHeader(title: tr(context, es: 'Ayuda y soporte', en: 'Help & support'), subtitle: tr(context, es: 'Reporta errores, dudas o sugerencias sin salir de Grupli.', en: 'Report bugs, questions or suggestions without leaving Grupli.'), leading: true),
       const SizedBox(height: 14),
       AppCard(
         padding: const EdgeInsets.all(16),
@@ -1313,59 +1304,59 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
           Container(width: 44, height: 44, decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.support_agent_rounded, color: AppColors.teal)),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Enviar reporte', style: Theme.of(context).textTheme.titleMedium),
+            Text(tr(context, es: 'Enviar reporte', en: 'Send report'), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
-            Text('Zona: $groupName · ${AppConfig.appVersion}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
+            Text(tr(context, es: 'Zona: $groupName · ${AppConfig.appVersion}', en: 'Scope: $groupName · ${AppConfig.appVersion}'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
           ])),
         ]),
       ),
       const SizedBox(height: 14),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        FieldLabel('Tipo de reporte'),
+        FieldLabel(tr(context, es: 'Tipo de reporte', en: 'Report type')),
         DropdownButtonFormField<String>(
           value: type,
-          items: const [
-            DropdownMenuItem(value: 'bug', child: Text('Bug o fallo')),
-            DropdownMenuItem(value: 'cuenta', child: Text('Cuenta / acceso')),
-            DropdownMenuItem(value: 'grupo', child: Text('Grupo / invitación')),
-            DropdownMenuItem(value: 'evento', child: Text('Evento / asistencia')),
-            DropdownMenuItem(value: 'finanzas', child: Text('Finanzas / pagos')),
-            DropdownMenuItem(value: 'torneo', child: Text('Torneos / resultados')),
-            DropdownMenuItem(value: 'sugerencia', child: Text('Sugerencia')),
-            DropdownMenuItem(value: 'otro', child: Text('Otro')),
+          items: [
+            DropdownMenuItem(value: 'bug', child: Text(tr(context, es: 'Bug o fallo', en: 'Bug or issue'))),
+            DropdownMenuItem(value: 'cuenta', child: Text(tr(context, es: 'Cuenta / acceso', en: 'Account / access'))),
+            DropdownMenuItem(value: 'grupo', child: Text(tr(context, es: 'Grupo / invitación', en: 'Group / invite'))),
+            DropdownMenuItem(value: 'evento', child: Text(tr(context, es: 'Evento / asistencia', en: 'Event / attendance'))),
+            DropdownMenuItem(value: 'finanzas', child: Text(tr(context, es: 'Finanzas / pagos', en: 'Finances / payments'))),
+            DropdownMenuItem(value: 'torneo', child: Text(tr(context, es: 'Torneos / resultados', en: 'Tournaments / results'))),
+            DropdownMenuItem(value: 'sugerencia', child: Text(tr(context, es: 'Sugerencia', en: 'Suggestion'))),
+            DropdownMenuItem(value: 'otro', child: Text(tr(context, es: 'Otro', en: 'Other'))),
           ],
           onChanged: (v) => setState(() => type = v ?? 'bug'),
         ),
         const SizedBox(height: 12),
-        FieldLabel('Prioridad'),
+        FieldLabel(tr(context, es: 'Prioridad', en: 'Priority')),
         DropdownButtonFormField<String>(
           value: priority,
-          items: const [
-            DropdownMenuItem(value: 'low', child: Text('Baja')),
-            DropdownMenuItem(value: 'normal', child: Text('Normal')),
-            DropdownMenuItem(value: 'high', child: Text('Alta')),
-            DropdownMenuItem(value: 'critical', child: Text('Crítica')),
+          items: [
+            DropdownMenuItem(value: 'low', child: Text(tr(context, es: 'Baja', en: 'Low'))),
+            DropdownMenuItem(value: 'normal', child: Text(tr(context, es: 'Normal', en: 'Normal'))),
+            DropdownMenuItem(value: 'high', child: Text(tr(context, es: 'Alta', en: 'High'))),
+            DropdownMenuItem(value: 'critical', child: Text(tr(context, es: 'Crítica', en: 'Critical'))),
           ],
           onChanged: (v) => setState(() => priority = v ?? 'normal'),
         ),
         const SizedBox(height: 12),
-        FieldLabel('Título'),
-        TextField(controller: title, decoration: const InputDecoration(hintText: 'Ej. No me deja marcar un pago')),
+        FieldLabel(tr(context, es: 'Título', en: 'Title')),
+        TextField(controller: title, decoration: InputDecoration(hintText: tr(context, es: 'Ej. No me deja marcar un pago', en: 'E.g. I cannot mark a payment'))),
         const SizedBox(height: 12),
-        FieldLabel('Descripción'),
-        TextField(controller: description, minLines: 4, maxLines: 7, decoration: const InputDecoration(hintText: 'Cuenta qué ha pasado, en qué pantalla y qué esperabas que ocurriera.')),
+        FieldLabel(tr(context, es: 'Descripción', en: 'Description')),
+        TextField(controller: description, minLines: 4, maxLines: 7, decoration: InputDecoration(hintText: tr(context, es: 'Cuenta qué ha pasado, en qué pantalla y qué esperabas que ocurriera.', en: 'Explain what happened, on which screen and what you expected to happen.'))),
         const SizedBox(height: 16),
-        PrimaryButton(label: 'Enviar reporte', icon: Icons.send_rounded, loading: loading, onTap: submit),
+        PrimaryButton(label: tr(context, es: 'Enviar reporte', en: 'Send report'), icon: Icons.send_rounded, loading: loading, onTap: submit),
       ])),
       const SizedBox(height: 18),
-      SectionHeader(title: 'Tus reportes recientes'),
+      SectionHeader(title: tr(context, es: 'Tus reportes recientes', en: 'Your recent reports')),
       const SizedBox(height: 8),
       FutureBuilder<List<Map<String, dynamic>>>(
         future: myTicketsFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) return const CenterLoader(label: 'Cargando reportes...');
+          if (snapshot.connectionState == ConnectionState.waiting) return CenterLoader(label: tr(context, es: 'Cargando reportes...', en: 'Loading reports...'));
           final tickets = snapshot.data ?? [];
-          if (tickets.isEmpty) return EmptySlim(icon: Icons.inbox_rounded, title: 'Sin reportes todavía', body: 'Cuando envíes algo aparecerá aquí.');
+          if (tickets.isEmpty) return EmptySlim(icon: Icons.inbox_rounded, title: tr(context, es: 'Sin reportes todavía', en: 'No reports yet'), body: tr(context, es: 'Cuando envíes algo aparecerá aquí.', en: 'When you send something, it will appear here.'));
           return Column(children: tickets.take(5).map((ticket) => SupportTicketCard(ticket: ticket)).toList());
         },
       ),
@@ -1400,14 +1391,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Future<void> changeStatus(Map<String, dynamic> ticket, String status, {String? note}) async {
     final role = await AppData.currentAppAdminRole();
-    if (role == 'viewer' || role.isEmpty) {
-      if (mounted) await showToast(context, 'Tu rol puede ver métricas, pero no modificar reportes.', danger: true);
+      if (role == 'viewer' || role.isEmpty) {
+      if (mounted) await showToast(context, tr(context, es: 'Tu rol puede ver métricas, pero no modificar reportes.', en: 'Your role can see metrics, but cannot modify reports.'), danger: true);
       return;
     }
     try {
       await AppData.updateSupportTicketStatus(ticket['id'].toString(), status, note: note);
       reload();
-      if (mounted) await showToast(context, 'Reporte actualizado.');
+      if (mounted) await showToast(context, tr(context, es: 'Reporte actualizado.', en: 'Report updated.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -1423,8 +1414,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           controller: controller,
           minLines: 4,
           maxLines: 7,
-          decoration: const InputDecoration(
-            hintText: 'Escribe una respuesta visible para el usuario...',
+          decoration: InputDecoration(
+            hintText: tr(context, es: 'Escribe una respuesta visible para el usuario...', en: 'Write a reply visible to the user...'),
           ),
           autofocus: true,
         ),
@@ -1445,18 +1436,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final label = status == 'blocked' ? 'bloquear' : 'activar';
     final ok = await confirmAction(
       context,
-      title: '¿${label[0].toUpperCase()}${label.substring(1)} usuario?',
+      title: tr(context, es: '¿${label[0].toUpperCase()}${label.substring(1)} usuario?', en: '${label[0].toUpperCase()}${label.substring(1)} user?'),
       body: status == 'blocked'
-          ? 'El usuario podrá seguir existiendo en base de datos, pero quedará marcado como bloqueado para soporte/admin.'
-          : 'El usuario volverá a aparecer como activo.',
+          ? tr(context, es: 'El usuario podrá seguir existiendo en base de datos, pero quedará marcado como bloqueado para soporte/admin.', en: 'The user can still exist in the database, but will be marked as blocked for support/admin.')
+          : tr(context, es: 'El usuario volverá a aparecer como activo.', en: 'The user will appear active again.'),
       danger: status == 'blocked',
-      confirmLabel: status == 'blocked' ? 'Bloquear' : 'Activar',
+      confirmLabel: status == 'blocked' ? tr(context, es: 'Bloquear', en: 'Block') : tr(context, es: 'Activar', en: 'Activate'),
     );
     if (ok != true) return;
     try {
       await AppData.adminSetUserStatus(email, status);
       reload();
-      if (mounted) await showToast(context, status == 'blocked' ? 'Usuario bloqueado.' : 'Usuario activado.');
+      if (mounted) await showToast(context, status == 'blocked' ? tr(context, es: 'Usuario bloqueado.', en: 'User blocked.') : tr(context, es: 'Usuario activado.', en: 'User activated.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -1479,30 +1470,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           AdminOverviewHero(overview: overview),
           const SizedBox(height: 12),
           Row(children: [
-            Expanded(child: AdminMetricCard(label: 'Usuarios', value: '${AppData.intValue(overview['users'])}', icon: Icons.people_alt_rounded, color: AppColors.teal)),
+            Expanded(child: AdminMetricCard(label: tr(context, es: 'Usuarios', en: 'Users'), value: '${AppData.intValue(overview['users'])}', icon: Icons.people_alt_rounded, color: AppColors.teal)),
             const SizedBox(width: 9),
-            Expanded(child: AdminMetricCard(label: 'Grupos', value: '${AppData.intValue(overview['groups'])}', icon: Icons.groups_rounded, color: AppColors.violet)),
+            Expanded(child: AdminMetricCard(label: tr(context, es: 'Grupos', en: 'Groups'), value: '${AppData.intValue(overview['groups'])}', icon: Icons.groups_rounded, color: AppColors.violet)),
           ]),
           const SizedBox(height: 9),
           Row(children: [
-            Expanded(child: AdminMetricCard(label: 'Reportes', value: '${AppData.intValue(overview['open_tickets'])}', icon: Icons.support_agent_rounded, color: AppColors.orange)),
+            Expanded(child: AdminMetricCard(label: tr(context, es: 'Reportes', en: 'Reports'), value: '${AppData.intValue(overview['open_tickets'])}', icon: Icons.support_agent_rounded, color: AppColors.orange)),
             const SizedBox(width: 9),
-            Expanded(child: AdminMetricCard(label: 'Críticos', value: '${AppData.intValue(overview['critical_tickets'])}', icon: Icons.warning_amber_rounded, color: AppColors.red)),
+            Expanded(child: AdminMetricCard(label: tr(context, es: 'Críticos', en: 'Critical'), value: '${AppData.intValue(overview['critical_tickets'])}', icon: Icons.warning_amber_rounded, color: AppColors.red)),
           ]),
           const SizedBox(height: 14),
           AdminSectionTabs(index: section, role: data.role, onChanged: (i) => setState(() => section = i)),
           const SizedBox(height: 14),
           if (section == 0) ...[
             SectionHeader(
-              title: 'Reportes de usuarios',
-              action: data.isViewer ? 'Solo lectura' : filter == 'open' ? 'Ver todos' : 'Abiertos',
+              title: tr(context, es: 'Reportes de usuarios', en: 'User reports'),
+              action: data.isViewer ? tr(context, es: 'Solo lectura', en: 'Read only') : filter == 'open' ? tr(context, es: 'Ver todos', en: 'View all') : tr(context, es: 'Abiertos', en: 'Open'),
               onTap: data.isViewer ? null : () { setState(() { filter = filter == 'open' ? 'all' : 'open'; load(); }); },
             ),
             const SizedBox(height: 8),
             if (data.isViewer)
-              EmptySlim(icon: Icons.visibility_rounded, title: 'Modo viewer', body: 'Puedes ver métricas y estado general, pero no detalles sensibles ni acciones de soporte.')
+              EmptySlim(icon: Icons.visibility_rounded, title: tr(context, es: 'Modo viewer', en: 'Viewer mode'), body: tr(context, es: 'Puedes ver métricas y estado general, pero no detalles sensibles ni acciones de soporte.', en: 'You can see metrics and overall status, but not sensitive details or support actions.'))
             else if (data.tickets.isEmpty)
-              EmptySlim(icon: Icons.verified_rounded, title: filter == 'open' ? 'No hay reportes abiertos' : 'No hay reportes', body: 'Cuando un usuario reporte algo aparecerá aquí.')
+              EmptySlim(icon: Icons.verified_rounded, title: filter == 'open' ? tr(context, es: 'No hay reportes abiertos', en: 'No open reports') : tr(context, es: 'No hay reportes', en: 'No reports'), body: tr(context, es: 'Cuando un usuario reporte algo aparecerá aquí.', en: 'When a user reports something, it will appear here.'))
             else
               ...data.tickets.map((ticket) => AdminTicketCard(
                 ticket: ticket,
@@ -1511,34 +1502,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 onReply: data.canHandleSupport ? () => replyToTicket(ticket) : null,
               )),
           ] else if (section == 1) ...[
-            SectionHeader(title: 'Usuarios', action: data.isOwner ? '${data.users.length}' : 'Owner'),
+            SectionHeader(title: tr(context, es: 'Usuarios', en: 'Users'), action: data.isOwner ? '${data.users.length}' : tr(context, es: 'Owner', en: 'Owner')),
             const SizedBox(height: 8),
             if (!data.isOwner)
-              EmptySlim(icon: Icons.lock_rounded, title: 'Solo owner', body: 'Los usuarios son información sensible. Support y viewer no pueden gestionarlos.')
+              EmptySlim(icon: Icons.lock_rounded, title: tr(context, es: 'Solo owner', en: 'Owner only'), body: tr(context, es: 'Los usuarios son información sensible. Support y viewer no pueden gestionarlos.', en: 'Users are sensitive information. Support and viewer cannot manage them.'))
             else if (data.users.isEmpty)
-              EmptySlim(icon: Icons.people_alt_rounded, title: 'Sin usuarios visibles', body: 'Todavía no hay usuarios para mostrar.')
+              EmptySlim(icon: Icons.people_alt_rounded, title: tr(context, es: 'Sin usuarios visibles', en: 'No visible users'), body: tr(context, es: 'Todavía no hay usuarios para mostrar.', en: 'There are no users to show yet.'))
             else
               ...data.users.map((u) => AdminUserCard(user: u, onBlock: () => setUserStatus(u, 'blocked'), onActivate: () => setUserStatus(u, 'active'))),
           ] else if (section == 2) ...[
-            SectionHeader(title: 'Grupos', action: data.isOwner ? '${data.groups.length}' : 'Owner'),
+            SectionHeader(title: tr(context, es: 'Grupos', en: 'Groups'), action: data.isOwner ? '${data.groups.length}' : tr(context, es: 'Owner', en: 'Owner')),
             const SizedBox(height: 8),
             if (!data.isOwner)
-              EmptySlim(icon: Icons.lock_rounded, title: 'Solo owner', body: 'La vista completa de grupos queda reservada al owner.')
+              EmptySlim(icon: Icons.lock_rounded, title: tr(context, es: 'Solo owner', en: 'Owner only'), body: tr(context, es: 'La vista completa de grupos queda reservada al owner.', en: 'The full groups view is reserved for the owner.'))
             else if (data.groups.isEmpty)
-              EmptySlim(icon: Icons.groups_rounded, title: 'Sin grupos visibles', body: 'Cuando se creen grupos aparecerán aquí.')
+              EmptySlim(icon: Icons.groups_rounded, title: tr(context, es: 'Sin grupos visibles', en: 'No visible groups'), body: tr(context, es: 'Cuando se creen grupos aparecerán aquí.', en: 'When groups are created, they will appear here.'))
             else
               ...data.groups.map((g) => AdminGroupCard(group: g)),
           ] else if (section == 3) ...[
-            SectionHeader(title: 'Dispositivos push', action: data.isOwner ? '${data.devices.length}' : 'Owner'),
+            SectionHeader(title: tr(context, es: 'Dispositivos push', en: 'Push devices'), action: data.isOwner ? '${data.devices.length}' : tr(context, es: 'Owner', en: 'Owner')),
             const SizedBox(height: 8),
             if (!data.isOwner)
-              EmptySlim(icon: Icons.lock_rounded, title: 'Solo owner', body: 'Los tokens/dispositivos son datos técnicos sensibles.')
+              EmptySlim(icon: Icons.lock_rounded, title: tr(context, es: 'Solo owner', en: 'Owner only'), body: tr(context, es: 'Los tokens/dispositivos son datos técnicos sensibles.', en: 'Tokens/devices are sensitive technical data.'))
             else if (data.devices.isEmpty)
               EmptySlim(icon: Icons.phone_android_rounded, title: tr(context, es: 'Sin dispositivos', en: 'No devices'), body: tr(context, es: 'Aparecerán cuando los usuarios activen notificaciones en su móvil.', en: 'They will appear when users enable notifications on their phone.'))
             else
               ...data.devices.map((d) => AdminDeviceCard(device: d)),
           ] else ...[
-            SectionHeader(title: 'Actividad y calidad', action: '${data.qualityEvents.length}'),
+            SectionHeader(title: tr(context, es: 'Actividad y calidad', en: 'Activity & quality'), action: '${data.qualityEvents.length}'),
             const SizedBox(height: 8),
             if (data.qualityEvents.isEmpty)
               EmptySlim(icon: Icons.insights_rounded, title: tr(context, es: 'Sin eventos todavía', en: 'No events yet'), body: tr(context, es: 'Se guardarán reportes y señales internas útiles.', en: 'Useful internal reports and signals will be stored here.'))
@@ -1622,7 +1613,7 @@ class SupportTicketCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.teal.withOpacity(.14))),
-            child: Text('Respuesta de soporte: ${AppData.text(ticket['admin_note'])}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.3)),
+            child: Text(tr(context, es: 'Respuesta de soporte: ${AppData.text(ticket['admin_note'])}', en: 'Support reply: ${AppData.text(ticket['admin_note'])}'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.3)),
           ),
         ],
       ])),
@@ -1639,12 +1630,12 @@ class AdminRoleInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final normalized = role.isEmpty ? 'viewer' : role;
     final color = normalized == 'owner' ? AppColors.orange : normalized == 'support' ? AppColors.teal : AppColors.violet;
-    final title = normalized == 'owner' ? 'Owner de la app' : normalized == 'support' ? 'Soporte' : 'Viewer';
+    final title = normalized == 'owner' ? tr(context, es: 'Owner de la app', en: 'App owner') : normalized == 'support' ? tr(context, es: 'Soporte', en: 'Support') : tr(context, es: 'Viewer', en: 'Viewer');
     final body = normalized == 'owner'
-        ? 'Control total: usuarios, grupos, reportes, métricas y acciones críticas.'
+        ? tr(context, es: 'Control total: usuarios, grupos, reportes, métricas y acciones críticas.', en: 'Full control: users, groups, reports, metrics and critical actions.')
         : normalized == 'support'
-            ? 'Puede ver y responder reportes, sin tocar acciones críticas de usuarios.'
-            : 'Solo métricas y estado general. No puede modificar información sensible.';
+            ? tr(context, es: 'Puede ver y responder reportes, sin tocar acciones críticas de usuarios.', en: 'Can view and reply to reports, without touching critical user actions.')
+            : tr(context, es: 'Solo métricas y estado general. No puede modificar información sensible.', en: 'Metrics and general status only. Cannot modify sensitive information.');
     return AppCard(
       padding: const EdgeInsets.all(13),
       color: color.withOpacity(.08),
@@ -1677,9 +1668,9 @@ class AdminOverviewHero extends StatelessWidget {
         Container(width: 48, height: 48, decoration: BoxDecoration(color: good ? AppColors.white : Colors.white.withOpacity(.13), borderRadius: BorderRadius.circular(16)), child: Icon(good ? Icons.verified_rounded : Icons.admin_panel_settings_rounded, color: good ? AppColors.green : Colors.white)),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(good ? 'Todo controlado' : '$open reportes abiertos', style: TextStyle(color: good ? AppColors.ink : Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+          Text(good ? tr(context, es: 'Todo controlado', en: 'All clear') : tr(context, es: '$open reportes abiertos', en: '$open open reports'), style: TextStyle(color: good ? AppColors.ink : Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
           const SizedBox(height: 4),
-          Text(critical > 0 ? '$critical críticos necesitan revisión prioritaria.' : 'Revisa soporte, usuarios y señales de calidad desde aquí.', style: TextStyle(color: good ? AppColors.muted : const Color(0xDFFFFFFF), fontWeight: FontWeight.w700)),
+          Text(critical > 0 ? tr(context, es: '$critical críticos necesitan revisión prioritaria.', en: '$critical critical items need priority review.') : tr(context, es: 'Revisa soporte, usuarios y señales de calidad desde aquí.', en: 'Review support, users and quality signals from here.'), style: TextStyle(color: good ? AppColors.muted : const Color(0xDFFFFFFF), fontWeight: FontWeight.w700)),
         ])),
       ]),
     );
@@ -1748,19 +1739,19 @@ class AdminTicketCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: AppColors.greenSoft, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.green.withOpacity(.15))),
-            child: Text('Respuesta admin: ${AppData.text(ticket['admin_note'])}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.3)),
+            child: Text(tr(context, es: 'Respuesta admin: ${AppData.text(ticket['admin_note'])}', en: 'Admin reply: ${AppData.text(ticket['admin_note'])}'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.3)),
           ),
         ],
         const SizedBox(height: 12),
         if (canHandle)
           Wrap(spacing: 8, runSpacing: 8, children: [
-            SizedBox(width: 130, child: SecondaryButton(label: 'Revisando', icon: Icons.search_rounded, onTap: () => onStatus('reviewing'))),
-            SizedBox(width: 130, child: PrimaryButton(label: 'Resolver', icon: Icons.check_rounded, onTap: () => onStatus('resolved'))),
-            SizedBox(width: 120, child: SecondaryButton(label: 'Cerrar', icon: Icons.archive_rounded, onTap: () => onStatus('closed'))),
-            if (onReply != null) SizedBox(width: 130, child: SecondaryButton(label: 'Responder', icon: Icons.reply_rounded, onTap: () => onReply!.call())),
+            SizedBox(width: 130, child: SecondaryButton(label: tr(context, es: 'Revisando', en: 'Reviewing'), icon: Icons.search_rounded, onTap: () => onStatus('reviewing'))),
+            SizedBox(width: 130, child: PrimaryButton(label: tr(context, es: 'Resolver', en: 'Resolve'), icon: Icons.check_rounded, onTap: () => onStatus('resolved'))),
+            SizedBox(width: 120, child: SecondaryButton(label: tr(context, es: 'Cerrar', en: 'Close'), icon: Icons.archive_rounded, onTap: () => onStatus('closed'))),
+            if (onReply != null) SizedBox(width: 130, child: SecondaryButton(label: tr(context, es: 'Responder', en: 'Reply'), icon: Icons.reply_rounded, onTap: () => onReply!.call())),
           ])
         else
-          EmptySlim(icon: Icons.visibility_rounded, title: 'Solo lectura', body: 'Tu rol no permite modificar reportes.'),
+          EmptySlim(icon: Icons.visibility_rounded, title: tr(context, es: 'Solo lectura', en: 'Read only'), body: tr(context, es: 'Tu rol no permite modificar reportes.', en: 'Your role cannot modify reports.')),
       ])),
     );
   }
@@ -1801,11 +1792,11 @@ class AdminSectionTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      (Icons.support_agent_rounded, 'Reportes', AppColors.orange),
-      (Icons.people_alt_rounded, 'Usuarios', AppColors.teal),
-      (Icons.groups_rounded, 'Grupos', AppColors.violet),
-      (Icons.phone_android_rounded, 'Dispositivos', AppColors.blue),
-      (Icons.insights_rounded, 'Actividad', AppColors.green),
+      (Icons.support_agent_rounded, tr(context, es: 'Reportes', en: 'Reports'), AppColors.orange),
+      (Icons.people_alt_rounded, tr(context, es: 'Usuarios', en: 'Users'), AppColors.teal),
+      (Icons.groups_rounded, tr(context, es: 'Grupos', en: 'Groups'), AppColors.violet),
+      (Icons.phone_android_rounded, tr(context, es: 'Dispositivos', en: 'Devices'), AppColors.blue),
+      (Icons.insights_rounded, tr(context, es: 'Actividad', en: 'Activity'), AppColors.green),
     ];
     return SizedBox(
       height: 44,
@@ -2086,8 +2077,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final framed = await Navigator.of(context).push<Uint8List>(MaterialPageRoute(
         builder: (_) => ImageFrameEditorScreen(
           bytes: raw,
-          title: 'Ajustar foto',
-          helper: 'Arrastra y pellizca para centrar tu foto dentro del círculo.',
+          title: tr(context, es: 'Ajustar foto', en: 'Adjust photo'),
+          helper: tr(context, es: 'Arrastra y pellizca para centrar tu foto dentro del círculo.', en: 'Drag and pinch to center your photo inside the circle.'),
           aspectRatio: 1,
           outputWidth: 900,
           circularPreview: true,
@@ -2096,10 +2087,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (framed == null) return;
       await AppData.uploadAvatarBytes(framed, 'avatar.png');
       reload();
-      if (mounted) await showToast(context, 'Foto actualizada.');
+      if (mounted) await showToast(context, tr(context, es: 'Foto actualizada.', en: 'Photo updated.'));
     } catch (e) {
       if (mounted) {
-        await showToast(context, 'No se ha podido subir la foto. Inténtalo de nuevo.', danger: true);
+        await showToast(context, tr(context, es: 'No se ha podido subir la foto. Inténtalo de nuevo.', en: 'Could not upload the photo. Please try again.'), danger: true);
       }
     } finally {
       if (mounted) setState(() => photoLoading = false);
@@ -2109,15 +2100,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> removePhoto() async {
     final ok = await confirmAction(
       context,
-      title: '¿Quitar foto?',
-      body: 'Volverás al avatar con iniciales. Puedes subir otra foto cuando quieras.',
+      title: tr(context, es: '¿Quitar foto?', en: 'Remove photo?'),
+      body: tr(context, es: 'Volverás al avatar con iniciales. Puedes subir otra foto cuando quieras.', en: 'You will go back to the initials avatar. You can upload another photo anytime.'),
       danger: true,
     );
     if (ok != true) return;
     try {
       await AppData.removeAvatar();
       reload();
-      if (mounted) await showToast(context, 'Foto eliminada.');
+      if (mounted) await showToast(context, tr(context, es: 'Foto eliminada.', en: 'Photo removed.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -2126,10 +2117,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> confirmSignOut() async {
     final ok = await confirmAction(
       context,
-      title: '¿Cerrar sesión?',
-      body: 'Podrás volver a entrar con tu correo cuando quieras.',
+      title: tr(context, es: '¿Cerrar sesión?', en: 'Sign out?'),
+      body: tr(context, es: 'Podrás volver a entrar con tu correo cuando quieras.', en: 'You can sign in again with your email anytime.'),
       danger: true,
-      confirmLabel: 'Cerrar sesión',
+      confirmLabel: tr(context, es: 'Cerrar sesión', en: 'Sign out'),
     );
     if (ok != true) return;
     await AppData.sb.auth.signOut();
@@ -2154,7 +2145,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             TextField(
               controller: controller,
               textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(hintText: 'ELIMINAR'),
+              decoration: InputDecoration(hintText: tr(context, es: 'ELIMINAR', en: 'DELETE')),
             ),
           ],
         ),
@@ -2172,14 +2163,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     controller.dispose();
     if (confirmed != true) {
       if (typed.trim().isNotEmpty && mounted) {
-        await showToast(context, 'Para eliminar la cuenta debes escribir ELIMINAR exactamente.', danger: true);
+        await showToast(context, tr(context, es: 'Para eliminar la cuenta debes escribir ELIMINAR exactamente.', en: 'To delete the account, you must type DELETE exactly.'), danger: true);
       }
       return;
     }
 
     try {
       await AppData.deleteMyAccount('ELIMINAR');
-      if (mounted) await showToast(context, 'Cuenta eliminada.');
+      if (mounted) await showToast(context, tr(context, es: 'Cuenta eliminada.', en: 'Account deleted.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -2204,20 +2195,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   setSheetState(() {});
                 }
                 return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  const SheetTitle(icon: Icons.notifications_active_outlined, title: 'Notificaciones', body: 'Elige qué avisos quieres recibir de tus grupos.'),
+                  SheetTitle(icon: Icons.notifications_active_outlined, title: tr(context, es: 'Notificaciones', en: 'Notifications'), body: tr(context, es: 'Elige qué avisos quieres recibir de tus grupos.', en: 'Choose which alerts you want to receive from your groups.')),
                   const SizedBox(height: 12),
-                  NotificationPreferenceSwitch(icon: Icons.event_available_rounded, title: 'Eventos', body: 'Nuevas quedadas, cambios y cancelaciones', value: enabled('notify_events'), onChanged: (v) => toggle('notify_events', v)),
-                  NotificationPreferenceSwitch(icon: Icons.account_balance_wallet_rounded, title: 'Finanzas', body: 'Gastos nuevos y pagos importantes', value: enabled('notify_expenses'), onChanged: (v) => toggle('notify_expenses', v)),
-                  NotificationPreferenceSwitch(icon: Icons.emoji_events_rounded, title: 'Torneos', body: 'Torneos, partidos y resultados', value: enabled('notify_tournaments'), onChanged: (v) => toggle('notify_tournaments', v)),
-                  NotificationPreferenceSwitch(icon: Icons.groups_rounded, title: 'Miembros', body: 'Entradas al grupo y cambios de rol', value: enabled('notify_members'), onChanged: (v) => toggle('notify_members', v)),
+                  NotificationPreferenceSwitch(icon: Icons.event_available_rounded, title: tr(context, es: 'Eventos', en: 'Events'), body: tr(context, es: 'Nuevas quedadas, cambios y cancelaciones', en: 'New events, changes and cancellations'), value: enabled('notify_events'), onChanged: (v) => toggle('notify_events', v)),
+                  NotificationPreferenceSwitch(icon: Icons.account_balance_wallet_rounded, title: tr(context, es: 'Finanzas', en: 'Finances'), body: tr(context, es: 'Gastos nuevos y pagos importantes', en: 'New expenses and important payments'), value: enabled('notify_expenses'), onChanged: (v) => toggle('notify_expenses', v)),
+                  NotificationPreferenceSwitch(icon: Icons.emoji_events_rounded, title: tr(context, es: 'Torneos', en: 'Tournaments'), body: tr(context, es: 'Torneos, partidos y resultados', en: 'Tournaments, matches and results'), value: enabled('notify_tournaments'), onChanged: (v) => toggle('notify_tournaments', v)),
+                  NotificationPreferenceSwitch(icon: Icons.groups_rounded, title: tr(context, es: 'Miembros', en: 'Members'), body: tr(context, es: 'Entradas al grupo y cambios de rol', en: 'Group joins and role changes'), value: enabled('notify_members'), onChanged: (v) => toggle('notify_members', v)),
                   const SizedBox(height: 12),
-                  PrimaryButton(label: 'Activar push en este dispositivo', icon: Icons.notifications_active_rounded, onTap: () async {
+                  PrimaryButton(label: tr(context, es: 'Activar push en este dispositivo', en: 'Enable push on this device'), icon: Icons.notifications_active_rounded, onTap: () async {
                     final token = await PushNotificationService.enableForCurrentDevice();
                     if (!mounted) return;
                     if (token == null) {
-                      await showToast(context, 'No se pudieron activar las notificaciones en este dispositivo.', danger: true);
+                      await showToast(context, tr(context, es: 'No se pudieron activar las notificaciones en este dispositivo.', en: 'Could not enable notifications on this device.'), danger: true);
                     } else {
-                      await showToast(context, 'Notificaciones activadas en este dispositivo.');
+                      await showToast(context, tr(context, es: 'Notificaciones activadas en este dispositivo.', en: 'Notifications enabled on this device.'));
                     }
                   }),
                 ]);
@@ -2235,13 +2226,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       showDragHandle: true,
       builder: (context) => Padding(
         padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: const [
-          SheetTitle(icon: Icons.lock_outline_rounded, title: 'Privacidad y seguridad', body: 'Grupli está pensada para grupos cerrados. Nadie entra sin invitación o código.'),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          SheetTitle(icon: Icons.lock_outline_rounded, title: tr(context, es: 'Privacidad y seguridad', en: 'Privacy & security'), body: tr(context, es: 'Grupli está pensada para grupos cerrados. Nadie entra sin invitación o código.', en: 'Grupli is designed for closed groups. Nobody joins without an invite or code.')),
           SizedBox(height: 12),
-          PreferencePreviewRow(icon: Icons.verified_user_rounded, title: 'Cuenta protegida', body: 'Acceso seguro y sesión privada'),
-          PreferencePreviewRow(icon: Icons.groups_rounded, title: 'Grupos privados', body: 'El contenido del grupo queda limitado a sus miembros'),
-          PreferencePreviewRow(icon: Icons.admin_panel_settings_rounded, title: 'Roles claros', body: 'Owner, admins y miembros tienen permisos separados'),
-          PreferencePreviewRow(icon: Icons.delete_outline_rounded, title: 'Eliminación de cuenta', body: 'Puedes iniciar el borrado de cuenta desde Perfil con confirmación explícita'),
+          PreferencePreviewRow(icon: Icons.verified_user_rounded, title: tr(context, es: 'Cuenta protegida', en: 'Protected account'), body: tr(context, es: 'Acceso seguro y sesión privada', en: 'Secure access and private session')),
+          PreferencePreviewRow(icon: Icons.groups_rounded, title: tr(context, es: 'Grupos privados', en: 'Private groups'), body: tr(context, es: 'El contenido del grupo queda limitado a sus miembros', en: 'Group content is limited to its members')),
+          PreferencePreviewRow(icon: Icons.admin_panel_settings_rounded, title: tr(context, es: 'Roles claros', en: 'Clear roles'), body: tr(context, es: 'Owner, admins y miembros tienen permisos separados', en: 'Owner, admins and members have separate permissions')),
+          PreferencePreviewRow(icon: Icons.delete_outline_rounded, title: tr(context, es: 'Eliminación de cuenta', en: 'Account deletion'), body: tr(context, es: 'Puedes iniciar el borrado de cuenta desde Perfil con confirmación explícita', en: 'You can start account deletion from Profile with explicit confirmation')),
         ]),
       ),
     );
@@ -2342,7 +2333,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         future: future,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const CenterLoader(label: 'Cargando perfil...');
+            return CenterLoader(label: tr(context, es: 'Cargando perfil...', en: 'Loading profile...'));
           }
           if (snapshot.hasError) {
             return ErrorBlock(message: humanError(snapshot.error), onRetry: reload);
@@ -2440,10 +2431,10 @@ class ProfileAllGroupsScreen extends StatelessWidget {
     return DirectPage(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        PageHeader(title: 'Tus grupos', subtitle: '${groups.length} grupos en total. Toca uno para abrirlo.', leading: true),
+        PageHeader(title: tr(context, es: 'Tus grupos', en: 'Your groups'), subtitle: tr(context, es: '${groups.length} grupos en total. Toca uno para abrirlo.', en: '${groups.length} groups total. Tap one to open it.'), leading: true),
         const SizedBox(height: 14),
         if (groups.isEmpty)
-          EmptyBlock(icon: Icons.groups_rounded, title: 'Aún no tienes grupos', body: 'Crea o únete a un grupo desde Inicio.')
+          EmptyBlock(icon: Icons.groups_rounded, title: tr(context, es: 'Aún no tienes grupos', en: 'You do not have any groups yet'), body: tr(context, es: 'Crea o únete a un grupo desde Inicio.', en: 'Create or join a group from Home.'))
         else
           ...groups.map((group) => ProfileGroupMiniCard(group: group, onTap: () => onOpenGroup(group))),
       ]),
@@ -2764,12 +2755,12 @@ void showGroupQuickActionsSheet(
             ])),
           ]),
           const SizedBox(height: 12),
-          SettingsRow(icon: Icons.edit_rounded, title: 'Editar grupo', subtitle: 'Nombre, portada y ajustes', onTap: () { Navigator.pop(sheetContext); onSettings(); }),
-          SettingsRow(icon: Icons.groups_rounded, title: 'Miembros', subtitle: 'Roles, admins y expulsiones', onTap: () { Navigator.pop(sheetContext); onMembers(); }),
-          SettingsRow(icon: Icons.link_rounded, title: 'Copiar enlace', subtitle: InviteLinks.joinUrl(code), onTap: () { Navigator.pop(sheetContext); copyInviteLink(context, code); }),
-          SettingsRow(icon: Icons.share_rounded, title: 'Compartir invitación', subtitle: 'Enviar por WhatsApp u otra app', onTap: () { Navigator.pop(sheetContext); Share.share(inviteText(name, code)); }),
-          SettingsRow(icon: Icons.more_horiz_rounded, title: 'Ver todo', subtitle: 'Invitaciones, permisos y privacidad', onTap: () { Navigator.pop(sheetContext); onMore(); }),
-          SettingsRow(icon: Icons.support_agent_rounded, title: 'Reportar problema', subtitle: 'Enviar incidencia sobre este grupo', onTap: () { Navigator.pop(sheetContext); onReport(); }),
+          SettingsRow(icon: Icons.edit_rounded, title: tr(context, es: 'Editar grupo', en: 'Edit group'), subtitle: tr(context, es: 'Nombre, portada y ajustes', en: 'Name, cover and settings'), onTap: () { Navigator.pop(sheetContext); onSettings(); }),
+          SettingsRow(icon: Icons.groups_rounded, title: tr(context, es: 'Miembros', en: 'Members'), subtitle: tr(context, es: 'Roles, admins y expulsiones', en: 'Roles, admins and removals'), onTap: () { Navigator.pop(sheetContext); onMembers(); }),
+          SettingsRow(icon: Icons.link_rounded, title: tr(context, es: 'Copiar enlace', en: 'Copy link'), subtitle: InviteLinks.joinUrl(code), onTap: () { Navigator.pop(sheetContext); copyInviteLink(context, code); }),
+          SettingsRow(icon: Icons.share_rounded, title: tr(context, es: 'Compartir invitación', en: 'Share invite'), subtitle: tr(context, es: 'Enviar por WhatsApp u otra app', en: 'Send via WhatsApp or another app'), onTap: () { Navigator.pop(sheetContext); Share.share(inviteText(name, code)); }),
+          SettingsRow(icon: Icons.more_horiz_rounded, title: tr(context, es: 'Ver todo', en: 'View all'), subtitle: tr(context, es: 'Invitaciones, permisos y privacidad', en: 'Invites, permissions and privacy'), onTap: () { Navigator.pop(sheetContext); onMore(); }),
+          SettingsRow(icon: Icons.support_agent_rounded, title: tr(context, es: 'Reportar problema', en: 'Report a problem'), subtitle: tr(context, es: 'Enviar incidencia sobre este grupo', en: 'Send an issue report about this group'), onTap: () { Navigator.pop(sheetContext); onReport(); }),
         ]),
       ),
     ),
