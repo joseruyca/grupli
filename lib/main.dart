@@ -951,14 +951,14 @@ String _cap(String value) {
 
 String monthTitle(DateTime date) => _cap(DateFormat('MMMM yyyy', 'es_ES').format(date));
 String longDay(DateTime date) => _cap(DateFormat('EEEE dd MMMM', 'es_ES').format(date));
-String longDateTime(DateTime date) => _cap(DateFormat('EEEE dd MMMM · HH:mm', 'es_ES').format(date));
+String longDateTime(DateTime date) => _cap(DateFormat('EEEE dd MMMM \u00B7 HH:mm', 'es_ES').format(date));
 String shortWeekday(DateTime date) => _cap(DateFormat('EEE', 'es_ES').format(date).replaceAll('.', ''));
 
 String money(double value) {
   final sign = value < 0 ? '-' : '';
-  return '$sign€ ${value.abs().toStringAsFixed(2).replaceAll('.', ',')}';
+  final formatted = NumberFormat('#,##0.00', 'es_ES').format(value.abs());
+  return '$sign\u20AC $formatted';
 }
-
 
 String newLocalUuid() {
   final random = Random.secure();

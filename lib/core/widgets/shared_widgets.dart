@@ -1956,7 +1956,7 @@ class GroupBottomNav extends StatelessWidget {
       NavSpec(Icons.calendar_month_rounded, 'Agenda'),
       NavSpec(Icons.account_balance_wallet_rounded, 'Finanzas'),
       NavSpec(Icons.emoji_events_rounded, 'Torneos'),
-      NavSpec(Icons.more_horiz_rounded, 'M?s'),
+      NavSpec(Icons.more_horiz_rounded, 'M\u00e1s'),
     ],
     index: index,
     onTap: onTap,
@@ -3966,7 +3966,7 @@ class ManageMemberCard extends StatelessWidget {
           ])),
           if (canEditThis)
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_horiz_rounded, color: AppColors.muted),
+      NavSpec(Icons.more_horiz_rounded, 'M\u00e1s'),
               onSelected: (value) {
                 if (value == 'admin') onRole(member, 'admin');
                 if (value == 'member') onRole(member, 'member');
