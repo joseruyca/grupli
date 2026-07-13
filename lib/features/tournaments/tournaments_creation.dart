@@ -1,4 +1,5 @@
 part of grupli_app;
+// ignore_for_file: override_on_non_overriding_member
 
 class TournamentCreateSimpleScreen extends StatefulWidget {
   final Map<String, dynamic> group;
