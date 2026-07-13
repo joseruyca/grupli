@@ -70,6 +70,27 @@ class AppData {
     return double.tryParse((value?.toString() ?? '').replaceAll(',', '.')) ?? fallback;
   }
 
+  static bool _looksLikeLegacyBackendShapeIssue(Object error) {
+    final text = error.toString().toLowerCase();
+    return text.contains('does not exist') ||
+        text.contains('could not find the table') ||
+        text.contains('could not find the relation') ||
+        text.contains('relation') && text.contains('does not exist') ||
+        text.contains('column') && text.contains('does not exist') ||
+        text.contains('function') && text.contains('does not exist');
+  }
+
+  static Exception backendFailure(String operation, Object error) {
+    return Exception('$operation: ${error.toString()}');
+  }
+
+  static Future<T> _fallbackOnlyForLegacy<T>(String operation, Object error, Future<T> Function() fallback) async {
+    if (_looksLikeLegacyBackendShapeIssue(error)) {
+      return fallback();
+    }
+    throw backendFailure(operation, error);
+  }
+
   static Future<void> ensureProfile() async {
     await sb.rpc('ensure_current_profile');
   }
@@ -145,20 +166,22 @@ class AppData {
     try {
       final res = await sb.rpc('get_my_groups');
       return asList(res);
-    } catch (_) {
-      final uid = user?.id;
-      if (uid == null) return [];
-      final res = await sb.from('group_members').select('role, groups(id,name,type,privacy,invite_code,cover_url,created_at)').eq('user_id', uid);
-      return asList(res).map((row) {
-        final g = asMap(row['groups']);
-        return {
-          ...g,
-          'role': row['role'],
-          'members_count': 1,
-          'events_count': 0,
-          'balance': 0,
-        };
-      }).toList();
+    } catch (e) {
+      return await _fallbackOnlyForLegacy('get_my_groups', e, () async {
+        final uid = user?.id;
+        if (uid == null) return [];
+        final res = await sb.from('group_members').select('role, groups(id,name,type,privacy,invite_code,cover_url,created_at)').eq('user_id', uid);
+        return asList(res).map((row) {
+          final g = asMap(row['groups']);
+          return {
+            ...g,
+            'role': row['role'],
+            'members_count': 1,
+            'events_count': 0,
+            'balance': 0,
+          };
+        }).toList();
+      });
     }
   }
 
@@ -183,18 +206,18 @@ class AppData {
         'p_language': language.trim().isEmpty ? 'es' : language.trim().toLowerCase(),
       });
       return res.toString();
-    } catch (_) {
-      final res = await sb.rpc('create_group_atomic', params: {'p_name': cleanName});
-      final groupId = res.toString();
-      final payload = <String, dynamic>{
-        'type': cleanType,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      };
-      if (cleanDescription.isNotEmpty) payload['description'] = cleanDescription;
-      try {
+    } catch (e) {
+      return await _fallbackOnlyForLegacy('create_group_atomic_v2', e, () async {
+        final res = await sb.rpc('create_group_atomic', params: {'p_name': cleanName});
+        final groupId = res.toString();
+        final payload = <String, dynamic>{
+          'type': cleanType,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        };
+        if (cleanDescription.isNotEmpty) payload['description'] = cleanDescription;
         await sb.from('groups').update(payload).eq('id', groupId);
-      } catch (_) {}
-      return groupId;
+        return groupId;
+      });
     }
   }
 
@@ -347,34 +370,21 @@ class AppData {
         return da.compareTo(db);
       });
       return rows;
-    } catch (_) {
-      // Si el SQL de v15.29.4 aún no está ejecutado, seguimos con la consulta directa.
-    }
-
-    try {
-      final res = await sb
-          .from('events')
-          .select('*, event_attendance(status,user_id)')
-          .eq('group_id', cleanGroupId)
-          .order('starts_at');
-      final rows = activeEventsOnly(asList(res));
-      rows.sort((a, b) {
-        final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return da.compareTo(db);
+    } catch (e) {
+      return await _fallbackOnlyForLegacy('group_events_with_attendance', e, () async {
+        final res = await sb
+            .from('events')
+            .select('*, event_attendance(status,user_id)')
+            .eq('group_id', cleanGroupId)
+            .order('starts_at');
+        final rows = activeEventsOnly(asList(res));
+        rows.sort((a, b) {
+          final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return da.compareTo(db);
+        });
+        return rows;
       });
-      return rows;
-    } catch (_) {
-      // Fallback defensivo: si Supabase no puede resolver el embed de asistencia
-      // por una relación/política temporal, la agenda debe seguir mostrando eventos.
-      final res = await sb.from('events').select('*').eq('group_id', cleanGroupId).order('starts_at');
-      final rows = activeEventsOnly(asList(res));
-      rows.sort((a, b) {
-        final da = DateTime.tryParse(a['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final db = DateTime.tryParse(b['starts_at']?.toString() ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return da.compareTo(db);
-      });
-      return rows;
     }
   }
 
@@ -727,8 +737,8 @@ class AppData {
           .eq('status', 'paid')
           .order('paid_at', ascending: false);
       return asList(res);
-    } catch (_) {
-      return [];
+    } catch (e) {
+      throw backendFailure('settlementPayments', e);
     }
   }
 
@@ -793,16 +803,16 @@ class AppData {
   }
 
   static Future<List<Map<String, dynamic>>> tournaments(String groupId) async {
-    final rows = asList(await sb
-        .from('tournaments')
-        .select()
-        .eq('group_id', groupId)
-        .order('created_at', ascending: false));
+    try {
+      final rows = asList(await sb
+          .from('tournaments')
+          .select()
+          .eq('group_id', groupId)
+          .order('created_at', ascending: false));
 
-    final output = <Map<String, dynamic>>[];
-    for (final row in rows) {
-      final id = row['id'].toString();
-      try {
+      final output = <Map<String, dynamic>>[];
+      for (final row in rows) {
+        final id = row['id'].toString();
         final teams = asList(await sb
             .from('tournament_teams')
             .select('id,name,avatar_url,color,seed,status,captain_id,created_at')
@@ -817,11 +827,22 @@ class AppData {
             .order('order_index', ascending: true)
             .order('created_at', ascending: true));
         output.add({...row, 'tournament_teams': teams, 'matches': matches});
-      } catch (_) {
-        output.add({...row, 'tournament_teams': <Map<String, dynamic>>[], 'matches': <Map<String, dynamic>>[]});
       }
+      return output;
+    } catch (e) {
+      return await _fallbackOnlyForLegacy('tournaments', e, () async {
+        final rows = asList(await sb
+            .from('tournaments')
+            .select()
+            .eq('group_id', groupId)
+            .order('created_at', ascending: false));
+        return rows.map((row) => {
+          ...row,
+          'tournament_teams': <Map<String, dynamic>>[],
+          'matches': <Map<String, dynamic>>[],
+        }).toList();
+      });
     }
-    return output;
   }
 
   static Future<Map<String, dynamic>> tournament(String tournamentId) async {

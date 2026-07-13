@@ -129,7 +129,10 @@ Future<void> main() async {
 
 class AppConfig {
   static const appVersion = 'v16.38';
-  static const enableRealtimeSubscriptions = false;
+  // Realtime ya está acotado por pantalla y con debounce. Lo dejamos activo
+  // para que grupo, agenda, finanzas y torneos se refresquen sin depender solo
+  // de navegación manual.
+  static const enableRealtimeSubscriptions = true;
 
   // Security baseline:
   // - No Supabase URL/key fallback is allowed in the frontend.
