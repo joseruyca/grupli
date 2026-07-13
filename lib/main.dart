@@ -44,7 +44,7 @@ part 'core/widgets/shared_widgets.dart';
 
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
-late Locale appLocale;
+Locale appLocale = resolveAppLocale(ui.PlatformDispatcher.instance.locale);
 
 @pragma('vm:entry-point')
 Future<void> grupliFirebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -111,7 +111,8 @@ Future<void> main() async {
     );
   };
 
-  appLocale = resolveAppLocale(ui.PlatformDispatcher.instance.locale);
+  await loadStoredAppLocale();
+  appLocale = resolveActiveAppLocale(ui.PlatformDispatcher.instance.locale);
   Intl.defaultLocale = appIntlLocale;
   await Future.wait([
     initializeDateFormatting('es_ES'),
@@ -416,11 +417,34 @@ Future<void> openAddressInGoogleMaps(BuildContext context, String address) async
 
 // core/theme/app_colors.dart moved to part file.
 
-class GrupliApp extends StatelessWidget {
+class GrupliApp extends StatefulWidget {
   const GrupliApp({super.key});
 
   @override
+  State<GrupliApp> createState() => _GrupliAppState();
+}
+
+class _GrupliAppState extends State<GrupliApp> {
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    appLocaleOverride.addListener(_onLocaleChanged);
+  }
+
+  @override
+  void dispose() {
+    appLocaleOverride.removeListener(_onLocaleChanged);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    appLocale = resolveActiveAppLocale(ui.PlatformDispatcher.instance.locale);
+    Intl.defaultLocale = appIntlLocale;
     return MaterialApp(
       navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,

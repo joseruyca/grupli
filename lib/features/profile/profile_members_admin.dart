@@ -2247,6 +2247,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> showLanguageSheet() async {
+    Locale? selected = appLocaleOverride.value;
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Padding(
+          padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            SheetTitle(
+              icon: Icons.language_rounded,
+              title: tr(context, es: 'Idioma', en: 'Language'),
+              body: tr(context, es: 'Elige el idioma de la app. Si dejas Automático, se usará el del dispositivo.', en: 'Choose the app language. If you leave it on Auto, the device language will be used.'),
+            ),
+            const SizedBox(height: 8),
+            RadioListTile<Locale?>(
+              value: null,
+              groupValue: selected,
+              onChanged: (value) => setSheetState(() => selected = null),
+              title: Text(tr(context, es: 'Automático', en: 'Automatic')),
+              subtitle: Text(tr(context, es: 'Usar el idioma del dispositivo', en: 'Use the device language')),
+            ),
+            RadioListTile<Locale?>(
+              value: const Locale('es'),
+              groupValue: selected,
+              onChanged: (value) => setSheetState(() => selected = const Locale('es')),
+              title: const Text('Español'),
+              subtitle: Text(tr(context, es: 'Interfaz en español', en: 'Spanish interface')),
+            ),
+            RadioListTile<Locale?>(
+              value: const Locale('en'),
+              groupValue: selected,
+              onChanged: (value) => setSheetState(() => selected = const Locale('en')),
+              title: const Text('English'),
+              subtitle: Text(tr(context, es: 'App in English', en: 'App in English')),
+            ),
+            const SizedBox(height: 8),
+            PrimaryButton(
+              label: tr(context, es: 'Guardar idioma', en: 'Save language'),
+              icon: Icons.check_rounded,
+              onTap: () async {
+                await saveStoredAppLocale(selected);
+                if (mounted) {
+                  setState(() {});
+                  Navigator.pop(sheetContext);
+                  await showToast(context, tr(context, es: 'Idioma actualizado.', en: 'Language updated.'));
+                }
+              },
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Future<void> openSupport() async {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SupportTicketScreen(screen: 'perfil')));
     reload();
@@ -2302,9 +2357,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               RoundBackButton(onTap: goBackFromProfile),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Perfil', style: Theme.of(context).textTheme.headlineMedium),
+                Text(tr(context, es: 'Perfil', en: 'Profile'), style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 4),
-                Text('Tu cuenta, foto, grupos y ajustes básicos.', style: Theme.of(context).textTheme.bodyMedium),
+                Text(tr(context, es: 'Tu cuenta, foto, grupos y ajustes básicos.', en: 'Your account, photo, groups and basic settings.'), style: Theme.of(context).textTheme.bodyMedium),
               ])),
               CircleIconButton(icon: Icons.refresh_rounded, onTap: reload),
             ]),
@@ -2341,33 +2396,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ]),
             ),
             const SizedBox(height: 18),
-            SectionHeader(title: 'Cuenta'),
+            SectionHeader(title: tr(context, es: 'Cuenta', en: 'Account')),
             const SizedBox(height: 8),
-            SettingsRow(icon: Icons.edit_rounded, title: 'Nombre visible', subtitle: name, onTap: () => editName(name)),
-            SettingsRow(icon: Icons.photo_camera_rounded, title: 'Cambiar foto', subtitle: photoLoading ? 'Subiendo imagen...' : 'Elige una imagen de tu dispositivo', onTap: changePhoto),
+            SettingsRow(icon: Icons.edit_rounded, title: tr(context, es: 'Nombre visible', en: 'Display name'), subtitle: name, onTap: () => editName(name)),
+            SettingsRow(icon: Icons.photo_camera_rounded, title: tr(context, es: 'Cambiar foto', en: 'Change photo'), subtitle: photoLoading ? tr(context, es: 'Subiendo imagen...', en: 'Uploading image...') : tr(context, es: 'Elige una imagen de tu dispositivo', en: 'Choose an image from your device'), onTap: changePhoto),
             if (avatarUrl.isNotEmpty)
-              SettingsRow(icon: Icons.delete_outline_rounded, title: 'Quitar foto', subtitle: 'Volver al avatar con iniciales', danger: true, onTap: removePhoto),
+              SettingsRow(icon: Icons.delete_outline_rounded, title: tr(context, es: 'Quitar foto', en: 'Remove photo'), subtitle: tr(context, es: 'Volver al avatar con iniciales', en: 'Go back to the initials avatar'), danger: true, onTap: removePhoto),
             const SizedBox(height: 8),
-            SectionHeader(title: 'Tus grupos', action: 'Ver todos', onTap: () => openAllGroups(data.groups)),
+            SectionHeader(title: tr(context, es: 'Tus grupos', en: 'Your groups'), action: tr(context, es: 'Ver todos', en: 'View all'), onTap: () => openAllGroups(data.groups)),
             const SizedBox(height: 8),
             if (data.groups.isEmpty)
-              EmptySlim(icon: Icons.groups_rounded, title: 'Aún no tienes grupos', body: 'Crea o únete a un grupo desde Inicio.')
+              EmptySlim(icon: Icons.groups_rounded, title: tr(context, es: 'Aún no tienes grupos', en: 'You do not have any groups yet'), body: tr(context, es: 'Crea o únete a un grupo desde Inicio.', en: 'Create or join a group from Home.'))
             else
               ...data.groups.take(3).map((group) => ProfileGroupMiniCard(group: group, onTap: () => openProfileGroup(group))),
             if (data.groups.length > 3)
-              SettingsRow(icon: Icons.more_horiz_rounded, title: 'Ver todos los grupos', subtitle: '${data.groups.length} grupos en total', onTap: () => openAllGroups(data.groups)),
+              SettingsRow(icon: Icons.more_horiz_rounded, title: tr(context, es: 'Ver todos los grupos', en: 'View all groups'), subtitle: tr(context, es: '${data.groups.length} grupos en total', en: '${data.groups.length} groups total'), onTap: () => openAllGroups(data.groups)),
             const SizedBox(height: 8),
-            SectionHeader(title: 'Ajustes'),
+            SectionHeader(title: tr(context, es: 'Ajustes', en: 'Settings')),
             const SizedBox(height: 8),
-            SettingsRow(icon: Icons.notifications_none_rounded, title: 'Notificaciones', subtitle: 'Eventos, gastos y torneos', onTap: showNotificationsSheet),
-            SettingsRow(icon: Icons.language_rounded, title: 'Idioma', subtitle: 'Español', onTap: () => showToast(context, 'El selector de idioma llegará en una próxima versión.')),
-            SettingsRow(icon: Icons.lock_outline_rounded, title: 'Privacidad y seguridad', subtitle: 'Grupos cerrados, roles y acceso privado', onTap: showPrivacySheet),
-            SettingsRow(icon: Icons.help_outline_rounded, title: 'Ayuda y soporte', subtitle: 'Reportar bugs, dudas o sugerencias', onTap: openSupport),
+            SettingsRow(icon: Icons.notifications_none_rounded, title: tr(context, es: 'Notificaciones', en: 'Notifications'), subtitle: tr(context, es: 'Eventos, gastos y torneos', en: 'Events, expenses and tournaments'), onTap: showNotificationsSheet),
+            SettingsRow(icon: Icons.language_rounded, title: tr(context, es: 'Idioma', en: 'Language'), subtitle: appLocaleOverride.value == null ? tr(context, es: 'Automático', en: 'Automatic') : (appLocale.languageCode == 'en' ? 'English' : 'Español'), onTap: showLanguageSheet),
+            SettingsRow(icon: Icons.lock_outline_rounded, title: tr(context, es: 'Privacidad y seguridad', en: 'Privacy & security'), subtitle: tr(context, es: 'Grupos cerrados, roles y acceso privado', en: 'Closed groups, roles and private access'), onTap: showPrivacySheet),
+            SettingsRow(icon: Icons.help_outline_rounded, title: tr(context, es: 'Ayuda y soporte', en: 'Help & support'), subtitle: tr(context, es: 'Reportar bugs, dudas o sugerencias', en: 'Report bugs, questions or suggestions'), onTap: openSupport),
             if (data.isAdmin)
-              SettingsRow(icon: Icons.admin_panel_settings_rounded, title: 'Panel admin', subtitle: 'Roles, reportes, métricas y calidad de Grupli', onTap: openAdminPanel),
-            SettingsRow(icon: Icons.delete_forever_rounded, title: 'Eliminar cuenta', subtitle: 'Borra tu cuenta y datos personales de Grupli', danger: true, onTap: deleteAccountFlow),
+              SettingsRow(icon: Icons.admin_panel_settings_rounded, title: tr(context, es: 'Panel admin', en: 'Admin panel'), subtitle: tr(context, es: 'Roles, reportes, métricas y calidad de Grupli', en: 'Roles, reports, metrics and Grupli quality'), onTap: openAdminPanel),
+            SettingsRow(icon: Icons.delete_forever_rounded, title: tr(context, es: 'Eliminar cuenta', en: 'Delete account'), subtitle: tr(context, es: 'Borra tu cuenta y datos personales de Grupli', en: 'Delete your account and personal Grupli data'), danger: true, onTap: deleteAccountFlow),
             const SizedBox(height: 10),
-            DangerButton(label: 'Cerrar sesión', icon: Icons.logout_rounded, onTap: confirmSignOut),
+            DangerButton(label: tr(context, es: 'Cerrar sesión', en: 'Sign out'), icon: Icons.logout_rounded, onTap: confirmSignOut),
           ]);
         },
       ),
