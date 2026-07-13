@@ -89,17 +89,17 @@ Future<void> main() async {
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: const [
+              children: [
                 Icon(Icons.error_outline_rounded, color: Color(0xFF087A78), size: 42),
                 SizedBox(height: 14),
                 Text(
-                  'La conexión titubeó',
+                  appIsEnglish ? 'The connection stumbled' : 'La conexión titubeó',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF12263A)),
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'No pasa nada. Vuelve atrás, inténtalo otra vez y Grupli recuperará el hilo.',
+                  appIsEnglish ? 'No worries. Go back, try again and Grupli will pick up the thread.' : 'No pasa nada. Vuelve atrás, inténtalo otra vez y Grupli recuperará el hilo.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
                 ),
@@ -210,19 +210,19 @@ class GrupliConfigurationMissingApp extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Column(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.lock_outline_rounded, color: Color(0xFF087A78), size: 42),
                     SizedBox(height: 14),
                     Text(
-                      'Configuración pendiente',
+                      appIsEnglish ? 'Configuration pending' : 'Configuración pendiente',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF12263A)),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'La app necesita su configuración segura de entorno para arrancar. Revisa el archivo .env local o las variables del entorno de despliegue.',
+                      appIsEnglish ? 'The app needs secure environment configuration to start. Check the local .env file or your deployment environment variables.' : 'La app necesita su configuración segura de entorno para arrancar. Revisa el archivo .env local o las variables del entorno de despliegue.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
                     ),
@@ -266,19 +266,19 @@ class GrupliStartupErrorApp extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Column(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.sync_problem_rounded, color: Color(0xFF087A78), size: 42),
                     SizedBox(height: 14),
                     Text(
-                      'Grupli no ha encontrado el camino',
+                      appIsEnglish ? 'Grupli could not find the way' : 'Grupli no ha encontrado el camino',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF12263A)),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'La configuración segura no respondió a tiempo. Actualiza la página o vuelve a abrir la app.',
+                      appIsEnglish ? 'The secure configuration did not respond in time. Refresh the page or reopen the app.' : 'La configuración segura no respondió a tiempo. Actualiza la página o vuelve a abrir la app.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
                     ),
@@ -325,7 +325,7 @@ class AddressSearchService {
         .timeout(const Duration(seconds: 8));
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('No se pudo buscar la dirección ahora mismo.');
+      throw Exception(appIsEnglish ? 'Could not search for the address right now.' : 'No se pudo buscar la dirección ahora mismo.');
     }
 
     final data = jsonDecode(response.body);
@@ -400,14 +400,14 @@ String mapsLaunchUrl(String address) {
 Future<void> openAddressInGoogleMaps(BuildContext context, String address) async {
   final url = mapsLaunchUrl(address);
   if (url.isEmpty) {
-    await showToast(context, 'Este evento no tiene dirección.', danger: true);
+    await showToast(context, appIsEnglish ? 'This event has no address.' : 'Este evento no tiene dirección.', danger: true);
     return;
   }
   final uri = Uri.parse(url);
   try {
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && context.mounted) {
-      await showToast(context, 'No se pudo abrir Google Maps.', danger: true);
+      await showToast(context, appIsEnglish ? 'Could not open Google Maps.' : 'No se pudo abrir Google Maps.', danger: true);
     }
   } catch (e) {
     if (context.mounted) await showToast(context, 'No se pudo abrir Google Maps.', danger: true);
@@ -1061,23 +1061,23 @@ bool eventIsRoutine(Map<String, dynamic> event) {
 
 String eventRoutineBadge(Map<String, dynamic> event) {
   final frequency = AppData.text(event['recurrence_frequency']);
-  if (frequency == 'weekly') return 'Cada semana';
-  if (frequency == 'biweekly') return 'Cada 2 semanas';
-  if (frequency == 'monthly') return 'Cada mes';
+  if (frequency == 'weekly') return appIsEnglish ? 'Every week' : 'Cada semana';
+  if (frequency == 'biweekly') return appIsEnglish ? 'Every 2 weeks' : 'Cada 2 semanas';
+  if (frequency == 'monthly') return appIsEnglish ? 'Every month' : 'Cada mes';
   final notes = AppData.text(event['notes']);
   final match = RegExp(r'Rutina:\s*([^·\\n]+)', caseSensitive: false).firstMatch(notes);
-  if (match != null) return _cap(match.group(1)?.trim() ?? 'rutina');
-  return 'Rutina';
+  if (match != null) return _cap(match.group(1)?.trim() ?? (appIsEnglish ? 'routine' : 'rutina'));
+  return appIsEnglish ? 'Routine' : 'Rutina';
 }
 
 String eventKindLabel(Map<String, dynamic> event) {
   switch (eventKind(event)) {
-    case 'partido': return 'Partido';
-    case 'entrenamiento': return 'Entrenamiento';
-    case 'cena': return 'Cena';
-    case 'reunion': return 'Reunión';
-    case 'torneo': return 'Torneo';
-    default: return 'Quedada';
+    case 'partido': return appIsEnglish ? 'Match' : 'Partido';
+    case 'entrenamiento': return appIsEnglish ? 'Training' : 'Entrenamiento';
+    case 'cena': return appIsEnglish ? 'Dinner' : 'Cena';
+    case 'reunion': return appIsEnglish ? 'Meeting' : 'Reunión';
+    case 'torneo': return appIsEnglish ? 'Tournament' : 'Torneo';
+    default: return appIsEnglish ? 'Meetup' : 'Quedada';
   }
 }
 
@@ -1221,11 +1221,11 @@ IconData groupTypeIcon(String value) {
 
 String groupTypeDefaultDescription(String value) {
   switch (groupTypeValue(value)) {
-    case 'deporte': return 'Partidos, asistencia, gastos y torneos del grupo.';
-    case 'amigos': return 'Planes, quedadas y gastos compartidos entre amigos.';
-    case 'viaje': return 'Gastos, planes y organización del viaje.';
-    case 'cartas': return 'Partidas, gastos y ligas para el grupo.';
-    default: return 'Planes, gastos y torneos del grupo.';
+    case 'deporte': return appIsEnglish ? 'Matches, attendance, expenses and tournaments.' : 'Partidos, asistencia, gastos y torneos del grupo.';
+    case 'amigos': return appIsEnglish ? 'Plans, meetups and shared expenses among friends.' : 'Planes, quedadas y gastos compartidos entre amigos.';
+    case 'viaje': return appIsEnglish ? 'Trip expenses, plans and organization.' : 'Gastos, planes y organización del viaje.';
+    case 'cartas': return appIsEnglish ? 'Matches, expenses and leagues for the group.' : 'Partidas, gastos y ligas para el grupo.';
+    default: return appIsEnglish ? 'Plans, expenses and tournaments for the group.' : 'Planes, gastos y torneos del grupo.';
   }
 }
 
@@ -1683,78 +1683,78 @@ String tournamentFormatLabel(String format) {
 String tournamentFormatSubtitle(String format) {
   switch (format) {
     case 'eliminatoria':
-      return 'Cuadro directo: quien gana avanza y quien pierde queda fuera.';
+      return appIsEnglish ? 'Single-elimination bracket: winners advance and losers are out.' : 'Cuadro directo: quien gana avanza y quien pierde queda fuera.';
     case 'americano':
-      return 'Rondas por pista con parejas rotativas, descansos y ranking individual.';
+      return appIsEnglish ? 'Rounds by court with rotating pairs, rests and an individual ranking.' : 'Rondas por pista con parejas rotativas, descansos y ranking individual.';
     case 'manual':
-      return 'Emparejamientos a mano, fechas a medida y control total.';
+      return appIsEnglish ? 'Manual pairings, custom dates and full control.' : 'Emparejamientos a mano, fechas a medida y control total.';
     default:
-      return 'Liga todos contra todos con clasificación automática.';
+      return appIsEnglish ? 'Round robin league with automatic standings.' : 'Liga todos contra todos con clasificación automática.';
   }
 }
 
 String scoringTypeLabel(String type) {
   switch (type) {
     case 'football':
-      return 'Fútbol';
+      return appIsEnglish ? 'Football' : 'Fútbol';
     case 'tennis_padel':
-      return 'Tenis / Pádel';
+      return appIsEnglish ? 'Tennis / Padel' : 'Tenis / Pádel';
     case 'basketball':
-      return 'Baloncesto';
+      return appIsEnglish ? 'Basketball' : 'Baloncesto';
     case 'volleyball':
-      return 'Voleibol';
+      return appIsEnglish ? 'Volleyball' : 'Voleibol';
     case 'ping_pong':
-      return 'Ping pong';
+      return appIsEnglish ? 'Ping pong' : 'Ping pong';
     case 'cards_mus':
-      return 'Mus / Cartas';
+      return appIsEnglish ? 'Mus / Cards' : 'Mus / Cartas';
     case 'darts':
-      return 'Dardos';
+      return appIsEnglish ? 'Darts' : 'Dardos';
     case 'billiards':
-      return 'Billar';
+      return appIsEnglish ? 'Billiards' : 'Billar';
     case 'esports':
-      return 'Esports';
+      return appIsEnglish ? 'Esports' : 'Esports';
     case 'custom':
-      return 'Personalizado';
+      return appIsEnglish ? 'Custom' : 'Personalizado';
     default:
-      return 'General';
+      return appIsEnglish ? 'General' : 'General';
   }
 }
 
 
 String scoringTableContractChip(String type, [dynamic raw]) {
   final model = scoringResultModel(type, raw);
-  if (model == 'goals') return 'Tabla por goles';
-  if (model == 'sets_games') return 'Tabla por sets/juegos';
-  if (model == 'sets_points') return 'Tabla por sets/puntos';
-  if (model == 'total_points') return 'Tabla por puntos';
-  if (type == 'basketball') return 'Tabla por puntos';
-  return 'Tabla adaptada';
+  if (model == 'goals') return appIsEnglish ? 'Goals table' : 'Tabla por goles';
+  if (model == 'sets_games') return appIsEnglish ? 'Sets/games table' : 'Tabla por sets/juegos';
+  if (model == 'sets_points') return appIsEnglish ? 'Sets/points table' : 'Tabla por sets/puntos';
+  if (model == 'total_points') return appIsEnglish ? 'Points table' : 'Tabla por puntos';
+  if (type == 'basketball') return appIsEnglish ? 'Points table' : 'Tabla por puntos';
+  return appIsEnglish ? 'Adapted table' : 'Tabla adaptada';
 }
 
 String scoringTypeSubtitle(String type) {
   switch (type) {
     case 'football':
-      return 'Victoria 3 puntos, empate 1. Desempate por diferencia de goles.';
+      return appIsEnglish ? 'Win = 3 points, draw = 1. Tiebreak by goal difference.' : 'Victoria 3 puntos, empate 1. Desempate por diferencia de goles.';
     case 'tennis_padel':
-      return 'Resultado por sets: registra cada set y calcula sets/juegos para desempatar.';
+      return appIsEnglish ? 'Set-based result: register each set and calculate sets/games for tiebreaks.' : 'Resultado por sets: registra cada set y calcula sets/juegos para desempatar.';
     case 'basketball':
-      return 'Victoria 2 puntos. El marcador representa puntos anotados.';
+      return appIsEnglish ? 'Win = 2 points. The score represents points scored.' : 'Victoria 2 puntos. El marcador representa puntos anotados.';
     case 'volleyball':
-      return 'Sets a 25 y quinto set corto. Ideal para mejor de 3 o 5.';
+      return appIsEnglish ? 'Sets to 25 and a short fifth set. Ideal for best of 3 or 5.' : 'Sets a 25 y quinto set corto. Ideal para mejor de 3 o 5.';
     case 'ping_pong':
-      return 'Sets rápidos a 11. La app calcula sets y puntos de cada parcial.';
+      return appIsEnglish ? 'Fast sets to 11. The app calculates sets and points for each partial.' : 'Sets rápidos a 11. La app calcula sets y puntos de cada parcial.';
     case 'cards_mus':
-      return 'Victoria 1 punto. Sirve para juegos, piedras, manos o rondas.';
+      return appIsEnglish ? 'Win = 1 point. Useful for games, stones, hands or rounds.' : 'Victoria 1 punto. Sirve para juegos, piedras, manos o rondas.';
     case 'darts':
-      return 'Puntuación directa para partidas a 301/501 o rondas.';
+      return appIsEnglish ? 'Direct scoring for 301/501 games or rounds.' : 'Puntuación directa para partidas a 301/501 o rondas.';
     case 'billiards':
-      return 'Partidas o bolas ganadas con marcador simple.';
+      return appIsEnglish ? 'Games or balls won with a simple score.' : 'Partidas o bolas ganadas con marcador simple.';
     case 'esports':
-      return 'Mapas, rondas o puntos. Flexible para videojuegos y torneos online.';
+      return appIsEnglish ? 'Maps, rounds or points. Flexible for games and online tournaments.' : 'Mapas, rondas o puntos. Flexible para videojuegos y torneos online.';
     case 'custom':
-      return 'Flexible: marcador directo o por sets/rondas, con puntos y unidades editables.';
+      return appIsEnglish ? 'Flexible: direct score or by sets/rounds, with editable points and units.' : 'Flexible: marcador directo o por sets/rondas, con puntos y unidades editables.';
     default:
-      return 'Sistema simple: victoria 3, empate 1, derrota 0.';
+      return appIsEnglish ? 'Simple system: win 3, draw 1, loss 0.' : 'Sistema simple: victoria 3, empate 1, derrota 0.';
   }
 }
 
@@ -2010,47 +2010,47 @@ String scoringSecondaryDifferenceLabel(String type, [dynamic raw]) {
 String scoringResultInputTitle(String type, [dynamic raw]) {
   switch (scoringResultModel(type, raw)) {
     case 'goals':
-      return 'Resultado por goles';
+      return appIsEnglish ? 'Goals result' : 'Resultado por goles';
     case 'sets_games':
-      return 'Resultado por sets y juegos';
+      return appIsEnglish ? 'Sets and games result' : 'Resultado por sets y juegos';
     case 'sets_points':
-      return 'Resultado por sets y puntos';
+      return appIsEnglish ? 'Sets and points result' : 'Resultado por sets y puntos';
     case 'total_points':
-      return 'Resultado por puntos totales';
+      return appIsEnglish ? 'Total points result' : 'Resultado por puntos totales';
     case 'games':
-      return 'Resultado por juegos/partidas';
+      return appIsEnglish ? 'Games/matches result' : 'Resultado por juegos/partidas';
     default:
-      return 'Resultado editable';
+      return appIsEnglish ? 'Editable result' : 'Resultado editable';
   }
 }
 
 String scoringResultInputHelp(String type, [dynamic raw]) {
   switch (scoringResultModel(type, raw)) {
     case 'goals':
-      return 'Escribe los goles de cada equipo. La tabla actualizará puntos, goles a favor, goles en contra y diferencia.';
+      return appIsEnglish ? 'Enter each team\\'s goals. The table will update points, goals for, goals against and difference.' : 'Escribe los goles de cada equipo. La tabla actualizará puntos, goles a favor, goles en contra y diferencia.';
     case 'sets_games':
-      return 'Escribe cada set en una línea, por ejemplo 6-4 o 7-5. La app calcula sets, juegos y desempates.';
+      return appIsEnglish ? 'Write each set on a line, for example 6-4 or 7-5. The app calculates sets, games and tiebreaks.' : 'Escribe cada set en una línea, por ejemplo 6-4 o 7-5. La app calcula sets, juegos y desempates.';
     case 'sets_points':
-      return 'Escribe cada parcial en una línea, por ejemplo 25-21 o 15-12. La app calcula sets, puntos y desempates.';
+      return appIsEnglish ? 'Write each partial on a line, for example 25-21 or 15-12. The app calculates sets, points and tiebreaks.' : 'Escribe cada parcial en una línea, por ejemplo 25-21 o 15-12. La app calcula sets, puntos y desempates.';
     case 'total_points':
-      return 'Escribe el marcador final de puntos. La tabla calculará victorias y diferencia.';
+      return appIsEnglish ? 'Enter the final score in points. The table will calculate wins and difference.' : 'Escribe el marcador final de puntos. La tabla calculará victorias y diferencia.';
     case 'games':
-      return 'Escribe juegos, partidas o mapas ganados por cada lado.';
+      return appIsEnglish ? 'Enter games, matches or maps won by each side.' : 'Escribe juegos, partidas o mapas ganados por cada lado.';
     default:
-      return 'Marcador flexible. La clasificación usará las reglas configuradas para este torneo.';
+      return appIsEnglish ? 'Flexible score. The standings will use the rules configured for this tournament.' : 'Marcador flexible. La clasificación usará las reglas configuradas para este torneo.';
   }
 }
 
 String scoringCreationHelp(String type, [dynamic raw]) {
   switch (scoringResultModel(type, raw)) {
     case 'goals':
-      return 'Fútbol: marcador por goles. La tabla usa puntos, GF, GC y DG.';
+      return appIsEnglish ? 'Football: goals-based score. The table uses points, GF, GA and GD.' : 'Fútbol: marcador por goles. La tabla usa puntos, GF, GC y DG.';
     case 'sets_games':
-      return 'Tenis/Pádel: introduces sets completos. La tabla usa victorias, sets, juegos y desempates.';
+      return appIsEnglish ? 'Tennis/Padel: enter full sets. The table uses wins, sets, games and tiebreaks.' : 'Tenis/Pádel: introduces sets completos. La tabla usa victorias, sets, juegos y desempates.';
     case 'sets_points':
-      return 'Voleibol/Ping pong: introduces sets completos. La tabla usa victorias, sets, puntos y desempates.';
+      return appIsEnglish ? 'Volleyball/Ping pong: enter full sets. The table uses wins, sets, points and tiebreaks.' : 'Voleibol/Ping pong: introduces sets completos. La tabla usa victorias, sets, puntos y desempates.';
     case 'total_points':
-      return 'Baloncesto: marcador por puntos. La tabla usa victorias, puntos a favor/en contra y diferencia.';
+      return appIsEnglish ? 'Basketball: points-based score. The table uses wins, points for/against and difference.' : 'Baloncesto: marcador por puntos. La tabla usa victorias, puntos a favor/en contra y diferencia.';
     default:
       return scoringConfigFullText(type, raw);
   }
@@ -2077,16 +2077,16 @@ String scoringValidationText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
   switch (scoringResultModel(type, cfg)) {
     case 'goals':
-      return 'Fútbol real: goles, empate permitido, GF/GC/DG y puntos de liga.';
+      return appIsEnglish ? 'Real football: goals, draws allowed, GF/GA/GD and league points.' : 'Fútbol real: goles, empate permitido, GF/GC/DG y puntos de liga.';
     case 'sets_games':
-      return 'Raqueta: cada set guarda juegos. Introduce todos los parciales para cerrar el partido.';
+      return appIsEnglish ? 'Racket sports: each set stores games. Enter all partial scores to close the match.' : 'Raqueta: cada set guarda juegos. Introduce todos los parciales para cerrar el partido.';
     case 'sets_points':
-      return 'Sets: cada parcial guarda puntos. No puede quedar empate a sets.';
+      return appIsEnglish ? 'Sets: each partial stores points. The match cannot end tied on sets.' : 'Sets: cada parcial guarda puntos. No puede quedar empate a sets.';
     case 'total_points':
-      return 'Baloncesto: puntos totales, sin empate, diferencia de puntos.';
+      return appIsEnglish ? 'Basketball: total points, no draws, point difference.' : 'Baloncesto: puntos totales, sin empate, diferencia de puntos.';
     default:
-      if (!scoringAllowDraw(type, cfg)) return 'El marcador no puede quedar empatado en este sistema.';
-      return 'Este sistema permite empate y calcula puntos y diferencia automáticamente.';
+      if (!scoringAllowDraw(type, cfg)) return appIsEnglish ? 'This system cannot end in a draw.' : 'El marcador no puede quedar empatado en este sistema.';
+      return appIsEnglish ? 'This system allows draws and calculates points and difference automatically.' : 'Este sistema permite empate y calcula puntos y diferencia automáticamente.';
   }
 }
 
@@ -2096,32 +2096,32 @@ String scoringConfigShortText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
   switch (scoringResultModel(type, cfg)) {
     case 'goals':
-      return 'Goles · GF/GC/DG';
+      return appIsEnglish ? 'Goals · GF/GA/GD' : 'Goles · GF/GC/DG';
     case 'sets_games':
-      return 'Sets + juegos · mejor de ${scoringBestOf(type, cfg)}';
+      return appIsEnglish ? 'Sets + games · best of ${scoringBestOf(type, cfg)}' : 'Sets + juegos · mejor de ${scoringBestOf(type, cfg)}';
     case 'sets_points':
-      return 'Sets + puntos · mejor de ${scoringBestOf(type, cfg)}';
+      return appIsEnglish ? 'Sets + points · best of ${scoringBestOf(type, cfg)}' : 'Sets + puntos · mejor de ${scoringBestOf(type, cfg)}';
     case 'total_points':
-      return 'Puntos totales · diferencia';
+      return appIsEnglish ? 'Total points · difference' : 'Puntos totales · diferencia';
     default:
-      return 'Victoria ${scoringWinPoints(type, cfg)} · empate ${scoringDrawPoints(type, cfg)} · derrota ${scoringLossPoints(type, cfg)}';
+      return appIsEnglish ? 'Win ${scoringWinPoints(type, cfg)} · draw ${scoringDrawPoints(type, cfg)} · loss ${scoringLossPoints(type, cfg)}' : 'Victoria ${scoringWinPoints(type, cfg)} · empate ${scoringDrawPoints(type, cfg)} · derrota ${scoringLossPoints(type, cfg)}';
   }
 }
 
 String tournamentClassificationTitle(String format, String scoringType, [dynamic scoringConfig]) {
-  if (format == 'americano') return 'Ranking individual';
-  if (format == 'eliminatoria') return 'Cuadro de eliminatoria';
+  if (format == 'americano') return appIsEnglish ? 'Individual ranking' : 'Ranking individual';
+  if (format == 'eliminatoria') return appIsEnglish ? 'Knockout bracket' : 'Cuadro de eliminatoria';
   switch (scoringResultModel(scoringType, scoringConfig)) {
     case 'goals':
-      return 'Clasificacion por goles';
+      return appIsEnglish ? 'Goals standings' : 'Clasificacion por goles';
     case 'sets_games':
-      return 'Clasificacion por sets y juegos';
+      return appIsEnglish ? 'Sets/games standings' : 'Clasificacion por sets y juegos';
     case 'sets_points':
-      return 'Clasificacion por sets y puntos';
+      return appIsEnglish ? 'Sets/points standings' : 'Clasificacion por sets y puntos';
     case 'total_points':
-      return 'Clasificacion por puntos';
+      return appIsEnglish ? 'Points standings' : 'Clasificacion por puntos';
     default:
-      return 'Clasificacion del torneo';
+      return appIsEnglish ? 'Tournament standings' : 'Clasificacion del torneo';
   }
 }
 
@@ -2135,42 +2135,42 @@ String tournamentClassificationSummary(
   final order = standingsOrderTextForScoring(breakers, scoringType, scoringConfig);
   if (format == 'americano') {
     final unit = scoringUsesGameSetMode(scoringType, scoringConfig)
-        ? 'juegos'
+        ? (appIsEnglish ? 'games' : 'juegos')
         : scoringUsesPointSetMode(scoringType, scoringConfig)
-            ? 'puntos'
+            ? (appIsEnglish ? 'points' : 'puntos')
             : scoringScoreLabel(scoringType, scoringConfig);
-    return 'Ranking individual: cada jugador suma $unit aunque cambie de pareja. Orden: $order.';
+    return appIsEnglish ? 'Individual ranking: each player adds $unit even when partner changes. Order: $order.' : 'Ranking individual: cada jugador suma $unit aunque cambie de pareja. Orden: $order.';
   }
   if (format == 'eliminatoria') {
-    return 'Cuadro directo: cada partido decide quien avanza. El desempate sigue este orden: $order.';
+    return appIsEnglish ? 'Single-elimination bracket: each match decides who advances. Tiebreaks follow this order: $order.' : 'Cuadro directo: cada partido decide quien avanza. El desempate sigue este orden: $order.';
   }
   switch (scoringResultModel(scoringType, scoringConfig)) {
     case 'goals':
-      return 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de goles, goles a favor y no presentados. Orden: $order.';
+      return appIsEnglish ? 'The table prioritizes points and then wins, head-to-head, goal difference, goals for and no-shows. Order: $order.' : 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de goles, goles a favor y no presentados. Orden: $order.';
     case 'sets_games':
-      return 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de sets, diferencia de juegos y juegos a favor. Orden: $order.';
+      return appIsEnglish ? 'The table prioritizes points and then wins, head-to-head, set difference, game difference and games for. Order: $order.' : 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de sets, diferencia de juegos y juegos a favor. Orden: $order.';
     case 'sets_points':
-      return 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de sets, diferencia de puntos y puntos a favor. Orden: $order.';
+      return appIsEnglish ? 'The table prioritizes points and then wins, head-to-head, set difference, point difference and points for. Order: $order.' : 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de sets, diferencia de puntos y puntos a favor. Orden: $order.';
     case 'total_points':
-      return 'La tabla prioriza victorias, diferencia de puntos y puntos a favor. Orden: $order.';
+      return appIsEnglish ? 'The table prioritizes wins, point difference and points for. Order: $order.' : 'La tabla prioriza victorias, diferencia de puntos y puntos a favor. Orden: $order.';
     default:
-      return 'La tabla usa la configuracion de puntos y los desempates definidos para este torneo. Orden: $order.';
+      return appIsEnglish ? 'The table uses the configured points and tiebreakers for this tournament. Order: $order.' : 'La tabla usa la configuracion de puntos y los desempates definidos para este torneo. Orden: $order.';
   }
 }
 
 
 String tieBreakerLabel(String value) {
   switch (value) {
-    case 'points': return 'puntos';
-    case 'wins': return 'victorias';
-    case 'direct': return 'directo';
-    case 'difference': return 'diferencia';
-    case 'for': return 'a favor';
-    case 'set_difference': return 'sets';
-    case 'game_difference': return 'juegos';
-    case 'games_for': return 'juegos a favor';
-    case 'manual': return 'manual';
-    case 'no_shows': return 'no presentados';
+    case 'points': return appIsEnglish ? 'points' : 'puntos';
+    case 'wins': return appIsEnglish ? 'wins' : 'victorias';
+    case 'direct': return appIsEnglish ? 'head-to-head' : 'directo';
+    case 'difference': return appIsEnglish ? 'difference' : 'diferencia';
+    case 'for': return appIsEnglish ? 'for' : 'a favor';
+    case 'set_difference': return appIsEnglish ? 'sets' : 'sets';
+    case 'game_difference': return appIsEnglish ? 'games' : 'juegos';
+    case 'games_for': return appIsEnglish ? 'games for' : 'juegos a favor';
+    case 'manual': return appIsEnglish ? 'manual' : 'manual';
+    case 'no_shows': return appIsEnglish ? 'no-shows' : 'no presentados';
     default: return value;
   }
 }
@@ -2178,22 +2178,22 @@ String tieBreakerLabel(String value) {
 String tieBreakerLabelForScoring(String value, String scoringType, [dynamic raw]) {
   switch (value) {
     case 'set_difference':
-      return 'diferencia de sets';
+      return appIsEnglish ? 'set difference' : 'diferencia de sets';
     case 'game_difference':
-      if (scoringUsesGameSetMode(scoringType, raw)) return 'diferencia de juegos';
-      if (scoringUsesPointSetMode(scoringType, raw)) return 'diferencia de puntos de set';
+      if (scoringUsesGameSetMode(scoringType, raw)) return appIsEnglish ? 'game difference' : 'diferencia de juegos';
+      if (scoringUsesPointSetMode(scoringType, raw)) return appIsEnglish ? 'set point difference' : 'diferencia de puntos de set';
       return tieBreakerLabel(value);
     case 'games_for':
-      if (scoringUsesGameSetMode(scoringType, raw)) return 'juegos a favor';
-      if (scoringUsesPointSetMode(scoringType, raw)) return 'puntos de set a favor';
+      if (scoringUsesGameSetMode(scoringType, raw)) return appIsEnglish ? 'games for' : 'juegos a favor';
+      if (scoringUsesPointSetMode(scoringType, raw)) return appIsEnglish ? 'set points for' : 'puntos de set a favor';
       return tieBreakerLabel(value);
     case 'difference':
-      if (scoringResultModel(scoringType, raw) == 'goals') return 'diferencia de goles';
-      if (scoringResultModel(scoringType, raw) == 'total_points') return 'diferencia de puntos';
+      if (scoringResultModel(scoringType, raw) == 'goals') return appIsEnglish ? 'goal difference' : 'diferencia de goles';
+      if (scoringResultModel(scoringType, raw) == 'total_points') return appIsEnglish ? 'point difference' : 'diferencia de puntos';
       return tieBreakerLabel(value);
     case 'for':
-      if (scoringResultModel(scoringType, raw) == 'goals') return 'goles a favor';
-      if (scoringResultModel(scoringType, raw) == 'total_points') return 'puntos a favor';
+      if (scoringResultModel(scoringType, raw) == 'goals') return appIsEnglish ? 'goals for' : 'goles a favor';
+      if (scoringResultModel(scoringType, raw) == 'total_points') return appIsEnglish ? 'points for' : 'puntos a favor';
       return tieBreakerLabel(value);
     default:
       return tieBreakerLabel(value);
@@ -2204,21 +2204,21 @@ String scoringConfigFullText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
   switch (scoringResultModel(type, cfg)) {
     case 'goals':
-      return 'Se registra el marcador en goles. La clasificación usa puntos de liga, goles a favor, goles en contra y diferencia de goles.';
+      return appIsEnglish ? 'The score is recorded in goals. The standings use league points, goals for, goals against and goal difference.' : 'Se registra el marcador en goles. La clasificación usa puntos de liga, goles a favor, goles en contra y diferencia de goles.';
     case 'sets_games':
-      return 'Se registra cada set con sus juegos. La app calcula sets ganados, juegos totales y desempates.';
+      return appIsEnglish ? 'Each set is recorded with its games. The app calculates sets won, total games and tiebreaks.' : 'Se registra cada set con sus juegos. La app calcula sets ganados, juegos totales y desempates.';
     case 'sets_points':
-      return 'Se registra cada set con sus puntos. La app calcula sets ganados, puntos totales y desempates.';
+      return appIsEnglish ? 'Each set is recorded with its points. The app calculates sets won, total points and tiebreaks.' : 'Se registra cada set con sus puntos. La app calcula sets ganados, puntos totales y desempates.';
     case 'total_points':
-      return 'Se registra el marcador total de puntos. La clasificación usa victorias, puntos a favor/en contra y diferencia.';
+      return appIsEnglish ? 'The total points score is recorded. The standings use wins, points for/against and difference.' : 'Se registra el marcador total de puntos. La clasificación usa victorias, puntos a favor/en contra y diferencia.';
     default:
-      return 'Marcador directo en ${scoringScoreLabel(type, cfg)}. La clasificación usa victoria ${scoringWinPoints(type, cfg)}, empate ${scoringDrawPoints(type, cfg)} y derrota ${scoringLossPoints(type, cfg)}.';
+      return appIsEnglish ? 'Direct score in ${scoringScoreLabel(type, cfg)}. The standings use win ${scoringWinPoints(type, cfg)}, draw ${scoringDrawPoints(type, cfg)} and loss ${scoringLossPoints(type, cfg)}.' : 'Marcador directo en ${scoringScoreLabel(type, cfg)}. La clasificación usa victoria ${scoringWinPoints(type, cfg)}, empate ${scoringDrawPoints(type, cfg)} y derrota ${scoringLossPoints(type, cfg)}.';
   }
 }
 
 String standingsHeaderForScoring(String type, [dynamic raw]) {
-  if (scoringUsesSetMode(type, raw)) return 'PTS · DP · ${scoringSetLabel(type, raw).toUpperCase()}';
-  return 'PTS · ${scoringRankingLabel(type, raw)} · PJ';
+  if (scoringUsesSetMode(type, raw)) return appIsEnglish ? 'PTS · GD · ${scoringSetLabel(type, raw).toUpperCase()}' : 'PTS · DP · ${scoringSetLabel(type, raw).toUpperCase()}';
+  return appIsEnglish ? 'PTS · ${scoringRankingLabel(type, raw)} · GP' : 'PTS · ${scoringRankingLabel(type, raw)} · PJ';
 }
 
 String standingDetailText(TeamStanding standing, String scoringType, [dynamic scoringConfig]) {
@@ -2296,18 +2296,18 @@ String standingWinRateText(TeamStanding standing) {
 
 String tournamentStatsIntroText(String scoringType, [dynamic scoringConfig]) {
   if (scoringUsesGameSetMode(scoringType, scoringConfig)) {
-    return 'La tabla usa puntos, victorias, sets y juegos reales para ordenar la clasificación.';
+    return appIsEnglish ? 'The table uses points, wins, sets and real games to rank the standings.' : 'La tabla usa puntos, victorias, sets y juegos reales para ordenar la clasificación.';
   }
   if (scoringUsesPointSetMode(scoringType, scoringConfig)) {
-    return 'La tabla usa puntos, victorias, sets y puntos de parcial para ordenar la clasificación.';
+    return appIsEnglish ? 'The table uses points, wins, sets and partial points to rank the standings.' : 'La tabla usa puntos, victorias, sets y puntos de parcial para ordenar la clasificación.';
   }
   if (scoringResultModel(scoringType, scoringConfig) == 'goals') {
-    return 'La tabla usa puntos, victorias, empates, goles a favor, goles en contra y diferencia.';
+    return appIsEnglish ? 'The table uses points, wins, draws, goals for, goals against and difference.' : 'La tabla usa puntos, victorias, empates, goles a favor, goles en contra y diferencia.';
   }
   if (scoringResultModel(scoringType, scoringConfig) == 'total_points') {
-    return 'La tabla usa victorias, puntos a favor, puntos en contra y diferencia.';
+    return appIsEnglish ? 'The table uses wins, points for, points against and difference.' : 'La tabla usa victorias, puntos a favor, puntos en contra y diferencia.';
   }
-  return 'La tabla usa puntos, victorias y diferencia según el marcador configurado.';
+  return appIsEnglish ? 'The table uses points, wins and difference according to the configured score.' : 'La tabla usa puntos, victorias y diferencia según el marcador configurado.';
 }
 
 String matchInputLabel(String type, bool local, [dynamic raw]) {
@@ -2514,8 +2514,8 @@ String matchSpecialResultText(Map<String, dynamic> match, Map<String, String> na
   if (special.isEmpty) return '';
   final winner = names[AppData.text(match['winner_team_id'])] ?? 'Ganador';
   final loser = names[AppData.text(details['loser_team_id'])] ?? names[AppData.text(details['no_show_team_id'])] ?? 'Rival';
-  if (special == 'no_show') return '$loser no se presentó · gana $winner';
-  if (special == 'walkover') return 'Victoria administrativa para $winner';
+  if (special == 'no_show') return appIsEnglish ? '$loser did not show up · $winner wins' : '$loser no se presentó · gana $winner';
+  if (special == 'walkover') return appIsEnglish ? 'Administrative win for $winner' : 'Victoria administrativa para $winner';
   return AppData.text(details['label'], special);
 }
 
@@ -2644,32 +2644,32 @@ String standingRankReason(int index, List<TeamStanding> standings, List<String> 
   final diffValue = current.goalDifference >= 0 ? '+${current.goalDifference}' : '${current.goalDifference}';
   if (index == 0) {
     if (current.americanoRawScore) {
-      return 'Lidera el ranking individual con ${current.points} pts acumulados y ${current.wins} victorias.';
+      return appIsEnglish ? 'Leads the individual ranking with ${current.points} accumulated pts and ${current.wins} wins.' : 'Lidera el ranking individual con ${current.points} pts acumulados y ${current.wins} victorias.';
     }
-    return 'Lidera con ${current.points} pts · ${current.wins} victorias · $diffLabel $diffValue.';
+    return appIsEnglish ? 'Leads with ${current.points} pts · ${current.wins} wins · $diffLabel $diffValue.' : 'Lidera con ${current.points} pts · ${current.wins} victorias · $diffLabel $diffValue.';
   }
   final previous = standings[index - 1];
   if (current.points != previous.points) {
-    return '${previous.name} está por delante por puntos (${previous.points} vs ${current.points}).';
+    return appIsEnglish ? '${previous.name} is ahead on points (${previous.points} vs ${current.points}).' : '${previous.name} está por delante por puntos (${previous.points} vs ${current.points}).';
   }
   for (final breaker in tieBreakers) {
     if (breaker == 'points') continue;
-    if (breaker == 'wins' && current.wins != previous.wins) return 'Desempate por victorias: ${previous.wins} vs ${current.wins}.';
+    if (breaker == 'wins' && current.wins != previous.wins) return appIsEnglish ? 'Tiebreak by wins: ${previous.wins} vs ${current.wins}.' : 'Desempate por victorias: ${previous.wins} vs ${current.wins}.';
     if ((breaker == 'difference' || breaker == 'set_difference') && current.goalDifference != previous.goalDifference) {
-      return 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalDifference} vs ${current.goalDifference}.';
+      return appIsEnglish ? 'Tiebreak by ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalDifference} vs ${current.goalDifference}.' : 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalDifference} vs ${current.goalDifference}.';
     }
     if (breaker == 'for' && current.goalsFor != previous.goalsFor) {
-      return 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalsFor} vs ${current.goalsFor}.';
+      return appIsEnglish ? 'Tiebreak by ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalsFor} vs ${current.goalsFor}.' : 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalsFor} vs ${current.goalsFor}.';
     }
     if (breaker == 'game_difference' && current.secondaryDifference != previous.secondaryDifference) {
-      return 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryDifference} vs ${current.secondaryDifference}.';
+      return appIsEnglish ? 'Tiebreak by ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryDifference} vs ${current.secondaryDifference}.' : 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryDifference} vs ${current.secondaryDifference}.';
     }
     if (breaker == 'games_for' && current.secondaryFor != previous.secondaryFor) {
-      return 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryFor} vs ${current.secondaryFor}.';
+      return appIsEnglish ? 'Tiebreak by ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryFor} vs ${current.secondaryFor}.' : 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryFor} vs ${current.secondaryFor}.';
     }
-    if (breaker == 'direct') return 'Mismo puntaje: se revisa enfrentamiento directo antes de seguir con la diferencia.';
+    if (breaker == 'direct') return appIsEnglish ? 'Same score: head-to-head is checked before moving to difference.' : 'Mismo puntaje: se revisa enfrentamiento directo antes de seguir con la diferencia.';
   }
-  return 'Mismo puntaje. Se aplica el siguiente criterio configurado o el orden alfabético.';
+  return appIsEnglish ? 'Same score. The next configured criterion or alphabetical order applies.' : 'Mismo puntaje. Se aplica el siguiente criterio configurado o el orden alfabético.';
 }
 
 String matchHistoryEntryText(Map<String, dynamic> item) {
