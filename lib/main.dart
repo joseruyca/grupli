@@ -33,6 +33,10 @@ part 'features/groups/groups.dart';
 part 'features/agenda/agenda.dart';
 part 'features/finances/finances.dart';
 part 'features/tournaments/tournament_engine_v2.dart';
+part 'features/tournaments/tournaments_shared.dart';
+part 'features/tournaments/tournaments_premium.dart';
+part 'features/tournaments/tournaments_creation.dart';
+part 'features/tournaments/tournaments_detail.dart';
 part 'features/tournaments/tournaments.dart';
 part 'features/profile/profile_members_admin.dart';
 part 'core/widgets/shared_widgets.dart';
@@ -447,7 +451,7 @@ class GrupliApp extends StatelessWidget {
           iconTheme: IconThemeData(color: AppColors.ink),
           titleTextStyle: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: AppColors.ink, letterSpacing: -0.2),
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: AppColors.white,
           elevation: 0,
           margin: EdgeInsets.zero,
@@ -456,7 +460,7 @@ class GrupliApp extends StatelessWidget {
             side: const BorderSide(color: AppColors.lineSoft),
           ),
         ),
-        dialogTheme: DialogTheme(
+        dialogTheme: DialogThemeData(
           backgroundColor: AppColors.surface,
           surfaceTintColor: Colors.transparent,
           shape: RoundedRectangleBorder(borderRadius: AppColors.softRadius),

@@ -1,10 +1,5 @@
 part of grupli_app;
 
-part 'tournaments_premium.dart';
-part 'tournaments_creation.dart';
-part 'tournaments_detail.dart';
-part 'tournaments_shared.dart';
-
 class TournamentsTab extends StatefulWidget {
   final Map<String, dynamic> group;
   final int refreshSeed;
