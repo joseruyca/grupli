@@ -7,14 +7,14 @@ class CreateJoinScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return DirectPage(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        PageHeader(title: 'Añadir grupo', subtitle: 'Crea un grupo nuevo o entra con invitación.', leading: true),
+        PageHeader(title: tr(context, es: 'Añadir grupo', en: 'Add group'), subtitle: tr(context, es: 'Crea un grupo nuevo o entra con invitación.', en: 'Create a new group or join with an invite.'), leading: true),
         const SizedBox(height: 20),
-        ChoiceBigCard(icon: Icons.groups_rounded, title: 'Crear un grupo', body: 'Crea tu grupo privado y empieza a organizar.', onTap: () async {
+        ChoiceBigCard(icon: Icons.groups_rounded, title: tr(context, es: 'Crear un grupo', en: 'Create a group'), body: tr(context, es: 'Crea tu grupo privado y empieza a organizar.', en: 'Create your private group and start organizing.'), onTap: () async {
           final result = await Navigator.push<dynamic>(context, MaterialPageRoute(builder: (_) => const CreateGroupScreen()));
           if (context.mounted && result != null) Navigator.pop(context, result);
         }),
         const SizedBox(height: 12),
-        ChoiceBigCard(icon: Icons.group_add_rounded, title: 'Unirse a un grupo', body: 'Únete a un grupo con código o enlace.', onTap: () async {
+        ChoiceBigCard(icon: Icons.group_add_rounded, title: tr(context, es: 'Unirse a un grupo', en: 'Join a group'), body: tr(context, es: 'Únete a un grupo con código o enlace.', en: 'Join a group with a code or link.'), onTap: () async {
           final result = await Navigator.push<dynamic>(context, MaterialPageRoute(builder: (_) => const JoinGroupScreen()));
           if (context.mounted && result != null) Navigator.pop(context, result);
         }),
@@ -85,7 +85,7 @@ Future<Uint8List> cropImageBytes({
   final picture = recorder.endRecording();
   final cropped = await picture.toImage(outputWidth, outputHeight);
   final data = await cropped.toByteData(format: ui.ImageByteFormat.png);
-  if (data == null) throw Exception('No se pudo preparar la imagen.');
+  if (data == null) throw Exception(appIsEnglish ? 'Could not prepare the image.' : 'No se pudo preparar la imagen.');
   return data.buffer.asUint8List();
 }
 
@@ -235,7 +235,7 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
       Row(children: [
         RoundBackButton(),
         const Spacer(),
-        TextButton(onPressed: saving ? null : save, child: const Text('Guardar', style: TextStyle(fontWeight: FontWeight.w900))),
+      TextButton(onPressed: saving ? null : save, child: Text(appIsEnglish ? 'Save' : 'Guardar', style: const TextStyle(fontWeight: FontWeight.w900))),
       ]),
       const SizedBox(height: 18),
       Text(widget.title, style: Theme.of(context).textTheme.headlineMedium),
@@ -245,10 +245,10 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0x240B6B8F))),
-        child: const Row(children: [
+        child: Row(children: [
           Icon(Icons.center_focus_strong_rounded, color: AppColors.teal, size: 19),
           SizedBox(width: 8),
-          Expanded(child: Text('Nuevo método: toca la cara o zona importante para centrarla. También puedes arrastrar y pellizcar con precisión real.', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, fontSize: 12.5))),
+          Expanded(child: Text(appIsEnglish ? 'New method: tap the face or an important area to center it. You can also drag and pinch with real precision.' : 'Nuevo método: toca la cara o zona importante para centrarla. También puedes arrastrar y pellizcar con precisión real.', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, fontSize: 12.5))),
         ]),
       ),
       const SizedBox(height: 14),
@@ -261,7 +261,7 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
               if (!snapshot.hasData) {
                 return AspectRatio(
                   aspectRatio: widget.aspectRatio,
-                  child: const CenterLoader(label: 'Preparando imagen...'),
+                  child: CenterLoader(label: appIsEnglish ? 'Preparing image...' : 'Preparando imagen...'),
                 );
               }
               final image = snapshot.data!;
@@ -310,7 +310,7 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                                 decoration: BoxDecoration(color: const Color(0x99000000), borderRadius: BorderRadius.circular(999)),
-                                child: const Text('Toca una zona para centrarla · arrastra para ajustar', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                                child: Text(appIsEnglish ? 'Tap a spot to center it · drag to adjust' : 'Toca una zona para centrarla · arrastra para ajustar', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
                               ),
                             ),
                           ),
@@ -324,11 +324,11 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
           ),
           const SizedBox(height: 14),
           Wrap(spacing: 8, runSpacing: 8, children: [
-            ActionChip(label: const Text('Arriba'), avatar: const Icon(Icons.keyboard_arrow_up_rounded, size: 18), onPressed: () => quickFocus('top')),
-            ActionChip(label: const Text('Centro'), avatar: const Icon(Icons.filter_center_focus_rounded, size: 18), onPressed: () => quickFocus('center')),
-            ActionChip(label: const Text('Abajo'), avatar: const Icon(Icons.keyboard_arrow_down_rounded, size: 18), onPressed: () => quickFocus('bottom')),
-            ActionChip(label: const Text('Izquierda'), avatar: const Icon(Icons.keyboard_arrow_left_rounded, size: 18), onPressed: () => quickFocus('left')),
-            ActionChip(label: const Text('Derecha'), avatar: const Icon(Icons.keyboard_arrow_right_rounded, size: 18), onPressed: () => quickFocus('right')),
+            ActionChip(label: Text(appIsEnglish ? 'Top' : 'Arriba'), avatar: const Icon(Icons.keyboard_arrow_up_rounded, size: 18), onPressed: () => quickFocus('top')),
+            ActionChip(label: Text(appIsEnglish ? 'Center' : 'Centro'), avatar: const Icon(Icons.filter_center_focus_rounded, size: 18), onPressed: () => quickFocus('center')),
+            ActionChip(label: Text(appIsEnglish ? 'Bottom' : 'Abajo'), avatar: const Icon(Icons.keyboard_arrow_down_rounded, size: 18), onPressed: () => quickFocus('bottom')),
+            ActionChip(label: Text(appIsEnglish ? 'Left' : 'Izquierda'), avatar: const Icon(Icons.keyboard_arrow_left_rounded, size: 18), onPressed: () => quickFocus('left')),
+            ActionChip(label: Text(appIsEnglish ? 'Right' : 'Derecha'), avatar: const Icon(Icons.keyboard_arrow_right_rounded, size: 18), onPressed: () => quickFocus('right')),
           ]),
           const SizedBox(height: 10),
           Row(children: [
@@ -357,14 +357,14 @@ class _ImageFrameEditorScreenState extends State<ImageFrameEditorScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            const Text('alto', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12)),
+            Text(appIsEnglish ? 'height' : 'alto', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 12)),
           ]),
         ]),
       ),
       const SizedBox(height: 16),
-      PrimaryButton(label: 'Guardar encuadre', icon: Icons.check_rounded, loading: saving, onTap: save),
+      PrimaryButton(label: appIsEnglish ? 'Save crop' : 'Guardar encuadre', icon: Icons.check_rounded, loading: saving, onTap: save),
       const SizedBox(height: 10),
-      SecondaryButton(label: 'Restablecer encuadre', icon: Icons.restart_alt_rounded, onTap: reset),
+      SecondaryButton(label: appIsEnglish ? 'Reset crop' : 'Restablecer encuadre', icon: Icons.restart_alt_rounded, onTap: reset),
     ]));
   }
 }
@@ -447,8 +447,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     final framed = await Navigator.of(context).push<Uint8List>(MaterialPageRoute(
       builder: (_) => ImageFrameEditorScreen(
         bytes: raw,
-        title: 'Ajustar portada',
-        helper: 'Arrastra y pellizca la imagen para encajar la portada como en una app real.',
+        title: appIsEnglish ? 'Adjust cover' : 'Ajustar portada',
+        helper: appIsEnglish ? 'Drag and pinch the image to fit the cover like in a real app.' : 'Arrastra y pellizca la imagen para encajar la portada como en una app real.',
         aspectRatio: 16 / 7,
         outputWidth: 1600,
       ),
@@ -462,7 +462,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   bool validateStep() {
     if (step == 0 && name.text.trim().length < 2) {
-      showToast(context, 'Pon un nombre de grupo.', danger: true);
+      showToast(context, tr(context, es: 'Pon un nombre de grupo.', en: 'Add a group name.'), danger: true);
       return false;
     }
     return true;
@@ -499,12 +499,12 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final title = step == 0 ? 'Crea tu grupo' : step == 1 ? 'Dale identidad' : 'Primeros pasos';
+    final title = step == 0 ? tr(context, es: 'Crea tu grupo', en: 'Create your group') : step == 1 ? tr(context, es: 'Dale identidad', en: 'Give it identity') : tr(context, es: 'Primeros pasos', en: 'First steps');
     final subtitle = step == 0
-        ? 'Nombre y privacidad. Todo privado por defecto.'
+        ? tr(context, es: 'Nombre y privacidad. Todo privado por defecto.', en: 'Name and privacy. Private by default.')
         : step == 1
-            ? 'Añade una portada y una descripción clara.'
-            : 'Después de crearlo podrás invitar, crear el primer plan y añadir gastos.';
+            ? tr(context, es: 'Añade una portada y una descripción clara.', en: 'Add a cover and a clear description.')
+            : tr(context, es: 'Después de crearlo podrás invitar, crear el primer plan y añadir gastos.', en: 'After creating it, you can invite people, create the first plan and add expenses.');
     return DirectPage(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -521,18 +521,18 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         const SizedBox(height: 18),
         if (step == 0) ...[
           AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            FieldLabel('Nombre del grupo'),
+            FieldLabel(tr(context, es: 'Nombre del grupo', en: 'Group name')),
             TextField(
               controller: name,
               autofocus: true,
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(hintText: 'Ej. Pádel los miércoles'),
+              decoration: InputDecoration(hintText: tr(context, es: 'Ej. Pádel los miércoles', en: 'E.g. Wednesday padel')),
             ),
             const SizedBox(height: 12),
             StatusNotice(
               icon: Icons.lock_outline_rounded,
-              title: 'Grupo privado',
-              body: 'Todos los grupos son privados. Después podrás invitar a miembros con código o enlace.',
+              title: tr(context, es: 'Grupo privado', en: 'Private group'),
+              body: tr(context, es: 'Todos los grupos son privados. Después podrás invitar a miembros con código o enlace.', en: 'All groups are private. You can invite members later with a code or link.'),
             ),
           ])),
         ] else if (step == 1) ...[
@@ -551,48 +551,48 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: const [
                         Icon(Icons.add_photo_alternate_rounded, color: Colors.white, size: 34),
                         SizedBox(height: 8),
-                        Text('Añadir portada', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                        Text(appIsEnglish ? 'Add cover' : 'Añadir portada', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
                         SizedBox(height: 4),
-                        Text('Después podrás encuadrarla', style: TextStyle(color: Color(0xCCFFFFFF), fontWeight: FontWeight.w700, fontSize: 12)),
+                        Text(appIsEnglish ? 'You can crop it later' : 'Después podrás encuadrarla', style: const TextStyle(color: Color(0xCCFFFFFF), fontWeight: FontWeight.w700, fontSize: 12)),
                       ]))
                     : Stack(children: [
                         Positioned.fill(child: ClipRRect(borderRadius: BorderRadius.circular(22), child: Image.memory(coverBytes!, fit: BoxFit.cover))),
                         Positioned(right: 12, bottom: 12, child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                           decoration: BoxDecoration(color: Colors.black.withOpacity(.38), borderRadius: BorderRadius.circular(99)),
-                          child: const Text('Cambiar encuadre', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                          child: Text(appIsEnglish ? 'Change crop' : 'Cambiar encuadre', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
                         )),
                       ]),
               ),
             ),
             const SizedBox(height: 16),
-            FieldLabel('Descripción'),
-            TextField(controller: description, minLines: 2, maxLines: 4, decoration: const InputDecoration(hintText: '¿Para qué usará el grupo Grupli?')),
+            FieldLabel(tr(context, es: 'Descripción', en: 'Description')),
+            TextField(controller: description, minLines: 2, maxLines: 4, decoration: InputDecoration(hintText: tr(context, es: '¿Para qué usará el grupo Grupli?', en: 'What will the group use Grupli for?'))),
             const SizedBox(height: 12),
             StatusNotice(
               icon: Icons.payments_rounded,
-              title: 'Moneda del grupo',
-              body: 'De momento el grupo usará euros. La selección de moneda se activará cuando Finanzas esté preparada para convertir importes de forma segura.',
+              title: tr(context, es: 'Moneda del grupo', en: 'Group currency'),
+              body: tr(context, es: 'De momento el grupo usará euros. La selección de moneda se activará cuando Finanzas esté preparada para convertir importes de forma segura.', en: 'For now the group will use euros. Currency selection will be enabled once Finances is ready to convert amounts safely.'),
             ),
           ])),
         ] else ...[
           AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _SetupTodoRow(icon: Icons.link_rounded, title: 'Invitar miembros', body: 'Comparte código o enlace por WhatsApp al terminar.'),
+            _SetupTodoRow(icon: Icons.link_rounded, title: tr(context, es: 'Invitar miembros', en: 'Invite members'), body: tr(context, es: 'Comparte código o enlace por WhatsApp al terminar.', en: 'Share the code or link on WhatsApp when you finish.')),
             const Divider(height: 20, color: AppColors.line),
-            _SetupTodoRow(icon: Icons.event_available_rounded, title: 'Crear primer plan', body: 'Una quedada rápida para que todos confirmen asistencia.'),
+            _SetupTodoRow(icon: Icons.event_available_rounded, title: tr(context, es: 'Crear primer plan', en: 'Create first plan'), body: tr(context, es: 'Una quedada rápida para que todos confirmen asistencia.', en: 'A quick plan so everyone can confirm attendance.')),
             const Divider(height: 20, color: AppColors.line),
-            _SetupTodoRow(icon: Icons.account_balance_wallet_rounded, title: 'Primer gasto', body: 'Si el grupo ya tiene gastos, Grupli calculará saldos.'),
+            _SetupTodoRow(icon: Icons.account_balance_wallet_rounded, title: tr(context, es: 'Primer gasto', en: 'First expense'), body: tr(context, es: 'Si el grupo ya tiene gastos, Grupli calculará saldos.', en: 'If the group already has expenses, Grupli will calculate balances.')),
             const Divider(height: 20, color: AppColors.line),
-            _SetupTodoRow(icon: Icons.emoji_events_rounded, title: 'Torneo opcional', body: 'Si el grupo lo necesita, podrás crear liga, eliminatoria, americano o partidos manuales.'),
+            _SetupTodoRow(icon: Icons.emoji_events_rounded, title: tr(context, es: 'Torneo opcional', en: 'Optional tournament'), body: tr(context, es: 'Si el grupo lo necesita, podrás crear liga, eliminatoria, americano o partidos manuales.', en: 'If the group needs it, you can create leagues, knockouts, americano or manual matches.')),
           ])),
         ],
         const SizedBox(height: 22),
         if (step < 2)
-          PrimaryButton(label: 'Continuar', icon: Icons.arrow_forward_rounded, onTap: () { if (validateStep()) setState(() => step++); })
+          PrimaryButton(label: tr(context, es: 'Continuar', en: 'Continue'), icon: Icons.arrow_forward_rounded, onTap: () { if (validateStep()) setState(() => step++); })
         else
-          PrimaryButton(label: 'Crear grupo', icon: Icons.check_rounded, loading: loading, onTap: create),
+          PrimaryButton(label: tr(context, es: 'Crear grupo', en: 'Create group'), icon: Icons.check_rounded, loading: loading, onTap: create),
         const SizedBox(height: 10),
-        if (step < 2) SecondaryButton(label: 'Crear rápido', icon: Icons.bolt_rounded, onTap: create),
+        if (step < 2) SecondaryButton(label: tr(context, es: 'Crear rápido', en: 'Quick create'), icon: Icons.bolt_rounded, onTap: create),
       ]),
     );
   }
@@ -641,13 +641,13 @@ class GroupCreatedScreen extends StatelessWidget {
     child: Center(child: AppCard(padding: const EdgeInsets.all(22), child: Column(mainAxisSize: MainAxisSize.min, children: [
       Container(width: 82, height: 82, decoration: const BoxDecoration(color: AppColors.greenSoft, shape: BoxShape.circle), child: const Icon(Icons.check_rounded, color: AppColors.green, size: 42)),
       const SizedBox(height: 18),
-      Text('Grupo creado', style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
+      Text(tr(context, es: 'Grupo creado', en: 'Group created'), style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
       const SizedBox(height: 8),
-      Text('$groupName ya está listo. Ahora invita gente o crea el primer plan.', style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
+      Text(tr(context, es: '$groupName ya está listo. Ahora invita gente o crea el primer plan.', en: '$groupName is ready. Now invite people or create the first plan.'), style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
       const SizedBox(height: 18),
-      PrimaryButton(label: 'Entrar al grupo', icon: Icons.arrow_forward_rounded, onTap: () => Navigator.pop(context, 'open')),
+      PrimaryButton(label: tr(context, es: 'Entrar al grupo', en: 'Enter group'), icon: Icons.arrow_forward_rounded, onTap: () => Navigator.pop(context, 'open')),
       const SizedBox(height: 10),
-      SecondaryButton(label: 'Volver a mis grupos', icon: Icons.home_rounded, onTap: () => Navigator.pop(context, 'home')),
+      SecondaryButton(label: tr(context, es: 'Volver a mis grupos', en: 'Back to my groups'), icon: Icons.home_rounded, onTap: () => Navigator.pop(context, 'home')),
     ]))),
   );
 }
@@ -703,18 +703,18 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         RoundBackButton(onTap: () => Navigator.pop(context)),
         const SizedBox(height: 28),
-        Text('Unirme a un grupo', style: Theme.of(context).textTheme.headlineMedium),
+        Text(tr(context, es: 'Unirme a un grupo', en: 'Join a group'), style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 8),
-        Text('Pega un código o un enlace de invitación. Si vienes desde un enlace, lo rellenamos automáticamente.', style: Theme.of(context).textTheme.bodyMedium),
+        Text(tr(context, es: 'Pega un código o un enlace de invitación. Si vienes desde un enlace, lo rellenamos automáticamente.', en: 'Paste an invite code or link. If you come from a link, we fill it in automatically.'), style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 26),
-        FieldLabel('Código o enlace de invitación'),
+        FieldLabel(tr(context, es: 'Código o enlace de invitación', en: 'Invite code or link')),
         TextField(
           controller: code,
           textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(prefixIcon: Icon(Icons.link_rounded), hintText: 'ABC123 o https://grupli.vercel.app/join/ABC123'),
+          decoration: InputDecoration(prefixIcon: const Icon(Icons.link_rounded), hintText: appIsEnglish ? 'ABC123 or https://grupli.vercel.app/join/ABC123' : 'ABC123 o https://grupli.vercel.app/join/ABC123'),
         ),
         const SizedBox(height: 18),
-        PrimaryButton(label: 'Unirme', icon: Icons.login_rounded, loading: loading, onTap: join),
+        PrimaryButton(label: tr(context, es: 'Unirme', en: 'Join'), icon: Icons.login_rounded, loading: loading, onTap: join),
       ]),
     );
   }
@@ -788,17 +788,17 @@ class _JoinInviteScreenState extends State<JoinInviteScreen> {
             ),
             const SizedBox(height: 18),
             Text(
-              loading ? 'Entrando al grupo...' : joined ? 'Ya estás dentro' : 'No se pudo abrir la invitación',
+              loading ? tr(context, es: 'Entrando al grupo...', en: 'Joining group...') : joined ? tr(context, es: 'Ya estás dentro', en: 'You are in') : tr(context, es: 'No se pudo abrir la invitación', en: 'Could not open the invite'),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 8),
             Text(
               loading
-                  ? 'Estamos usando el enlace privado ${widget.inviteCode}.'
+                  ? tr(context, es: 'Estamos usando el enlace privado ${widget.inviteCode}.', en: 'We are using the private link ${widget.inviteCode}.')
                   : joined
-                      ? 'Te llevamos a ${groupName ?? 'tu grupo'} automáticamente.'
-                      : (error ?? 'El enlace puede haber caducado o el código no es válido.'),
+                      ? tr(context, es: 'Te llevamos a ${groupName ?? 'tu grupo'} automáticamente.', en: 'We are taking you to ${groupName ?? 'your group'} automatically.')
+                      : (error ?? tr(context, es: 'El enlace puede haber caducado o el código no es válido.', en: 'The link may have expired or the code is not valid.')),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
@@ -806,14 +806,14 @@ class _JoinInviteScreenState extends State<JoinInviteScreen> {
             if (loading)
               const CircularProgressIndicator(color: AppColors.teal)
             else if (joined && groupId != null)
-              PrimaryButton(label: 'Entrar al grupo', icon: Icons.arrow_forward_rounded, onTap: () => Navigator.pop(context, {
+              PrimaryButton(label: tr(context, es: 'Entrar al grupo', en: 'Enter group'), icon: Icons.arrow_forward_rounded, onTap: () => Navigator.pop(context, {
                 'action': 'open',
                 'groupId': groupId!,
               }))
             else ...[
-              PrimaryButton(label: 'Intentar otra vez', icon: Icons.refresh_rounded, onTap: _joinFromLink),
+              PrimaryButton(label: tr(context, es: 'Intentar otra vez', en: 'Try again'), icon: Icons.refresh_rounded, onTap: _joinFromLink),
               const SizedBox(height: 10),
-              SecondaryButton(label: 'Escribir código', icon: Icons.qr_code_rounded, onTap: () async {
+              SecondaryButton(label: tr(context, es: 'Escribir código', en: 'Enter code'), icon: Icons.qr_code_rounded, onTap: () async {
                 final result = await Navigator.of(context).push<dynamic>(MaterialPageRoute(builder: (_) => JoinGroupScreen(initialCode: widget.inviteCode)));
                 if (result != null && mounted) Navigator.pop(context, result);
               }),
@@ -1005,7 +1005,7 @@ class _GroupShellState extends State<GroupShell> {
           _cachedGroup = snapshot.data;
         }
         if (snapshot.connectionState == ConnectionState.waiting && _cachedGroup == null) {
-          return const DirectPage(child: CenterLoader(label: 'Cargando grupo...'));
+          return DirectPage(child: CenterLoader(label: tr(context, es: 'Cargando grupo...', en: 'Loading group...')));
         }
         if (snapshot.hasError && _cachedGroup == null) {
           return DirectPage(child: ErrorBlock(message: snapshot.error.toString(), onRetry: refresh));
@@ -1167,30 +1167,30 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                     ),
                     const SizedBox(height: 8),
                     if (snapshot.connectionState == ConnectionState.waiting)
-                      const CenterLoader(label: 'Cargando resumen...')
+                      CenterLoader(label: appIsEnglish ? 'Loading summary...' : 'Cargando resumen...')
                     else if (snapshot.hasError)
                       ErrorBlock(message: snapshot.error.toString(), onRetry: reload)
                     else ...[
                       GroupDashboardIntro(nextEvent: nextEvent, pendingCount: myDecisionPending.length),
                       const SizedBox(height: 14),
                       SectionHeader(
-                        title: 'Lo próximo',
-                        action: nextEvent == null ? 'Crear plan' : 'Ver planes',
+                        title: tr(context, es: 'Lo próximo', en: 'Up next'),
+                        action: nextEvent == null ? tr(context, es: 'Crear plan', en: 'Create plan') : tr(context, es: 'Ver planes', en: 'View plans'),
                         onTap: nextEvent == null ? openCreateEvent : () => widget.onNavigateTab?.call(1),
                       ),
                       const SizedBox(height: 8),
                       if (nextEvent == null)
                         EmptySlim(
                           icon: Icons.event_available_rounded,
-                          title: 'Sin planes todavía',
-                          body: 'Crea un plan y el grupo podrá decir si va.',
+                          title: tr(context, es: 'Sin planes todavía', en: 'No plans yet'),
+                          body: tr(context, es: 'Crea un plan y el grupo podrá decir si va.', en: 'Create a plan and the group can say whether they are going.'),
                         )
                       else if (nextDayEvents.length > 1)
                         DashboardUpcomingEventsCard(events: nextDayEvents, group: group, onChanged: reload)
                       else
                         DashboardEventCard(event: nextEvent, group: group, onChanged: reload),
                       const SizedBox(height: 16),
-                      const SectionHeader(title: 'Últimos cambios'),
+                      SectionHeader(title: tr(context, es: 'Últimos cambios', en: 'Recent changes')),
                       const SizedBox(height: 8),
                       DashboardActivityCard(
                         events: events,
@@ -1260,28 +1260,28 @@ class GroupMoreTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
         children: [
-          PageHeader(title: 'Más', subtitle: 'Miembros, invitaciones y ajustes.', leading: false),
+          PageHeader(title: tr(context, es: 'Más', en: 'More'), subtitle: tr(context, es: 'Miembros, invitaciones y ajustes.', en: 'Members, invites and settings.'), leading: false),
           const SizedBox(height: 14),
           InviteAccessCard(groupName: name, code: code),
           const SizedBox(height: 14),
-          SectionHeader(title: 'Grupo'),
+          SectionHeader(title: tr(context, es: 'Grupo', en: 'Group')),
           const SizedBox(height: 8),
           SettingsRow(
             icon: Icons.groups_rounded,
-            title: 'Miembros y admins',
-            subtitle: 'Roles, admins y expulsiones seguras',
+            title: tr(context, es: 'Miembros y admins', en: 'Members and admins'),
+            subtitle: tr(context, es: 'Roles, admins y expulsiones seguras', en: 'Roles, admins and safe removals'),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group))),
           ),
           SettingsRow(
             icon: Icons.verified_user_rounded,
-            title: 'Permisos',
-            subtitle: 'Qué puede hacer cada rol',
+            title: tr(context, es: 'Permisos', en: 'Permissions'),
+            subtitle: tr(context, es: 'Qué puede hacer cada rol', en: 'What each role can do'),
             onTap: () => showPermissionSheet(context),
           ),
           SettingsRow(
             icon: Icons.settings_rounded,
-            title: 'Ajustes del grupo',
-            subtitle: 'Nombre, portada y acciones importantes',
+            title: tr(context, es: 'Ajustes del grupo', en: 'Group settings'),
+            subtitle: tr(context, es: 'Nombre, portada y acciones importantes', en: 'Name, cover and important actions'),
             onTap: () async {
               final result = await Navigator.of(context).push<dynamic>(MaterialPageRoute(builder: (_) => GroupSettingsScreen(group: group, onChanged: refresh)));
               if (result == 'deleted') {
@@ -1294,8 +1294,8 @@ class GroupMoreTab extends StatelessWidget {
           ),
           SettingsRow(
             icon: Icons.support_agent_rounded,
-            title: 'Reportar problema',
-            subtitle: 'Enviar una incidencia sobre este grupo',
+            title: tr(context, es: 'Reportar problema', en: 'Report a problem'),
+            subtitle: tr(context, es: 'Enviar una incidencia sobre este grupo', en: 'Send an issue about this group'),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SupportTicketScreen(group: group, screen: 'grupo'))),
           ),
           const SizedBox(height: 16),

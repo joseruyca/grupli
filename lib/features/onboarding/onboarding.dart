@@ -29,22 +29,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   static const slides = [
     _OnboardingSlideData(
       icon: Icons.groups_rounded,
-      title: 'Tu grupo,\nsiempre ordenado',
-      body: 'Crea espacios privados para coordinar planes, asistencia, gastos y competiciones sin perder información en chats.',
+      titleEs: 'Tu grupo,\nsiempre ordenado',
+      titleEn: 'Your group,\nalways organized',
+      bodyEs: 'Crea espacios privados para coordinar planes, asistencia, gastos y competiciones sin perder información en chats.',
+      bodyEn: 'Create private spaces to coordinate plans, attendance, expenses and competitions without losing information in chats.',
       accent: AppColors.teal,
       soft: AppColors.tealSoft,
     ),
     _OnboardingSlideData(
       icon: Icons.event_available_rounded,
-      title: 'Planes claros\ny asistencia rápida',
-      body: 'Cada evento muestra fecha, ubicación, quién va, quién duda y si falta gente. Confirmar solo lleva un toque.',
+      titleEs: 'Planes claros\ny asistencia rápida',
+      titleEn: 'Clear plans\nand quick attendance',
+      bodyEs: 'Cada evento muestra fecha, ubicación, quién va, quién duda y si falta gente. Confirmar solo lleva un toque.',
+      bodyEn: 'Every event shows date, location, who is going, who is unsure and whether more people are needed. Confirming takes one tap.',
       accent: AppColors.violet,
       soft: AppColors.violetSoft,
     ),
     _OnboardingSlideData(
       icon: Icons.emoji_events_rounded,
-      title: 'Gastos, ligas\ny torneos',
-      body: 'Registra gastos, liquida pagos pendientes y organiza ligas o torneos con calendario, resultados y clasificación.',
+      titleEs: 'Gastos, ligas\ny torneos',
+      titleEn: 'Expenses, leagues\nand tournaments',
+      bodyEs: 'Registra gastos, liquida pagos pendientes y organiza ligas o torneos con calendario, resultados y clasificación.',
+      bodyEn: 'Track expenses, settle pending payments and organize leagues or tournaments with calendar, results and standings.',
       accent: AppColors.orange,
       soft: AppColors.orangeSoft,
     ),
@@ -80,7 +86,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(width: 10),
           const Expanded(child: Text('Grupli', style: TextStyle(fontSize: 24, color: AppColors.ink, fontWeight: FontWeight.w900, letterSpacing: -.7))),
-          TextButton(onPressed: () => widget.onFinish(), child: const Text('Saltar', style: TextStyle(fontWeight: FontWeight.w900))),
+          TextButton(onPressed: () => widget.onFinish(), child: Text(appIsEnglish ? 'Skip' : 'Saltar', style: const TextStyle(fontWeight: FontWeight.w900))),
         ]),
         const SizedBox(height: 18),
         Expanded(
@@ -116,7 +122,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
               ),
               icon: Icon(last ? Icons.check_rounded : Icons.arrow_forward_rounded),
-              label: Text(last ? 'Empezar' : 'Siguiente', style: const TextStyle(fontWeight: FontWeight.w900)),
+              label: Text(last ? (appIsEnglish ? 'Start' : 'Empezar') : (appIsEnglish ? 'Next' : 'Siguiente'), style: const TextStyle(fontWeight: FontWeight.w900)),
             ),
           ),
         ]),
@@ -127,11 +133,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
 class _OnboardingSlideData {
   final IconData icon;
-  final String title;
-  final String body;
+  final String titleEs;
+  final String titleEn;
+  final String bodyEs;
+  final String bodyEn;
   final Color accent;
   final Color soft;
-  const _OnboardingSlideData({required this.icon, required this.title, required this.body, required this.accent, required this.soft});
+  const _OnboardingSlideData({
+    required this.icon,
+    required this.titleEs,
+    required this.titleEn,
+    required this.bodyEs,
+    required this.bodyEn,
+    required this.accent,
+    required this.soft,
+  });
+
+  String get title => appIsEnglish ? titleEn : titleEs;
+  String get body => appIsEnglish ? bodyEn : bodyEs;
 }
 
 
@@ -335,10 +354,10 @@ class _GroupPrivateScene extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(99)),
-                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
                         Icon(Icons.lock_rounded, color: AppColors.teal, size: 14),
                         SizedBox(width: 5),
-                        Text('Privado', style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 11)),
+                        Text(appIsEnglish ? 'Private' : 'Privado', style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900, fontSize: 11)),
                       ]),
                     ),
                   ),
@@ -346,15 +365,15 @@ class _GroupPrivateScene extends StatelessWidget {
               ]),
             ),
             const SizedBox(height: 12),
-            const Text('Los pingüino', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w900, height: 1)),
+            Text(appIsEnglish ? 'The Penguins' : 'Los pingüino', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w900, height: 1)),
             const SizedBox(height: 5),
-            const Text('Agenda, gastos y torneos del grupo', style: TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w700)),
+            Text(appIsEnglish ? 'Agenda, expenses and tournaments for the group' : 'Agenda, gastos y torneos del grupo', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w700)),
             const SizedBox(height: 14),
-            _SceneMiniTile(icon: Icons.calendar_month_rounded, color: AppColors.teal, title: 'Plan del viernes', subtitle: '4 van · 1 duda', progress: _pop(.25, .55)),
+            _SceneMiniTile(icon: Icons.calendar_month_rounded, color: AppColors.teal, title: appIsEnglish ? 'Friday plan' : 'Plan del viernes', subtitle: appIsEnglish ? '4 going · 1 unsure' : '4 van · 1 duda', progress: _pop(.25, .55)),
             const SizedBox(height: 8),
-            _SceneMiniTile(icon: Icons.account_balance_wallet_rounded, color: AppColors.green, title: 'Pago pendiente', subtitle: 'Liquidar € 2,50', progress: _pop(.35, .68)),
+            _SceneMiniTile(icon: Icons.account_balance_wallet_rounded, color: AppColors.green, title: appIsEnglish ? 'Pending payment' : 'Pago pendiente', subtitle: appIsEnglish ? 'Settle € 2.50' : 'Liquidar € 2,50', progress: _pop(.35, .68)),
             const SizedBox(height: 8),
-            _SceneMiniTile(icon: Icons.emoji_events_rounded, color: AppColors.red, title: 'Liga activa', subtitle: 'Jornada 2 lista', progress: _pop(.45, .78)),
+            _SceneMiniTile(icon: Icons.emoji_events_rounded, color: AppColors.red, title: appIsEnglish ? 'Active league' : 'Liga activa', subtitle: appIsEnglish ? 'Round 2 ready' : 'Jornada 2 lista', progress: _pop(.45, .78)),
           ]),
         ),
       ),
@@ -383,7 +402,7 @@ class _AgendaScene extends StatelessWidget {
           boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 24, offset: Offset(0, 14))],
         ),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Row(children: [
+          Row(children: [
             Icon(Icons.calendar_month_rounded, color: AppColors.teal, size: 19),
             SizedBox(width: 7),
             Text('Agenda', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
@@ -423,10 +442,10 @@ class _AgendaScene extends StatelessWidget {
                   Row(children: [
                     Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.location_on_outlined, color: AppColors.teal, size: 20)),
                     const SizedBox(width: 9),
-                    const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Partido del grupo', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(appIsEnglish ? 'Group match' : 'Partido del grupo', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
                       SizedBox(height: 2),
-                      Text('Vie 12 · 20:00', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+                      Text(appIsEnglish ? 'Fri 12 · 20:00' : 'Vie 12 · 20:00', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
                     ])),
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 280),
@@ -438,9 +457,9 @@ class _AgendaScene extends StatelessWidget {
                   ]),
                   const SizedBox(height: 12),
                   Row(children: [
-                    Expanded(child: _IntroAttendanceButton(label: 'Voy', color: AppColors.green, selected: confirmed || selected, pulse: pulse)),
+                    Expanded(child: _IntroAttendanceButton(label: appIsEnglish ? 'Going' : 'Voy', color: AppColors.green, selected: confirmed || selected, pulse: pulse)),
                     const SizedBox(width: 7),
-                    Expanded(child: _IntroAttendanceButton(label: 'Duda', color: AppColors.amber, selected: !confirmed && selected, pulse: 0)),
+                    Expanded(child: _IntroAttendanceButton(label: appIsEnglish ? 'Maybe' : 'Duda', color: AppColors.amber, selected: !confirmed && selected, pulse: 0)),
                     const SizedBox(width: 7),
                     Expanded(child: _IntroAttendanceButton(label: 'No', color: AppColors.red, selected: false, pulse: 0)),
                   ]),
@@ -485,15 +504,15 @@ class _FinanceTournamentScene extends StatelessWidget {
                   Container(width: 39, height: 39, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: Icon(paid ? Icons.verified_rounded : Icons.account_balance_wallet_rounded, color: AppColors.green)),
                   const SizedBox(width: 10),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(paid ? 'Pago liquidado' : 'Pago recomendado', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+                    Text(paid ? (appIsEnglish ? 'Payment settled' : 'Pago liquidado') : (appIsEnglish ? 'Recommended payment' : 'Pago recomendado'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
                     const SizedBox(height: 2),
-                    Text(paid ? 'Balance del grupo a cero' : 'Marta liquida € 2,50 a Javi', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+                    Text(paid ? (appIsEnglish ? 'Group balance at zero' : 'Balance del grupo a cero') : (appIsEnglish ? 'Marta settles € 2.50 with Javi' : 'Marta liquida € 2,50 a Javi'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
                   ])),
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 350),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                     decoration: BoxDecoration(color: paid ? AppColors.green : AppColors.teal, borderRadius: BorderRadius.circular(99)),
-                    child: Text(paid ? 'Listo' : 'Liquidar', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+                    child: Text(paid ? (appIsEnglish ? 'Done' : 'Listo') : (appIsEnglish ? 'Settle' : 'Liquidar'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
                   ),
                 ]),
               ),
@@ -508,19 +527,19 @@ class _FinanceTournamentScene extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(color: AppColors.orangeSoft, borderRadius: BorderRadius.circular(21)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Row(children: [
+                  Row(children: [
                     Icon(Icons.emoji_events_rounded, color: AppColors.orange, size: 20),
                     SizedBox(width: 7),
-                    Text('Liga del grupo', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+                    Text(appIsEnglish ? 'Group league' : 'Liga del grupo', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
                     Spacer(),
-                    Text('J2', style: TextStyle(color: AppColors.orange, fontWeight: FontWeight.w900)),
+                    Text(appIsEnglish ? 'R2' : 'J2', style: const TextStyle(color: AppColors.orange, fontWeight: FontWeight.w900)),
                   ]),
                   const SizedBox(height: 10),
-                  _MiniRankingRow(position: 1, name: tableStep ? 'Cuatro' : 'Dos', points: tableStep ? '6 pts' : '3 pts', active: true),
+                  _MiniRankingRow(position: 1, name: tableStep ? (appIsEnglish ? 'Four' : 'Cuatro') : (appIsEnglish ? 'Two' : 'Dos'), points: tableStep ? '6 pts' : '3 pts', active: true),
                   const SizedBox(height: 7),
-                  _MiniRankingRow(position: 2, name: tableStep ? 'Dos' : 'Cuatro', points: tableStep ? '3 pts' : '3 pts', active: false),
+                  _MiniRankingRow(position: 2, name: tableStep ? (appIsEnglish ? 'Two' : 'Dos') : (appIsEnglish ? 'Four' : 'Cuatro'), points: tableStep ? '3 pts' : '3 pts', active: false),
                   const SizedBox(height: 7),
-                  _MiniRankingRow(position: 3, name: 'Tres', points: '0 pts', active: false),
+                  _MiniRankingRow(position: 3, name: appIsEnglish ? 'Three' : 'Tres', points: '0 pts', active: false),
                 ]),
               ),
             ),

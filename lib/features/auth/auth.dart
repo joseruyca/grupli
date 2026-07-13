@@ -46,23 +46,23 @@ class WelcomeScreen extends StatelessWidget {
                 const SizedBox(height: 22),
                 const Text('grupli', style: TextStyle(fontSize: 45, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -1.5)),
                 const SizedBox(height: 10),
-                const Text('Organiza tu grupo.\nDisfruta más.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, height: 1.16, fontWeight: FontWeight.w800)),
+                Text(tr(context, es: 'Organiza tu grupo.\nDisfruta más.', en: 'Organize your group.\nEnjoy it more.'), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 18, height: 1.16, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 28),
-                SizedBox(width: double.infinity, child: WhiteButton(label: inviteCode == null ? 'Comenzar' : 'Crear cuenta y unirme', onTap: () => _openAuth(context, register: true))),
-                TextButton(onPressed: () => _openAuth(context, register: false), child: Text(inviteCode == null ? 'Iniciar sesión' : 'Ya tengo cuenta', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
+                SizedBox(width: double.infinity, child: WhiteButton(label: inviteCode == null ? tr(context, es: 'Comenzar', en: 'Get started') : tr(context, es: 'Crear cuenta y unirme', en: 'Create account and join'), onTap: () => _openAuth(context, register: true))),
+                TextButton(onPressed: () => _openAuth(context, register: false), child: Text(inviteCode == null ? tr(context, es: 'Iniciar sesión', en: 'Sign in') : tr(context, es: 'Ya tengo cuenta', en: 'I already have an account'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
               ],
             ),
           ),
           const SizedBox(height: 23),
-          Text('La app privada para coordinar grupos sin caos.', textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
+          Text(tr(context, es: 'La app privada para coordinar grupos sin caos.', en: 'The private app for coordinating groups without chaos.'), textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 10),
-          const Text('Eventos, calendario, finanzas y torneos en un único espacio cerrado.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted, fontSize: 15, height: 1.35)),
+          Text(tr(context, es: 'Eventos, calendario, finanzas y torneos en un único espacio cerrado.', en: 'Events, calendar, finances and tournaments in one private space.'), textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontSize: 15, height: 1.35)),
           if (inviteCode == null && onShowIntro != null) ...[
             const SizedBox(height: 12),
             TextButton.icon(
               onPressed: onShowIntro,
               icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
-              label: const Text('Ver introducción', style: TextStyle(fontWeight: FontWeight.w900)),
+              label: Text(tr(context, es: 'Ver introducción', en: 'View intro'), style: const TextStyle(fontWeight: FontWeight.w900)),
             ),
           ],
         ],
@@ -89,9 +89,9 @@ class InviteLandingBanner extends StatelessWidget {
         Container(width: 42, height: 42, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: const Icon(Icons.mark_email_unread_rounded, color: AppColors.teal)),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Te han invitado a un grupo', style: Theme.of(context).textTheme.titleMedium),
+          Text(tr(context, es: 'Te han invitado a un grupo', en: 'You have been invited to a group'), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 3),
-          Text('Código $code · inicia sesión y entraremos automáticamente.', style: Theme.of(context).textTheme.bodyMedium),
+          Text(tr(context, es: 'Código $code · inicia sesión y entraremos automáticamente.', en: 'Code $code · sign in and we will join automatically.'), style: Theme.of(context).textTheme.bodyMedium),
         ])),
       ]),
     );
@@ -122,7 +122,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> submit() async {
     if (email.text.trim().isEmpty || password.text.length < 6) {
-      await showToast(context, 'Introduce email y contraseña de al menos 6 caracteres.', danger: true);
+      await showToast(context, tr(context, es: 'Introduce email y contraseña de al menos 6 caracteres.', en: 'Enter an email and a password with at least 6 characters.'), danger: true);
       return;
     }
     setState(() => loading = true);
@@ -148,7 +148,7 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> resetPassword() async {
     final mail = email.text.trim();
     if (mail.isEmpty) {
-      await showToast(context, 'Introduce tu email y te enviaremos un enlace para cambiar la contraseña.', danger: true);
+      await showToast(context, tr(context, es: 'Introduce tu email y te enviaremos un enlace para cambiar la contraseña.', en: 'Enter your email and we will send you a password reset link.'), danger: true);
       return;
     }
     setState(() => loading = true);
@@ -158,7 +158,7 @@ class _AuthScreenState extends State<AuthScreen> {
         redirectTo: AppConfig.appBaseUrl,
       );
       if (!mounted) return;
-      await showToast(context, 'Te hemos enviado un enlace para cambiar la contraseña.');
+      await showToast(context, tr(context, es: 'Te hemos enviado un enlace para cambiar la contraseña.', en: 'We have sent you a password reset link.'));
     } catch (e) {
       if (!mounted) return;
       await showToast(context, humanError(e), danger: true);
@@ -183,20 +183,20 @@ class _AuthScreenState extends State<AuthScreen> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         RoundBackButton(onTap: () => Navigator.of(context).maybePop()),
         const SizedBox(height: 18),
-        Text(widget.register ? 'Crear cuenta' : '¡Bienvenido de nuevo!', style: Theme.of(context).textTheme.headlineMedium),
+        Text(widget.register ? tr(context, es: 'Crear cuenta', en: 'Create account') : tr(context, es: '¡Bienvenido de nuevo!', en: 'Welcome back!'), style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 4),
-        Text(widget.register ? 'Empieza a organizar tus grupos privados.' : 'Inicia sesión para continuar.', style: Theme.of(context).textTheme.bodyMedium),
+        Text(widget.register ? tr(context, es: 'Empieza a organizar tus grupos privados.', en: 'Start organizing your private groups.') : tr(context, es: 'Inicia sesión para continuar.', en: 'Sign in to continue.'), style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 24),
-        SocialButton(label: 'Continuar con Google', icon: 'G', onTap: () => oauth(OAuthProvider.google)),
+        SocialButton(label: tr(context, es: 'Continuar con Google', en: 'Continue with Google'), icon: 'G', onTap: () => oauth(OAuthProvider.google)),
         const SizedBox(height: 10),
-        SocialButton(label: 'Continuar con Apple', icon: '', onTap: () => oauth(OAuthProvider.apple)),
+        SocialButton(label: tr(context, es: 'Continuar con Apple', en: 'Continue with Apple'), icon: '', onTap: () => oauth(OAuthProvider.apple)),
         const SizedBox(height: 24),
         const OrDivider(),
         const SizedBox(height: 22),
-        FieldLabel('Correo electrónico'),
-        TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(prefixIcon: Icon(Icons.mail_outline_rounded), hintText: 'tu@email.com')),
+        FieldLabel(tr(context, es: 'Correo electrónico', en: 'Email')),
+        TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: InputDecoration(prefixIcon: const Icon(Icons.mail_outline_rounded), hintText: tr(context, es: 'tu@email.com', en: 'you@email.com'))),
         const SizedBox(height: 15),
-        FieldLabel('Contraseña'),
+        FieldLabel(tr(context, es: 'Contraseña', en: 'Password')),
         TextField(
           controller: password,
           obscureText: hidden,
@@ -207,15 +207,15 @@ class _AuthScreenState extends State<AuthScreen> {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: loading ? null : resetPassword,
-              child: const Text('¿Olvidaste tu contraseña?'),
+              child: Text(tr(context, es: '¿Olvidaste tu contraseña?', en: 'Forgot your password?')),
             ),
           ),
         const SizedBox(height: 16),
-        PrimaryButton(label: widget.register ? 'Crear cuenta' : 'Iniciar sesión', icon: widget.register ? Icons.person_add_alt_1_rounded : Icons.login_rounded, loading: loading, onTap: submit),
+        PrimaryButton(label: widget.register ? tr(context, es: 'Crear cuenta', en: 'Create account') : tr(context, es: 'Iniciar sesión', en: 'Sign in'), icon: widget.register ? Icons.person_add_alt_1_rounded : Icons.login_rounded, loading: loading, onTap: submit),
         const SizedBox(height: 22),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text(widget.register ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?', style: Theme.of(context).textTheme.bodyMedium),
-          TextButton(onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => AuthScreen(register: !widget.register, inviteCode: widget.inviteCode))), child: Text(widget.register ? 'Inicia sesión' : 'Regístrate')),
+          Text(widget.register ? tr(context, es: '¿Ya tienes cuenta?', en: 'Already have an account?') : tr(context, es: '¿No tienes cuenta?', en: 'Don’t have an account?'), style: Theme.of(context).textTheme.bodyMedium),
+          TextButton(onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => AuthScreen(register: !widget.register, inviteCode: widget.inviteCode))), child: Text(widget.register ? tr(context, es: 'Inicia sesión', en: 'Sign in') : tr(context, es: 'Regístrate', en: 'Sign up'))),
         ]),
       ]),
     );
@@ -404,7 +404,7 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.fromLTRB(22, 24, 22, 28),
         children: [
           Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-            Expanded(child: PageHeader(title: 'Mis grupos', subtitle: 'Hola, $name. Aquí tienes tus grupos y planes.')),
+            Expanded(child: PageHeader(title: tr(context, es: 'Mis grupos', en: 'My groups'), subtitle: tr(context, es: 'Hola, $name. Aquí tienes tus grupos y planes.', en: 'Hi, $name. Here are your groups and plans.'))),
             const SizedBox(width: 12),
             CircleIconButton(icon: Icons.add_rounded, filled: true, onTap: _openCreateJoin),
           ]),
@@ -417,17 +417,17 @@ class _HomeScreenState extends State<HomeScreen> {
               final groups = snapshot.data ?? [];
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  Text('Tus grupos', style: Theme.of(context).textTheme.titleLarge),
+                  Text(tr(context, es: 'Tus grupos', en: 'Your groups'), style: Theme.of(context).textTheme.titleLarge),
                   const Spacer(),
-                  TextButton(onPressed: reload, child: const Text('Actualizar')),
+                  TextButton(onPressed: reload, child: Text(tr(context, es: 'Actualizar', en: 'Refresh'))),
                 ]),
                 const SizedBox(height: 10),
                 if (groups.isEmpty) ...[
-                  EmptyBlock(icon: Icons.groups_rounded, title: 'Aún no tienes grupos', body: 'Crea tu primer grupo o entra con un código.'),
+                  EmptyBlock(icon: Icons.groups_rounded, title: tr(context, es: 'Aún no tienes grupos', en: 'You do not have any groups yet'), body: tr(context, es: 'Crea tu primer grupo o entra con un código.', en: 'Create your first group or join with a code.')),
                   const SizedBox(height: 14),
-                  PrimaryButton(label: 'Crear grupo', icon: Icons.add_rounded, onTap: _openCreateGroup),
+                  PrimaryButton(label: tr(context, es: 'Crear grupo', en: 'Create group'), icon: Icons.add_rounded, onTap: _openCreateGroup),
                   const SizedBox(height: 10),
-                  SecondaryButton(label: 'Unirme con código', icon: Icons.qr_code_rounded, onTap: _openJoinGroup),
+                  SecondaryButton(label: tr(context, es: 'Unirme con código', en: 'Join with code'), icon: Icons.qr_code_rounded, onTap: _openJoinGroup),
                 ] else ...[
                   ...groups.map((g) => GroupHomeCard(group: g, onTap: () async {
                     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupShell(groupId: g['id'].toString())));
@@ -436,8 +436,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 14),
                   ChoiceBigCard(
                     icon: Icons.add_circle_outline_rounded,
-                    title: 'Crear o unirme a un grupo',
-                    body: 'Crea uno nuevo o entra con un código.',
+                    title: tr(context, es: 'Crear o unirme a un grupo', en: 'Create or join a group'),
+                    body: tr(context, es: 'Crea uno nuevo o entra con un código.', en: 'Create a new one or join with a code.'),
                     onTap: _openCreateJoin,
                   ),
                 ],

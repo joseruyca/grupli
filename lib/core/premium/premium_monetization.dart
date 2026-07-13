@@ -91,7 +91,7 @@ class DisabledPremiumBillingProvider extends PremiumBillingProvider {
   String get id => 'disabled';
 
   @override
-  String get label => 'Billing desactivado';
+  String get label => appIsEnglish ? 'Billing disabled' : 'Billing desactivado';
 
   @override
   PremiumBillingChannel get channel => PremiumBillingChannel.disabled;
@@ -114,7 +114,7 @@ class DisabledPremiumBillingProvider extends PremiumBillingProvider {
   }) async {
     return PremiumPurchaseResult.failure(
       providerId: id,
-      message: 'Las compras todavía no están activas.',
+      message: appIsEnglish ? 'Purchases are not active yet.' : 'Las compras todavía no están activas.',
     );
   }
 
@@ -124,7 +124,7 @@ class DisabledPremiumBillingProvider extends PremiumBillingProvider {
   }) async {
     return PremiumPurchaseResult.failure(
       providerId: id,
-      message: 'No hay compras activas para restaurar todavía.',
+      message: appIsEnglish ? 'There are no active purchases to restore yet.' : 'No hay compras activas para restaurar todavía.',
     );
   }
 }
@@ -135,53 +135,53 @@ class GrupliMonetizationBlueprint {
   static const bool adsUseRemoteOverride = true;
   static const bool adsSoftLaunch = false;
 
-  static const List<String> mobileBillingRoutes = [
-    'iOS: App Store',
-    'Android: Google Play',
+  static List<String> get mobileBillingRoutes => [
+    appIsEnglish ? 'iOS: App Store' : 'iOS: App Store',
+    appIsEnglish ? 'Android: Google Play' : 'Android: Google Play',
   ];
 
-  static const List<String> webBillingRoutes = [
-    'Web futura: Stripe',
+  static List<String> get webBillingRoutes => [
+    appIsEnglish ? 'Future web: Stripe' : 'Web futura: Stripe',
   ];
 
-  static const List<PremiumAdPlacement> adPlacements = [
+  static List<PremiumAdPlacement> get adPlacements => [
     PremiumAdPlacement(
-      screen: 'Inicio del grupo',
-      placement: 'Debajo del hero del grupo',
-      behavior: 'Banner nativo muy discreto cuando el usuario ya ha visto el contenido principal.',
+      screen: appIsEnglish ? 'Group home' : 'Inicio del grupo',
+      placement: appIsEnglish ? 'Below the group hero' : 'Debajo del hero del grupo',
+      behavior: appIsEnglish ? 'Very discreet native banner after the user has seen the main content.' : 'Banner nativo muy discreto cuando el usuario ya ha visto el contenido principal.',
     ),
     PremiumAdPlacement(
-      screen: 'Inicio del grupo',
-      placement: 'Al final de bloques largos',
-      behavior: 'Solo como cierre, nunca por encima de acciones importantes.',
+      screen: appIsEnglish ? 'Group home' : 'Inicio del grupo',
+      placement: appIsEnglish ? 'At the end of long sections' : 'Al final de bloques largos',
+      behavior: appIsEnglish ? 'Only as a closing element, never above important actions.' : 'Solo como cierre, nunca por encima de acciones importantes.',
     ),
     PremiumAdPlacement(
-      screen: 'Agenda',
-      placement: 'Después de la lista de próximos eventos',
-      behavior: 'No interrumpe crear o editar eventos.',
+      screen: appIsEnglish ? 'Agenda' : 'Agenda',
+      placement: appIsEnglish ? 'After the upcoming events list' : 'Después de la lista de próximos eventos',
+      behavior: appIsEnglish ? 'Does not interrupt creating or editing events.' : 'No interrumpe crear o editar eventos.',
     ),
     PremiumAdPlacement(
-      screen: 'Torneos',
-      placement: 'Tras el listado de torneos o resultados',
-      behavior: 'Nunca dentro del flujo de crear torneo, registrar marcador o cerrar ronda.',
+      screen: appIsEnglish ? 'Tournaments' : 'Torneos',
+      placement: appIsEnglish ? 'After the tournaments or results list' : 'Tras el listado de torneos o resultados',
+      behavior: appIsEnglish ? 'Never inside the flow to create a tournament, record a score or close a round.' : 'Nunca dentro del flujo de crear torneo, registrar marcador o cerrar ronda.',
     ),
     PremiumAdPlacement(
-      screen: 'Finanzas',
-      placement: 'Después del resumen y al final del historial',
-      behavior: 'No aparece dentro de liquidar gastos ni del cálculo de saldos.',
+      screen: appIsEnglish ? 'Finances' : 'Finanzas',
+      placement: appIsEnglish ? 'After the summary and at the end of the history' : 'Después del resumen y al final del historial',
+      behavior: appIsEnglish ? 'Does not appear inside expense settlement or balance calculations.' : 'No aparece dentro de liquidar gastos ni del cálculo de saldos.',
     ),
     PremiumAdPlacement(
-      screen: 'Perfil',
-      placement: 'En tarjetas informativas o vacíos de contenido',
-      behavior: 'Solo como apoyo visual, sin bloquear ajustes ni permisos.',
+      screen: appIsEnglish ? 'Profile' : 'Perfil',
+      placement: appIsEnglish ? 'In info cards or empty states' : 'En tarjetas informativas o vacíos de contenido',
+      behavior: appIsEnglish ? 'Only as visual support, without blocking settings or permissions.' : 'Solo como apoyo visual, sin bloquear ajustes ni permisos.',
     ),
   ];
 
-  static const List<String> blockedScreens = [
-    'Crear torneo',
-    'Registrar resultado',
-    'Liquidar gastos',
-    'Pantalla de compra',
+  static List<String> get blockedScreens => [
+    appIsEnglish ? 'Create tournament' : 'Crear torneo',
+    appIsEnglish ? 'Record result' : 'Registrar resultado',
+    appIsEnglish ? 'Settle expenses' : 'Liquidar gastos',
+    appIsEnglish ? 'Purchase screen' : 'Pantalla de compra',
   ];
 
   static const Map<String, bool> screenAdFlags = {
@@ -196,11 +196,11 @@ class GrupliMonetizationBlueprint {
     'liquidar_gastos': false,
   };
 
-  static const List<String> monetizationRules = [
-    'Una sola suscripción por grupo.',
-    'Premium quita anuncios en toda la app.',
-    'La versión gratis sigue siendo completa.',
-    'El backend decide el acceso, no la UI.',
+  static List<String> get monetizationRules => [
+    appIsEnglish ? 'One subscription per group.' : 'Una sola suscripción por grupo.',
+    appIsEnglish ? 'Premium removes ads across the whole app.' : 'Premium quita anuncios en toda la app.',
+    appIsEnglish ? 'The free version stays fully usable.' : 'La versión gratis sigue siendo completa.',
+    appIsEnglish ? 'The backend decides access, not the UI.' : 'El backend decide el acceso, no la UI.',
   ];
 
   static const PremiumBillingProvider disabledProvider = DisabledPremiumBillingProvider();
@@ -225,15 +225,15 @@ class GrupliMonetizationBlueprint {
 
   static String _normalizeScreenKey(String value) {
     final normalized = value.trim().toLowerCase();
-    if (normalized == 'inicio del grupo') return 'inicio_grupo';
+    if (normalized == 'inicio del grupo' || normalized == 'group home') return 'inicio_grupo';
     if (normalized == 'agenda') return 'agenda';
-    if (normalized == 'torneos') return 'torneos';
-    if (normalized == 'finanzas') return 'finanzas';
-    if (normalized == 'perfil') return 'perfil';
-    if (normalized == 'crear torneo') return 'crear_torneo';
-    if (normalized == 'registrar resultado') return 'registrar_resultado';
-    if (normalized == 'liquidar gastos') return 'liquidar_gastos';
-    if (normalized == 'pantalla de compra') return 'compra';
+    if (normalized == 'torneos' || normalized == 'tournaments') return 'torneos';
+    if (normalized == 'finanzas' || normalized == 'finances') return 'finanzas';
+    if (normalized == 'perfil' || normalized == 'profile') return 'perfil';
+    if (normalized == 'crear torneo' || normalized == 'create tournament') return 'crear_torneo';
+    if (normalized == 'registrar resultado' || normalized == 'record result') return 'registrar_resultado';
+    if (normalized == 'liquidar gastos' || normalized == 'settle expenses') return 'liquidar_gastos';
+    if (normalized == 'pantalla de compra' || normalized == 'purchase screen') return 'compra';
     return normalized.replaceAll(' ', '_');
   }
 
@@ -244,23 +244,23 @@ class GrupliMonetizationBlueprint {
   static String _screenLabelForKey(String key) {
     switch (key) {
       case 'inicio_grupo':
-        return 'Inicio del grupo';
+        return appIsEnglish ? 'Group home' : 'Inicio del grupo';
       case 'agenda':
-        return 'Agenda';
+        return appIsEnglish ? 'Agenda' : 'Agenda';
       case 'torneos':
-        return 'Torneos';
+        return appIsEnglish ? 'Tournaments' : 'Torneos';
       case 'finanzas':
-        return 'Finanzas';
+        return appIsEnglish ? 'Finances' : 'Finanzas';
       case 'perfil':
-        return 'Perfil';
+        return appIsEnglish ? 'Profile' : 'Perfil';
       case 'crear_torneo':
-        return 'Crear torneo';
+        return appIsEnglish ? 'Create tournament' : 'Crear torneo';
       case 'registrar_resultado':
-        return 'Registrar resultado';
+        return appIsEnglish ? 'Record result' : 'Registrar resultado';
       case 'liquidar_gastos':
-        return 'Liquidar gastos';
+        return appIsEnglish ? 'Settle expenses' : 'Liquidar gastos';
       case 'compra':
-        return 'Pantalla de compra';
+        return appIsEnglish ? 'Purchase screen' : 'Pantalla de compra';
       default:
         return key.replaceAll('_', ' ');
     }

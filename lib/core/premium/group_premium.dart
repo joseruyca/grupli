@@ -67,7 +67,9 @@ class GroupPremiumEntitlement {
     return active && (enabledFeatures.isEmpty || enabledFeatures.contains(featureKey));
   }
 
-  String get label => active ? 'Premium activo' : 'Plan gratis';
+  String get label => active
+      ? (appIsEnglish ? 'Premium active' : 'Premium activo')
+      : (appIsEnglish ? 'Free plan' : 'Plan gratis');
 }
 
 class GrupliPremium {
@@ -103,29 +105,29 @@ class GrupliPremium {
     return GrupliMonetizationBlueprint.placementsForScreen(screenKey);
   }
 
-  static const List<PremiumFeatureDefinition> features = [
+  static List<PremiumFeatureDefinition> get features => [
     PremiumFeatureDefinition(
       key: 'unlimited_active_tournaments',
-      title: 'Torneos activos ilimitados',
-      description: 'Para grupos que organizan varias competiciones a la vez.',
+      title: appIsEnglish ? 'Unlimited active tournaments' : 'Torneos activos ilimitados',
+      description: appIsEnglish ? 'For groups running several competitions at the same time.' : 'Para grupos que organizan varias competiciones a la vez.',
       icon: Icons.all_inclusive_rounded,
     ),
     PremiumFeatureDefinition(
       key: 'advanced_americano',
-      title: 'Americano avanzado',
-      description: 'Rotaciones inteligentes, descansos equilibrados y menos repeticiones.',
+      title: appIsEnglish ? 'Advanced americano' : 'Americano avanzado',
+      description: appIsEnglish ? 'Smart rotations, balanced breaks and fewer repeats.' : 'Rotaciones inteligentes, descansos equilibrados y menos repeticiones.',
       icon: Icons.shuffle_rounded,
     ),
     PremiumFeatureDefinition(
       key: 'smart_multi_courts',
-      title: 'Múltiples pistas inteligentes',
-      description: 'Reparte partidos por pista, mesa o campo de forma automática.',
+      title: appIsEnglish ? 'Smart multiple courts' : 'Múltiples pistas inteligentes',
+      description: appIsEnglish ? 'Distribute matches across courts, tables or fields automatically.' : 'Reparte partidos por pista, mesa o campo de forma automática.',
       icon: Icons.grid_view_rounded,
     ),
     PremiumFeatureDefinition(
       key: 'advanced_calendar',
-      title: 'Calendario automático avanzado',
-      description: 'Genera jornadas, detecta conflictos y reorganiza fechas.',
+      title: appIsEnglish ? 'Advanced auto calendar' : 'Calendario automático avanzado',
+      description: appIsEnglish ? 'Generates rounds, detects conflicts and reshuffles dates.' : 'Genera jornadas, detecta conflictos y reorganiza fechas.',
       icon: Icons.auto_awesome_rounded,
     ),
     PremiumFeatureDefinition(
@@ -154,14 +156,14 @@ class GrupliPremium {
     ),
     PremiumFeatureDefinition(
       key: 'finance_insights',
-      title: 'Finanzas avanzadas',
-      description: 'Análisis más profundo, contexto de gastos y lectura rápida del balance.',
+      title: appIsEnglish ? 'Advanced finances' : 'Finanzas avanzadas',
+      description: appIsEnglish ? 'Deeper analysis, expense context and a faster view of the balance.' : 'Análisis más profundo, contexto de gastos y lectura rápida del balance.',
       icon: Icons.insights_rounded,
     ),
     PremiumFeatureDefinition(
       key: 'ad_free',
-      title: 'Sin anuncios',
-      description: 'Quita la publicidad de toda la app para una experiencia más limpia.',
+      title: appIsEnglish ? 'No ads' : 'Sin anuncios',
+      description: appIsEnglish ? 'Remove ads from the whole app for a cleaner experience.' : 'Quita la publicidad de toda la app para una experiencia más limpia.',
       icon: Icons.do_not_disturb_rounded,
     ),
     PremiumFeatureDefinition(
@@ -202,15 +204,15 @@ class GrupliPremium {
     ),
   ];
 
-  static const List<String> freeTournamentPrinciples = [
-    'Grupos grandes gratis',
-    'Participantes amplios gratis',
-    'Liga, eliminatoria, manual y americano básico',
-    'Resultados por deporte',
-    'Clasificación básica',
-    'Tercer puesto incluido',
-    'Editar partidos uno a uno',
-    'Añadir partidos a Agenda',
+  static List<String> get freeTournamentPrinciples => [
+    appIsEnglish ? 'Large groups stay free' : 'Grupos grandes gratis',
+    appIsEnglish ? 'Wide participant counts stay free' : 'Participantes amplios gratis',
+    appIsEnglish ? 'League, knockout, manual and basic americano' : 'Liga, eliminatoria, manual y americano básico',
+    appIsEnglish ? 'Results by sport' : 'Resultados por deporte',
+    appIsEnglish ? 'Basic standings' : 'Clasificación básica',
+    appIsEnglish ? 'Third place included' : 'Tercer puesto incluido',
+    appIsEnglish ? 'Edit matches one by one' : 'Editar partidos uno a uno',
+    appIsEnglish ? 'Add matches to Agenda' : 'Añadir partidos a Agenda',
   ];
 
   static Set<String> get featureKeys => features.map((feature) => feature.key).toSet();
@@ -222,8 +224,8 @@ class GrupliPremium {
       (item) => item.key == key,
       orElse: () => PremiumFeatureDefinition(
         key: key,
-        title: 'Función Premium',
-        description: 'Herramienta avanzada para grupos que usan mucho Grupli.',
+        title: appIsEnglish ? 'Premium feature' : 'Función Premium',
+        description: appIsEnglish ? 'Advanced tool for groups that use Grupli a lot.' : 'Herramienta avanzada para grupos que usan mucho Grupli.',
         icon: Icons.workspace_premium_rounded,
       ),
     );
@@ -257,7 +259,7 @@ Future<bool> showPremiumFeatureGate(
               Container(width: 46, height: 46, decoration: BoxDecoration(color: AppColors.orangeSoft, borderRadius: BorderRadius.circular(16)), child: Icon(feature.icon, color: AppColors.orange)),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Incluido en Grupli Premium', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
+                Text(appIsEnglish ? 'Included in Grupli Premium' : 'Incluido en Grupli Premium', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
                 const SizedBox(height: 4),
                 Text(feature.title, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
               ])),
@@ -265,12 +267,12 @@ Future<bool> showPremiumFeatureGate(
             const SizedBox(height: 12),
             Text(feature.description, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, height: 1.3)),
             const SizedBox(height: 10),
-            const Text('Los pagos aún no están activos. Esta pantalla deja preparada la experiencia para activar Premium por grupo más adelante, y Premium también quitará anuncios de la app.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+            Text(appIsEnglish ? 'Billing is not live yet. This screen prepares the experience for enabling Premium per group later, and Premium will also remove ads from the app.' : 'Los pagos aún no están activos. Esta pantalla deja preparada la experiencia para activar Premium por grupo más adelante, y Premium también quitará anuncios de la app.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
             const SizedBox(height: 14),
             Row(children: [
-              Expanded(child: SecondaryButton(label: 'Ahora no', icon: Icons.close_rounded, onTap: () => Navigator.pop(sheetContext, false))),
+              Expanded(child: SecondaryButton(label: appIsEnglish ? 'Not now' : 'Ahora no', icon: Icons.close_rounded, onTap: () => Navigator.pop(sheetContext, false))),
               const SizedBox(width: 10),
-              Expanded(child: PrimaryButton(label: 'Ver Premium', icon: Icons.workspace_premium_rounded, onTap: () {
+              Expanded(child: PrimaryButton(label: appIsEnglish ? 'See Premium' : 'Ver Premium', icon: Icons.workspace_premium_rounded, onTap: () {
                 Navigator.pop(sheetContext, false);
                 Navigator.of(context).push(MaterialPageRoute(builder: (_) => PremiumGroupScreen(group: group)));
               })),

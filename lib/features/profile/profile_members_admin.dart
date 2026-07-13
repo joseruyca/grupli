@@ -49,11 +49,11 @@ class _MembersScreenState extends State<MembersScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Expulsar a $name'),
-        content: const Text('Esta persona perderá acceso al grupo. Podrá volver si recibe una nueva invitación.'),
+        title: Text(tr(context, es: 'Expulsar a $name', en: 'Remove $name')),
+        content: Text(tr(context, es: 'Esta persona perderá acceso al grupo. Podrá volver si recibe una nueva invitación.', en: 'This person will lose access to the group. They can come back if they get a new invite.')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Expulsar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(tr(context, es: 'Expulsar', en: 'Remove'))),
         ],
       ),
     );
@@ -61,7 +61,7 @@ class _MembersScreenState extends State<MembersScreen> {
     try {
       await AppData.removeMember(member['id'].toString());
       reload();
-      if (mounted) await showToast(context, '$name ya no está en el grupo.');
+      if (mounted) await showToast(context, tr(context, es: '$name ya no está en el grupo.', en: '$name is no longer in the group.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -69,17 +69,17 @@ class _MembersScreenState extends State<MembersScreen> {
 
   Future<void> _leaveGroup(String groupName, bool isOwner) async {
     if (isOwner) {
-      await showToast(context, 'El owner no puede salir sin transferir o eliminar el grupo.', danger: true);
+      await showToast(context, tr(context, es: 'El owner no puede salir sin transferir o eliminar el grupo.', en: 'The owner cannot leave without transferring or deleting the group.'), danger: true);
       return;
     }
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Salir del grupo'),
-        content: Text('Vas a salir de $groupName. Para volver necesitarás una invitación.'),
+        title: Text(tr(context, es: 'Salir del grupo', en: 'Leave group')),
+        content: Text(tr(context, es: 'Vas a salir de $groupName. Para volver necesitarás una invitación.', en: 'You are about to leave $groupName. You will need an invite to come back.')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Salir')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(tr(context, es: 'Salir', en: 'Leave'))),
         ],
       ),
     );
@@ -88,7 +88,7 @@ class _MembersScreenState extends State<MembersScreen> {
       await AppData.leaveGroup(widget.group['id'].toString());
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
-      await showToast(context, 'Has salido del grupo.');
+      await showToast(context, tr(context, es: 'Has salido del grupo.', en: 'You have left the group.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -100,14 +100,14 @@ class _MembersScreenState extends State<MembersScreen> {
     final code = AppData.text(widget.group['invite_code'], '------');
     return DirectPage(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        PageHeader(title: 'Miembros', subtitle: 'Personas, roles y permisos del grupo.', leading: true),
+        PageHeader(title: tr(context, es: 'Miembros', en: 'Members'), subtitle: tr(context, es: 'Personas, roles y permisos del grupo.', en: 'People, roles and group permissions.'), leading: true),
         const SizedBox(height: 14),
         InviteAccessCard(groupName: groupName, code: code, compact: false),
         const SizedBox(height: 14),
         FutureBuilder<List<Map<String, dynamic>>>(
           future: future,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) return const CenterLoader(label: 'Cargando miembros...');
+            if (snapshot.connectionState == ConnectionState.waiting) return CenterLoader(label: tr(context, es: 'Cargando miembros...', en: 'Loading members...'));
             if (snapshot.hasError) return ErrorBlock(message: humanError(snapshot.error), onRetry: reload);
             final members = snapshot.data ?? [];
             final admins = members.where((m) => ['owner', 'admin'].contains(AppData.text(m['role']))).toList();
@@ -121,7 +121,7 @@ class _MembersScreenState extends State<MembersScreen> {
                 const SizedBox(width: 10),
                 Expanded(child: StatCard(icon: Icons.admin_panel_settings_rounded, value: admins.length.toString(), label: 'Admins', color: AppColors.violet)),
                 const SizedBox(width: 10),
-                Expanded(child: StatCard(icon: Icons.person_outline_rounded, value: regular.length.toString(), label: 'Miembros', color: AppColors.orange)),
+                Expanded(child: StatCard(icon: Icons.person_outline_rounded, value: regular.length.toString(), label: tr(context, es: 'Miembros', en: 'Members'), color: AppColors.orange)),
               ]),
               const SizedBox(height: 16),
               RoleInfoCard(role: myRole),
@@ -130,10 +130,10 @@ class _MembersScreenState extends State<MembersScreen> {
               const SizedBox(height: 8),
               ...admins.map((m) => ManageMemberCard(member: m, canManage: canManage, onRole: _changeRole, onRemove: _remove)),
               const SizedBox(height: 16),
-              SectionHeader(title: 'Miembros'),
+              SectionHeader(title: tr(context, es: 'Miembros', en: 'Members')),
               const SizedBox(height: 8),
               if (regular.isEmpty)
-                EmptySlim(icon: Icons.person_add_alt_1_rounded, title: 'Aún no hay miembros normales', body: 'Invita a tu grupo con el código cuando esté listo.')
+                  EmptySlim(icon: Icons.person_add_alt_1_rounded, title: tr(context, es: 'Aún no hay miembros normales', en: 'There are no regular members yet'), body: tr(context, es: 'Invita a tu grupo con el código cuando esté listo.', en: 'Invite people with the code when it is ready.'))
               else
                 ...regular.map((m) => ManageMemberCard(member: m, canManage: canManage, onRole: _changeRole, onRemove: _remove)),
               const SizedBox(height: 16),
@@ -145,12 +145,12 @@ class _MembersScreenState extends State<MembersScreen> {
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: const [
                     Icon(Icons.shield_rounded, color: AppColors.teal),
                     SizedBox(width: 10),
-                    Expanded(child: Text('Eres owner del grupo. Puedes gestionar miembros y eliminar el grupo desde Ajustes.', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.3))),
+                    Expanded(child: Text(tr(context, es: 'Eres owner del grupo. Puedes gestionar miembros y eliminar el grupo desde Ajustes.', en: 'You are the group owner. You can manage members and delete the group from Settings.'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.3))),
                   ]),
                 )
               else
                 DangerButton(
-                  label: 'Salir del grupo',
+                  label: tr(context, es: 'Salir del grupo', en: 'Leave group'),
                   icon: Icons.logout_rounded,
                   onTap: () => _leaveGroup(groupName, isOwner),
                 ),
@@ -231,7 +231,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         group['rules'] = rulesController.text.trim();
       });
       widget.onChanged?.call();
-      await showToast(context, 'Grupo actualizado.');
+      await showToast(context, tr(context, es: 'Grupo actualizado.', en: 'Group updated.'));
     } catch (e) {
       if (!mounted) return;
       await showToast(context, humanError(e), danger: true);
@@ -291,7 +291,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     final confirm = await showConfirmDialog(
       context,
       title: 'Regenerar código',
-      message: 'El código anterior dejará de servir para nuevas invitaciones. Los miembros actuales seguirán dentro.',
+      message: tr(context, es: 'El código anterior dejará de servir para nuevas invitaciones. Los miembros actuales seguirán dentro.', en: 'The previous code will stop working for new invites. Current members will stay in the group.'),
       confirm: 'Regenerar',
       danger: true,
     );
@@ -322,22 +322,22 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Eliminar grupo'),
+        title: Text(tr(context, es: 'Eliminar grupo', en: 'Delete group')),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Vas a eliminar "${AppData.text(group['name'], 'este grupo')}".'),
           const SizedBox(height: 10),
-          const Text('Se eliminarán sus miembros, eventos, asistencias, gastos, liquidaciones, torneos y notificaciones relacionadas.'),
+          Text(tr(context, es: 'Se eliminarán sus miembros, eventos, asistencias, gastos, liquidaciones, torneos y notificaciones relacionadas.', en: 'Its members, events, attendance, expenses, settlements, tournaments and related notifications will be deleted.')),
           const SizedBox(height: 14),
-          const Text('Escribe ELIMINAR GRUPO para confirmar.', style: TextStyle(fontWeight: FontWeight.w900)),
+          Text(tr(context, es: 'Escribe ELIMINAR GRUPO para confirmar.', en: 'Type DELETE GROUP to confirm.'), style: const TextStyle(fontWeight: FontWeight.w900)),
           const SizedBox(height: 8),
-          TextField(controller: controller, textCapitalization: TextCapitalization.characters, decoration: const InputDecoration(hintText: 'ELIMINAR GRUPO')),
+          TextField(controller: controller, textCapitalization: TextCapitalization.characters, decoration: InputDecoration(hintText: appIsEnglish ? 'DELETE GROUP' : 'ELIMINAR GRUPO')),
         ]),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.red),
             onPressed: () => Navigator.pop(context, controller.text.trim().toUpperCase() == 'ELIMINAR GRUPO'),
-            child: const Text('Eliminar'),
+            child: Text(tr(context, es: 'Eliminar', en: 'Delete')),
           ),
         ],
       ),
@@ -345,7 +345,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     final typed = controller.text;
     controller.dispose();
     if (confirmed != true) {
-      if (typed.trim().isNotEmpty && mounted) await showToast(context, 'Escribe ELIMINAR GRUPO exactamente para eliminarlo.', danger: true);
+      if (typed.trim().isNotEmpty && mounted) await showToast(context, tr(context, es: 'Escribe ELIMINAR GRUPO exactamente para eliminarlo.', en: 'Type DELETE GROUP exactly to delete it.'), danger: true);
       return;
     }
 
@@ -353,7 +353,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       await AppData.deleteGroup(group['id'].toString(), 'ELIMINAR GRUPO');
       widget.onChanged?.call();
       if (!mounted) return;
-      await showToast(context, 'Grupo eliminado.');
+      await showToast(context, tr(context, es: 'Grupo eliminado.', en: 'Group deleted.'));
       if (mounted) Navigator.of(context).pop('deleted');
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
@@ -364,7 +364,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     final name = AppData.text(group['name'], 'Grupo');
     final code = AppData.text(group['invite_code'], '------');
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: 'Ajustes del grupo', subtitle: 'Identidad, invitaciones y permisos de $name', leading: true),
+      PageHeader(title: tr(context, es: 'Ajustes del grupo', en: 'Group settings'), subtitle: tr(context, es: 'Identidad, invitaciones y permisos de $name', en: 'Identity, invites and permissions for $name'), leading: true),
       const SizedBox(height: 16),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -385,14 +385,14 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         const SizedBox(height: 12),
         StatusNotice(
           icon: Icons.tune_rounded,
-          title: 'Idioma y moneda',
+          title: tr(context, es: 'Idioma y moneda', en: 'Language and currency'),
           body: 'Por ahora Grupli trabaja en español y euros. Estos ajustes se activarán cuando estén cerrados en toda la app.',
         ),
         const SizedBox(height: 12),
         FieldLabel('Zona horaria'),
         TextField(controller: timezoneController, decoration: const InputDecoration(prefixIcon: Icon(Icons.schedule_rounded), hintText: 'Europe/Madrid')),
         const SizedBox(height: 12),
-        PrimaryButton(label: savingInfo ? 'Guardando...' : 'Guardar cambios', icon: Icons.save_rounded, loading: savingInfo, onTap: saveInfo),
+        PrimaryButton(label: savingInfo ? tr(context, es: 'Guardando...', en: 'Saving...') : tr(context, es: 'Guardar cambios', en: 'Save changes'), icon: Icons.save_rounded, loading: savingInfo, onTap: saveInfo),
       ])),
       const SizedBox(height: 16),
       GroupCoverSettingsCard(group: group, saving: savingCover, onChange: changeCover, onRemove: removeCover),
@@ -403,7 +403,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         FieldLabel('Reglas del grupo'),
         TextField(controller: rulesController, minLines: 2, maxLines: 5, decoration: const InputDecoration(hintText: 'Ej. Confirmar asistencia antes del jueves, gastos con ticket...')),
         const SizedBox(height: 12),
-        SecondaryButton(label: 'Guardar reglas', icon: Icons.rule_rounded, onTap: saveInfo),
+        SecondaryButton(label: tr(context, es: 'Guardar reglas', en: 'Save rules'), icon: Icons.rule_rounded, onTap: saveInfo),
       ])),
       const SizedBox(height: 16),
       SectionHeader(title: 'Premium'),
@@ -412,9 +412,9 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       const SizedBox(height: 16),
       SectionHeader(title: 'Administración'),
       const SizedBox(height: 8),
-      SettingsRow(icon: Icons.groups_rounded, title: 'Miembros y roles', subtitle: 'Owner, admins y miembros', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
-      SettingsRow(icon: Icons.verified_user_rounded, title: 'Permisos', subtitle: 'Qué puede hacer cada rol', onTap: () => showPermissionSheet(context)),
-      SettingsRow(icon: Icons.delete_outline_rounded, title: 'Eliminar grupo', subtitle: 'Solo owner · elimina eventos, gastos y torneos', danger: true, onTap: deleteGroupFlow),
+      SettingsRow(icon: Icons.groups_rounded, title: tr(context, es: 'Miembros y roles', en: 'Members and roles'), subtitle: tr(context, es: 'Owner, admins y miembros', en: 'Owner, admins and members'), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
+      SettingsRow(icon: Icons.verified_user_rounded, title: tr(context, es: 'Permisos', en: 'Permissions'), subtitle: tr(context, es: 'Qué puede hacer cada rol', en: 'What each role can do'), onTap: () => showPermissionSheet(context)),
+      SettingsRow(icon: Icons.delete_outline_rounded, title: tr(context, es: 'Eliminar grupo', en: 'Delete group'), subtitle: tr(context, es: 'Solo owner · elimina eventos, gastos y torneos', en: 'Owner only · removes events, expenses and tournaments'), danger: true, onTap: deleteGroupFlow),
     ]));
   }
 }
@@ -636,7 +636,7 @@ class PremiumGroupScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Incluido gratis', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+                Text(tr(context, es: 'Incluido gratis', en: 'Included free'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 10),
                 ...GrupliPremium.freeTournamentPrinciples.map(
                   (item) => Padding(
@@ -712,7 +712,7 @@ class PremiumGroupScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Reglas de producto', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+                Text(tr(context, es: 'Reglas de producto', en: 'Product rules'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 8),
                 ...GrupliPremium.monetizationRules.map(
                   (item) => Padding(
@@ -934,7 +934,7 @@ class GroupAlertsSheet extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(18, 16, 10, 10),
             child: Row(children: [
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Avisos del grupo', style: Theme.of(context).textTheme.titleLarge),
+        Text(tr(context, es: 'Avisos del grupo', en: 'Group alerts'), style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 3),
                 Text(AppData.text(group['name'], 'Grupo'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
               ])),
@@ -1080,7 +1080,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Expanded(child: PageHeader(title: 'Avisos', subtitle: unread == 0 ? 'Todo leído en tus grupos.' : '$unread aviso${unread == 1 ? '' : 's'} sin leer', leading: false)),
                   if (unread > 0)
-                    TextButton(onPressed: markAll, child: const Text('Leer todo')),
+                    TextButton(onPressed: markAll, child: Text(tr(context, es: 'Leer todo', en: 'Mark all read'))),
                 ]),
                 const SizedBox(height: 12),
                 PushStatusCard(onEnable: () async {
@@ -1089,7 +1089,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   if (token == null) {
                     await showToast(context, 'No se pudieron activar las notificaciones en este dispositivo.', danger: true);
                   } else {
-                    await showToast(context, 'Notificaciones push activadas en este dispositivo.');
+                      await showToast(context, tr(context, es: 'Notificaciones push activadas en este dispositivo.', en: 'Push notifications enabled on this device.'));
                   }
                 }),
                 const SizedBox(height: 16),
@@ -1149,7 +1149,7 @@ class PushStatusCard extends StatelessWidget {
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(onPressed: onEnable, icon: const Icon(Icons.power_settings_new_rounded), label: const Text('Activar en este dispositivo')),
+            child: TextButton.icon(onPressed: onEnable, icon: const Icon(Icons.power_settings_new_rounded), label: Text(tr(context, es: 'Activar en este dispositivo', en: 'Enable on this device'))),
           ),
         ])),
       ]),
@@ -1292,7 +1292,7 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
       title.clear();
       description.clear();
       setState(() { myTicketsFuture = AppData.mySupportTickets(); });
-      if (mounted) await showToast(context, 'Reporte enviado. Gracias, lo revisarás desde el panel admin.');
+      if (mounted) await showToast(context, tr(context, es: 'Reporte enviado. Gracias, lo revisarás desde el panel admin.', en: 'Report sent. Thanks, you will review it from the admin panel.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     } finally {
@@ -1418,7 +1418,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final note = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Responder reporte'),
+        title: Text(tr(context, es: 'Responder reporte', en: 'Reply to report')),
         content: TextField(
           controller: controller,
           minLines: 4,
@@ -1429,8 +1429,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Guardar respuesta')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: Text(tr(context, es: 'Guardar respuesta', en: 'Save reply'))),
         ],
       ),
     );
@@ -1467,12 +1467,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return DirectPage(child: FutureBuilder<_AdminDashboardData>(
       future: future,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const CenterLoader(label: 'Cargando panel admin...');
+        if (snapshot.connectionState == ConnectionState.waiting) return CenterLoader(label: tr(context, es: 'Cargando panel admin...', en: 'Loading admin panel...'));
         if (snapshot.hasError) return ErrorBlock(message: humanError(snapshot.error), onRetry: reload);
         final data = snapshot.data ?? _AdminDashboardData.empty();
         final overview = data.overview;
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          PageHeader(title: 'Panel admin', subtitle: 'Soporte, usuarios, grupos y calidad de Grupli.', leading: true),
+          PageHeader(title: tr(context, es: 'Panel admin', en: 'Admin panel'), subtitle: tr(context, es: 'Soporte, usuarios, grupos y calidad de Grupli.', en: 'Support, users, groups and Grupli quality.'), leading: true),
           const SizedBox(height: 10),
           AdminRoleInfoCard(role: data.role),
           const SizedBox(height: 12),
@@ -1534,14 +1534,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             if (!data.isOwner)
               EmptySlim(icon: Icons.lock_rounded, title: 'Solo owner', body: 'Los tokens/dispositivos son datos técnicos sensibles.')
             else if (data.devices.isEmpty)
-              EmptySlim(icon: Icons.phone_android_rounded, title: 'Sin dispositivos', body: 'Aparecerán cuando los usuarios activen notificaciones en su móvil.')
+              EmptySlim(icon: Icons.phone_android_rounded, title: tr(context, es: 'Sin dispositivos', en: 'No devices'), body: tr(context, es: 'Aparecerán cuando los usuarios activen notificaciones en su móvil.', en: 'They will appear when users enable notifications on their phone.'))
             else
               ...data.devices.map((d) => AdminDeviceCard(device: d)),
           ] else ...[
             SectionHeader(title: 'Actividad y calidad', action: '${data.qualityEvents.length}'),
             const SizedBox(height: 8),
             if (data.qualityEvents.isEmpty)
-              EmptySlim(icon: Icons.insights_rounded, title: 'Sin eventos todavía', body: 'Se guardarán reportes y señales internas útiles.')
+              EmptySlim(icon: Icons.insights_rounded, title: tr(context, es: 'Sin eventos todavía', en: 'No events yet'), body: tr(context, es: 'Se guardarán reportes y señales internas útiles.', en: 'Useful internal reports and signals will be stored here.'))
             else
               ...data.qualityEvents.take(20).map((event) => QualityEventCard(event: event)),
           ],
@@ -1963,23 +1963,23 @@ IconData ticketTypeIcon(String type) {
 
 String ticketTypeLabel(String type) {
   switch (type) {
-    case 'cuenta': return 'Cuenta';
-    case 'grupo': return 'Grupo';
-    case 'evento': return 'Evento';
-    case 'finanzas': return 'Finanzas';
-    case 'torneo': return 'Torneo';
-    case 'sugerencia': return 'Sugerencia';
-    case 'otro': return 'Otro';
-    default: return 'Bug';
+    case 'cuenta': return appIsEnglish ? 'Account' : 'Cuenta';
+    case 'grupo': return appIsEnglish ? 'Group' : 'Grupo';
+    case 'evento': return appIsEnglish ? 'Event' : 'Evento';
+    case 'finanzas': return appIsEnglish ? 'Finances' : 'Finanzas';
+    case 'torneo': return appIsEnglish ? 'Tournament' : 'Torneo';
+    case 'sugerencia': return appIsEnglish ? 'Suggestion' : 'Sugerencia';
+    case 'otro': return appIsEnglish ? 'Other' : 'Otro';
+    default: return appIsEnglish ? 'Bug' : 'Bug';
   }
 }
 
 String ticketStatusLabel(String status) {
   switch (status) {
-    case 'reviewing': return 'En revisión';
-    case 'resolved': return 'Resuelto';
-    case 'closed': return 'Cerrado';
-    default: return 'Abierto';
+    case 'reviewing': return appIsEnglish ? 'Reviewing' : 'En revisión';
+    case 'resolved': return appIsEnglish ? 'Resolved' : 'Resuelto';
+    case 'closed': return appIsEnglish ? 'Closed' : 'Cerrado';
+    default: return appIsEnglish ? 'Open' : 'Abierto';
   }
 }
 
@@ -1994,10 +1994,10 @@ Color ticketStatusColor(String status) {
 
 String ticketPriorityLabel(String priority) {
   switch (priority) {
-    case 'critical': return 'Crítica';
-    case 'high': return 'Alta';
-    case 'low': return 'Baja';
-    default: return 'Normal';
+    case 'critical': return appIsEnglish ? 'Critical' : 'Crítica';
+    case 'high': return appIsEnglish ? 'High' : 'Alta';
+    case 'low': return appIsEnglish ? 'Low' : 'Baja';
+    default: return appIsEnglish ? 'Normal' : 'Normal';
   }
 }
 
@@ -2044,7 +2044,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final newName = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Editar nombre'),
+        title: Text(tr(context, es: 'Editar nombre', en: 'Edit name')),
         content: TextField(
           controller: controller,
           textCapitalization: TextCapitalization.words,
@@ -2055,8 +2055,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Guardar')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: Text(tr(context, es: 'Guardar', en: 'Save'))),
         ],
       ),
     );
@@ -2140,16 +2140,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Eliminar cuenta'),
+        title: Text(tr(context, es: 'Eliminar cuenta', en: 'Delete account')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Esta acción elimina tu cuenta de Grupli, tu perfil, tu foto, tus dispositivos, tus avisos y tu acceso a los grupos.'),
+            Text(tr(context, es: 'Esta acción elimina tu cuenta de Grupli, tu perfil, tu foto, tus dispositivos, tus avisos y tu acceso a los grupos.', en: 'This will delete your Grupli account, your profile, your photo, your devices, your notifications and your access to groups.')),
             const SizedBox(height: 10),
-            const Text('Si eres owner de algún grupo, esos grupos también se eliminarán con sus eventos, gastos y torneos.'),
+            Text(tr(context, es: 'Si eres owner de algún grupo, esos grupos también se eliminarán con sus eventos, gastos y torneos.', en: 'If you own any group, those groups will also be deleted with their events, expenses and tournaments.')),
             const SizedBox(height: 14),
-            const Text('Escribe ELIMINAR para confirmar.', style: TextStyle(fontWeight: FontWeight.w900)),
+            Text(tr(context, es: 'Escribe ELIMINAR para confirmar.', en: 'Type DELETE to confirm.'), style: const TextStyle(fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
             TextField(
               controller: controller,
@@ -2159,11 +2159,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.red),
             onPressed: () => Navigator.pop(context, controller.text.trim().toUpperCase() == 'ELIMINAR'),
-            child: const Text('Eliminar cuenta'),
+            child: Text(tr(context, es: 'Eliminar cuenta', en: 'Delete account')),
           ),
         ],
       ),
@@ -2273,14 +2273,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               value: const Locale('es'),
               groupValue: selected,
               onChanged: (value) => setSheetState(() => selected = const Locale('es')),
-              title: const Text('Español'),
+              title: Text(tr(context, es: 'Español', en: 'Spanish')),
               subtitle: Text(tr(context, es: 'Interfaz en español', en: 'Spanish interface')),
             ),
             RadioListTile<Locale?>(
               value: const Locale('en'),
               groupValue: selected,
               onChanged: (value) => setSheetState(() => selected = const Locale('en')),
-              title: const Text('English'),
+              title: Text(tr(context, es: 'English', en: 'English')),
               subtitle: Text(tr(context, es: 'App in English', en: 'App in English')),
             ),
             const SizedBox(height: 8),
@@ -2760,7 +2760,7 @@ void showGroupQuickActionsSheet(
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
-              const Text('Acciones rápidas del grupo', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
+              Text(tr(context, es: 'Acciones rápidas del grupo', en: 'Quick group actions'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
             ])),
           ]),
           const SizedBox(height: 12),
