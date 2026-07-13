@@ -452,73 +452,303 @@ class PremiumGroupScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = AppData.text(group['name'], 'Grupo');
     final entitlement = GrupliPremium.entitlementForGroup(group);
-    return DirectPage(child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        PageHeader(title: 'Grupli Premium', subtitle: 'Premium será por grupo: si se activa aquí, todos los miembros de $name lo disfrutan y la app va sin anuncios.', leading: true),
-        const SizedBox(height: 16),
-        AppCard(
-          color: entitlement.active ? AppColors.tealSoft : AppColors.orangeSoft,
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Container(width: 48, height: 48, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17)), child: Icon(entitlement.active ? Icons.verified_rounded : Icons.lock_clock_rounded, color: entitlement.active ? AppColors.teal : AppColors.orange)),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(entitlement.label, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 18)),
-                const SizedBox(height: 4),
-                Text(GrupliPremium.billingEnabled ? 'Los pagos estarán conectados al backend y a las stores.' : 'Los pagos todavía no están activos. Esta versión solo prepara permisos y experiencia, con acceso sin anuncios cuando Premium llegue.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25)),
-              ])),
-            ]),
-            const SizedBox(height: 14),
-            StatusNotice(
-              icon: Icons.shield_outlined,
-              title: 'Sin trampas locales',
-              body: 'Cuando se activen pagos, la app consultará al backend si el grupo tiene Premium. El frontend no decidirá solo.',
-            ),
-          ]),
-        ),
-        const SizedBox(height: 16),
-        SectionHeader(title: 'Gratis debe seguir siendo útil'),
-        const SizedBox(height: 8),
-        AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Incluido gratis', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 10),
-          ...GrupliPremium.freeTournamentPrinciples.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 18),
-              const SizedBox(width: 8),
-              Expanded(child: Text(item, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, height: 1.25))),
-            ]),
-          )),
-        ])),
-        const SizedBox(height: 16),
-        SectionHeader(title: 'Premium futuro'),
-        const SizedBox(height: 8),
-        ...GrupliPremium.features.map((feature) => Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: AppCard(
-            padding: const EdgeInsets.all(13),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(14)), child: Icon(feature.icon, color: AppColors.orange, size: 21)),
-              const SizedBox(width: 11),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(feature.title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 3),
-                Text(feature.description, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 12)),
-              ])),
-            ]),
+    return DirectPage(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PageHeader(
+            title: 'Grupli Premium',
+            subtitle: entitlement.active
+                ? 'Premium ya est? activo en $name y toda la app se ver? sin anuncios para este grupo.'
+                : 'Premium es por grupo: una sola compra activa la experiencia para todos los miembros de $name.',
+            leading: true,
           ),
-        )),
-        const SizedBox(height: 8),
-        PrimaryButton(
-          label: GrupliPremium.billingEnabled ? 'Activar Premium' : 'Pagos todavía desactivados',
-          icon: Icons.workspace_premium_rounded,
-          onTap: () => showToast(context, GrupliPremium.billingEnabled ? 'El pago se conectará con la store.' : 'Premium está preparado, pero los pagos reales se activarán en una fase posterior.'),
-        ),
-      ],
-    ));
+          const SizedBox(height: 16),
+          AppCard(
+            color: entitlement.active ? AppColors.tealSoft : AppColors.orangeSoft,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Icon(
+                        entitlement.active ? Icons.verified_rounded : Icons.lock_clock_rounded,
+                        color: entitlement.active ? AppColors.teal : AppColors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            entitlement.label,
+                            style: const TextStyle(
+                              color: AppColors.ink,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            GrupliPremium.billingEnabled
+                                ? 'Pagos conectados y listos para la tienda elegida.'
+                                : 'La capa t?cnica ya est? preparada para conectar compras m?s adelante.',
+                            style: const TextStyle(
+                              color: AppColors.muted,
+                              fontWeight: FontWeight.w800,
+                              height: 1.25,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                StatusNotice(
+                  icon: Icons.shield_outlined,
+                  title: 'Acceso centralizado',
+                  body: 'El backend decidir? el estado real del grupo. La interfaz solo mostrar? el resultado, nunca lo inventar?.',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionHeader(title: 'C?mo se vender?'),
+          const SizedBox(height: 8),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Pasarelas previstas',
+                  style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ...GrupliPremium.mobileBillingRoutes.map((route) => TournamentRuleChip(label: route)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'La web quedar? separada como canal futuro, no mezclada con el flujo de la app m?vil.',
+                  style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ...GrupliPremium.webBillingRoutes.map((route) => TournamentRuleChip(label: route)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionHeader(title: 'D?nde ir?n los anuncios'),
+          const SizedBox(height: 8),
+          ...GrupliPremium.adPlacements.map(
+            (placement) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: AppCard(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: AppColors.tealSoft,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.auto_awesome_rounded, color: AppColors.teal, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  placement.screen,
+                                  style: const TextStyle(
+                                    color: AppColors.ink,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              if (placement.hiddenByPremium)
+                                const Padding(
+                                  padding: EdgeInsets.only(left: 8),
+                                  child: TournamentRuleChip(label: 'Sin anuncios con Premium'),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            placement.placement,
+                            style: const TextStyle(
+                              color: AppColors.orange,
+                              fontWeight: FontWeight.w800,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            placement.behavior,
+                            style: const TextStyle(
+                              color: AppColors.muted,
+                              fontWeight: FontWeight.w700,
+                              height: 1.25,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionHeader(title: 'Gratis seguir? siendo ?til'),
+          const SizedBox(height: 8),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Incluido gratis', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 10),
+                ...GrupliPremium.freeTournamentPrinciples.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            item,
+                            style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, height: 1.25),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionHeader(title: 'Premium futuro'),
+          const SizedBox(height: 8),
+          ...GrupliPremium.features.map(
+            (feature) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: AppCard(
+                padding: const EdgeInsets.all(13),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.faint,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(feature.icon, color: AppColors.orange, size: 21),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            feature.title,
+                            style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            feature.description,
+                            style: const TextStyle(
+                              color: AppColors.muted,
+                              fontWeight: FontWeight.w700,
+                              height: 1.25,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          AppCard(
+            color: AppColors.faint,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Reglas de producto', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                ...GrupliPremium.monetizationRules.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            item,
+                            style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, height: 1.25),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          PrimaryButton(
+            label: GrupliPremium.billingEnabled ? 'Gestionar Premium' : 'Premium preparado',
+            icon: Icons.workspace_premium_rounded,
+            onTap: () => showToast(
+              context,
+              GrupliPremium.billingEnabled
+                  ? 'Las compras ya pueden gestionarse desde la capa conectada.'
+                  : 'La arquitectura de Premium est? lista para conectar pagos m?s adelante.',
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

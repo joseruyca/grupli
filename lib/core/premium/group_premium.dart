@@ -71,12 +71,18 @@ class GroupPremiumEntitlement {
 }
 
 class GrupliPremium {
-  static const bool billingEnabled = false;
+  static PremiumBillingProvider get billingProvider => GrupliMonetizationBlueprint.disabledProvider;
+  static bool get billingEnabled => billingProvider.isAvailable;
   static const String scope = 'group';
   static const int freeActiveTournamentsPerGroup = 2;
   static const bool largeGroupsAreFree = true;
   static const bool participantLimitsEnabled = false;
   static const bool thirdPlaceIsFree = true;
+  static List<String> get mobileBillingRoutes => GrupliMonetizationBlueprint.mobileBillingRoutes;
+  static List<String> get webBillingRoutes => GrupliMonetizationBlueprint.webBillingRoutes;
+  static List<PremiumAdPlacement> get adPlacements => GrupliMonetizationBlueprint.adPlacements;
+  static List<String> get blockedAdPlacements => GrupliMonetizationBlueprint.blockedScreens;
+  static List<String> get monetizationRules => GrupliMonetizationBlueprint.monetizationRules;
 
   static const List<PremiumFeatureDefinition> features = [
     PremiumFeatureDefinition(

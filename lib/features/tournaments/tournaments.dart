@@ -709,24 +709,6 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
       ),
       const SizedBox(height: 10),
       TournamentValidationCard(format: format, scoringType: scoringType, scoringConfig: scoringConfig),
-      const SizedBox(height: 10),
-      AppCard(
-        color: AppColors.faint,
-        padding: const EdgeInsets.all(12),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 20)),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(TournamentEngineV2.sportSpec(scoringType).resultLabel, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 4),
-            Text(TournamentEngineV2.resultContractText(scoringType, format), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
-            const SizedBox(height: 8),
-            Text('Incluido gratis: ${TournamentEngineV2.sportStatsSummary(scoringType)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
-            const SizedBox(height: 4),
-            const Text('Premium más adelante: estadísticas avanzadas, exportación y comparativas históricas.', style: TextStyle(color: AppColors.orange, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
-          ])),
-        ]),
-      ),
     ]);
   }
 
@@ -748,7 +730,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(participantTypeTitle(), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
-            Text(participantHelperText(), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+            Text('Elige participantes sin escribir de más.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
           ])),
         ]),
       ),
@@ -770,12 +752,14 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(participantTypeTitle(), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
-            Text(canAutoFillMembers
-                ? 'Elige miembros del grupo tocando un botón. El cuadro de texto queda solo para pegar listas largas.'
-                : teamType == 'pareja'
-                    ? 'Crea parejas visuales con dos miembros o añade parejas invitadas.'
-                    : 'Crea equipos con nombres claros. Después se podrán preparar los partidos.',
-                style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+            Text(
+              canAutoFillMembers
+                  ? 'Toca un botón para añadir gente.'
+                  : teamType == 'pareja'
+                      ? 'Crea parejas en dos toques.'
+                      : 'Pon un nombre claro al equipo.',
+              style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12),
+            ),
           ])),
         ]),
         const SizedBox(height: 12),
@@ -809,8 +793,8 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           child: ExpansionTile(
             tilePadding: EdgeInsets.zero,
             childrenPadding: EdgeInsets.zero,
-            title: const Text('Pegar lista manual', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 13)),
-            subtitle: const Text('Opción rápida para copiar muchos nombres', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11)),
+            title: const Text('Pegar nombres', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w900, fontSize: 13)),
+            subtitle: const Text('Opcional', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11)),
             children: [
               TextField(
                 controller: participants,
@@ -820,7 +804,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   hintText: participantHintText(),
-                  helperText: 'Un nombre por línea. Ejemplo: Ana / Javi para una pareja.',
+                  helperText: 'Uno por línea. Ejemplo: Ana / Javi.',
                 ),
               ),
             ],
@@ -831,11 +815,11 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         const SizedBox(height: 12),
         AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Expanded(child: Text('Selector visual de partidos', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+            const Expanded(child: Text('Partidos', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
             TournamentRuleChip(label: '${manualRows.length} partidos'),
           ]),
           const SizedBox(height: 8),
-          const Text('Crea cada partido con selectores para evitar errores de texto. Puedes poner jornada, fecha, pista y notas.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          const Text('Crea cruces con selectores. Puedes añadir fecha y pista.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
           const SizedBox(height: 12),
           Row(children: [
             Expanded(child: PrimaryButton(label: 'Añadir partido', icon: Icons.add_rounded, onTap: addManualDraftRow)),
@@ -860,7 +844,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         const SizedBox(height: 12),
         AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Expanded(child: Text('Importar cruces desde texto', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+            const Expanded(child: Text('Pegar cruces', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
             TournamentRuleChip(label: '${parseTournamentPairings(pairings.text).length} escritos'),
           ]),
           const SizedBox(height: 8),
@@ -872,7 +856,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               hintText: 'Jornada 1: Equipo Azul vs Los Invencibles\nJornada 1: Ana / Javi vs Marta / Luis',
-              helperText: 'Solo se usará si no has añadido partidos con el selector visual.',
+              helperText: 'Opcional. Se usará si no hay partidos creados a mano.',
             ),
           ),
         ])),
@@ -880,11 +864,11 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         const SizedBox(height: 12),
         AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Expanded(child: Text('Cruces manuales opcionales', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
+            const Expanded(child: Text('Cruces opcionales', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
             TournamentRuleChip(label: '${parseTournamentPairings(pairings.text).length} escritos'),
           ]),
           const SizedBox(height: 8),
-          const Text('Normalmente la app sortea/genera los cruces. Usa esto solo si quieres controlar los emparejamientos desde el inicio.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          const Text('Solo si quieres controlar los cruces desde el inicio.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
           const SizedBox(height: 8),
           TextField(
             controller: pairings,
@@ -894,7 +878,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               hintText: 'Jornada 1: Equipo Azul vs Los Invencibles\nJornada 1: Ana / Javi vs Marta / Luis',
-              helperText: 'Si lo rellenas, la app usará estos cruces en vez del sorteo automático.',
+              helperText: 'Si lo rellenas, sustituye al sorteo automático.',
             ),
           ),
         ])),
@@ -934,7 +918,16 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(tournamentFormatLabel(format), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 16)),
             const SizedBox(height: 3),
-            Text(TournamentEngineV2.formatHelp(scoringType, format), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+            Text(
+              format == 'americano'
+                  ? 'Rondas y ranking individual.'
+                  : format == 'manual'
+                      ? 'Cruces a mano y fechas por partido.'
+                      : format == 'eliminatoria'
+                          ? 'Cuadro, byes y siguiente ronda.'
+                          : 'Jornadas y clasificación.',
+              style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3),
+            ),
           ])),
         ]),
         const SizedBox(height: 12),
@@ -947,7 +940,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           const SizedBox(height: 10),
           TournamentCounterRow(label: 'Vueltas', value: leagueLegs, min: 1, max: 4, onChanged: (v) => setState(() => leagueLegs = v), helper: leagueLegs == 1 ? 'Solo ida' : '$leagueLegs vueltas'),
           TournamentCounterRow(label: 'Jornadas por vuelta', value: leagueRoundsLimit, min: 0, max: max(1, fullRounds), zeroLabel: 'Todas', onChanged: (v) => setState(() => leagueRoundsLimit = v), helper: leagueRoundsLimit == 0 ? (hasParticipants ? 'Liga completa: $fullRounds por vuelta · $totalLeagueRounds en total' : 'Se calcula al añadir participantes') : '$leagueRoundsLimit por vuelta · $limitedLeagueRounds en total'),
-        ] else if (format == 'americano') ...[
+          ] else if (format == 'americano') ...[
           Wrap(spacing: 8, runSpacing: 8, children: const [
             TournamentRuleChip(label: 'Solo jugadores'),
             TournamentRuleChip(label: 'Parejas rotativas'),
@@ -955,10 +948,10 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
             TournamentRuleChip(label: 'Descansos equilibrados'),
           ]),
           const SizedBox(height: 10),
-          TournamentCounterRow(label: 'Rondas', value: americanoRounds, min: 1, max: 40, onChanged: (v) => setState(() => americanoRounds = v), helper: hasParticipants ? 'Recomendado: ${recommendedAmericanoRounds(participantNames.length, courtsCount)} rondas' : 'Se recomienda al añadir jugadores'),
+          TournamentCounterRow(label: 'Rondas', value: americanoRounds, min: 1, max: 40, onChanged: (v) => setState(() => americanoRounds = v), helper: hasParticipants ? 'Recomendado: ${recommendedAmericanoRounds(participantNames.length, courtsCount)}' : 'Se ajusta al añadir jugadores'),
           TournamentCounterRow(label: 'Pistas / mesas', value: courtsCount, min: 1, max: 12, onChanged: (v) => setState(() => courtsCount = v), helper: '1 partido por pista y ronda'),
           const SizedBox(height: 8),
-          Text(hasParticipants ? americanoRulesText(participantNames.length, courtsCount, americanoRounds) : 'En el siguiente paso añade jugadores individuales. La app intentará que cada ronda tenga parejas distintas antes de repetir.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          Text(hasParticipants ? 'La app rota parejas y reparte descansos automáticamente.' : 'Añade jugadores para generar las primeras rondas.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
           if (hasParticipants && participantNames.length >= 4 && americanoRounds != recommendedAmericanoRounds(participantNames.length, courtsCount)) ...[
             const SizedBox(height: 10),
             SecondaryButton(label: 'Usar ${recommendedAmericanoRounds(participantNames.length, courtsCount)} rondas recomendadas', icon: Icons.auto_awesome_rounded, onTap: () => setState(() => americanoRounds = recommendedAmericanoRounds(participantNames.length, courtsCount))),
@@ -974,7 +967,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
             const Expanded(child: Text('Sortear cruces al crear', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
             Switch(value: randomizePairings, activeThumbColor: AppColors.red, onChanged: (v) => setState(() => randomizePairings = v)),
           ]),
-          Text(randomizePairings ? 'Recomendado para grupos normales: evita que el orden de escritura favorezca a nadie.' : 'Usa el orden de participantes como cabeza de serie: #1 contra el último, #2 contra el penúltimo. Después podrás cambiar seeds desde Participantes.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          Text(randomizePairings ? 'Recomendado: evita sesgos por el orden.' : 'Usa el orden como cabeza de serie.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
         ] else ...[
           Wrap(spacing: 8, runSpacing: 8, children: const [
             TournamentRuleChip(label: 'Todo editable'),
@@ -982,7 +975,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
             TournamentRuleChip(label: 'Fechas por partido'),
           ]),
           const SizedBox(height: 8),
-          const Text('Manual sirve para torneos raros, eventos de un día o cruces que quieres decidir tú. En el siguiente paso crearás los partidos uno a uno.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          const Text('Ideal para cruces raros o eventos de un día.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
         ],
       ])),
       const SizedBox(height: 12),
@@ -995,16 +988,16 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(format == 'americano' ? 'Siguiente: jugadores individuales' : format == 'manual' ? 'Siguiente: participantes y selector de partidos' : 'Siguiente: participantes adecuados', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
-            Text(format == 'americano'
-                ? 'No se crean parejas fijas: Grupli las rota ronda a ronda.'
-                : !sportSupportsAmericano
-                    ? 'Para este deporte se prioriza Liga, Eliminatoria o Manual. Americano se reserva para juegos de parejas rotativas.'
-                    : scoringType == 'tennis_padel'
-                        ? 'Podrás elegir parejas o jugadores individuales según cómo juguéis.'
-                        : format == 'eliminatoria'
-                            ? 'Añade equipos/jugadores y Grupli sortea el cuadro.'
-                            : 'Añade jugadores, parejas o equipos y prepara los cruces.',
-                style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+            Text(
+              format == 'americano'
+                  ? 'Grupli rota parejas y reparte descansos.'
+                  : format == 'manual'
+                      ? 'Después añades los cruces uno a uno.'
+                      : format == 'eliminatoria'
+                          ? 'Añade equipos y la app hace el cuadro.'
+                          : 'Añade participantes y la app genera jornadas.',
+              style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12),
+            ),
           ])),
         ]),
       ),
@@ -1048,10 +1041,10 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           const SizedBox(height: 8),
           Text(
             scoringUsesGameSetMode(scoringType, scoringConfig)
-                ? 'Cada jugador suma los juegos reales que consigue en sus partidos, aunque vaya cambiando de pareja. Las victorias se muestran como apoyo, pero no sustituyen al ranking acumulado.'
+                ? 'Cada jugador suma sus juegos reales aunque cambie de pareja.'
                 : scoringUsesPointSetMode(scoringType, scoringConfig)
-                    ? 'Cada jugador suma los puntos reales de set que consigue en sus partidos. El ranking es individual y las parejas rotan.'
-                    : 'Cada jugador suma el marcador real que consigue en sus partidos. El ranking es individual y las parejas rotan.',
+                    ? 'Cada jugador suma los puntos reales de sus parciales.'
+                    : 'Cada jugador suma su marcador real y rota de pareja.',
             style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3),
           ),
           if (scoringUsesSetMode(scoringType, scoringConfig)) ...[
@@ -1063,7 +1056,11 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Clasificación', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
           const SizedBox(height: 8),
-          Text(scoringConfigFullText(scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            TournamentRuleChip(label: scoringUsesSetMode(scoringType, scoringConfig) ? 'Con parciales' : scoringScoreLabel(scoringType, scoringConfig)),
+            TournamentRuleChip(label: scoringAllowDraw(scoringType, scoringConfig) ? 'Empate permitido' : 'Sin empate'),
+            if (scoringUsesSetMode(scoringType, scoringConfig)) TournamentRuleChip(label: 'Mejor de $bestOf'),
+          ]),
           const SizedBox(height: 10),
           TournamentCounterRow(label: 'Victoria', value: winPoints, min: 0, max: 10, onChanged: (v) => setState(() => winPoints = v)),
           if (scoringAllowDraw(scoringType, scoringConfig)) TournamentCounterRow(label: 'Empate', value: drawPoints, min: 0, max: 10, onChanged: (v) => setState(() => drawPoints = v)),
@@ -2107,13 +2104,13 @@ class TournamentCreationHeroCard extends StatelessWidget {
         width: 48,
         height: 48,
         decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(16)),
-        child: const Center(child: Text('🏆', style: TextStyle(fontSize: 25))),
+        child: const Center(child: Icon(Icons.emoji_events_rounded, color: Colors.white, size: 26)),
       ),
       const SizedBox(width: 12),
       const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Crea una competición bien configurada', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
+        Text('Configura tu torneo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
         SizedBox(height: 5),
-        Text('Primero elige el deporte. Después Grupli adapta formato, resultados y tabla.', style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.25)),
+        Text('Elige deporte, formato y participantes. Grupli ajusta el resto.', style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.25)),
       ])),
     ]),
   );
@@ -2265,11 +2262,12 @@ class TournamentSimpleFormatSummary extends StatelessWidget {
       Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: Center(child: Text(scoringEmoji(scoringType), style: const TextStyle(fontSize: 23)))),
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${scoringTypeLabel(scoringType)} · ${tournamentFormatLabel(format)} · ${teamTypeLabel(teamType)}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        Text('${scoringTypeLabel(scoringType)} - ${tournamentFormatLabel(format)}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         const SizedBox(height: 4),
-        Text(tournamentFormatSubtitle(format), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 12)),
-        const SizedBox(height: 4),
-        Text(tournamentClassificationSummary(format, scoringType), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 11.5)),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          TournamentRuleChip(label: teamTypeLabel(teamType)),
+          TournamentRuleChip(label: tournamentFormatSubtitle(format)),
+        ]),
       ])),
     ]),
   );
@@ -2286,20 +2284,23 @@ class TournamentSimpleFormatConfigCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (format == 'manual' || format == 'eliminatoria') {
-      return AppCard(color: AppColors.faint, child: Text(format == 'manual'
-          ? 'Manual: añade cruces con selectores y fecha individual. Puedes importar texto si prefieres.'
-          : 'Eliminatoria: la app crea cuadro, byes, cabezas de serie, siguiente ronda y tercer puesto.',
-        style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3),
-      ));
+      return AppCard(
+        color: AppColors.faint,
+        padding: const EdgeInsets.all(12),
+        child: Wrap(spacing: 8, runSpacing: 8, children: [
+          TournamentRuleChip(label: format == 'manual' ? 'Selector visual' : 'Cuadro autom?tico'),
+          TournamentRuleChip(label: format == 'manual' ? 'Importar texto' : 'Byes y siguiente ronda'),
+        ]),
+      );
     }
     return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(format == 'americano' ? 'Configuración rápida de americano' : 'Configuración rápida de liga', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+      Text(format == 'americano' ? 'Americano' : 'Liga', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
       const SizedBox(height: 10),
       if (format == 'americano')
-        TournamentCounterRow(label: 'Rondas', value: rounds <= 0 ? 5 : rounds, min: 1, max: 20, onChanged: onRoundsChanged, helper: 'ranking individual')
+        TournamentCounterRow(label: 'Rondas', value: rounds <= 0 ? 5 : rounds, min: 1, max: 20, onChanged: onRoundsChanged, helper: 'Ranking individual')
       else
-        TournamentCounterRow(label: 'Jornadas límite', value: rounds, min: 0, max: 30, zeroLabel: 'Todas', onChanged: onRoundsChanged, helper: 'déjalo en Todas para liga completa'),
-      TournamentCounterRow(label: 'Pistas / mesas', value: courts, min: 1, max: 12, onChanged: onCourtsChanged, helper: courts <= 1 ? 'una a la vez' : 'en paralelo'),
+        TournamentCounterRow(label: 'Jornadas', value: rounds, min: 0, max: 30, zeroLabel: 'Todas', onChanged: onRoundsChanged, helper: 'Liga completa'),
+      TournamentCounterRow(label: 'Pistas / mesas', value: courts, min: 1, max: 12, onChanged: onCourtsChanged, helper: courts <= 1 ? 'Una a la vez' : 'En paralelo'),
     ]));
   }
 }
@@ -2377,9 +2378,7 @@ class TournamentValidationCard extends StatelessWidget {
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(tournamentClassificationTitle(format, scoringType, scoringConfig), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         const SizedBox(height: 4),
-        Text(tournamentClassificationSummary(format, scoringType, scoringConfig: scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 11.5)),
-        const SizedBox(height: 4),
-        Text(scoringValidationText(scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+        Text(scoringValidationText(scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 12)),
       ])),
     ]),
   );
@@ -5949,12 +5948,12 @@ String defaultTournamentName(String format) {
 
 String stepSubtitle(int step) {
   switch (step) {
-    case 0: return 'Deporte primero: la app adapta todo lo demás.';
-    case 1: return 'Solo se muestran formatos válidos para ese deporte.';
-    case 2: return 'Participantes correctos: jugadores, parejas o equipos.';
-    case 3: return 'Resultado real: goles, sets, puntos o ranking americano.';
-    case 4: return 'Fechas, pistas y eventos de Agenda.';
-    default: return 'Revisión completa antes de crear.';
+    case 0: return 'Deporte y nombre.';
+    case 1: return 'Formato y reglas.';
+    case 2: return 'Participantes.';
+    case 3: return 'Resultados y tabla.';
+    case 4: return 'Fechas y agenda.';
+    default: return 'Revisa y crea.';
   }
 }
 

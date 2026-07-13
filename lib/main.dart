@@ -26,6 +26,7 @@ import 'package:url_launcher/url_launcher.dart';
 part 'core/theme/app_colors.dart';
 part 'core/app_data/app_data.dart';
 part 'core/premium/group_premium.dart';
+part 'core/premium/premium_monetization.dart';
 part 'features/onboarding/onboarding.dart';
 part 'features/auth/auth.dart';
 part 'features/groups/groups.dart';
@@ -423,9 +424,101 @@ class GrupliApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.bgShell,
-        fontFamily: 'Roboto',
-        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, surface: AppColors.surface),
+        fontFamily: null,
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, surface: AppColors.surface).copyWith(
+          primary: AppColors.teal,
+          secondary: AppColors.orange,
+          tertiary: AppColors.violet,
+          error: AppColors.red,
+          surface: AppColors.surface,
+          surfaceTint: AppColors.tealSoft,
+          outline: AppColors.line,
+          outlineVariant: AppColors.lineSoft,
+        ),
         visualDensity: VisualDensity.standard,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: false,
+          iconTheme: IconThemeData(color: AppColors.ink),
+          titleTextStyle: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: AppColors.ink, letterSpacing: -0.2),
+        ),
+        cardTheme: CardTheme(
+          color: AppColors.white,
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppColors.softRadius,
+            side: const BorderSide(color: AppColors.lineSoft),
+          ),
+        ),
+        dialogTheme: DialogTheme(
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: AppColors.softRadius),
+        ),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: AppColors.surface,
+          modalBackgroundColor: AppColors.surface,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+        ),
+        snackBarTheme: SnackBarThemeData(
+          backgroundColor: AppColors.ink,
+          contentTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: AppColors.white,
+          indicatorColor: AppColors.teal,
+          labelTextStyle: MaterialStateProperty.resolveWith((states) {
+            final selected = states.contains(MaterialState.selected);
+            return TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              color: selected ? Colors.white : AppColors.muted,
+            );
+          }),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.teal,
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(52),
+            shape: RoundedRectangleBorder(borderRadius: AppColors.humanRadius),
+            textStyle: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.white,
+            foregroundColor: AppColors.ink,
+            minimumSize: const Size.fromHeight(52),
+            shape: RoundedRectangleBorder(borderRadius: AppColors.humanRadius, side: const BorderSide(color: AppColors.lineSoft)),
+            textStyle: const TextStyle(fontWeight: FontWeight.w900),
+            elevation: 0,
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.ink,
+            side: const BorderSide(color: AppColors.line),
+            minimumSize: const Size.fromHeight(52),
+            shape: RoundedRectangleBorder(borderRadius: AppColors.humanRadius),
+            textStyle: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.teal,
+            textStyle: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+        ),
+        progressIndicatorTheme: const ProgressIndicatorThemeData(color: AppColors.teal),
         pageTransitionsTheme: PageTransitionsTheme(
           builders: {
             TargetPlatform.android: ZoomPageTransitionsBuilder(),

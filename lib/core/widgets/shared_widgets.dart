@@ -1950,25 +1950,17 @@ class GroupBottomNav extends StatelessWidget {
   const GroupBottomNav({super.key, required this.groupName, required this.index, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.line)),
-      ),
-      child: BottomBar(
-        items: const [
-          NavSpec(Icons.home_rounded, 'Inicio'),
-          NavSpec(Icons.calendar_month_rounded, 'Agenda'),
-          NavSpec(Icons.account_balance_wallet_rounded, 'Finanzas'),
-          NavSpec(Icons.emoji_events_rounded, 'Torneos'),
-          NavSpec(Icons.more_horiz_rounded, 'Más'),
-        ],
-        index: index,
-        onTap: onTap,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => BottomBar(
+    items: const [
+      NavSpec(Icons.home_rounded, 'Inicio'),
+      NavSpec(Icons.calendar_month_rounded, 'Agenda'),
+      NavSpec(Icons.account_balance_wallet_rounded, 'Finanzas'),
+      NavSpec(Icons.emoji_events_rounded, 'Torneos'),
+      NavSpec(Icons.more_horiz_rounded, 'M?s'),
+    ],
+    index: index,
+    onTap: onTap,
+  );
 }
 
 class NavSpec { final IconData icon; final String label; const NavSpec(this.icon, this.label); }
@@ -1997,54 +1989,56 @@ class BottomBar extends StatelessWidget {
   const BottomBar({super.key, required this.items, required this.index, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-    padding: const EdgeInsets.all(7),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(28),
-      border: Border.all(color: AppColors.lineSoft),
-      boxShadow: const [BoxShadow(color: Color(0x14111B34), blurRadius: 28, offset: Offset(0, -4))],
-    ),
-    child: Row(children: List.generate(items.length, (i) {
-      final active = i == index;
-      final spec = items[i];
-      final color = navColorFor(i, items.length);
-      return Expanded(
-        child: PressableScale(
-          onTap: active ? null : () => onTap(i),
-          borderRadius: BorderRadius.circular(20),
-          pressedScale: .94,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 210),
-            curve: Curves.easeOutCubic,
-            height: 58,
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-            decoration: BoxDecoration(
-              color: active ? color : Colors.transparent,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: active ? [BoxShadow(color: color.withOpacity(.24), blurRadius: 16, offset: const Offset(0, 7))] : null,
-            ),
-            child: AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOutCubic,
-              style: TextStyle(fontSize: items.length >= 5 ? 9.4 : 10.2, fontWeight: FontWeight.w900, color: active ? Colors.white : AppColors.muted),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                AnimatedScale(
-                  scale: active ? 1.06 : 1,
-                  duration: const Duration(milliseconds: 160),
-                  curve: Curves.easeOutCubic,
-                  child: Icon(spec.icon, size: 22, color: active ? Colors.white : color),
-                ),
-                const SizedBox(height: 3),
-                Text(spec.label, maxLines: 1, overflow: TextOverflow.ellipsis),
-              ]),
-            ),
-          ),
-        ),
-      );
-    })),
-  );
+  Widget build(BuildContext context) {
+    final isCupertino = defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS;
+    final navBar = isCupertino
+        ? CupertinoTabBar(
+            backgroundColor: Colors.white,
+            activeColor: AppColors.teal,
+            inactiveColor: AppColors.muted,
+            border: const Border(top: BorderSide(color: AppColors.lineSoft)),
+            currentIndex: index,
+            onTap: onTap,
+            items: items
+                .map(
+                  (spec) => BottomNavigationBarItem(
+                    icon: Icon(spec.icon),
+                    label: spec.label,
+                  ),
+                )
+                .toList(),
+          )
+        : NavigationBar(
+            backgroundColor: Colors.white,
+            indicatorColor: AppColors.teal,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            selectedIndex: index,
+            onDestinationSelected: onTap,
+            destinations: List.generate(items.length, (i) {
+              final spec = items[i];
+              final color = navColorFor(i, items.length);
+              return NavigationDestination(
+                icon: Icon(spec.icon, color: color),
+                selectedIcon: Icon(spec.icon, color: Colors.white),
+                label: spec.label,
+              );
+            }),
+          );
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppColors.lineSoft),
+        boxShadow: const [BoxShadow(color: Color(0x14111B34), blurRadius: 28, offset: Offset(0, -4))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: navBar,
+      ),
+    );
+  }
 }
 
 class PageHeader extends StatelessWidget {

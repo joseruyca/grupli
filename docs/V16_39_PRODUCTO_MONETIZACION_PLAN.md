@@ -159,3 +159,49 @@ Este documento define la dirección de la app para que siga siendo muy fácil de
 - Gratis: uso completo para la mayoría.
 - Premium: ahorro de tiempo, análisis y presentación avanzada.
 - Ads: discretos, limitados y nunca invasivos.
+
+
+## Arquitectura de monetización
+
+### Pasarelas
+
+- iOS: compras dentro de la App Store.
+- Android: Google Play Billing.
+- Web futura: Stripe solo si existe un checkout web separado.
+- El acceso Premium siempre debe validarlo el backend mediante entitlements.
+
+### Página Premium
+
+- Hero corto, sin discurso largo.
+- Comparativa Free vs Premium.
+- Bloque de torneos.
+- Bloque de finanzas.
+- Bloque de anuncios.
+- Bloque de confianza: restaurar compras, cancelar, sincronizar dispositivos.
+
+### Dónde irán los anuncios
+
+- Inicio del grupo.
+- Final de listas largas.
+- Vacíos de contenido.
+- Nunca en creación de torneos.
+- Nunca en entrada de resultados.
+- Nunca en liquidación de gastos.
+- Nunca en la pantalla de compra.
+
+### Reglas de implementación
+
+- Una sola suscripción por grupo.
+- Sin lógica de Premium repartida por pantallas.
+- Flags y entitlements en una sola capa central.
+- Los anuncios deben poder apagarse con un flag global.
+- El free debe seguir siendo plenamente usable.
+
+### Mapa exacto de anuncios por pantalla
+
+- `Inicio del grupo`: debajo del hero y al final de bloques largos.
+- `Agenda`: después de la lista de próximos eventos.
+- `Torneos`: al final del listado, nunca dentro de crear torneo o registrar marcador.
+- `Finanzas`: tras el resumen y al final del historial, nunca al liquidar gastos.
+- `Perfil`: en tarjetas informativas o vacíos de contenido, nunca en ajustes críticos.
+- `Pantalla de compra`: nunca se muestran anuncios.
