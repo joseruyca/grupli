@@ -1045,7 +1045,7 @@ class TournamentAgendaBadge extends StatelessWidget {
       borderRadius: BorderRadius.circular(99),
       border: Border.all(color: AppColors.amber.withOpacity(.42)),
     ),
-    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(Icons.emoji_events_rounded, color: AppColors.amber, size: 13),
       SizedBox(width: 4),
       Text(appIsEnglish ? 'Tournament' : 'Torneo', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 10.5)),
@@ -3973,7 +3973,6 @@ class ManageMemberCard extends StatelessWidget {
           ])),
           if (canEditThis)
             PopupMenuButton<String>(
-      NavSpec(Icons.more_horiz_rounded, 'M\u00e1s'),
               onSelected: (value) {
                 if (value == 'admin') onRole(member, 'admin');
                 if (value == 'member') onRole(member, 'member');

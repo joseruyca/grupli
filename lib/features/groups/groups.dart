@@ -548,7 +548,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   gradient: const LinearGradient(colors: [Color(0xFF041F33), Color(0xFF087A78)]),
                 ),
                 child: coverBytes == null
-                    ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: const [
+                    ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
                         Icon(Icons.add_photo_alternate_rounded, color: Colors.white, size: 34),
                         SizedBox(height: 8),
                         Text(appIsEnglish ? 'Add cover' : 'Añadir portada', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),

@@ -142,7 +142,7 @@ class _MembersScreenState extends State<MembersScreen> {
               if (isOwner)
                 AppCard(
                   color: AppColors.tealSoft,
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Icon(Icons.shield_rounded, color: AppColors.teal),
                     SizedBox(width: 10),
                     Expanded(child: Text(tr(context, es: 'Eres owner del grupo. Puedes gestionar miembros y eliminar el grupo desde Ajustes.', en: 'You are the group owner. You can manage members and delete the group from Settings.'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.3))),
@@ -590,7 +590,7 @@ class PremiumGroupScreen extends StatelessWidget {
                                 ),
                               ),
                               if (placement.hiddenByPremium)
-                                const Padding(
+                                Padding(
                                   padding: EdgeInsets.only(left: 8),
                                   child: TournamentRuleChip(label: tr(context, es: 'Sin anuncios con Premium', en: 'No ads with Premium')),
                                 ),

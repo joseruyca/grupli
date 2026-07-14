@@ -2027,17 +2027,17 @@ String scoringResultInputTitle(String type, [dynamic raw]) {
 String scoringResultInputHelp(String type, [dynamic raw]) {
   switch (scoringResultModel(type, raw)) {
     case 'goals':
-      return appIsEnglish ? 'Enter each team\\'s goals. The table will update points, goals for, goals against and difference.' : 'Escribe los goles de cada equipo. La tabla actualizar√° puntos, goles a favor, goles en contra y diferencia.';
+      return appIsEnglish ? "Enter each team's goals. The table will update points, goals for, goals against and difference." : 'Escribe los goles de cada equipo. La tabla actualizar· puntos, goles a favor, goles en contra y diferencia.';
     case 'sets_games':
-      return appIsEnglish ? 'Write each set on a line, for example 6-4 or 7-5. The app calculates sets, games and tiebreaks.' : 'Escribe cada set en una l√≠nea, por ejemplo 6-4 o 7-5. La app calcula sets, juegos y desempates.';
+      return appIsEnglish ? 'Write each set on a line, for example 6-4 or 7-5. The app calculates sets, games and tiebreaks.' : 'Escribe cada set en una lÌnea, por ejemplo 6-4 o 7-5. La app calcula sets, juegos y desempates.';
     case 'sets_points':
-      return appIsEnglish ? 'Write each partial on a line, for example 25-21 or 15-12. The app calculates sets, points and tiebreaks.' : 'Escribe cada parcial en una l√≠nea, por ejemplo 25-21 o 15-12. La app calcula sets, puntos y desempates.';
+      return appIsEnglish ? 'Write each partial on a line, for example 25-21 or 15-12. The app calculates sets, points and tiebreaks.' : 'Escribe cada parcial en una lÌnea, por ejemplo 25-21 o 15-12. La app calcula sets, puntos y desempates.';
     case 'total_points':
-      return appIsEnglish ? 'Enter the final score in points. The table will calculate wins and difference.' : 'Escribe el marcador final de puntos. La tabla calcular√° victorias y diferencia.';
+      return appIsEnglish ? 'Enter the final score in points. The table will calculate wins and difference.' : 'Escribe el marcador final de puntos. La tabla calcular· victorias y diferencia.';
     case 'games':
       return appIsEnglish ? 'Enter games, matches or maps won by each side.' : 'Escribe juegos, partidas o mapas ganados por cada lado.';
     default:
-      return appIsEnglish ? 'Flexible score. The standings will use the rules configured for this tournament.' : 'Marcador flexible. La clasificaci√≥n usar√° las reglas configuradas para este torneo.';
+      return appIsEnglish ? 'Flexible score. The standings will use the rules configured for this tournament.' : 'Marcador flexible. La clasificaciÛn usar· las reglas configuradas para este torneo.';
   }
 }
 
