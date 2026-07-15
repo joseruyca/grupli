@@ -4,7 +4,7 @@ class TournamentEngineV2 {
   static const int version = 20;
   static const String architectureKey = 'tournaments_final_architecture_v1';
 
-  static const List<TournamentSportSpec> sportSpecs = [
+  static final List<TournamentSportSpec> sportSpecs = [
     TournamentSportSpec(
       key: 'football',
       label: appIsEnglish ? 'Football' : 'Fútbol',
@@ -117,7 +117,7 @@ class TournamentEngineV2 {
     ),
   ];
 
-  static const List<TournamentPremiumFeature> premiumFeatures = [
+  static final List<TournamentPremiumFeature> premiumFeatures = [
     TournamentPremiumFeature('unlimited_active_tournaments', appIsEnglish ? 'Unlimited active tournaments' : 'Torneos activos ilimitados', appIsEnglish ? 'For groups that run several competitions at the same time.' : 'Para grupos que organizan varias competiciones a la vez.'),
     TournamentPremiumFeature('advanced_americano', appIsEnglish ? 'Advanced Americano' : 'Americano avanzado', appIsEnglish ? 'Smart rotations, balanced breaks and fewer repeats.' : 'Rotaciones inteligentes, descansos equilibrados y menos repeticiones.'),
     TournamentPremiumFeature('smart_multi_courts', appIsEnglish ? 'Smart multiple courts' : 'Múltiples pistas inteligentes', appIsEnglish ? 'Distribute matches across courts or tables automatically.' : 'Reparte partidos por pista o mesa de forma automática.'),
@@ -238,37 +238,37 @@ class TournamentEngineV2 {
 
   static List<TournamentChoice> participantChoices(String sport, String format) {
     if (format == 'americano') {
-      return const [TournamentChoice('individual', 'Jugadores', 'Ranking individual', Icons.person_rounded)];
+      return [TournamentChoice('individual', 'Jugadores', 'Ranking individual', Icons.person_rounded)];
     }
     if (format == 'manual') {
-      return const [
+      return [
         TournamentChoice('individual', 'Jugadores', 'Uno contra uno', Icons.person_rounded),
         TournamentChoice('pareja', 'Parejas', 'Ana / Javi', Icons.people_rounded),
         TournamentChoice('equipo', 'Equipos', 'Nombres libres', Icons.groups_rounded),
       ];
     }
     if (sport == 'tennis_padel') {
-      return const [
+      return [
         TournamentChoice('pareja', appIsEnglish ? 'Pairs' : 'Parejas', appIsEnglish ? 'Padel doubles' : 'Pádel dobles', Icons.people_rounded),
         TournamentChoice('individual', 'Individual', 'Uno contra uno', Icons.person_rounded),
       ];
     }
     if (sport == 'football' || sport == 'basketball' || sport == 'volleyball' || sport == 'esports') {
-      return const [TournamentChoice('equipo', 'Equipos', 'Clubes o equipos', Icons.groups_rounded)];
+      return [TournamentChoice('equipo', 'Equipos', 'Clubes o equipos', Icons.groups_rounded)];
     }
     if (sport == 'ping_pong' || sport == 'cards_mus') {
-      return const [
+      return [
         TournamentChoice('individual', 'Jugadores', 'Ranking por jugador', Icons.person_rounded),
         TournamentChoice('pareja', 'Parejas', 'Dos por equipo', Icons.people_rounded),
       ];
     }
     if (sport == 'darts' || sport == 'billiards') {
-      return const [
+      return [
         TournamentChoice('individual', 'Jugadores', 'Uno contra uno', Icons.person_rounded),
         TournamentChoice('equipo', 'Equipos', 'Equipos libres', Icons.groups_rounded),
       ];
     }
-    return const [
+    return [
       TournamentChoice('equipo', 'Equipos', 'Nombres libres', Icons.groups_rounded),
       TournamentChoice('individual', 'Jugadores', 'Uno contra uno', Icons.person_rounded),
       TournamentChoice('pareja', 'Parejas', 'Ana / Javi', Icons.people_rounded),

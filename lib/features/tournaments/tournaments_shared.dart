@@ -573,7 +573,7 @@ class TournamentQuickModeInfoCard extends StatelessWidget {
   Widget build(BuildContext context) => AppCard(
     color: AppColors.tealSoft,
     padding: const EdgeInsets.all(11),
-    child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Icon(Icons.info_outline_rounded, color: AppColors.teal, size: 20),
       SizedBox(width: 9),
       Expanded(child: Text(
