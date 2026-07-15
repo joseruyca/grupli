@@ -481,7 +481,7 @@ class TournamentQuickTemplateGrid extends StatelessWidget {
   final List<String>? allowedValues;
   const TournamentQuickTemplateGrid({super.key, required this.selected, required this.onChanged, this.allowedValues});
 
-  static const templates = [
+  static final templates = [
     TournamentQuickTemplate('league', '', 'Liga', appIsEnglish ? 'Rounds and standings' : 'Jornadas y clasificación'),
     TournamentQuickTemplate('americano_padel', '', 'Americano', appIsEnglish ? 'Rounds and individual ranking' : 'Rondas y ranking individual'),
     TournamentQuickTemplate('quick_cup', '', 'Eliminatoria', appIsEnglish ? 'Bracket, semifinal and final' : 'Cuadro, semifinal y final'),
