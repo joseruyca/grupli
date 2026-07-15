@@ -1,4 +1,4 @@
-part of 'package:grupli/main.dart';
+part of grupli_app;
 
 class AppData {
   static SupabaseClient get sb => Supabase.instance.client;

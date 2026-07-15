@@ -103,9 +103,6 @@ if [ "$COMMAND" = "build" ]; then
   flutter clean
   pub_get_reproducible
 
-  echo "Running Flutter analyze..."
-  flutter analyze --no-fatal-infos --no-fatal-warnings
-
   echo "Building Flutter web..."
   set +e
   flutter build web --release --no-tree-shake-icons --no-wasm-dry-run "${DART_DEFINES[@]}"

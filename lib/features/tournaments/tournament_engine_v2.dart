@@ -1,4 +1,4 @@
-part of 'package:grupli/main.dart';
+part of grupli_app;
 
 class TournamentEngineV2 {
   static const int version = 20;

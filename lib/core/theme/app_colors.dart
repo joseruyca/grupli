@@ -1,4 +1,4 @@
-part of 'package:grupli/main.dart';
+part of grupli_app;
 
 class AppColors {
   // Grupli v16.34 design tokens: warm, calm and readable.

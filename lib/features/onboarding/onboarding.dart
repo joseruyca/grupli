@@ -1,4 +1,4 @@
-part of 'package:grupli/main.dart';
+part of grupli_app;
 
 class OnboardingStore {
   static const seenKey = 'grupli_onboarding_seen_v1';
