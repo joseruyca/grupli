@@ -2271,25 +2271,25 @@ bool looksLikeSessionProblem(String raw) {
 String humanizeError(String raw) {
   final original = raw.replaceAll('Exception: ', '').trim();
   final text = original.toLowerCase();
-  if (text.isEmpty) return 'No se pudo completar la acción. Inténtalo de nuevo.';
-  if (text.contains('invalid login credentials')) return 'Email o contraseña incorrectos.';
-  if (text.contains('email not confirmed')) return 'Confirma tu email antes de iniciar sesión.';
-  if (text.contains('invalid email')) return 'El email no tiene un formato válido.';
-  if (text.contains('weak password')) return 'La contraseña es demasiado débil.';
-  if (text.contains('user already registered') || text.contains('already registered')) return 'Esta cuenta ya existe. Inicia sesión en lugar de registrarte.';
-  if (text.contains('confirmation_required')) return 'Para eliminar la cuenta debes escribir ELIMINAR exactamente.';
-  if (looksLikeSessionProblem(original)) return 'Tu sesión ha caducado. Cierra sesión e inicia sesión de nuevo.';
-  if (text.contains('owner_protected') || text.contains('owner') || text.contains('creador del grupo')) return 'El creador del grupo está protegido. Transfiere o elimina el grupo antes de hacer esa acción.';
-  if (text.contains('member_not_found') || text.contains('not_member')) return 'Ese miembro ya no está disponible en el grupo.';
-  if (text.contains('invalid_role')) return 'Ese rol no es válido.';
-  if (text.contains('settlement_payments') || text.contains('create_settlement_payment_atomic')) return 'Finanzas necesita una actualización interna. Vuelve a intentarlo más tarde.';
-  if (text.contains('tournaments_scoring_type_check')) return 'Torneos necesita una actualización interna. Vuelve a intentarlo más tarde.';
-  if (text.contains('permission') || text.contains('policy') || text.contains('rls') || text.contains('not allowed') || text.contains('denied') || text.contains('violates row-level')) return 'No tienes permiso para hacer esa acción.';
-  if (looksLikeNetworkError(original)) return 'No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.';
-  if (text.contains('duplicate') || text.contains('already') || text.contains('unique constraint')) return 'Parece que esto ya existe o ya se había guardado.';
-  if (text.contains('foreign key') || text.contains('violates') || text.contains('constraint')) return 'No se pudo guardar porque hay datos relacionados. Revisa la acción e inténtalo de nuevo.';
-  if (text.contains('postgrestexception') || text.contains('pgrst') || text.contains('supabase') || text.contains('postgres')) return 'No se pudo completar la acción en la base de datos. Inténtalo otra vez.';
-  if (original.length > 120) return 'No se pudo completar la acción. Inténtalo de nuevo.';
+  if (text.isEmpty) return appIsEnglish ? 'The action could not be completed. Try again.' : 'No se pudo completar la acción. Inténtalo de nuevo.';
+  if (text.contains('invalid login credentials')) return appIsEnglish ? 'Incorrect email or password.' : 'Email o contraseña incorrectos.';
+  if (text.contains('email not confirmed')) return appIsEnglish ? 'Confirm your email before signing in.' : 'Confirma tu email antes de iniciar sesión.';
+  if (text.contains('invalid email')) return appIsEnglish ? 'The email format is invalid.' : 'El email no tiene un formato válido.';
+  if (text.contains('weak password')) return appIsEnglish ? 'The password is too weak.' : 'La contraseña es demasiado débil.';
+  if (text.contains('user already registered') || text.contains('already registered')) return appIsEnglish ? 'This account already exists. Sign in instead of registering.' : 'Esta cuenta ya existe. Inicia sesión en lugar de registrarte.';
+  if (text.contains('confirmation_required')) return appIsEnglish ? 'To delete the account, type DELETE exactly.' : 'Para eliminar la cuenta debes escribir ELIMINAR exactamente.';
+  if (looksLikeSessionProblem(original)) return appIsEnglish ? 'Your session has expired. Sign out and sign back in.' : 'Tu sesión ha caducado. Cierra sesión e inicia sesión de nuevo.';
+  if (text.contains('owner_protected') || text.contains('owner') || text.contains('creador del grupo')) return appIsEnglish ? 'The group owner is protected. Transfer or delete the group before doing that.' : 'El creador del grupo está protegido. Transfiere o elimina el grupo antes de hacer esa acción.';
+  if (text.contains('member_not_found') || text.contains('not_member')) return appIsEnglish ? 'That member is no longer available in the group.' : 'Ese miembro ya no está disponible en el grupo.';
+  if (text.contains('invalid_role')) return appIsEnglish ? 'That role is not valid.' : 'Ese rol no es válido.';
+  if (text.contains('settlement_payments') || text.contains('create_settlement_payment_atomic')) return appIsEnglish ? 'Finances needs an internal update. Try again later.' : 'Finanzas necesita una actualización interna. Vuelve a intentarlo más tarde.';
+  if (text.contains('tournaments_scoring_type_check')) return appIsEnglish ? 'Tournaments needs an internal update. Try again later.' : 'Torneos necesita una actualización interna. Vuelve a intentarlo más tarde.';
+  if (text.contains('permission') || text.contains('policy') || text.contains('rls') || text.contains('not allowed') || text.contains('denied') || text.contains('violates row-level')) return appIsEnglish ? 'You do not have permission to do that.' : 'No tienes permiso para hacer esa acción.';
+  if (looksLikeNetworkError(original)) return appIsEnglish ? 'Could not connect. Check your connection and try again.' : 'No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.';
+  if (text.contains('duplicate') || text.contains('already') || text.contains('unique constraint')) return appIsEnglish ? 'It looks like this already exists or was already saved.' : 'Parece que esto ya existe o ya se había guardado.';
+  if (text.contains('foreign key') || text.contains('violates') || text.contains('constraint')) return appIsEnglish ? 'Could not save because there is related data. Review the action and try again.' : 'No se pudo guardar porque hay datos relacionados. Revisa la acción e inténtalo de nuevo.';
+  if (text.contains('postgrestexception') || text.contains('pgrst') || text.contains('supabase') || text.contains('postgres')) return appIsEnglish ? 'Could not complete the database action. Try again.' : 'No se pudo completar la acción en la base de datos. Inténtalo otra vez.';
+  if (original.length > 120) return appIsEnglish ? 'The action could not be completed. Try again.' : 'No se pudo completar la acción. Inténtalo de nuevo.';
   return original;
 }
 

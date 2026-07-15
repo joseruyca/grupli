@@ -679,7 +679,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
   Future<void> join() async {
     final clean = InviteLinks.codeFromText(code.text);
     if (clean == null || clean.length < 4) {
-      await showToast(context, 'Introduce un código o enlace válido.', danger: true);
+      await showToast(context, appIsEnglish ? 'Enter a valid code or link.' : 'Introduce un código o enlace válido.', danger: true);
       return;
     }
     setState(() => loading = true);

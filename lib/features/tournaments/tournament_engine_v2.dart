@@ -7,7 +7,7 @@ class TournamentEngineV2 {
   static const List<TournamentSportSpec> sportSpecs = [
     TournamentSportSpec(
       key: 'football',
-      label: 'Fútbol',
+      label: appIsEnglish ? 'Football' : 'Fútbol',
       emoji: '⚽',
       resultMode: 'score',
       resultLabel: 'Goles',
@@ -27,7 +27,7 @@ class TournamentEngineV2 {
     ),
     TournamentSportSpec(
       key: 'tennis_padel',
-      label: 'Tenis / Pádel',
+      label: appIsEnglish ? 'Tennis / Padel' : 'Tenis / Pádel',
       emoji: '🎾',
       resultMode: 'sets_games',
       resultLabel: 'Sets y juegos',
@@ -118,19 +118,19 @@ class TournamentEngineV2 {
   ];
 
   static const List<TournamentPremiumFeature> premiumFeatures = [
-    TournamentPremiumFeature('unlimited_active_tournaments', 'Torneos activos ilimitados', 'Para grupos que organizan varias competiciones a la vez.'),
-    TournamentPremiumFeature('advanced_americano', 'Americano avanzado', 'Rotaciones inteligentes, descansos equilibrados y menos repeticiones.'),
-    TournamentPremiumFeature('smart_multi_courts', 'Múltiples pistas inteligentes', 'Reparte partidos por pista o mesa de forma automática.'),
-    TournamentPremiumFeature('advanced_calendar', 'Calendario automático avanzado', 'Reorganiza fechas, detecta conflictos y prepara jornadas.'),
-    TournamentPremiumFeature('move_matchdays', 'Mover jornadas completas', 'Cambia una jornada entera sin editar partido por partido.'),
-    TournamentPremiumFeature('advanced_stats', 'Estadísticas avanzadas', 'Rachas, evolución, comparativas e historial.'),
-    TournamentPremiumFeature('custom_tiebreakers', 'Desempates configurables', 'Cambia el orden de desempates según el grupo.'),
-    TournamentPremiumFeature('exports', 'Exportar clasificación', 'Crea PDF, imagen o archivo para compartir.'),
-    TournamentPremiumFeature('beautiful_share', 'Compartir resumen bonito', 'Resumen visual para WhatsApp o redes.'),
-    TournamentPremiumFeature('duplicate_tournaments', 'Duplicar torneo', 'Repite una liga o torneo con la misma estructura.'),
-    TournamentPremiumFeature('saved_templates', 'Plantillas guardadas', 'Guarda formatos habituales del grupo.'),
-    TournamentPremiumFeature('seeding', 'Cabezas de serie', 'Ordena favoritos o usa ranking para el cuadro.'),
-    TournamentPremiumFeature('historical_group_ranking', 'Ranking histórico del grupo', 'Ranking acumulado entre torneos y temporadas.'),
+    TournamentPremiumFeature('unlimited_active_tournaments', appIsEnglish ? 'Unlimited active tournaments' : 'Torneos activos ilimitados', appIsEnglish ? 'For groups that run several competitions at the same time.' : 'Para grupos que organizan varias competiciones a la vez.'),
+    TournamentPremiumFeature('advanced_americano', appIsEnglish ? 'Advanced Americano' : 'Americano avanzado', appIsEnglish ? 'Smart rotations, balanced breaks and fewer repeats.' : 'Rotaciones inteligentes, descansos equilibrados y menos repeticiones.'),
+    TournamentPremiumFeature('smart_multi_courts', appIsEnglish ? 'Smart multiple courts' : 'Múltiples pistas inteligentes', appIsEnglish ? 'Distribute matches across courts or tables automatically.' : 'Reparte partidos por pista o mesa de forma automática.'),
+    TournamentPremiumFeature('advanced_calendar', appIsEnglish ? 'Advanced automatic calendar' : 'Calendario automático avanzado', appIsEnglish ? 'Reorder dates, detect conflicts and prepare rounds.' : 'Reorganiza fechas, detecta conflictos y prepara jornadas.'),
+    TournamentPremiumFeature('move_matchdays', appIsEnglish ? 'Move full matchdays' : 'Mover jornadas completas', appIsEnglish ? 'Move a full round without editing match by match.' : 'Cambia una jornada entera sin editar partido por partido.'),
+    TournamentPremiumFeature('advanced_stats', appIsEnglish ? 'Advanced stats' : 'Estadísticas avanzadas', appIsEnglish ? 'Streaks, evolution, comparisons and history.' : 'Rachas, evolución, comparativas e historial.'),
+    TournamentPremiumFeature('custom_tiebreakers', appIsEnglish ? 'Custom tiebreakers' : 'Desempates configurables', appIsEnglish ? 'Change the tiebreak order for the group.' : 'Cambia el orden de desempates según el grupo.'),
+    TournamentPremiumFeature('exports', appIsEnglish ? 'Export standings' : 'Exportar clasificación', appIsEnglish ? 'Create a PDF, image or file to share.' : 'Crea PDF, imagen o archivo para compartir.'),
+    TournamentPremiumFeature('beautiful_share', appIsEnglish ? 'Beautiful sharing' : 'Compartir resumen bonito', appIsEnglish ? 'Visual summary for WhatsApp or social networks.' : 'Resumen visual para WhatsApp o redes.'),
+    TournamentPremiumFeature('duplicate_tournaments', appIsEnglish ? 'Duplicate tournament' : 'Duplicar torneo', appIsEnglish ? 'Repeat a league or tournament with the same structure.' : 'Repite una liga o torneo con la misma estructura.'),
+    TournamentPremiumFeature('saved_templates', appIsEnglish ? 'Saved templates' : 'Plantillas guardadas', appIsEnglish ? 'Save the group’s usual formats.' : 'Guarda formatos habituales del grupo.'),
+    TournamentPremiumFeature('seeding', appIsEnglish ? 'Seeding' : 'Cabezas de serie', appIsEnglish ? 'Order favorites or use ranking for the bracket.' : 'Ordena favoritos o usa ranking para el cuadro.'),
+    TournamentPremiumFeature('historical_group_ranking', appIsEnglish ? 'Historical group ranking' : 'Ranking histórico del grupo', appIsEnglish ? 'Accumulated ranking across tournaments and seasons.' : 'Ranking acumulado entre torneos y temporadas.'),
   ];
 
   static TournamentSportSpec sportSpec(String sport) {
@@ -249,7 +249,7 @@ class TournamentEngineV2 {
     }
     if (sport == 'tennis_padel') {
       return const [
-        TournamentChoice('pareja', 'Parejas', 'Pádel dobles', Icons.people_rounded),
+        TournamentChoice('pareja', appIsEnglish ? 'Pairs' : 'Parejas', appIsEnglish ? 'Padel doubles' : 'Pádel dobles', Icons.people_rounded),
         TournamentChoice('individual', 'Individual', 'Uno contra uno', Icons.person_rounded),
       ];
     }
@@ -362,16 +362,16 @@ class TournamentEngineV2 {
   }
 
   static String? setupError({required String sport, required String format, required String participantType, required int participantCount, required int manualMatchesCount}) {
-    if (!supportsFormat(sport, format)) return '${tournamentFormatLabel(format)} no está disponible para ${scoringTypeLabel(sport)}.';
+    if (!supportsFormat(sport, format)) return appIsEnglish ? '${tournamentFormatLabel(format)} is not available for ${scoringTypeLabel(sport)}.' : '${tournamentFormatLabel(format)} no está disponible para ${scoringTypeLabel(sport)}.';
     final allowedModes = participantChoices(sport, format).map((item) => item.value).toSet();
     if (!allowedModes.contains(participantType)) return 'Ese tipo de participantes no encaja con este deporte y formato.';
     if (format == 'americano') {
-      if (participantType != 'individual') return 'El Americano solo admite jugadores individuales.';
-      if (participantCount < 4) return 'El Americano necesita al menos 4 jugadores.';
+      if (participantType != 'individual') return appIsEnglish ? 'Americano only allows individual players.' : 'El Americano solo admite jugadores individuales.';
+      if (participantCount < 4) return appIsEnglish ? 'Americano needs at least 4 players.' : 'El Americano necesita al menos 4 jugadores.';
     } else if (participantCount < 2) {
-      return 'Añade al menos 2 participantes.';
+      return appIsEnglish ? 'Add at least 2 participants.' : 'Añade al menos 2 participantes.';
     }
-    if (format == 'manual' && manualMatchesCount <= 0) return 'Añade al menos un partido manual.';
+    if (format == 'manual' && manualMatchesCount <= 0) return appIsEnglish ? 'Add at least one manual match.' : 'Añade al menos un partido manual.';
     return null;
   }
 }

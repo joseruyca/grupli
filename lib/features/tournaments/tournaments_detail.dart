@@ -50,25 +50,25 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
   bool get currentCanCreatePairs => currentFormat != 'americano' && currentTeamType == 'pareja';
 
   String get currentParticipantAddTitle {
-    if (currentFormat == 'americano') return 'Añadir jugadores';
-    if (currentTeamType == 'pareja') return 'Añadir parejas';
-    if (currentTeamType == 'individual') return 'Añadir jugadores';
-    return 'Añadir equipos';
+    if (currentFormat == 'americano') return appIsEnglish ? 'Add players' : 'Añadir jugadores';
+    if (currentTeamType == 'pareja') return appIsEnglish ? 'Add pairs' : 'Añadir parejas';
+    if (currentTeamType == 'individual') return appIsEnglish ? 'Add players' : 'Añadir jugadores';
+    return appIsEnglish ? 'Add teams' : 'Añadir equipos';
   }
 
   String get currentParticipantAddHint {
     if (currentFormat == 'americano') return 'Ana\nJavi\nMarta\nLuis';
     if (currentTeamType == 'pareja') return 'Ana / Javi\nMarta / Luis\nCris / Pablo';
     if (currentTeamType == 'individual') return 'Ana\nJavi\nMarta\nLuis';
-    if (currentScoringType == 'football') return 'Los Pingüinos FC\nEquipo Azul\nLa Banda del Domingo';
-    return 'Equipo Azul\nLos Invencibles\nGrupo del Viernes';
+    if (currentScoringType == 'football') return appIsEnglish ? 'The Penguins FC\nBlue Team\nSunday Crew' : 'Los Pingüinos FC\nEquipo Azul\nLa Banda del Domingo';
+    return appIsEnglish ? 'Blue Team\nThe Underdogs\nFriday Crew' : 'Equipo Azul\nLos Invencibles\nGrupo del Viernes';
   }
 
   String get currentParticipantAddHelp {
-    if (currentFormat == 'americano') return 'Un jugador por línea. En Americano Grupli crea parejas rotativas automáticamente.';
-    if (currentTeamType == 'pareja') return 'Una pareja por línea. Usa el formato Ana / Javi para que se entienda bien.';
-    if (currentTeamType == 'individual') return 'Un jugador por línea.';
-    return 'Un equipo por línea. No añadas jugadores sueltos si esta competición es por equipos.';
+    if (currentFormat == 'americano') return appIsEnglish ? 'One player per line. In Americano, Grupli creates rotating pairs automatically.' : 'Un jugador por línea. En Americano Grupli crea parejas rotativas automáticamente.';
+    if (currentTeamType == 'pareja') return appIsEnglish ? 'One pair per line. Use the Ana / Javi format so it is clear.' : 'Una pareja por línea. Usa el formato Ana / Javi para que se entienda bien.';
+    if (currentTeamType == 'individual') return appIsEnglish ? 'One player per line.' : 'Un jugador por línea.';
+    return appIsEnglish ? 'One team per line. Do not add loose players if this competition is for teams.' : 'Un equipo por línea. No añadas jugadores sueltos si esta competición es por equipos.';
   }
 
   Future<void> addParticipants() async {
@@ -92,8 +92,8 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Añadir')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(appIsEnglish ? 'Cancel' : 'Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: Text(appIsEnglish ? 'Add' : 'Añadir')),
         ],
       ),
     );
@@ -103,7 +103,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
     try {
       await AppData.addTournamentTeams(widget.tournamentId, names);
       await load(soft: true);
-      if (mounted) await showToast(context, 'Participantes añadidos. Regenera o añade partidos si lo necesitas.');
+      if (mounted) await showToast(context, appIsEnglish ? 'Participants added. Regenerate or add matches if needed.' : 'Participantes añadidos. Regenera o añade partidos si lo necesitas.');
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -112,8 +112,8 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
   Future<void> addGroupMembersVisual() async {
     if (!currentCanAddMembers) {
       await showToast(context, currentTeamType == 'pareja'
-          ? 'Esta competición usa parejas. Crea las parejas desde el botón Pareja o escríbelas como Ana / Javi.'
-          : 'Esta competición usa equipos. Añade nombres de equipos en vez de cargar miembros sueltos.',
+          ? (appIsEnglish ? 'This competition uses pairs. Create pairs from the Pair button or write them as Ana / Javi.' : 'Esta competición usa parejas. Crea las parejas desde el botón Pareja o escríbelas como Ana / Javi.')
+          : (appIsEnglish ? 'This competition uses teams. Add team names instead of loading individual members.' : 'Esta competición usa equipos. Añade nombres de equipos en vez de cargar miembros sueltos.'),
           danger: true);
       return;
     }
@@ -127,7 +127,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
       if (mounted) {
         await showToast(
           context,
-          added == 0 ? 'No se añadieron miembros nuevos: ya estaban en el torneo.' : '$added participante${added == 1 ? '' : 's'} añadidos.',
+          added == 0 ? (appIsEnglish ? 'No new members were added: they were already in the tournament.' : 'No se añadieron miembros nuevos: ya estaban en el torneo.') : (appIsEnglish ? '$added participant${added == 1 ? '' : 's'} added.' : '$added participante${added == 1 ? '' : 's'} añadidos.'),
           danger: added == 0,
         );
       }
@@ -139,8 +139,8 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
   Future<void> createPairVisual() async {
     if (!currentCanCreatePairs) {
       await showToast(context, currentFormat == 'americano'
-          ? 'En Americano no se crean parejas fijas: Grupli las rota ronda a ronda.'
-          : 'Esta competición no está configurada como parejas.',
+          ? (appIsEnglish ? 'Americano does not create fixed pairs: Grupli rotates them round by round.' : 'En Americano no se crean parejas fijas: Grupli las rota ronda a ronda.')
+          : (appIsEnglish ? 'This competition is not configured as pairs.' : 'Esta competición no está configurada como parejas.'),
           danger: true);
       return;
     }
@@ -151,7 +151,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
       if (pair == null) return;
       await AppData.addTournamentPairFromMembers(widget.tournamentId, pair.first, pair.second, customName: pair.name);
       await load(soft: true);
-      if (mounted) await showToast(context, 'Pareja creada.');
+      if (mounted) await showToast(context, appIsEnglish ? 'Pair created.' : 'Pareja creada.');
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -166,7 +166,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
     if (edited == null) return;
 
     if (hasResults && edited.rulesChanged) {
-      await showToast(context, 'Hay resultados registrados. Para proteger la tabla solo se permite cambiar el nombre.', danger: true);
+      await showToast(context, appIsEnglish ? 'There are recorded results. To protect the table, only the name can be changed.' : 'Hay resultados registrados. Para proteger la tabla solo se permite cambiar el nombre.', danger: true);
       return;
     }
 
@@ -180,7 +180,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
         tieBreakers: edited.tieBreakers,
       );
       await load(soft: true);
-      if (mounted) await showToast(context, 'Torneo actualizado.');
+      if (mounted) await showToast(context, appIsEnglish ? 'Tournament updated.' : 'Torneo actualizado.');
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -199,18 +199,18 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
     final value = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Añadir partidos manuales'),
+        title: Text(appIsEnglish ? 'Add manual matches' : 'Añadir partidos manuales'),
         content: TextField(
           controller: controller,
           minLines: 6,
           maxLines: 10,
           autofocus: true,
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(hintText: 'Jornada 2: Equipo Azul vs Equipo Rojo\nJornada 2: Ana / Javi vs Marta / Luis'),
+          decoration: InputDecoration(hintText: appIsEnglish ? 'Round 2: Blue Team vs Red Team\nRound 2: Ana / Javi vs Marta / Luis' : 'Jornada 2: Equipo Azul vs Equipo Rojo\nJornada 2: Ana / Javi vs Marta / Luis'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Añadir')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(appIsEnglish ? 'Cancel' : 'Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: Text(appIsEnglish ? 'Add' : 'Añadir')),
         ],
       ),
     );
@@ -220,7 +220,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
     try {
       await AppData.addManualMatches(widget.tournamentId, tournamentTeams(t), pairs, scheduleConfig: tournamentScheduleConfig(t));
       await load(soft: true);
-      if (mounted) await showToast(context, 'Partidos añadidos.');
+      if (mounted) await showToast(context, appIsEnglish ? 'Matches added.' : 'Partidos añadidos.');
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -236,29 +236,29 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
     }
     final teams = tournamentTeams(t);
     if (teams.length < 2) {
-      await showToast(context, 'Añade al menos 2 participantes.', danger: true);
+      await showToast(context, appIsEnglish ? 'Add at least 2 participants.' : 'Añade al menos 2 participantes.', danger: true);
       return;
     }
     final matches = tournamentMatches(t);
     final results = matches.where(matchCountsForStandings).length;
     if (results > 0) {
-      await showToast(context, 'No se puede regenerar una liga con resultados. Borra primero los resultados o crea otra competición.', danger: true);
+      await showToast(context, appIsEnglish ? 'You cannot regenerate a league with results. Delete the results first or create another competition.' : 'No se puede regenerar una liga con resultados. Borra primero los resultados o crea otra competición.', danger: true);
       return;
     }
     if (matches.isNotEmpty) {
       final ok = await confirmAction(
         context,
-        title: '¿Regenerar calendario?',
-        body: 'Se borrarán los partidos pendientes actuales para crear un calendario nuevo. Los resultados ya registrados bloquean esta acción.',
+        title: appIsEnglish ? 'Regenerate schedule?' : '¿Regenerar calendario?',
+        body: appIsEnglish ? 'Current pending matches will be deleted to create a new schedule. Recorded results block this action.' : 'Se borrarán los partidos pendientes actuales para crear un calendario nuevo. Los resultados ya registrados bloquean esta acción.',
         danger: true,
-        confirmLabel: 'Regenerar',
+        confirmLabel: appIsEnglish ? 'Regenerate' : 'Regenerar',
       );
       if (ok != true) return;
     }
     try {
       await AppData.generateMatches(widget.tournamentId, format, teams, formatConfig: tournamentFormatConfig(t), scheduleConfig: tournamentScheduleConfig(t));
       await load(soft: true);
-      if (mounted) await showToast(context, 'Calendario generado.');
+      if (mounted) await showToast(context, appIsEnglish ? 'Schedule generated.' : 'Calendario generado.');
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -270,7 +270,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
     try {
       await AppData.generateNextEliminationRound(widget.tournamentId, tournamentMatches(t));
       await load(soft: true);
-      if (mounted) await showToast(context, 'Siguiente ronda generada.');
+      if (mounted) await showToast(context, appIsEnglish ? 'Next round generated.' : 'Siguiente ronda generada.');
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -282,7 +282,7 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
     try {
       await AppData.generateThirdPlaceMatch(widget.tournamentId, tournamentMatches(t));
       await load(soft: true);
-      if (mounted) await showToast(context, 'Partido por el tercer puesto creado.');
+      if (mounted) await showToast(context, appIsEnglish ? 'Third-place match created.' : 'Partido por el tercer puesto creado.');
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -304,10 +304,10 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
   Future<void> deleteTournament() async {
     final ok = await confirmAction(
       context,
-      title: '¿Eliminar competición?',
-      body: 'Se borrarán participantes, partidos y resultados. Esta acción no se puede deshacer.',
+      title: appIsEnglish ? 'Delete competition?' : '¿Eliminar competición?',
+      body: appIsEnglish ? 'Participants, matches and results will be deleted. This action cannot be undone.' : 'Se borrarán participantes, partidos y resultados. Esta acción no se puede deshacer.',
       danger: true,
-      confirmLabel: 'Eliminar',
+      confirmLabel: appIsEnglish ? 'Delete' : 'Eliminar',
     );
     if (ok != true) return;
     try {
@@ -341,10 +341,10 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
     final pending = matches.length - played;
 
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: t == null ? 'Competición' : AppData.text(t['name'], 'Competición'), subtitle: t == null ? 'Cargando...' : '${tournamentFormatLabel(format)} · ${teamTypeLabel(AppData.text(t['team_type'], 'equipo'))} · Jornada ${currentTournamentRound(matches)}', leading: true),
+      PageHeader(title: t == null ? (appIsEnglish ? 'Competition' : 'Competición') : AppData.text(t['name'], appIsEnglish ? 'Competition' : 'Competición'), subtitle: t == null ? (appIsEnglish ? 'Loading...' : 'Cargando...') : '${tournamentFormatLabel(format)} · ${teamTypeLabel(AppData.text(t['team_type'], appIsEnglish ? 'team' : 'equipo'))} · ${appIsEnglish ? 'Round' : 'Jornada'} ${currentTournamentRound(matches)}', leading: true),
       const SizedBox(height: 14),
       if (loading && t == null)
-        const CenterLoader(label: 'Cargando competición...')
+        CenterLoader(label: appIsEnglish ? 'Loading competition...' : 'Cargando competición...')
       else if (error != null && t == null)
         ErrorBlock(message: error!, onRetry: () => load())
       else ...[

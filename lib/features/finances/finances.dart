@@ -332,7 +332,7 @@ class _FinancesTabState extends State<FinancesTab> {
             foregroundColor: Colors.white,
             onPressed: openCreate,
             icon: const Icon(Icons.add_rounded),
-            label: const Text('Gasto', style: TextStyle(fontWeight: FontWeight.w900)),
+            label: Text(appIsEnglish ? 'Expense' : 'Gasto', style: const TextStyle(fontWeight: FontWeight.w900)),
           ),
         ),
       ]),
@@ -501,7 +501,7 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
   @override
   Widget build(BuildContext context) {
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: widget.editing ? 'Editar gasto' : 'Nuevo gasto', subtitle: widget.editing ? 'Ajusta importe, pagador o reparto.' : 'Importe, pagador y reparto en pocos pasos.', leading: true),
+      PageHeader(title: widget.editing ? (appIsEnglish ? 'Edit expense' : 'Editar gasto') : (appIsEnglish ? 'New expense' : 'Nuevo gasto'), subtitle: widget.editing ? (appIsEnglish ? 'Adjust amount, payer or split.' : 'Ajusta importe, pagador o reparto.') : (appIsEnglish ? 'Amount, payer and split in a few steps.' : 'Importe, pagador y reparto en pocos pasos.'), leading: true),
       const SizedBox(height: 18),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -513,11 +513,11 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
           ])),
         ]),
         const SizedBox(height: 16),
-        FieldLabel('Concepto'),
-        TextField(controller: concept, decoration: const InputDecoration(hintText: 'Ej. Pista de pádel, cena, gasolina...')),
+        FieldLabel(appIsEnglish ? 'Concept' : 'Concepto'),
+        TextField(controller: concept, decoration: InputDecoration(hintText: appIsEnglish ? 'E.g. padel court, dinner, fuel...' : 'Ej. Pista de pádel, cena, gasolina...')),
         const SizedBox(height: 12),
-        FieldLabel('Importe total'),
-        TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0,00 €')),
+        FieldLabel(appIsEnglish ? 'Total amount' : 'Importe total'),
+        TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(hintText: appIsEnglish ? '0.00 €' : '0,00 €')),
       ])),
       const SizedBox(height: 14),
       FutureBuilder<List<Map<String, dynamic>>>(
@@ -529,9 +529,9 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
           final equalShare = selected.isEmpty ? 0.0 : value / selected.length;
           final custom = customTotal();
           final diff = value - custom;
-          if (snapshot.connectionState == ConnectionState.waiting) return const CenterLoader(label: 'Cargando miembros...');
+          if (snapshot.connectionState == ConnectionState.waiting) return CenterLoader(label: appIsEnglish ? 'Loading members...' : 'Cargando miembros...');
           if (snapshot.hasError) return ErrorBlock(message: snapshot.error.toString(), onRetry: () => setState(() { membersFuture = AppData.members(widget.groupId); }));
-          if (members.isEmpty) return EmptyBlock(icon: Icons.groups_rounded, title: 'No hay miembros', body: 'Añade miembros al grupo para poder repartir gastos.');
+          if (members.isEmpty) return EmptyBlock(icon: Icons.groups_rounded, title: appIsEnglish ? 'No members yet' : 'No hay miembros', body: appIsEnglish ? 'Add members to the group to split expenses.' : 'Añade miembros al grupo para poder repartir gastos.');
           return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               FieldLabel('Pagado por'),
@@ -554,13 +554,13 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
             ])),
             const SizedBox(height: 14),
             AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              FieldLabel('Reparto'),
+              FieldLabel(appIsEnglish ? 'Split' : 'Reparto'),
               Row(children: [
-                Expanded(child: ChoicePill(label: 'Todos', active: splitMode == 'all', onTap: () => setMode('all', members))),
+                Expanded(child: ChoicePill(label: appIsEnglish ? 'All' : 'Todos', active: splitMode == 'all', onTap: () => setMode('all', members))),
                 const SizedBox(width: 8),
-                Expanded(child: ChoicePill(label: 'Algunos', active: splitMode == 'some', onTap: () => setMode('some', members))),
+                Expanded(child: ChoicePill(label: appIsEnglish ? 'Some' : 'Algunos', active: splitMode == 'some', onTap: () => setMode('some', members))),
                 const SizedBox(width: 8),
-                Expanded(child: ChoicePill(label: 'Manual', active: splitMode == 'custom', onTap: () => setMode('custom', members))),
+                Expanded(child: ChoicePill(label: appIsEnglish ? 'Manual' : 'Manual', active: splitMode == 'custom', onTap: () => setMode('custom', members))),
               ]),
               const SizedBox(height: 12),
               Wrap(spacing: 9, runSpacing: 9, children: members.map((m) {
@@ -584,7 +584,7 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
               }).toList()),
               if (splitMode == 'custom') ...[
                 const SizedBox(height: 14),
-                FieldLabel('Importe por persona'),
+                FieldLabel(appIsEnglish ? 'Amount per person' : 'Importe por persona'),
                 ...members.where((m) => selected.contains(m['user_id'].toString())).map((m) {
                   final id = m['user_id'].toString();
                   final controller = customShares.putIfAbsent(id, () => TextEditingController());
@@ -603,7 +603,7 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
                           controller: controller,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           textAlign: TextAlign.right,
-                          decoration: const InputDecoration(hintText: '0,00'),
+                          decoration: InputDecoration(hintText: appIsEnglish ? '0.00' : '0,00'),
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
@@ -626,15 +626,15 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
       ),
       const SizedBox(height: 14),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        FieldLabel('Nota opcional'),
-        TextField(controller: note, maxLines: 3, decoration: const InputDecoration(hintText: 'Ej. Reserva incluida, se pagó con tarjeta...')),
+        FieldLabel(appIsEnglish ? 'Optional note' : 'Nota opcional'),
+        TextField(controller: note, maxLines: 3, decoration: InputDecoration(hintText: appIsEnglish ? 'E.g. booking included, paid by card...' : 'Ej. Reserva incluida, se pagó con tarjeta...')),
       ])),
       const SizedBox(height: 24),
       FutureBuilder<List<Map<String, dynamic>>>(
         future: membersFuture,
         builder: (context, snapshot) {
           final members = snapshot.data ?? [];
-          return PrimaryButton(label: widget.editing ? 'Guardar cambios' : 'Guardar gasto', loading: loading, onTap: () => save(members));
+          return PrimaryButton(label: widget.editing ? (appIsEnglish ? 'Save changes' : 'Guardar cambios') : (appIsEnglish ? 'Save expense' : 'Guardar gasto'), loading: loading, onTap: () => save(members));
         },
       ),
     ]));
@@ -687,7 +687,7 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
     final unpaid = unpaidAmount(expense);
     final status = AppData.text(expense['status'], 'pending');
     return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: AppData.text(expense['concept'], 'Gasto'), subtitle: 'Detalle y pagos', leading: true),
+      PageHeader(title: AppData.text(expense['concept'], appIsEnglish ? 'Expense' : 'Gasto'), subtitle: appIsEnglish ? 'Details and payments' : 'Detalle y pagos', leading: true),
       const SizedBox(height: 18),
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -695,9 +695,9 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(money(total), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: AppColors.ink)),
-            Text('Pagado por ${financeMemberName(paidBy, widget.members)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
+            Text(appIsEnglish ? 'Paid by ${financeMemberName(paidBy, widget.members)}' : 'Pagado por ${financeMemberName(paidBy, widget.members)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
           ])),
-          _MiniChip(text: status == 'paid' || unpaid <= .01 ? 'Liquidado' : 'Pendiente', color: status == 'paid' || unpaid <= .01 ? AppColors.green : AppColors.orange),
+          _MiniChip(text: status == 'paid' || unpaid <= .01 ? (appIsEnglish ? 'Settled' : 'Liquidado') : (appIsEnglish ? 'Pending' : 'Pendiente'), color: status == 'paid' || unpaid <= .01 ? AppColors.green : AppColors.orange),
         ]),
         if (AppData.text(expense['note']).isNotEmpty) ...[
           const SizedBox(height: 14),
@@ -733,14 +733,14 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
         );
       }).toList())),
       const SizedBox(height: 18),
-      SecondaryButton(label: 'Editar gasto', icon: Icons.edit_rounded, onTap: loading ? () {} : () => editExpense(expense)),
+      SecondaryButton(label: appIsEnglish ? 'Edit expense' : 'Editar gasto', icon: Icons.edit_rounded, onTap: loading ? () {} : () => editExpense(expense)),
       const SizedBox(height: 10),
-      if (unpaid > .01) PrimaryButton(label: 'Marcar gasto liquidado', icon: Icons.verified_rounded, loading: loading, onTap: () => run(() => AppData.markExpenseSettled(expenseId))),
+      if (unpaid > .01) PrimaryButton(label: appIsEnglish ? 'Mark as settled' : 'Marcar gasto liquidado', icon: Icons.verified_rounded, loading: loading, onTap: () => run(() => AppData.markExpenseSettled(expenseId))),
       if (unpaid <= .01 || status == 'paid') ...[
-        SecondaryButton(label: 'Reabrir pagos', icon: Icons.restart_alt_rounded, onTap: () => run(() => AppData.reopenExpense(expenseId))),
+        SecondaryButton(label: appIsEnglish ? 'Reopen payments' : 'Reabrir pagos', icon: Icons.restart_alt_rounded, onTap: () => run(() => AppData.reopenExpense(expenseId))),
       ],
       const SizedBox(height: 10),
-      DangerButton(label: 'Eliminar gasto', icon: Icons.delete_outline_rounded, onTap: () => run(() => AppData.deleteExpense(expenseId))),
+      DangerButton(label: appIsEnglish ? 'Delete expense' : 'Eliminar gasto', icon: Icons.delete_outline_rounded, onTap: () => run(() => AppData.deleteExpense(expenseId))),
     ]));
   }
 }
@@ -1279,7 +1279,7 @@ class SettlementHistoryRow extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('${financeMemberName(fromId, members)} pagó a ${financeMemberName(toId, members)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+          Text(appIsEnglish ? '${financeMemberName(fromId, members)} paid ${financeMemberName(toId, members)}' : '${financeMemberName(fromId, members)} pagó a ${financeMemberName(toId, members)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
           const SizedBox(height: 2),
           Text(dateText, style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w700)),
         ])),
@@ -1744,7 +1744,7 @@ class SettlementRow extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 8),
     child: Row(children: [
-      Expanded(child: Text('${debt.fromName} paga a ${debt.toName}', style: const TextStyle(fontWeight: FontWeight.w900))),
+      Expanded(child: Text(appIsEnglish ? '${debt.fromName} pays ${debt.toName}' : '${debt.fromName} paga a ${debt.toName}', style: const TextStyle(fontWeight: FontWeight.w900))),
       Text(money(debt.amount), style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.w900)),
     ]),
   );

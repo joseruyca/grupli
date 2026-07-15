@@ -18,10 +18,10 @@ class TournamentGroupHeader extends StatelessWidget {
       ),
       const SizedBox(width: 12),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Torneos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -.6)),
+        Text(appIsEnglish ? 'Tournaments' : 'Torneos', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -.6)),
         const SizedBox(height: 4),
         Text(
-          'Competiciones de $subtitle',
+          appIsEnglish ? 'Competitions for $subtitle' : 'Competiciones de $subtitle',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800, fontSize: 13),
@@ -63,7 +63,7 @@ class TournamentUxCommandCenter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasActivity = activeCount > 0 || nextCount > 0 || latestResults > 0;
-    final title = hasActivity ? 'Qué toca ahora' : 'Empieza una competición clara';
+    final title = hasActivity ? (appIsEnglish ? 'What is next' : 'Qué toca ahora') : (appIsEnglish ? 'Start a clear competition' : 'Empieza una competición clara');
     final body = nextCount > 0
         ? '$nextCount ${nextCount == 1 ? 'partido pendiente' : 'partidos pendientes'} para revisar. Lo importante queda arriba, sin esconderlo entre tablas.'
         : activeCount > 0
@@ -94,12 +94,12 @@ class TournamentUxCommandCenter extends StatelessWidget {
           Row(children: [
             Expanded(child: TournamentMiniMetric(label: 'Activas', value: '$activeCount', color: AppColors.navTournaments)),
             const SizedBox(width: 8),
-            Expanded(child: TournamentMiniMetric(label: 'Pendientes', value: '$nextCount', color: AppColors.amber)),
+            Expanded(child: TournamentMiniMetric(label: appIsEnglish ? 'Pending' : 'Pendientes', value: '$nextCount', color: AppColors.amber)),
             const SizedBox(width: 8),
-            Expanded(child: TournamentMiniMetric(label: 'Finalizadas', value: '$finishedCount', color: AppColors.blue)),
+            Expanded(child: TournamentMiniMetric(label: appIsEnglish ? 'Finished' : 'Finalizadas', value: '$finishedCount', color: AppColors.blue)),
           ]),
           const SizedBox(height: 14),
-          PrimaryButton(label: 'Crear torneo o liga', icon: Icons.add_rounded, onTap: onCreate),
+          PrimaryButton(label: appIsEnglish ? 'Create tournament or league' : 'Crear torneo o liga', icon: Icons.add_rounded, onTap: onCreate),
         ]),
       ),
     );
@@ -177,7 +177,7 @@ class TournamentDetailNextStepCard extends StatelessWidget {
                     ? Icons.sports_score_rounded
                     : Icons.verified_rounded;
     final actionLabel = needsTeams
-        ? 'Añadir participantes'
+        ? (appIsEnglish ? 'Add participants' : 'Añadir participantes')
         : matches.isEmpty
             ? 'Generar partidos'
             : unscheduled > 0
@@ -257,7 +257,7 @@ class TournamentActiveCard extends StatelessWidget {
       });
     final next = pendingMatches.isNotEmpty ? pendingMatches.first : null;
     final nextText = matches.isEmpty
-        ? 'Sin partidos creados todavía'
+        ? (appIsEnglish ? 'No matches created yet' : 'Sin partidos creados todavía')
         : next == null
             ? 'Todos los partidos jugados'
             : 'Próximo: ${tournamentMatchSideName(next, names, true)} vs ${tournamentMatchSideName(next, names, false)}';
@@ -362,11 +362,11 @@ class TournamentCleanEmptyState extends StatelessWidget {
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Container(width: 58, height: 58, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(20)), child: const Icon(Icons.emoji_events_rounded, color: AppColors.teal, size: 29)),
       const SizedBox(height: 14),
-      const Text('Todavía no hay competiciones', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 19, letterSpacing: -.2)),
+      Text(appIsEnglish ? 'No competitions yet' : 'Todavía no hay competiciones', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 19, letterSpacing: -.2)),
       const SizedBox(height: 6),
-      const Text('Crea una liga, una eliminatoria o un torneo manual. Grupli te ayudará con los partidos, resultados y clasificación.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.35)),
+      Text(appIsEnglish ? 'Create a league, knockout or manual tournament. Grupli helps with matches, results and standings.' : 'Crea una liga, una eliminatoria o un torneo manual. Grupli te ayudará con los partidos, resultados y clasificación.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.35)),
       const SizedBox(height: 16),
-      PrimaryButton(label: 'Crear torneo o liga', icon: Icons.add_rounded, onTap: onCreate),
+      PrimaryButton(label: appIsEnglish ? 'Create tournament or league' : 'Crear torneo o liga', icon: Icons.add_rounded, onTap: onCreate),
     ]),
   );
 }
@@ -400,11 +400,11 @@ class TournamentEmptyState extends StatelessWidget {
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Container(width: 54, height: 54, decoration: BoxDecoration(color: AppColors.redSoft, borderRadius: BorderRadius.circular(18)), child: const Icon(Icons.emoji_events_rounded, color: AppColors.red)),
       const SizedBox(height: 12),
-      const Text('Crea tu primer torneo', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
+      Text(appIsEnglish ? 'Create your first tournament' : 'Crea tu primer torneo', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
       const SizedBox(height: 5),
-      const Text('Liga, eliminatoria, americano o manual. Con partidos, tabla y estadísticas.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+      Text(appIsEnglish ? 'League, knockout, Americano or manual. With matches, table and stats.' : 'Liga, eliminatoria, americano o manual. Con partidos, tabla y estadísticas.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
       const SizedBox(height: 14),
-      PrimaryButton(label: 'Crear torneo o liga', icon: Icons.add_rounded, onTap: onCreate),
+      PrimaryButton(label: appIsEnglish ? 'Create tournament or league' : 'Crear torneo o liga', icon: Icons.add_rounded, onTap: onCreate),
     ]),
   );
 }
@@ -482,10 +482,10 @@ class TournamentQuickTemplateGrid extends StatelessWidget {
   const TournamentQuickTemplateGrid({super.key, required this.selected, required this.onChanged, this.allowedValues});
 
   static const templates = [
-    TournamentQuickTemplate('league', '', 'Liga', 'Jornadas y clasificación'),
-    TournamentQuickTemplate('americano_padel', '', 'Americano', 'Rondas y ranking individual'),
-    TournamentQuickTemplate('quick_cup', '', 'Eliminatoria', 'Cuadro, semifinal y final'),
-    TournamentQuickTemplate('manual_day', '', 'Manual', 'Tú decides los partidos'),
+    TournamentQuickTemplate('league', '', 'Liga', appIsEnglish ? 'Rounds and standings' : 'Jornadas y clasificación'),
+    TournamentQuickTemplate('americano_padel', '', 'Americano', appIsEnglish ? 'Rounds and individual ranking' : 'Rondas y ranking individual'),
+    TournamentQuickTemplate('quick_cup', '', 'Eliminatoria', appIsEnglish ? 'Bracket, semifinal and final' : 'Cuadro, semifinal y final'),
+    TournamentQuickTemplate('manual_day', '', 'Manual', appIsEnglish ? 'You decide the matches' : 'Tú decides los partidos'),
   ];
 
   @override
@@ -557,9 +557,9 @@ class TournamentAdvancedToggleCard extends StatelessWidget {
       ),
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(enabled ? 'Modo avanzado activo' : 'Modo rápido recomendado', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        Text(enabled ? (appIsEnglish ? 'Advanced mode on' : 'Modo avanzado activo') : (appIsEnglish ? 'Quick mode recommended' : 'Modo rápido recomendado'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         const SizedBox(height: 3),
-        Text(enabled ? 'Puedes tocar formato, rondas, vueltas, cruces y reglas.' : 'Sigues los mismos pasos, pero la app oculta ajustes técnicos y aplica valores seguros.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+        Text(enabled ? (appIsEnglish ? 'You can tweak format, rounds, legs, brackets and rules.' : 'Puedes tocar formato, rondas, vueltas, cruces y reglas.') : (appIsEnglish ? 'You keep the same steps, but the app hides technical settings and applies safe defaults.' : 'Sigues los mismos pasos, pero la app oculta ajustes técnicos y aplica valores seguros.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
       ])),
       Switch(value: enabled, activeThumbColor: AppColors.orange, onChanged: onChanged),
     ]),
@@ -577,7 +577,7 @@ class TournamentQuickModeInfoCard extends StatelessWidget {
       Icon(Icons.info_outline_rounded, color: AppColors.teal, size: 20),
       SizedBox(width: 9),
       Expanded(child: Text(
-        'Modo rápido: eliges Liga, Americano, Eliminatoria o Manual y sigues el mismo proceso, pero sin ajustes técnicos innecesarios.',
+        appIsEnglish ? 'Quick mode: pick League, Americano, Knockout or Manual and follow the same flow, without unnecessary technical settings.' : 'Modo rápido: eliges Liga, Americano, Eliminatoria o Manual y sigues el mismo proceso, pero sin ajustes técnicos innecesarios.',
         style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12),
       )),
     ]),
@@ -919,28 +919,28 @@ Future<TournamentManualDraftRow?> showTournamentManualDraftDialog(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (dialogContext, setLocal) => AlertDialog(
-        title: Text(initial == null ? 'Añadir partido' : 'Editar partido'),
+        title: Text(initial == null ? (appIsEnglish ? 'Add match' : 'Añadir partido') : (appIsEnglish ? 'Edit match' : 'Editar partido')),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           DropdownButtonFormField<String>(
             value: teamA,
-            decoration: const InputDecoration(labelText: 'Participante A'),
+            decoration: InputDecoration(labelText: appIsEnglish ? 'Participant A' : 'Participante A'),
             items: participants.map((name) => DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis))).toList(),
             onChanged: (v) => setLocal(() => teamA = v),
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             value: teamB,
-            decoration: const InputDecoration(labelText: 'Participante B'),
+            decoration: InputDecoration(labelText: appIsEnglish ? 'Participant B' : 'Participante B'),
             items: participants.map((name) => DropdownMenuItem(value: name, child: Text(name, overflow: TextOverflow.ellipsis))).toList(),
             onChanged: (v) => setLocal(() => teamB = v),
           ),
           const SizedBox(height: 8),
-          TextField(controller: roundController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: const InputDecoration(labelText: 'Jornada')),
+          TextField(controller: roundController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: appIsEnglish ? 'Round' : 'Jornada')),
           CheckboxListTile(
             value: useDate,
             onChanged: (v) => setLocal(() => useDate = v == true),
             contentPadding: EdgeInsets.zero,
-            title: const Text('Poner fecha individual'),
+            title: Text(appIsEnglish ? 'Set individual date' : 'Poner fecha individual'),
           ),
           if (useDate) Row(children: [
             Expanded(child: SecondaryButton(label: DateFormat('d MMM', appDateLocale).format(selectedDate), icon: Icons.calendar_today_rounded, onTap: () async {
@@ -954,16 +954,16 @@ Future<TournamentManualDraftRow?> showTournamentManualDraftDialog(
             })),
           ]),
           const SizedBox(height: 8),
-          TextField(controller: durationController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: const InputDecoration(labelText: 'Duración minutos')),
+          TextField(controller: durationController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: appIsEnglish ? 'Duration minutes' : 'Duración minutos')),
           const SizedBox(height: 8),
           TextField(controller: courtController, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Pista / mesa / campo')),
           const SizedBox(height: 8),
-          TextField(controller: locationController, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Ubicación')),
+          TextField(controller: locationController, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: appIsEnglish ? 'Location' : 'Ubicación')),
           const SizedBox(height: 8),
-          TextField(controller: notesController, minLines: 2, maxLines: 4, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Notas')),
+          TextField(controller: notesController, minLines: 2, maxLines: 4, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: appIsEnglish ? 'Notes' : 'Notas')),
         ])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text(appIsEnglish ? 'Cancel' : 'Cancelar')),
           FilledButton(
             onPressed: teamA == null || teamB == null || teamA == teamB ? null : () => Navigator.pop(dialogContext, TournamentManualDraftRow(
               round: max(1, int.tryParse(roundController.text.trim()) ?? defaultRound),
@@ -975,7 +975,7 @@ Future<TournamentManualDraftRow?> showTournamentManualDraftDialog(
               courtName: courtController.text.trim(),
               notes: notesController.text.trim(),
             )),
-            child: const Text('Guardar'),
+            child: Text(appIsEnglish ? 'Save' : 'Guardar'),
           ),
         ],
       ),
@@ -1009,24 +1009,24 @@ Future<TournamentMatchEditorResult?> showTournamentMatchEditorDialog(BuildContex
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (dialogContext, setLocal) => AlertDialog(
-        title: const Text('Añadir partido manual'),
+        title: Text(appIsEnglish ? 'Add manual match' : 'Añadir partido manual'),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           DropdownButtonFormField<String>(
             value: teamA,
-            decoration: const InputDecoration(labelText: 'Participante A'),
+            decoration: InputDecoration(labelText: appIsEnglish ? 'Participant A' : 'Participante A'),
             items: ids.map((id) => DropdownMenuItem(value: id, child: Text(names[id] ?? 'Participante'))).toList(),
             onChanged: (v) => setLocal(() => teamA = v),
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             value: teamB,
-            decoration: const InputDecoration(labelText: 'Participante B'),
+            decoration: InputDecoration(labelText: appIsEnglish ? 'Participant B' : 'Participante B'),
             items: ids.map((id) => DropdownMenuItem(value: id, child: Text(names[id] ?? 'Participante'))).toList(),
             onChanged: (v) => setLocal(() => teamB = v),
           ),
           const SizedBox(height: 8),
-          TextField(controller: roundController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: const InputDecoration(labelText: 'Jornada')),
-          CheckboxListTile(value: useDate, onChanged: (v) => setLocal(() => useDate = v == true), contentPadding: EdgeInsets.zero, title: const Text('Programar fecha')),
+          TextField(controller: roundController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: appIsEnglish ? 'Round' : 'Jornada')),
+          CheckboxListTile(value: useDate, onChanged: (v) => setLocal(() => useDate = v == true), contentPadding: EdgeInsets.zero, title: Text(appIsEnglish ? 'Schedule date' : 'Programar fecha')),
           if (useDate) Row(children: [
             Expanded(child: SecondaryButton(label: DateFormat('d MMM', appDateLocale).format(selectedDate), icon: Icons.calendar_today_rounded, onTap: () async {
               final picked = await showDatePicker(context: dialogContext, initialDate: selectedDate, firstDate: DateTime.now().subtract(const Duration(days: 365)), lastDate: DateTime.now().add(const Duration(days: 730)), locale: appLocale);
@@ -1039,17 +1039,17 @@ Future<TournamentMatchEditorResult?> showTournamentMatchEditorDialog(BuildContex
             })),
           ]),
           const SizedBox(height: 8),
-          TextField(controller: durationController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: const InputDecoration(labelText: 'Duración minutos')),
+          TextField(controller: durationController, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: InputDecoration(labelText: appIsEnglish ? 'Duration minutes' : 'Duración minutos')),
           const SizedBox(height: 8),
           TextField(controller: courtController, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Pista / mesa / campo')),
           const SizedBox(height: 8),
-          TextField(controller: locationController, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Ubicación')),
+          TextField(controller: locationController, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: appIsEnglish ? 'Location' : 'Ubicación')),
           const SizedBox(height: 8),
-          TextField(controller: notesController, minLines: 2, maxLines: 4, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Notas')),
-          if (useDate) CheckboxListTile(value: syncAgenda, onChanged: (v) => setLocal(() => syncAgenda = v == true), contentPadding: EdgeInsets.zero, title: const Text('Añadir a Agenda')),
+          TextField(controller: notesController, minLines: 2, maxLines: 4, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: appIsEnglish ? 'Notes' : 'Notas')),
+          if (useDate) CheckboxListTile(value: syncAgenda, onChanged: (v) => setLocal(() => syncAgenda = v == true), contentPadding: EdgeInsets.zero, title: Text(appIsEnglish ? 'Add to Agenda' : 'Añadir a Agenda')),
         ])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text(appIsEnglish ? 'Cancel' : 'Cancelar')),
           FilledButton(
             onPressed: teamA == null || teamB == null || teamA == teamB ? null : () => Navigator.pop(dialogContext, TournamentMatchEditorResult(
               teamAId: teamA!,
@@ -1062,7 +1062,7 @@ Future<TournamentMatchEditorResult?> showTournamentMatchEditorDialog(BuildContex
               notes: notesController.text.trim(),
               syncAgenda: syncAgenda,
             )),
-            child: const Text('Añadir'),
+            child: Text(appIsEnglish ? 'Add' : 'Añadir'),
           ),
         ],
       ),
@@ -1086,7 +1086,7 @@ Future<int?> showTournamentDuplicateRoundDialog(BuildContext context, {required 
       builder: (dialogContext, setLocal) => AlertDialog(
         title: const Text('Duplicar jornada'),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Se copiarán los mismos cruces en una jornada nueva, sin resultados ni fecha.', style: TextStyle(fontWeight: FontWeight.w700)),
+          Text(appIsEnglish ? 'The same pairings will be copied to a new round, without results or date.' : 'Se copiarán los mismos cruces en una jornada nueva, sin resultados ni fecha.', style: const TextStyle(fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
           DropdownButtonFormField<int>(
             value: selected,

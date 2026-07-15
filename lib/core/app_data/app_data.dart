@@ -116,7 +116,7 @@ class AppData {
 
   static Future<String> uploadAvatarBytes(Uint8List bytes, String filename) async {
     final uid = user?.id;
-    if (uid == null) throw Exception('Inicia sesión para cambiar la foto.');
+    if (uid == null) throw Exception(appIsEnglish ? 'Sign in to change your photo.' : 'Inicia sesión para cambiar la foto.');
     await ensureProfile();
     final ext = filename.toLowerCase().endsWith('.png')
         ? 'png'
@@ -242,7 +242,7 @@ class AppData {
     String? rules,
   }) async {
     final cleanName = name.trim();
-    if (cleanName.length < 2) throw Exception('El nombre del grupo es demasiado corto.');
+    if (cleanName.length < 2) throw Exception(appIsEnglish ? 'The group name is too short.' : 'El nombre del grupo es demasiado corto.');
     final payload = <String, dynamic>{
       'name': cleanName,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -272,7 +272,7 @@ class AppData {
 
   static Future<String> uploadGroupCoverBytes(String groupId, Uint8List bytes, String filename) async {
     final uid = user?.id;
-    if (uid == null) throw Exception('Inicia sesión para cambiar la foto del grupo.');
+    if (uid == null) throw Exception(appIsEnglish ? 'Sign in to change the group photo.' : 'Inicia sesión para cambiar la foto del grupo.');
     final ext = filename.toLowerCase().endsWith('.png')
         ? 'png'
         : filename.toLowerCase().endsWith('.webp')
@@ -310,7 +310,7 @@ class AppData {
 
   static Future<void> updateMemberRole(String memberRowId, String role) async {
     if (!['admin', 'member'].contains(role)) {
-      throw Exception('Rol no válido.');
+      throw Exception(appIsEnglish ? 'Invalid role.' : 'Rol no válido.');
     }
     try {
       await sb.rpc('set_group_member_role', params: {'p_member_row_id': memberRowId, 'p_role': role});
@@ -340,7 +340,7 @@ class AppData {
   static Future<void> deleteGroup(String groupId, String confirmation) async {
     final clean = confirmation.trim().toUpperCase();
     if (clean != 'ELIMINAR GRUPO') {
-      throw Exception('Para eliminar el grupo escribe ELIMINAR GRUPO exactamente.');
+      throw Exception(appIsEnglish ? 'To delete the group, type DELETE GROUP exactly.' : 'Para eliminar el grupo escribe ELIMINAR GRUPO exactamente.');
     }
     try {
       await sb.rpc('delete_group_safe', params: {
@@ -351,7 +351,7 @@ class AppData {
     } catch (e) {
       final message = e.toString().toLowerCase();
       if (message.contains('function') || message.contains('delete_group_safe')) {
-        throw Exception('No se pudo eliminar el grupo de forma segura. Inténtalo de nuevo más tarde.');
+        throw Exception(appIsEnglish ? 'The group could not be deleted safely. Try again later.' : 'No se pudo eliminar el grupo de forma segura. Inténtalo de nuevo más tarde.');
       }
       rethrow;
     }
@@ -519,7 +519,7 @@ class AppData {
     }).eq('id', eventId).select('id,status');
     final rows = asList(updated);
     if (rows.isEmpty) {
-      throw Exception('No se pudo cancelar el evento. Puede que no tengas permiso o que el evento ya no exista.');
+      throw Exception(appIsEnglish ? 'The event could not be cancelled. You may not have permission, or the event may no longer exist.' : 'No se pudo cancelar el evento. Puede que no tengas permiso o que el evento ya no exista.');
     }
   }
 
@@ -570,18 +570,18 @@ class AppData {
 
   static Future<void> saveEventContribution({required String groupId, required String eventId, required String itemsText}) async {
     final uid = user?.id;
-    if (uid == null) throw Exception('Inicia sesión para decir qué vas a llevar.');
+    if (uid == null) throw Exception(appIsEnglish ? 'Sign in to say what you are bringing.' : 'Inicia sesión para decir qué vas a llevar.');
     final cleanGroupId = groupId.trim();
     final cleanEventId = eventId.trim();
     final cleanText = itemsText.trim().replaceAll(RegExp(r'\s+'), ' ');
     if (cleanGroupId.isEmpty || cleanEventId.isEmpty) {
-      throw Exception('No se encontró el evento del grupo.');
+      throw Exception(appIsEnglish ? 'The group event was not found.' : 'No se encontró el evento del grupo.');
     }
     if (cleanText.length < 2) {
-      throw Exception('Escribe algo sencillo, por ejemplo: bebida, comida o pelotas.');
+      throw Exception(appIsEnglish ? 'Write something simple, for example: drinks, food or balls.' : 'Escribe algo sencillo, por ejemplo: bebida, comida o pelotas.');
     }
     if (cleanText.length > 240) {
-      throw Exception('El texto es demasiado largo. Déjalo en una frase corta.');
+      throw Exception(appIsEnglish ? 'The text is too long. Keep it to a short sentence.' : 'El texto es demasiado largo. Déjalo en una frase corta.');
     }
     try {
       await sb.from('event_contributions').upsert({
@@ -593,7 +593,7 @@ class AppData {
       }, onConflict: 'event_id,user_id');
     } catch (e) {
       if (e.toString().toLowerCase().contains('event_contributions')) {
-        throw Exception('Falta actualizar la base de datos con el SQL v16.22.');
+        throw Exception(appIsEnglish ? 'The database still needs the v16.22 SQL update.' : 'Falta actualizar la base de datos con el SQL v16.22.');
       }
       rethrow;
     }
@@ -601,7 +601,7 @@ class AppData {
 
   static Future<void> deleteMyEventContribution(String eventId) async {
     final uid = user?.id;
-    if (uid == null) throw Exception('Inicia sesión para cambiar lo que llevas.');
+    if (uid == null) throw Exception(appIsEnglish ? 'Sign in to change what you are bringing.' : 'Inicia sesión para cambiar lo que llevas.');
     final cleanEventId = eventId.trim();
     if (cleanEventId.isEmpty) return;
     try {
@@ -749,7 +749,7 @@ class AppData {
     double amount,
   ) async {
     final cleanAmount = double.parse(amount.toStringAsFixed(2));
-    if (cleanAmount <= 0) throw Exception('El importe debe ser mayor que cero.');
+    if (cleanAmount <= 0) throw Exception(appIsEnglish ? 'The amount must be greater than zero.' : 'El importe debe ser mayor que cero.');
 
     // Preferimos RPC para evitar fallos de RLS/SQL al registrar una liquidación.
     // Si la base aún no tiene la función del parche, usamos el insert directo como respaldo.
@@ -768,7 +768,7 @@ class AppData {
 
     final currentUser = user?.id;
     if (currentUser == null || currentUser.isEmpty) {
-      throw Exception('Tu sesión no está activa. Cierra sesión y vuelve a entrar.');
+      throw Exception(appIsEnglish ? 'Your session is not active. Sign out and sign back in.' : 'Tu sesión no está activa. Cierra sesión y vuelve a entrar.');
     }
 
     final row = await sb.from('settlement_payments').insert({
@@ -784,7 +784,7 @@ class AppData {
   }
 
   static Future<void> cancelSettlementPayment(String paymentId) async {
-    if (paymentId.trim().isEmpty) throw Exception('No se ha podido identificar el pago.');
+    if (paymentId.trim().isEmpty) throw Exception(appIsEnglish ? 'The payment could not be identified.' : 'No se ha podido identificar el pago.');
 
     // Preferimos RPC para validar permisos y evitar inconsistencias.
     try {
@@ -1007,11 +1007,11 @@ class AppData {
     final secondProfile = asMap(second['profiles']);
     final firstId = text(first['user_id'], text(firstProfile['id']));
     final secondId = text(second['user_id'], text(secondProfile['id']));
-    if (firstId.isNotEmpty && secondId.isNotEmpty && firstId == secondId) throw Exception('Elige dos miembros distintos.');
+    if (firstId.isNotEmpty && secondId.isNotEmpty && firstId == secondId) throw Exception(appIsEnglish ? 'Choose two different members.' : 'Elige dos miembros distintos.');
     final firstName = memberDisplayName(first);
     final secondName = memberDisplayName(second);
     final pairName = (customName ?? '').trim().isNotEmpty ? customName!.trim() : '$firstName / $secondName';
-    if (existingNames.contains(pairName.toLowerCase())) throw Exception('Ya existe un participante con ese nombre.');
+    if (existingNames.contains(pairName.toLowerCase())) throw Exception(appIsEnglish ? 'A participant with that name already exists.' : 'Ya existe un participante con ese nombre.');
     final avatar = memberAvatarUrl(first).trim().isNotEmpty ? memberAvatarUrl(first) : memberAvatarUrl(second);
 
     final row = asMap(await sb.from('tournament_teams').insert({
@@ -1052,7 +1052,7 @@ class AppData {
     required List<String> tieBreakers,
   }) async {
     final clean = name.trim().replaceAll(RegExp(r'\s+'), ' ');
-    if (clean.length < 2) throw Exception('El nombre debe tener al menos 2 caracteres.');
+    if (clean.length < 2) throw Exception(appIsEnglish ? 'The name must have at least 2 characters.' : 'El nombre debe tener al menos 2 caracteres.');
     await sb.from('tournaments').update({
       'name': clean,
       'scoring_type': scoringType,
@@ -1065,7 +1065,7 @@ class AppData {
 
   static Future<void> renameTournamentTeam(String teamId, String name) async {
     final clean = name.trim().replaceAll(RegExp(r'\s+'), ' ');
-    if (clean.length < 2) throw Exception('El nombre debe tener al menos 2 caracteres.');
+    if (clean.length < 2) throw Exception(appIsEnglish ? 'The name must have at least 2 characters.' : 'El nombre debe tener al menos 2 caracteres.');
     await sb.from('tournament_teams').update({
       'name': clean,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -1112,7 +1112,7 @@ class AppData {
     List<TournamentDraftMatch> pairings, {
     Map<String, dynamic>? scheduleConfig,
   }) async {
-    if (pairings.isEmpty) throw Exception('Añade al menos un emparejamiento manual.');
+    if (pairings.isEmpty) throw Exception(appIsEnglish ? 'Add at least one manual pairing.' : 'Añade al menos un emparejamiento manual.');
     await clearTournamentMatches(tournamentId);
     await addManualMatches(tournamentId, teams, pairings, scheduleConfig: scheduleConfig);
   }
@@ -1123,7 +1123,7 @@ class AppData {
     List<TournamentDraftMatch> pairings, {
     Map<String, dynamic>? scheduleConfig,
   }) async {
-    if (pairings.isEmpty) throw Exception('Añade al menos un emparejamiento manual.');
+    if (pairings.isEmpty) throw Exception(appIsEnglish ? 'Add at least one manual pairing.' : 'Añade al menos un emparejamiento manual.');
     final byName = <String, String>{
       for (final team in teams) AppData.text(team['name']).trim().toLowerCase(): team['id'].toString(),
     };
@@ -1134,9 +1134,9 @@ class AppData {
       final aId = byName[pair.teamAName.trim().toLowerCase()];
       final bId = byName[pair.teamBName.trim().toLowerCase()];
       if (aId == null || bId == null) {
-        throw Exception('No encuentro en participantes: ${aId == null ? pair.teamAName : pair.teamBName}.');
+        throw Exception(appIsEnglish ? 'Could not find in participants: ${aId == null ? pair.teamAName : pair.teamBName}.' : 'No encuentro en participantes: ${aId == null ? pair.teamAName : pair.teamBName}.');
       }
-      if (aId == bId) throw Exception('Un equipo no puede jugar contra sí mismo.');
+      if (aId == bId) throw Exception(appIsEnglish ? 'A team cannot play against itself.' : 'Un equipo no puede jugar contra sí mismo.');
       final round = max(1, pair.round);
       final orderInsideRound = roundCounters[round] ?? 0;
       roundCounters[round] = orderInsideRound + 1;
@@ -1166,7 +1166,7 @@ class AppData {
     Map<String, dynamic>? scheduleConfig,
   }) async {
     final cleanRows = rows.where((r) => r.teamAName.trim().isNotEmpty && r.teamBName.trim().isNotEmpty).toList();
-    if (cleanRows.isEmpty) throw Exception('Añade al menos un partido manual.');
+    if (cleanRows.isEmpty) throw Exception(appIsEnglish ? 'Add at least one manual match.' : 'Añade al menos un partido manual.');
     await clearTournamentMatches(tournamentId);
     final byName = <String, String>{
       for (final team in teams) AppData.text(team['name']).trim().toLowerCase(): team['id'].toString(),
@@ -1178,9 +1178,9 @@ class AppData {
       final aId = byName[row.teamAName.trim().toLowerCase()];
       final bId = byName[row.teamBName.trim().toLowerCase()];
       if (aId == null || bId == null) {
-        throw Exception('No encuentro en participantes: ${aId == null ? row.teamAName : row.teamBName}.');
+        throw Exception(appIsEnglish ? 'Could not find in participants: ${aId == null ? row.teamAName : row.teamBName}.' : 'No encuentro en participantes: ${aId == null ? row.teamAName : row.teamBName}.');
       }
-      if (aId == bId) throw Exception('Un equipo no puede jugar contra sí mismo.');
+      if (aId == bId) throw Exception(appIsEnglish ? 'A team cannot play against itself.' : 'Un equipo no puede jugar contra sí mismo.');
       final round = max(1, row.round);
       final orderInsideRound = roundCounters[round] ?? 0;
       roundCounters[round] = orderInsideRound + 1;
@@ -1216,8 +1216,8 @@ class AppData {
     String courtName = '',
     String notes = '',
   }) async {
-    if (teamAId.trim().isEmpty || teamBId.trim().isEmpty) throw Exception('Elige dos participantes.');
-    if (teamAId == teamBId) throw Exception('Un participante no puede jugar contra sí mismo.');
+    if (teamAId.trim().isEmpty || teamBId.trim().isEmpty) throw Exception(appIsEnglish ? 'Choose two participants.' : 'Elige dos participantes.');
+    if (teamAId == teamBId) throw Exception(appIsEnglish ? 'A participant cannot play against itself.' : 'Un participante no puede jugar contra sí mismo.');
     final existing = asList(await sb
         .from('matches')
         .select('order_index')
@@ -1253,7 +1253,7 @@ class AppData {
         .eq('round', max(1, sourceRound))
         .order('order_index', ascending: true)
         .order('created_at', ascending: true));
-    if (source.isEmpty) throw Exception('No hay partidos en esa jornada.');
+    if (source.isEmpty) throw Exception(appIsEnglish ? 'There are no matches in that round.' : 'No hay partidos en esa jornada.');
     final rounds = asList(await sb.from('matches').select('round').eq('tournament_id', tournamentId));
     final nextRound = rounds.fold<int>(0, (value, row) => max(value, intValue(row['round']))) + 1;
     final rows = <Map<String, dynamic>>[];
@@ -1356,10 +1356,10 @@ class AppData {
     Map<String, dynamic>? scheduleConfig,
   }) async {
     if (teams.length < 2) {
-      throw Exception('Añade al menos 2 participantes.');
+      throw Exception(appIsEnglish ? 'Add at least 2 participants.' : 'Añade al menos 2 participantes.');
     }
     if (format == 'manual') {
-      throw Exception('Este torneo usa emparejamientos manuales. Añade los partidos desde el panel del torneo.');
+      throw Exception(appIsEnglish ? 'This tournament uses manual pairings. Add matches from the tournament panel.' : 'Este torneo usa emparejamientos manuales. Añade los partidos desde el panel del torneo.');
     }
 
     await clearTournamentMatches(tournamentId);
@@ -1401,13 +1401,13 @@ class AppData {
 
     if (format == 'americano') {
       if (ordered.length < 4) {
-        throw Exception('El americano necesita al menos 4 jugadores.');
+        throw Exception(appIsEnglish ? 'Americano needs at least 4 players.' : 'El americano necesita al menos 4 jugadores.');
       }
       final rounds = max(1, min(40, intValue(formatConfig?['americano_rounds'], intValue(formatConfig?['rounds'], 5))));
       final courts = max(1, min(12, intValue(formatConfig?['courts_count'], intValue(scheduleConfig?['courts_count'], 1))));
       final generated = generateAmericanoRoundsIds(ordered.map((e) => e['id'].toString()).toList(), rounds: rounds, courts: courts);
       if (generated.isEmpty) {
-        throw Exception('No se han podido generar rondas de americano.');
+        throw Exception(appIsEnglish ? 'Could not generate Americano rounds.' : 'No se han podido generar rondas de americano.');
       }
       final teamById = {for (final team in ordered) team['id'].toString(): team};
       for (final item in generated) {
@@ -1485,7 +1485,7 @@ class AppData {
       }
     }
 
-    if (rows.isEmpty) throw Exception('No se han podido generar partidos.');
+    if (rows.isEmpty) throw Exception(appIsEnglish ? 'Could not generate matches.' : 'No se han podido generar partidos.');
     await sb.from('matches').insert(rows);
   }
 
@@ -1494,19 +1494,19 @@ class AppData {
     final latestRound = normalMatches.fold<int>(0, (maxRound, m) => max(maxRound, intValue(m['round'])));
     final latestMatches = normalMatches.where((m) => intValue(m['round']) == latestRound).toList()
       ..sort((a, b) => intValue(a['order_index']).compareTo(intValue(b['order_index'])));
-    if (latestMatches.isEmpty) throw Exception('No hay partidos para generar la siguiente ronda.');
+    if (latestMatches.isEmpty) throw Exception(appIsEnglish ? 'There are no matches to generate the next round.' : 'No hay partidos para generar la siguiente ronda.');
     if (latestMatches.any((m) => text(m['status']) != 'played' && text(m['status']) != 'bye' && text(m['status']) != 'walkover' && text(m['status']) != 'no_show')) {
-      throw Exception('Cierra todos los resultados de la ronda actual antes de avanzar.');
+      throw Exception(appIsEnglish ? 'Close every result from the current round before advancing.' : 'Cierra todos los resultados de la ronda actual antes de avanzar.');
     }
-    if (latestMatches.length == 1) throw Exception('La eliminatoria ya tiene final registrada.');
+    if (latestMatches.length == 1) throw Exception(appIsEnglish ? 'The bracket already has a recorded final.' : 'La eliminatoria ya tiene final registrada.');
 
     final winners = <String>[];
     for (final match in latestMatches) {
       final winner = tournamentMatchWinnerId(match);
-      if (winner.isEmpty) throw Exception('Hay un partido sin ganador válido.');
+      if (winner.isEmpty) throw Exception(appIsEnglish ? 'There is a match without a valid winner.' : 'Hay un partido sin ganador válido.');
       winners.add(winner);
     }
-    if (winners.length % 2 != 0) throw Exception('Número impar de ganadores. Revisa resultados.');
+    if (winners.length % 2 != 0) throw Exception(appIsEnglish ? 'Odd number of winners. Check the results.' : 'Número impar de ganadores. Revisa resultados.');
     final rows = <Map<String, dynamic>>[];
     for (var i = 0; i < winners.length; i += 2) {
       rows.add({
@@ -1525,13 +1525,13 @@ class AppData {
 
   static Future<void> generateThirdPlaceMatch(String tournamentId, List<Map<String, dynamic>> matches) async {
     if (matches.any((m) => text(asMap(m['result_details'])['stage']) == 'third_place' || text(m['round_name']).toLowerCase().contains('tercer'))) {
-      throw Exception('El partido por el tercer puesto ya existe.');
+      throw Exception(appIsEnglish ? 'The third-place match already exists.' : 'El partido por el tercer puesto ya existe.');
     }
 
     final normalMatches = matches.where((m) => text(asMap(m['result_details'])['stage']) != 'third_place').toList();
     final rounds = normalMatches.map((m) => intValue(m['round'])).toSet().toList()..sort();
     if (rounds.length < 2) {
-      throw Exception('Necesitas tener semifinales cerradas para crear el tercer puesto.');
+      throw Exception(appIsEnglish ? 'You need closed semifinals to create the third-place match.' : 'Necesitas tener semifinales cerradas para crear el tercer puesto.');
     }
 
     List<Map<String, dynamic>> semis = [];
@@ -1543,13 +1543,13 @@ class AppData {
         break;
       }
     }
-    if (semis.length != 2) throw Exception('No encuentro dos semifinales para sacar el tercer puesto.');
+    if (semis.length != 2) throw Exception(appIsEnglish ? 'I cannot find two semifinals to create the third-place match.' : 'No encuentro dos semifinales para sacar el tercer puesto.');
     if (semis.any((m) => text(m['status']) != 'played' && text(m['status']) != 'walkover' && text(m['status']) != 'no_show')) {
-      throw Exception('Cierra las dos semifinales antes de crear el tercer puesto.');
+      throw Exception(appIsEnglish ? 'Close both semifinals before creating the third-place match.' : 'Cierra las dos semifinales antes de crear el tercer puesto.');
     }
 
     final losers = semis.map(tournamentMatchLoserId).where((id) => id.isNotEmpty).toList();
-    if (losers.length != 2) throw Exception('No se han podido detectar los dos perdedores de semifinales.');
+    if (losers.length != 2) throw Exception(appIsEnglish ? 'Could not detect the two semifinal losers.' : 'No se han podido detectar los dos perdedores de semifinales.');
 
     final targetRound = normalMatches.fold<int>(0, (value, m) => max(value, intValue(m['round'])));
     await sb.from('matches').insert({
@@ -1603,8 +1603,8 @@ class AppData {
         .single());
     final aId = text(current['team_a']);
     final bId = text(current['team_b']);
-    if (aId.isEmpty || bId.isEmpty) throw Exception('Este partido no tiene dos participantes.');
-    if (winnerTeamId != aId && winnerTeamId != bId) throw Exception('Ganador no válido.');
+    if (aId.isEmpty || bId.isEmpty) throw Exception(appIsEnglish ? 'This match does not have two participants.' : 'Este partido no tiene dos participantes.');
+    if (winnerTeamId != aId && winnerTeamId != bId) throw Exception(appIsEnglish ? 'Invalid winner.' : 'Ganador no válido.');
     final winnerIsA = winnerTeamId == aId;
     final scoreA = winnerIsA ? 3 : 0;
     final scoreB = winnerIsA ? 0 : 3;
@@ -1770,7 +1770,7 @@ class AppData {
     required String courtName,
     required bool syncAgenda,
   }) async {
-    if (matches.isEmpty) throw Exception('No hay partidos para reprogramar.');
+    if (matches.isEmpty) throw Exception(appIsEnglish ? 'There are no matches to reschedule.' : 'No hay partidos para reprogramar.');
     final names = teamNameMap(teams);
     final ordered = [...matches]..sort((a, b) {
       final round = intValue(a['round']).compareTo(intValue(b['round']));
@@ -1825,7 +1825,7 @@ class AppData {
     required bool syncAgenda,
   }) async {
     final selected = matches.where((m) => intValue(m['round'], 1) == round && text(m['status']) != 'played' && text(m['status']) != 'cancelled' && text(m['status']) != 'bye').toList();
-    if (selected.isEmpty) throw Exception('No hay partidos movibles en esta jornada.');
+    if (selected.isEmpty) throw Exception(appIsEnglish ? 'There are no movable matches in this round.' : 'No hay partidos movibles en esta jornada.');
     await bulkScheduleTournamentMatches(
       groupId: groupId,
       tournamentName: tournamentName,
@@ -1978,12 +1978,12 @@ class AppData {
     String screen = 'app',
   }) async {
     final uid = user?.id;
-    if (uid == null) throw Exception('Inicia sesión para enviar el reporte.');
+    if (uid == null) throw Exception(appIsEnglish ? 'Sign in to send the report.' : 'Inicia sesión para enviar el reporte.');
     await ensureProfile();
     final cleanTitle = title.trim();
     final cleanDescription = description.trim();
     if (cleanTitle.length < 3 || cleanDescription.length < 8) {
-      throw Exception('Describe el problema con un poco más de detalle.');
+      throw Exception(appIsEnglish ? 'Describe the problem in a little more detail.' : 'Describe el problema con un poco más de detalle.');
     }
     final row = await sb.from('support_tickets').insert({
       'user_id': uid,
