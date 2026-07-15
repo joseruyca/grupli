@@ -1,4 +1,4 @@
-part of grupli_app;
+part of 'package:grupli/main.dart';
 
 class PremiumFeatureDefinition {
   final String key;

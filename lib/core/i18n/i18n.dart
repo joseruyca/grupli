@@ -1,4 +1,4 @@
-part of grupli_app;
+part of 'package:grupli/main.dart';
 
 const String _appLocaleOverrideKey = 'app_locale_override';
 final ValueNotifier<Locale?> appLocaleOverride = ValueNotifier<Locale?>(null);

@@ -1,4 +1,4 @@
-part of grupli_app;
+part of 'package:grupli/main.dart';
 // ignore_for_file: override_on_non_overriding_member
 
 class TournamentDetailSimpleScreen extends StatefulWidget {

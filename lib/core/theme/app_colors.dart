@@ -1,4 +1,4 @@
-part of grupli_app;
+part of 'package:grupli/main.dart';
 
 class AppColors {
   // Grupli v16.34 design tokens: warm, calm and readable.
@@ -59,4 +59,3 @@ class AppColors {
         bottomRight: Radius.circular(16),
       );
 }
-
