@@ -199,7 +199,7 @@ class _FinancesTabState extends State<FinancesTab> {
             if (snapshot.hasError) {
               return ListView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
-                children: [ErrorBlock(message: snapshot.error.toString(), onRetry: reload)],
+                children: [ErrorBlock(message: snapshot.error, onRetry: reload)],
               );
             }
 
@@ -242,7 +242,7 @@ class _FinancesTabState extends State<FinancesTab> {
                     SectionHeader(title: tr(context, es: 'Movimientos', en: 'Activity'), action: hasMovements ? '${data.expenses.length + data.settlementPayments.length}' : '0'),
                     const SizedBox(height: 8),
                     if (!hasMovements)
-                      EmptyBlock(icon: Icons.receipt_long_rounded, title: tr(context, es: 'Aún no hay movimientos', en: 'No activity yet'), body: tr(context, es: 'Añade el primer gasto. Aquí verás lo que se ha pagado y si falta algo por liquidar.', en: 'Add the first expense. Here you will see what has been paid and whether anything remains to be settled.'))
+                      EmptyBlock(icon: Icons.receipt_long_rounded, title: tr(context, es: 'Aún no hay movimientos', en: 'No activity yet'), body: tr(context, es: 'Añade el primer gasto. Aquí verás lo que se ha pagado y lo que queda por liquidar.', en: 'Add the first expense. Here you will see what has been paid and what remains to be settled.'))
                     else ...[
                       if (data.expenses.isNotEmpty) ...[
                         SectionHeader(title: tr(context, es: 'Gastos pagados', en: 'Paid expenses'), action: '${tr(context, es: 'Total', en: 'Total')} ${money(summary.totalExpenses)}'),
@@ -530,7 +530,7 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
           final custom = customTotal();
           final diff = value - custom;
           if (snapshot.connectionState == ConnectionState.waiting) return CenterLoader(label: appIsEnglish ? 'Loading members...' : 'Cargando miembros...');
-          if (snapshot.hasError) return ErrorBlock(message: snapshot.error.toString(), onRetry: () => setState(() { membersFuture = AppData.members(widget.groupId); }));
+          if (snapshot.hasError) return ErrorBlock(message: snapshot.error, onRetry: () => setState(() { membersFuture = AppData.members(widget.groupId); }));
           if (members.isEmpty) return EmptyBlock(icon: Icons.groups_rounded, title: appIsEnglish ? 'No members yet' : 'No hay miembros', body: appIsEnglish ? 'Add members to the group to split expenses.' : 'Añade miembros al grupo para poder repartir gastos.');
           return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1818,7 +1818,7 @@ class FinanceHumanNextStepCard extends StatelessWidget {
             : tr(context, es: 'Hay saldo pendiente', en: 'There is still a balance');
     final body = clean
         ? expensesCount == 0
-            ? tr(context, es: 'Aún no hay gastos. Cuando alguien pague algo, Grupli te dirá exactamente quién debe qué.', en: 'There are no expenses yet. When someone pays for something, Grupli will tell you exactly who owes what.')
+            ? tr(context, es: 'Aún no hay gastos. Cuando alguien pague algo, Grupli te dirá quién debe qué.', en: 'There are no expenses yet. When someone pays for something, Grupli will tell you who owes what.')
             : tr(context, es: '$expensesCount ${expensesCount == 1 ? 'movimiento registrado' : 'movimientos registrados'} y ningún pago pendiente.', en: '$expensesCount ${expensesCount == 1 ? 'recorded activity' : 'recorded activities'} and no pending payment.')
         : firstDebt != null
             ? tr(context, es: '${firstDebt.fromName} paga a ${firstDebt.toName} ${money(firstDebt.amount)}. Con eso el grupo se acerca a cero.', en: '${firstDebt.fromName} pays ${firstDebt.toName} ${money(firstDebt.amount)}. That brings the group closer to zero.')
@@ -1869,7 +1869,7 @@ class FinancePremiumTeaserCard extends StatelessWidget {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(tr(context, es: 'Finanzas avanzadas', en: 'Advanced finances'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
           const SizedBox(height: 4),
-          Text(tr(context, es: 'Premium también quita anuncios y añade un análisis más completo para quien organiza mucho.', en: 'Premium also removes ads and adds deeper insights for frequent organizers.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+          Text(tr(context, es: 'Premium quita anuncios y añade análisis más completos para quien organiza a menudo.', en: 'Premium removes ads and adds deeper insights for frequent organizers.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
         ])),
       ]),
       const SizedBox(height: 10),

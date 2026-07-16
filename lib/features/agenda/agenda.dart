@@ -42,7 +42,7 @@ class _EventsTabState extends State<EventsTab> {
               future: future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) return const CenterLoader(label: 'Cargando eventos...');
-                if (snapshot.hasError) return ErrorBlock(message: snapshot.error.toString(), onRetry: reload);
+                if (snapshot.hasError) return ErrorBlock(message: snapshot.error, onRetry: reload);
                 final events = snapshot.data ?? [];
                 final upcoming = events.where((e) => DateTime.tryParse(e['starts_at']?.toString() ?? '')?.isAfter(DateTime.now().subtract(const Duration(hours: 2))) ?? false).toList();
                 final past = events.length - upcoming.length;
@@ -676,7 +676,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           return const DirectPage(child: CenterLoader(label: 'Cargando evento...'));
         }
         if (snapshot.hasError) {
-          return DirectPage(child: ErrorBlock(message: snapshot.error.toString(), onRetry: reload));
+          return DirectPage(child: ErrorBlock(message: snapshot.error, onRetry: reload));
         }
         final data = snapshot.data!;
         final event = data.event;

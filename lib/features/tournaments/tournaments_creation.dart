@@ -569,7 +569,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(participantTypeTitle(), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
-            Text('Elige participantes sin escribir de más.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+            Text('Añade participantes sin escribir de más.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
           ])),
         ]),
       ),
@@ -613,7 +613,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         ]),
         const SizedBox(height: 12),
         if (participantNames.isEmpty)
-          EmptySlim(icon: Icons.groups_rounded, title: 'Sin participantes todavía', body: canAutoFillMembers ? 'Pulsa Elegir miembros para añadir personas del grupo.' : teamType == 'pareja' ? 'Crea parejas o añade una pareja invitada.' : 'Añade equipos para preparar la competición.')
+            EmptySlim(icon: Icons.groups_rounded, title: 'Sin participantes todavía', body: canAutoFillMembers ? 'Usa Elegir miembros para añadir personas del grupo.' : teamType == 'pareja' ? 'Crea parejas o añade una pareja invitada.' : 'Añade equipos para preparar la competición.')
         else ...[
           Row(children: [
             Expanded(child: Text('Preparados', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
@@ -658,7 +658,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
             TournamentRuleChip(label: '${manualRows.length} partidos'),
           ]),
           const SizedBox(height: 8),
-          const Text('Crea cruces con selectores. Puedes añadir fecha y pista.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          const Text('Crea cruces con selectores y añade fecha si quieres.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
           const SizedBox(height: 12),
           Row(children: [
             Expanded(child: PrimaryButton(label: 'Añadir partido', icon: Icons.add_rounded, onTap: addManualDraftRow)),
@@ -707,7 +707,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
             TournamentRuleChip(label: '${parseTournamentPairings(pairings.text).length} escritos'),
           ]),
           const SizedBox(height: 8),
-          const Text('Solo si quieres controlar los cruces desde el inicio.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          const Text('Úsalo si quieres controlar los cruces desde el inicio.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
           const SizedBox(height: 8),
           TextField(
             controller: pairings,

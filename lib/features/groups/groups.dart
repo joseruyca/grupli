@@ -1008,7 +1008,7 @@ class _GroupShellState extends State<GroupShell> {
           return DirectPage(child: CenterLoader(label: tr(context, es: 'Cargando grupo...', en: 'Loading group...')));
         }
         if (snapshot.hasError && _cachedGroup == null) {
-          return DirectPage(child: ErrorBlock(message: snapshot.error.toString(), onRetry: refresh));
+          return DirectPage(child: ErrorBlock(message: snapshot.error, onRetry: refresh));
         }
         final group = snapshot.data ?? _cachedGroup ?? <String, dynamic>{'id': widget.groupId, 'name': 'Grupo'};
         final name = AppData.text(group['name'], 'Grupo');
@@ -1169,7 +1169,7 @@ class _GroupDashboardTabState extends State<GroupDashboardTab> {
                     if (snapshot.connectionState == ConnectionState.waiting)
                       CenterLoader(label: appIsEnglish ? 'Loading summary...' : 'Cargando resumen...')
                     else if (snapshot.hasError)
-                      ErrorBlock(message: snapshot.error.toString(), onRetry: reload)
+                      ErrorBlock(message: snapshot.error, onRetry: reload)
                     else ...[
                       GroupDashboardIntro(nextEvent: nextEvent, pendingCount: myDecisionPending.length),
                       const SizedBox(height: 14),

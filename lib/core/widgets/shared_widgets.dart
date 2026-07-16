@@ -2129,15 +2129,16 @@ class CenterLoader extends StatelessWidget {
 }
 
 class ErrorBlock extends StatelessWidget {
-  final String message;
+  final Object? message;
   final VoidCallback onRetry;
   const ErrorBlock({super.key, required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
-    final sessionProblem = looksLikeSessionProblem(message);
+    final raw = message?.toString() ?? '';
+    final sessionProblem = looksLikeSessionProblem(raw);
     final title = sessionProblem ? 'Sesión pausada' : 'La conexión titubeó';
-    final body = sessionProblem ? 'Vuelve a entrar y dejamos todo en su sitio.' : humanizeError(message);
+    final body = sessionProblem ? 'Vuelve a entrar y dejamos todo en su sitio.' : humanError(message);
     return AppCard(
       color: AppColors.surfaceWarm,
       accentColor: sessionProblem ? AppColors.amber : AppColors.humanAccent,
@@ -2269,7 +2270,11 @@ bool looksLikeSessionProblem(String raw) {
 }
 
 String humanizeError(String raw) {
-  final original = raw.replaceAll('Exception: ', '').trim();
+  final withoutExceptionPrefix = raw.replaceAll('Exception: ', '').trim();
+  final colonIndex = withoutExceptionPrefix.indexOf(': ');
+  final original = colonIndex > 0
+      ? withoutExceptionPrefix.substring(colonIndex + 2).trim()
+      : withoutExceptionPrefix;
   final text = original.toLowerCase();
   if (text.isEmpty) return appIsEnglish ? 'The action could not be completed. Try again.' : 'No se pudo completar la acción. Inténtalo de nuevo.';
   if (text.contains('invalid login credentials')) return appIsEnglish ? 'Incorrect email or password.' : 'Email o contraseña incorrectos.';

@@ -1283,7 +1283,7 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
       title.clear();
       description.clear();
       setState(() { myTicketsFuture = AppData.mySupportTickets(); });
-      if (mounted) await showToast(context, tr(context, es: 'Reporte enviado. Gracias, lo revisarás desde el panel admin.', en: 'Report sent. Thanks, you will review it from the admin panel.'));
+      if (mounted) await showToast(context, tr(context, es: 'Reporte enviado. Gracias. El equipo lo revisará desde el panel admin.', en: 'Report sent. Thanks. The team will review it from the admin panel.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     } finally {

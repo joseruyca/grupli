@@ -413,7 +413,7 @@ class _HomeScreenState extends State<HomeScreen> {
             future: future,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) return const HomeLoading();
-              if (snapshot.hasError) return ErrorBlock(message: snapshot.error.toString(), onRetry: reload);
+              if (snapshot.hasError) return ErrorBlock(message: snapshot.error, onRetry: reload);
               final groups = snapshot.data ?? [];
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
