@@ -1917,7 +1917,6 @@ class AppData {
       'enabled': true,
       'last_seen_at': DateTime.now().toUtc().toIso8601String(),
     }, onConflict: 'fcm_token');
-    await updateNotificationSettings({'push_enabled': true});
   }
 
 

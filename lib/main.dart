@@ -864,6 +864,17 @@ class PushNotificationService {
           await Firebase.initializeApp();
         }
       }
+      if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS)) {
+        try {
+          await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+        } catch (_) {
+          // Si el canal nativo aÃºn no estÃ¡ listo, la app sigue funcionando.
+        }
+      }
       _configured = true;
       _wireListenersOnce();
       return true;
@@ -937,6 +948,7 @@ class PushNotificationService {
     final token = await messaging.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
     if (token != null && token.trim().isNotEmpty) {
       await AppData.registerDeviceToken(token, platformLabel);
+      await AppData.updateNotificationSettings({'push_enabled': true});
       await AppData.logQualityEvent('push_token_registered', screen: 'push', message: 'Token registrado', metadata: {'platform': platformLabel});
     }
     return token;
@@ -2027,17 +2039,17 @@ String scoringResultInputTitle(String type, [dynamic raw]) {
 String scoringResultInputHelp(String type, [dynamic raw]) {
   switch (scoringResultModel(type, raw)) {
     case 'goals':
-      return appIsEnglish ? "Enter each team's goals. The table will update points, goals for, goals against and difference." : 'Escribe los goles de cada equipo. La tabla actualizará puntos, goles a favor, goles en contra y diferencia.';
+      return appIsEnglish ? "Enter each team's goals. The table will update points, goals for, goals against and difference." : 'Escribe los goles de cada equipo. La tabla actualizarï¿½ puntos, goles a favor, goles en contra y diferencia.';
     case 'sets_games':
-      return appIsEnglish ? 'Write each set on a line, for example 6-4 or 7-5. The app calculates sets, games and tiebreaks.' : 'Escribe cada set en una línea, por ejemplo 6-4 o 7-5. La app calcula sets, juegos y desempates.';
+      return appIsEnglish ? 'Write each set on a line, for example 6-4 or 7-5. The app calculates sets, games and tiebreaks.' : 'Escribe cada set en una lï¿½nea, por ejemplo 6-4 o 7-5. La app calcula sets, juegos y desempates.';
     case 'sets_points':
-      return appIsEnglish ? 'Write each partial on a line, for example 25-21 or 15-12. The app calculates sets, points and tiebreaks.' : 'Escribe cada parcial en una línea, por ejemplo 25-21 o 15-12. La app calcula sets, puntos y desempates.';
+      return appIsEnglish ? 'Write each partial on a line, for example 25-21 or 15-12. The app calculates sets, points and tiebreaks.' : 'Escribe cada parcial en una lï¿½nea, por ejemplo 25-21 o 15-12. La app calcula sets, puntos y desempates.';
     case 'total_points':
-      return appIsEnglish ? 'Enter the final score in points. The table will calculate wins and difference.' : 'Escribe el marcador final de puntos. La tabla calculará victorias y diferencia.';
+      return appIsEnglish ? 'Enter the final score in points. The table will calculate wins and difference.' : 'Escribe el marcador final de puntos. La tabla calcularï¿½ victorias y diferencia.';
     case 'games':
       return appIsEnglish ? 'Enter games, matches or maps won by each side.' : 'Escribe juegos, partidas o mapas ganados por cada lado.';
     default:
-      return appIsEnglish ? 'Flexible score. The standings will use the rules configured for this tournament.' : 'Marcador flexible. La clasificación usará las reglas configuradas para este torneo.';
+      return appIsEnglish ? 'Flexible score. The standings will use the rules configured for this tournament.' : 'Marcador flexible. La clasificaciï¿½n usarï¿½ las reglas configuradas para este torneo.';
   }
 }
 

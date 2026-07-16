@@ -55,6 +55,9 @@ Deno.serve(async (req) => {
       .single<NotificationRecord>()
 
     if (notificationError || !notification) throw notificationError ?? new Error('Notification not found')
+    if (!['pending', 'failed', 'partial'].includes(notification.push_status ?? 'pending')) {
+      return json({ ok: true, skipped: true, reason: 'already_sent', status: notification.push_status ?? null })
+    }
 
     const { data: settings } = await supabase
       .from('user_settings')
