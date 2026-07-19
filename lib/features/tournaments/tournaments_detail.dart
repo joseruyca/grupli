@@ -112,8 +112,8 @@ class _TournamentDetailSimpleScreenState extends State<TournamentDetailSimpleScr
   Future<void> addGroupMembersVisual() async {
     if (!currentCanAddMembers) {
       await showToast(context, currentTeamType == 'pareja'
-          ? (appIsEnglish ? 'This competition uses pairs. Create pairs from the Pair button or write them as Ana / Javi.' : 'Esta competición usa parejas. Crea las parejas desde el botón Pareja o escríbelas como Ana / Javi.')
-          : (appIsEnglish ? 'This competition uses teams. Add team names instead of loading individual members.' : 'Esta competición usa equipos. Añade nombres de equipos en vez de cargar miembros sueltos.'),
+          ? (appIsEnglish ? 'Use the Pair button or write them as Ana / Javi.' : 'Esta competición usa parejas. Crea las parejas desde el botón Pareja o escríbelas como Ana / Javi.')
+          : (appIsEnglish ? 'Add team names instead of individual members.' : 'Esta competición usa equipos. Añade nombres de equipos en vez de cargar miembros sueltos.'),
           danger: true);
       return;
     }

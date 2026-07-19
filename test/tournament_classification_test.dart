@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/main.dart';
+import 'package:grupli/main.dart';
 
 void main() {
   test('football classification uses goals and direct order', () {

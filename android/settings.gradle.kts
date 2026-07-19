@@ -1,3 +1,5 @@
+import org.gradle.api.initialization.resolve.RepositoriesMode
+
 pluginManagement {
     val flutterSdkPath =
         run {
@@ -7,13 +9,48 @@ pluginManagement {
             require(flutterSdkPath != null) { "flutter.sdk not set in local.properties" }
             flutterSdkPath
         }
-
+    val storageUrl = System.getenv("FLUTTER_STORAGE_BASE_URL") ?: "https://storage.googleapis.com"
+    val engineVersion = file("$flutterSdkPath/bin/cache/engine.stamp").readText().trim()
+    var engineRealm = file("$flutterSdkPath/bin/cache/engine.realm").readText().trim()
+    if (engineRealm.isNotEmpty()) {
+        engineRealm += "/"
+    }
+    val flutterEngineRepo = uri("$storageUrl/${engineRealm}download.flutter.io")
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
         google()
         mavenCentral()
         gradlePluginPortal()
+        maven {
+            url = flutterEngineRepo
+        }
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    val flutterSdkPath =
+        run {
+            val properties = java.util.Properties()
+            file("local.properties").inputStream().use { properties.load(it) }
+            val flutterSdkPath = properties.getProperty("flutter.sdk")
+            require(flutterSdkPath != null) { "flutter.sdk not set in local.properties" }
+            flutterSdkPath
+        }
+    val storageUrl = System.getenv("FLUTTER_STORAGE_BASE_URL") ?: "https://storage.googleapis.com"
+    val engineVersion = file("$flutterSdkPath/bin/cache/engine.stamp").readText().trim()
+    var engineRealm = file("$flutterSdkPath/bin/cache/engine.realm").readText().trim()
+    if (engineRealm.isNotEmpty()) {
+        engineRealm += "/"
+    }
+    val flutterEngineRepo = uri("$storageUrl/${engineRealm}download.flutter.io")
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            url = flutterEngineRepo
+        }
     }
 }
 

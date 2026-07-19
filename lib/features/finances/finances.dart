@@ -1,4 +1,4 @@
-part of grupli_app;
+﻿part of grupli_app;
 
 class FinancesTab extends StatefulWidget {
   final Map<String, dynamic> group;
@@ -517,7 +517,7 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
         TextField(controller: concept, decoration: InputDecoration(hintText: appIsEnglish ? 'E.g. padel court, dinner, fuel...' : 'Ej. Pista de pádel, cena, gasolina...')),
         const SizedBox(height: 12),
         FieldLabel(appIsEnglish ? 'Total amount' : 'Importe total'),
-        TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(hintText: appIsEnglish ? '0.00 €' : '0,00 €')),
+        TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(hintText: appIsEnglish ? '0.00 â‚¬' : '0,00 â‚¬')),
       ])),
       const SizedBox(height: 14),
       FutureBuilder<List<Map<String, dynamic>>>(
@@ -1860,28 +1860,56 @@ class FinancePremiumTeaserCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AppCard(
-    color: AppColors.orangeSoft,
-    accentColor: AppColors.orange,
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(width: 46, height: 46, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.workspace_premium_rounded, color: AppColors.orange, size: 22)),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(tr(context, es: 'Finanzas avanzadas', en: 'Advanced finances'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
-          const SizedBox(height: 4),
-          Text(tr(context, es: 'Premium quita anuncios y añade análisis más completos para quien organiza a menudo.', en: 'Premium removes ads and adds deeper insights for frequent organizers.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
-        ])),
-      ]),
-      const SizedBox(height: 10),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        TournamentRuleChip(label: tr(context, es: 'Sin anuncios', en: 'No ads')),
-        TournamentRuleChip(label: tr(context, es: 'Análisis avanzado', en: 'Advanced insights')),
-        TournamentRuleChip(label: tr(context, es: 'Exportar balances', en: 'Export balances')),
-      ]),
-      const SizedBox(height: 10),
-      SecondaryButton(label: tr(context, es: 'Ver Premium', en: 'See Premium'), icon: Icons.workspace_premium_rounded, onTap: onOpen),
-    ]),
-  );
+        color: AppColors.orangeSoft,
+        accentColor: AppColors.orange,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(15)),
+                child: const Icon(Icons.workspace_premium_rounded,
+                    color: AppColors.orange, size: 22)),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(
+                      tr(context,
+                          es: 'Premium de Finanzas', en: 'Finance Premium'),
+                      style: const TextStyle(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 17)),
+                  const SizedBox(height: 4),
+                  Text(
+                      tr(context,
+                          es: 'Sin anuncios y más contexto de un vistazo.',
+                          en: 'No ads and more context at a glance.'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25)),
+                ])),
+          ]),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            TournamentRuleChip(label: tr(context, es: 'Sin anuncios', en: 'No ads')),
+            TournamentRuleChip(label: tr(context, es: 'Más contexto', en: 'More context')),
+            TournamentRuleChip(label: tr(context, es: 'Más claro', en: 'Clearer view')),
+          ]),
+          const SizedBox(height: 10),
+          SecondaryButton(
+              label: tr(context, es: 'Ver Premium', en: 'View premium'),
+              icon: Icons.workspace_premium_rounded,
+              onTap: onOpen),
+        ]),
+      );
 }
 
 class FinanceAdvancedInsightsCard extends StatelessWidget {
@@ -1964,3 +1992,6 @@ class FinanceFocusMetric extends StatelessWidget {
     ]),
   );
 }
+
+
+

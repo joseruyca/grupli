@@ -759,11 +759,11 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
             const SizedBox(height: 3),
             Text(
               format == 'americano'
-                  ? 'Rondas y ranking individual.'
+                  ? 'Rondas y ranking.'
                   : format == 'manual'
-                      ? 'Cruces a mano y fechas por partido.'
+                      ? 'Cruces manuales y fechas.'
                       : format == 'eliminatoria'
-                          ? 'Cuadro, byes y siguiente ronda.'
+                          ? 'Cuadro y siguiente ronda.'
                           : 'Jornadas y clasificación.',
               style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3),
             ),
@@ -788,12 +788,12 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           ]),
           const SizedBox(height: 10),
           TournamentCounterRow(label: 'Rondas', value: americanoRounds, min: 1, max: 40, onChanged: (v) => setState(() => americanoRounds = v), helper: hasParticipants ? 'Recomendado: ${recommendedAmericanoRounds(participantNames.length, courtsCount)}' : 'Se ajusta al añadir jugadores'),
-          TournamentCounterRow(label: 'Pistas / mesas', value: courtsCount, min: 1, max: 12, onChanged: (v) => setState(() => courtsCount = v), helper: '1 partido por pista y ronda'),
+          TournamentCounterRow(label: 'Pistas / mesas', value: courtsCount, min: 1, max: 12, onChanged: (v) => setState(() => courtsCount = v), helper: '1 partido por pista'),
           const SizedBox(height: 8),
           Text(hasParticipants ? 'La app rota parejas y reparte descansos automáticamente.' : 'Añade jugadores para generar las primeras rondas.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
           if (hasParticipants && participantNames.length >= 4 && americanoRounds != recommendedAmericanoRounds(participantNames.length, courtsCount)) ...[
             const SizedBox(height: 10),
-            SecondaryButton(label: 'Usar ${recommendedAmericanoRounds(participantNames.length, courtsCount)} rondas recomendadas', icon: Icons.auto_awesome_rounded, onTap: () => setState(() => americanoRounds = recommendedAmericanoRounds(participantNames.length, courtsCount))),
+            SecondaryButton(label: 'Usar ${recommendedAmericanoRounds(participantNames.length, courtsCount)} rondas', icon: Icons.auto_awesome_rounded, onTap: () => setState(() => americanoRounds = recommendedAmericanoRounds(participantNames.length, courtsCount))),
           ],
         ] else if (format == 'eliminatoria') ...[
           Wrap(spacing: 8, runSpacing: 8, children: [
@@ -806,7 +806,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
             const Expanded(child: Text('Sortear cruces al crear', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))),
             Switch(value: randomizePairings, activeThumbColor: AppColors.red, onChanged: (v) => setState(() => randomizePairings = v)),
           ]),
-          Text(randomizePairings ? 'Recomendado: evita sesgos por el orden.' : 'Usa el orden como cabeza de serie.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+          Text(randomizePairings ? 'Recomendado: evita sesgos.' : 'Usa el orden como cabeza de serie.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
         ] else ...[
           Wrap(spacing: 8, runSpacing: 8, children: const [
             TournamentRuleChip(label: 'Todo editable'),
@@ -825,7 +825,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
           Container(width: 36, height: 36, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.group_add_rounded, color: AppColors.teal, size: 19)),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(format == 'americano' ? 'Siguiente: jugadores individuales' : format == 'manual' ? 'Siguiente: participantes y selector de partidos' : 'Siguiente: participantes adecuados', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+            Text(format == 'americano' ? 'Siguiente: jugadores' : format == 'manual' ? 'Siguiente: cruces manuales' : 'Siguiente: participantes', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
             Text(
               format == 'americano'
@@ -845,7 +845,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         SectionHeader(title: 'Vista previa'),
         const SizedBox(height: 8),
         if (preview.isEmpty)
-          EmptySlim(icon: Icons.sports_score_rounded, title: 'Sin cruces todavía', body: 'Revisa participantes o crea los cruces manuales.')
+          EmptySlim(icon: Icons.sports_score_rounded, title: 'Sin cruces todavía', body: 'Revisa participantes o crea el primer cruce.')
         else
           ...preview.map((m) => TournamentDraftMatchTile(match: m)),
       ],
@@ -975,7 +975,7 @@ class _TournamentCreateSimpleScreenState extends State<TournamentCreateSimpleScr
         TournamentReviewRow(label: 'Nombre', value: title),
         TournamentReviewRow(label: 'Formato', value: tournamentFormatLabel(format)),
         TournamentReviewRow(label: 'Participantes', value: '${names.length} · ${participantTypeTitle()}'),
-        TournamentReviewRow(label: 'Partidos previstos', value: '${matches.length}'),
+        TournamentReviewRow(label: 'Partidos', value: '${matches.length}'),
         TournamentReviewRow(label: 'Resultado', value: '${scoringTypeLabel(scoringType)} · ${scoringConfigShortText(scoringType, scoringConfig)}'),
         TournamentReviewRow(label: 'Estadísticas', value: TournamentEngineV2.sportStatsSummary(scoringType)),
         TournamentReviewRow(label: 'Calendario', value: scheduleMatches ? '${DateFormat('d MMM', appDateLocale).format(firstMatchDate)} · ${firstMatchTime.format(context)}' : 'Sin fechas'),

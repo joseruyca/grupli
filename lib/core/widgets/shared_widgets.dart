@@ -1,4 +1,4 @@
-part of grupli_app;
+﻿part of grupli_app;
 
 class GroupHeroCard extends StatelessWidget {
   final String name;
@@ -142,18 +142,39 @@ class GroupDashboardIntro extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = nextEvent == null
-        ? tr(context, es: 'Este grupo todavía no tiene planes próximos.', en: 'This group does not have any upcoming plans yet.')
+        ? tr(context, es: 'Sin planes próximos', en: 'No upcoming plans')
         : pendingCount > 0
             ? (pendingCount == 1
-                ? tr(context, es: 'Tienes 1 plan pendiente de confirmar.', en: 'You have 1 plan waiting for confirmation.')
-                : tr(context, es: 'Tienes $pendingCount planes pendientes de confirmar.', en: 'You have $pendingCount plans waiting for confirmation.'))
-            : tr(context, es: 'El próximo plan ya está organizado.', en: 'The next plan is already set.');
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Text(
-        text,
-        style: const TextStyle(color: AppColors.muted, fontSize: 14.5, fontWeight: FontWeight.w800, height: 1.32),
-      ),
+                ? tr(context, es: '1 plan por confirmar', en: '1 plan waiting for confirmation')
+                : tr(context, es: '$pendingCount planes por confirmar', en: '$pendingCount plans waiting for confirmation'))
+            : tr(context, es: 'Todo listo', en: 'Everything is set');
+
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      color: AppColors.faint,
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: AppColors.tealSoft,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(Icons.auto_awesome_rounded, color: AppColors.teal, size: 18),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: AppColors.ink,
+              fontSize: 14.3,
+              fontWeight: FontWeight.w900,
+              height: 1.18,
+            ),
+          ),
+        ),
+      ]),
     );
   }
 }
@@ -2107,23 +2128,94 @@ class CenterLoader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 34),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 34,
-                height: 34,
-                child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.teal),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 280),
+            child: AppCard(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: const BoxDecoration(
+                      color: AppColors.tealSoft,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.groups_rounded, color: AppColors.teal),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Solo un momento.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: const LinearProgressIndicator(
+                      minHeight: 6,
+                      backgroundColor: AppColors.faint,
+                      color: AppColors.teal,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 18),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.35),
-              ),
-            ],
+            ),
           ),
+        ),
+      );
+}
+
+class InlineLoader extends StatelessWidget {
+  final double size;
+  final Color color;
+  const InlineLoader({super.key, this.size = 16, this.color = AppColors.teal});
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: size,
+        height: size,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: color,
+        ),
+      );
+}
+
+class SlimProgressBar extends StatelessWidget {
+  final Color color;
+  final Color backgroundColor;
+  final double minHeight;
+  const SlimProgressBar({
+    super.key,
+    this.color = AppColors.teal,
+    this.backgroundColor = AppColors.faint,
+    this.minHeight = 3,
+  });
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(999),
+        child: LinearProgressIndicator(
+          minHeight: minHeight,
+          color: color,
+          backgroundColor: backgroundColor,
         ),
       );
 }
@@ -2138,7 +2230,7 @@ class ErrorBlock extends StatelessWidget {
     final raw = message?.toString() ?? '';
     final sessionProblem = looksLikeSessionProblem(raw);
     final title = sessionProblem ? 'Sesión pausada' : 'La conexión titubeó';
-    final body = sessionProblem ? 'Vuelve a entrar y dejamos todo en su sitio.' : humanError(message);
+    final body = sessionProblem ? 'Vuelve a entrar y seguimos desde donde lo dejaste.' : humanError(message);
     return AppCard(
       color: AppColors.surfaceWarm,
       accentColor: sessionProblem ? AppColors.amber : AppColors.humanAccent,
@@ -2298,46 +2390,155 @@ String humanizeError(String raw) {
   return original;
 }
 
-class HomeLoading extends StatelessWidget { const HomeLoading({super.key}); @override Widget build(BuildContext context) => Column(children: [Row(children: const [Expanded(child: GhostBox(height: 90)), SizedBox(width: 10), Expanded(child: GhostBox(height: 90)), SizedBox(width: 10), Expanded(child: GhostBox(height: 90))]), const SizedBox(height: 24), const GhostBox(height: 100), const SizedBox(height: 10), const GhostBox(height: 100)]); }
-class GhostBox extends StatelessWidget {
-  final double height;
-  const GhostBox({super.key, required this.height});
+class HomeLoading extends StatelessWidget {
+  const HomeLoading({super.key});
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    _SkeletonLine(widthFactor: .48, height: 24),
+                    SizedBox(height: 8),
+                    _SkeletonLine(widthFactor: .72, height: 14),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              const _SkeletonDot(),
+            ],
+          ),
+          const SizedBox(height: 18),
+          const _LoadingCard(),
+          const SizedBox(height: 12),
+          const _LoadingCard(secondary: true),
+        ],
+      );
+}
+
+class _LoadingCard extends StatelessWidget {
+  final bool secondary;
+  const _LoadingCard({this.secondary = false});
 
   @override
   Widget build(BuildContext context) => Container(
-        height: height,
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
+          color: secondary ? AppColors.white : AppColors.surfaceWarm,
           borderRadius: AppColors.softRadius,
           border: Border.all(color: AppColors.hairline),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.surfaceWarm, AppColors.faint, AppColors.tealMist],
-            stops: [0, .58, 1],
-          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x120B2330),
+              blurRadius: 16,
+              offset: Offset(0, 6),
+            ),
+          ],
         ),
-        child: ClipRRect(
-          borderRadius: AppColors.softRadius,
-          child: CustomPaint(painter: GrupliSkeletonPainter()),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                _SkeletonSquare(size: 44),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SkeletonLine(widthFactor: .58, height: 16),
+                      SizedBox(height: 8),
+                      _SkeletonLine(widthFactor: .86, height: 12),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: const [
+                Expanded(child: _SkeletonPill()),
+                SizedBox(width: 8),
+                Expanded(child: _SkeletonPill()),
+              ],
+            ),
+          ],
         ),
       );
 }
 
-class GrupliSkeletonPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(.46)
-      ..strokeWidth = 10
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(Offset(size.width * .12, size.height * .36), Offset(size.width * .68, size.height * .36), paint);
-    paint.strokeWidth = 8;
-    paint.color = Colors.white.withOpacity(.36);
-    canvas.drawLine(Offset(size.width * .12, size.height * .58), Offset(size.width * .48, size.height * .58), paint);
-  }
+class _SkeletonLine extends StatelessWidget {
+  final double widthFactor;
+  final double height;
+  const _SkeletonLine({required this.widthFactor, required this.height});
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  Widget build(BuildContext context) => FractionallySizedBox(
+        widthFactor: widthFactor,
+        alignment: Alignment.centerLeft,
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: AppColors.tealMist,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+      );
+}
+
+class _SkeletonSquare extends StatelessWidget {
+  final double size;
+  const _SkeletonSquare({required this.size});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: AppColors.tealMist,
+          borderRadius: AppColors.humanRadius,
+        ),
+      );
+}
+
+class _SkeletonPill extends StatelessWidget {
+  const _SkeletonPill();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 34,
+        decoration: BoxDecoration(
+          color: AppColors.faint,
+          borderRadius: BorderRadius.circular(999),
+        ),
+      );
+}
+
+class _SkeletonDot extends StatelessWidget {
+  const _SkeletonDot();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: AppColors.navTournaments,
+          shape: BoxShape.circle,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1A0E6B73),
+              blurRadius: 12,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+      );
 }
 
 class ChoiceBigCard extends StatelessWidget { final IconData icon; final String title; final String body; final VoidCallback onTap; const ChoiceBigCard({super.key, required this.icon, required this.title, required this.body, required this.onTap}); @override Widget build(BuildContext context) => AppCard(onTap: onTap, child: Row(children: [Container(width: 48, height: 48, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.tealSoft), child: Icon(icon, color: AppColors.teal)), const SizedBox(width: 14), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.titleMedium), Text(body, style: Theme.of(context).textTheme.bodyMedium)])), const Icon(Icons.chevron_right_rounded, color: AppColors.muted)])); }
@@ -2410,7 +2611,11 @@ class AgendaPremiumHero extends StatelessWidget {
     if (next != null) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (nextDayEvents.length > 1)
-          AgendaSameDayCompactCard(events: nextDayEvents, group: group, onChanged: onChanged, title: tr(context, es: 'Próximos de ese día', en: 'Upcoming for that day'))
+          AgendaSameDayCompactCard(
+              events: nextDayEvents,
+              group: group,
+              onChanged: onChanged,
+              title: tr(context, es: 'Próximos de ese día', en: 'Upcoming for that day'))
         else
           EventAgendaCard(event: next, group: group, onChanged: onChanged),
         const SizedBox(height: 10),
@@ -2430,22 +2635,49 @@ class AgendaPremiumHero extends StatelessWidget {
           Container(
             width: 58,
             height: 62,
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white.withOpacity(.18))),
+            decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white.withOpacity(.18))),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Text('SIN', style: TextStyle(color: AppColors.navAgenda, fontSize: 10, fontWeight: FontWeight.w900)),
-              const Text('+', style: TextStyle(color: AppColors.ink, fontSize: 25, fontWeight: FontWeight.w900, height: 1)),
-              Text(DateFormat('MMM', appDateLocale).format(DateTime.now()).replaceAll('.', ''), style: const TextStyle(color: AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800)),
+              const Text('SIN',
+                  style: TextStyle(
+                      color: AppColors.navAgenda,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900)),
+              const Text('+',
+                  style: TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 25,
+                      fontWeight: FontWeight.w900,
+                      height: 1)),
+              Text(
+                  DateFormat('MMM', appDateLocale)
+                      .format(DateTime.now())
+                      .replaceAll('.', ''),
+                  style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800)),
             ]),
           ),
           const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(tr(context, es: 'Próximo plan', en: 'Next plan'), style: const TextStyle(color: Color(0xDFFFFFFF), fontSize: 12, fontWeight: FontWeight.w800)),
+          Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(tr(context, es: 'Próximo plan', en: 'Next plan'),
+                style: const TextStyle(
+                    color: Color(0xDFFFFFFF), fontSize: 12, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
             Text(
-              tr(context, es: 'Crea el primer plan del grupo', en: 'Create the group\'s first plan'),
+              tr(context, es: 'Aún no hay planes', en: 'No plans yet'),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 21, height: 1.05, letterSpacing: -.25),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 20,
+                  height: 1.05,
+                  letterSpacing: -.25),
             ),
           ])),
           const SizedBox(width: 8),
@@ -2457,17 +2689,15 @@ class AgendaPremiumHero extends StatelessWidget {
                 backgroundColor: Colors.white,
                 foregroundColor: AppColors.navy,
                 padding: const EdgeInsets.symmetric(horizontal: 13),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15)),
               ),
               icon: const Icon(Icons.add_rounded, size: 18),
-              label: Text(tr(context, es: 'Crear', en: 'Create'), style: const TextStyle(fontWeight: FontWeight.w900)),
+              label: Text(tr(context, es: 'Crear', en: 'Create'),
+                  style: const TextStyle(fontWeight: FontWeight.w900)),
             ),
           ),
         ]),
-        const SizedBox(height: 12),
-        Text(tr(context, es: 'Elige un día, crea un evento y el grupo podrá confirmar asistencia desde la Agenda.', en: 'Pick a day, create an event and the group can confirm attendance from Agenda.'), style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.32)),
-        const SizedBox(height: 12),
-        AgendaMatteStatsRow(events: events.length, upcoming: upcomingEvents.length, attendance: '$totalYes / $totalMaybe'),
       ]),
     );
   }
@@ -4263,3 +4493,6 @@ void showCodeSheet(BuildContext context, String code, String groupName) {
     ),
   );
 }
+
+
+

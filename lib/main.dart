@@ -21,8 +21,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-
-
 part 'core/theme/app_colors.dart';
 part 'core/i18n/i18n.dart';
 part 'core/app_data/app_data.dart';
@@ -42,16 +40,17 @@ part 'features/tournaments/tournaments.dart';
 part 'features/profile/profile_members_admin.dart';
 part 'core/widgets/shared_widgets.dart';
 
-
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 Locale appLocale = resolveAppLocale(ui.PlatformDispatcher.instance.locale);
 
 @pragma('vm:entry-point')
-Future<void> grupliFirebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future<void> grupliFirebaseMessagingBackgroundHandler(
+    RemoteMessage message) async {
   try {
     if (Firebase.apps.isEmpty) {
       if (AppConfig.firebaseConfigured) {
-        await Firebase.initializeApp(options: PushNotificationService.firebaseOptions);
+        await Firebase.initializeApp(
+            options: PushNotificationService.firebaseOptions);
       } else {
         await Firebase.initializeApp();
       }
@@ -64,9 +63,9 @@ Future<void> grupliFirebaseMessagingBackgroundHandler(RemoteMessage message) asy
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb) {
-    FirebaseMessaging.onBackgroundMessage(grupliFirebaseMessagingBackgroundHandler);
+    FirebaseMessaging.onBackgroundMessage(
+        grupliFirebaseMessagingBackgroundHandler);
   }
-
 
   // Android 15+ activa el modo edge-to-edge por defecto.
   // Mantenemos las barras del sistema limpias y usamos SafeArea global abajo
@@ -90,18 +89,30 @@ Future<void> main() async {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.error_outline_rounded, color: Color(0xFF087A78), size: 42),
+                Icon(Icons.error_outline_rounded,
+                    color: Color(0xFF087A78), size: 42),
                 SizedBox(height: 14),
                 Text(
-                  appIsEnglish ? 'The connection stumbled' : 'La conexión titubeó',
+                  appIsEnglish
+                      ? 'The connection stumbled'
+                      : 'La conexión titubeó',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF12263A)),
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF12263A)),
                 ),
                 SizedBox(height: 8),
                 Text(
-                  appIsEnglish ? 'No worries. Go back, try again and Grupli will pick up the thread.' : 'No pasa nada. Vuelve atrás, inténtalo otra vez y Grupli recuperará el hilo.',
+                  appIsEnglish
+                      ? 'No worries. Go back, try again and Grupli will pick up the thread.'
+                      : 'No pasa nada. Vuelve atrás, inténtalo otra vez y Grupli recuperará el hilo.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF6A7A89),
+                      height: 1.35),
                 ),
               ],
             ),
@@ -128,7 +139,8 @@ Future<void> main() async {
     await Supabase.initialize(
       url: AppConfig.supabaseUrl,
       anonKey: AppConfig.supabaseAnonKey,
-      authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce),
+      authOptions:
+          const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce),
     );
   } catch (_) {
     runApp(const GrupliStartupErrorApp());
@@ -157,17 +169,25 @@ class AppConfig {
 
   static const firebaseApiKey = String.fromEnvironment('FIREBASE_API_KEY');
   static const firebaseAppId = String.fromEnvironment('FIREBASE_APP_ID');
-  static const firebaseMessagingSenderId = String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
-  static const firebaseProjectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
+  static const firebaseMessagingSenderId =
+      String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
+  static const firebaseProjectId =
+      String.fromEnvironment('FIREBASE_PROJECT_ID');
   static const firebaseVapidKey = String.fromEnvironment('FIREBASE_VAPID_KEY');
-  static const osmGeocoderEndpointDefine = String.fromEnvironment('OSM_GEOCODER_ENDPOINT');
+  static const osmGeocoderEndpointDefine =
+      String.fromEnvironment('OSM_GEOCODER_ENDPOINT');
   static const fallbackOsmGeocoderEndpoint = 'https://photon.komoot.io/api/';
 
   static String get supabaseUrl => supabaseUrlDefine.trim();
   static String get supabaseAnonKey => supabaseAnonDefine.trim();
-  static String get appBaseUrl => appBaseUrlDefine.trim().isNotEmpty ? appBaseUrlDefine.trim().replaceFirst(RegExp(r'/+$'), '') : fallbackAppBaseUrl;
+  static String get appBaseUrl => appBaseUrlDefine.trim().isNotEmpty
+      ? appBaseUrlDefine.trim().replaceFirst(RegExp(r'/+$'), '')
+      : fallbackAppBaseUrl;
 
-  static String get osmGeocoderEndpoint => osmGeocoderEndpointDefine.trim().isNotEmpty ? osmGeocoderEndpointDefine.trim() : fallbackOsmGeocoderEndpoint;
+  static String get osmGeocoderEndpoint =>
+      osmGeocoderEndpointDefine.trim().isNotEmpty
+          ? osmGeocoderEndpointDefine.trim()
+          : fallbackOsmGeocoderEndpoint;
 
   static bool get hasSupabaseRuntimeConfig =>
       supabaseUrl.trim().isNotEmpty &&
@@ -213,18 +233,30 @@ class GrupliConfigurationMissingApp extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.lock_outline_rounded, color: Color(0xFF087A78), size: 42),
+                    Icon(Icons.lock_outline_rounded,
+                        color: Color(0xFF087A78), size: 42),
                     SizedBox(height: 14),
                     Text(
-                      appIsEnglish ? 'Configuration pending' : 'Configuración pendiente',
+                      appIsEnglish
+                          ? 'Configuration pending'
+                          : 'Configuración pendiente',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF12263A)),
+                      style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF12263A)),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      appIsEnglish ? 'The app needs secure environment configuration to start. Check the local .env file or your deployment environment variables.' : 'La app necesita su configuración segura de entorno para arrancar. Revisa el archivo .env local o las variables del entorno de despliegue.',
+                      appIsEnglish
+                          ? 'The app needs secure environment configuration to start. Check the local .env file or your deployment environment variables.'
+                          : 'La app necesita su configuración segura de entorno para arrancar. Revisa el archivo .env local o las variables del entorno de despliegue.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF6A7A89),
+                          height: 1.35),
                     ),
                   ],
                 ),
@@ -236,7 +268,6 @@ class GrupliConfigurationMissingApp extends StatelessWidget {
     );
   }
 }
-
 
 class GrupliStartupErrorApp extends StatelessWidget {
   const GrupliStartupErrorApp({super.key});
@@ -269,18 +300,30 @@ class GrupliStartupErrorApp extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.sync_problem_rounded, color: Color(0xFF087A78), size: 42),
+                    Icon(Icons.sync_problem_rounded,
+                        color: Color(0xFF087A78), size: 42),
                     SizedBox(height: 14),
                     Text(
-                      appIsEnglish ? 'Grupli could not find the way' : 'Grupli no ha encontrado el camino',
+                      appIsEnglish
+                          ? 'Grupli could not find the way'
+                          : 'Grupli no ha encontrado el camino',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF12263A)),
+                      style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF12263A)),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      appIsEnglish ? 'The secure configuration did not respond in time. Refresh the page or reopen the app.' : 'La configuración segura no respondió a tiempo. Actualiza la página o vuelve a abrir la app.',
+                      appIsEnglish
+                          ? 'The secure configuration did not respond in time. Refresh the page or reopen the app.'
+                          : 'La configuración segura no respondió a tiempo. Actualiza la página o vuelve a abrir la app.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF6A7A89), height: 1.35),
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF6A7A89),
+                          height: 1.35),
                     ),
                   ],
                 ),
@@ -293,13 +336,16 @@ class GrupliStartupErrorApp extends StatelessWidget {
   }
 }
 
-
 class PlaceSuggestion {
   final String description;
   final String source;
   final double? lat;
   final double? lon;
-  const PlaceSuggestion({required this.description, this.source = 'OpenStreetMap', this.lat, this.lon});
+  const PlaceSuggestion(
+      {required this.description,
+      this.source = 'OpenStreetMap',
+      this.lat,
+      this.lon});
 }
 
 class AddressSearchService {
@@ -320,12 +366,14 @@ class AddressSearchService {
       ...params,
     });
 
-    final response = await http
-        .get(uri, headers: const {'Accept': 'application/json'})
-        .timeout(const Duration(seconds: 8));
+    final response = await http.get(uri, headers: const {
+      'Accept': 'application/json'
+    }).timeout(const Duration(seconds: 8));
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(appIsEnglish ? 'Could not search for the address right now.' : 'No se pudo buscar la dirección ahora mismo.');
+      throw Exception(appIsEnglish
+          ? 'Could not search for the address right now.'
+          : 'No se pudo buscar la dirección ahora mismo.');
     }
 
     final data = jsonDecode(response.body);
@@ -336,12 +384,18 @@ class AddressSearchService {
     final seen = <String>{};
     final result = <PlaceSuggestion>[];
     for (final raw in features) {
-      final feature = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
-      final props = feature['properties'] is Map ? Map<String, dynamic>.from(feature['properties']) : <String, dynamic>{};
-      final geometry = feature['geometry'] is Map ? Map<String, dynamic>.from(feature['geometry']) : <String, dynamic>{};
+      final feature =
+          raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+      final props = feature['properties'] is Map
+          ? Map<String, dynamic>.from(feature['properties'])
+          : <String, dynamic>{};
+      final geometry = feature['geometry'] is Map
+          ? Map<String, dynamic>.from(feature['geometry'])
+          : <String, dynamic>{};
       final coordinates = geometry['coordinates'];
       final description = _photonDescription(props);
-      if (description.isEmpty || seen.contains(description.toLowerCase())) continue;
+      if (description.isEmpty || seen.contains(description.toLowerCase()))
+        continue;
       seen.add(description.toLowerCase());
       double? lon;
       double? lat;
@@ -370,7 +424,8 @@ class AddressSearchService {
 
     final firstLine = <String>[
       if (name.isNotEmpty) name,
-      if (street.isNotEmpty && street != name) [street, houseNumber].where((x) => x.isNotEmpty).join(' '),
+      if (street.isNotEmpty && street != name)
+        [street, houseNumber].where((x) => x.isNotEmpty).join(' '),
     ].where((x) => x.trim().isNotEmpty).join(' · ');
 
     final secondLine = <String>[postcode, city, state, country]
@@ -383,7 +438,8 @@ class AddressSearchService {
     ];
     final unique = <String>[];
     for (final part in parts) {
-      if (!unique.any((x) => x.toLowerCase() == part.toLowerCase())) unique.add(part);
+      if (!unique.any((x) => x.toLowerCase() == part.toLowerCase()))
+        unique.add(part);
     }
     return unique.join(', ');
   }
@@ -393,27 +449,41 @@ String mapsLaunchUrl(String address) {
   final clean = address.trim();
   if (clean.isEmpty) return '';
   final parsed = Uri.tryParse(clean);
-  if (parsed != null && (parsed.scheme == 'http' || parsed.scheme == 'https')) return clean;
-  return Uri.https('www.google.com', '/maps/search/', {'api': '1', 'query': clean}).toString();
+  if (parsed != null && (parsed.scheme == 'http' || parsed.scheme == 'https'))
+    return clean;
+  return Uri.https(
+          'www.google.com', '/maps/search/', {'api': '1', 'query': clean})
+      .toString();
 }
 
-Future<void> openAddressInGoogleMaps(BuildContext context, String address) async {
+Future<void> openAddressInGoogleMaps(
+    BuildContext context, String address) async {
   final url = mapsLaunchUrl(address);
   if (url.isEmpty) {
-    await showToast(context, appIsEnglish ? 'This event has no address.' : 'Este evento no tiene dirección.', danger: true);
+    await showToast(
+        context,
+        appIsEnglish
+            ? 'This event has no address.'
+            : 'Este evento no tiene dirección.',
+        danger: true);
     return;
   }
   final uri = Uri.parse(url);
   try {
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && context.mounted) {
-      await showToast(context, appIsEnglish ? 'Could not open Google Maps.' : 'No se pudo abrir Google Maps.', danger: true);
+      await showToast(
+          context,
+          appIsEnglish
+              ? 'Could not open Google Maps.'
+              : 'No se pudo abrir Google Maps.',
+          danger: true);
     }
   } catch (e) {
-    if (context.mounted) await showToast(context, 'No se pudo abrir Google Maps.', danger: true);
+    if (context.mounted)
+      await showToast(context, 'No se pudo abrir Google Maps.', danger: true);
   }
 }
-
 
 // core/theme/app_colors.dart moved to part file.
 
@@ -462,7 +532,9 @@ class _GrupliAppState extends State<GrupliApp> {
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.bgShell,
         fontFamily: null,
-        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.teal, surface: AppColors.surface).copyWith(
+        colorScheme: ColorScheme.fromSeed(
+                seedColor: AppColors.teal, surface: AppColors.surface)
+            .copyWith(
           primary: AppColors.teal,
           secondary: AppColors.orange,
           tertiary: AppColors.violet,
@@ -479,7 +551,11 @@ class _GrupliAppState extends State<GrupliApp> {
           elevation: 0,
           centerTitle: false,
           iconTheme: IconThemeData(color: AppColors.ink),
-          titleTextStyle: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: AppColors.ink, letterSpacing: -0.2),
+          titleTextStyle: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+              color: AppColors.ink,
+              letterSpacing: -0.2),
         ),
         cardTheme: CardThemeData(
           color: AppColors.white,
@@ -505,9 +581,11 @@ class _GrupliAppState extends State<GrupliApp> {
         ),
         snackBarTheme: SnackBarThemeData(
           backgroundColor: AppColors.ink,
-          contentTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          contentTextStyle:
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: AppColors.white,
@@ -535,7 +613,9 @@ class _GrupliAppState extends State<GrupliApp> {
             backgroundColor: AppColors.white,
             foregroundColor: AppColors.ink,
             minimumSize: const Size.fromHeight(52),
-            shape: RoundedRectangleBorder(borderRadius: AppColors.humanRadius, side: const BorderSide(color: AppColors.lineSoft)),
+            shape: RoundedRectangleBorder(
+                borderRadius: AppColors.humanRadius,
+                side: const BorderSide(color: AppColors.lineSoft)),
             textStyle: const TextStyle(fontWeight: FontWeight.w900),
             elevation: 0,
           ),
@@ -555,7 +635,8 @@ class _GrupliAppState extends State<GrupliApp> {
             textStyle: const TextStyle(fontWeight: FontWeight.w900),
           ),
         ),
-        progressIndicatorTheme: const ProgressIndicatorThemeData(color: AppColors.teal),
+        progressIndicatorTheme:
+            const ProgressIndicatorThemeData(color: AppColors.teal),
         pageTransitionsTheme: PageTransitionsTheme(
           builders: {
             TargetPlatform.android: ZoomPageTransitionsBuilder(),
@@ -566,31 +647,64 @@ class _GrupliAppState extends State<GrupliApp> {
             TargetPlatform.fuchsia: FadeUpwardsPageTransitionsBuilder(),
           },
         ),
-        dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1, space: 1),
+        dividerTheme: const DividerThemeData(
+            color: AppColors.line, thickness: 1, space: 1),
         chipTheme: ChipThemeData(
           backgroundColor: AppColors.surface,
           selectedColor: AppColors.tealSoft,
           side: const BorderSide(color: AppColors.line),
-          labelStyle: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+          labelStyle: const TextStyle(
+              fontWeight: FontWeight.w800, color: AppColors.ink),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         ),
         textTheme: const TextTheme(
-          headlineLarge: TextStyle(fontSize: 31.2, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.02, letterSpacing: -1.05),
-          headlineMedium: TextStyle(fontSize: 25.6, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.06, letterSpacing: -0.55),
-          titleLarge: TextStyle(fontSize: 19.5, fontWeight: FontWeight.w900, color: AppColors.ink, letterSpacing: -0.2),
-          titleMedium: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w900, color: AppColors.ink, height: 1.22),
-          bodyLarge: TextStyle(fontSize: 16, color: AppColors.ink, height: 1.42),
-          bodyMedium: TextStyle(fontSize: 14.6, color: AppColors.muted, height: 1.44, fontWeight: FontWeight.w600),
+          headlineLarge: TextStyle(
+              fontSize: 31.2,
+              fontWeight: FontWeight.w900,
+              color: AppColors.ink,
+              height: 1.02,
+              letterSpacing: -1.05),
+          headlineMedium: TextStyle(
+              fontSize: 25.6,
+              fontWeight: FontWeight.w900,
+              color: AppColors.ink,
+              height: 1.06,
+              letterSpacing: -0.55),
+          titleLarge: TextStyle(
+              fontSize: 19.5,
+              fontWeight: FontWeight.w900,
+              color: AppColors.ink,
+              letterSpacing: -0.2),
+          titleMedium: TextStyle(
+              fontSize: 16.5,
+              fontWeight: FontWeight.w900,
+              color: AppColors.ink,
+              height: 1.22),
+          bodyLarge:
+              TextStyle(fontSize: 16, color: AppColors.ink, height: 1.42),
+          bodyMedium: TextStyle(
+              fontSize: 14.6,
+              color: AppColors.muted,
+              height: 1.44,
+              fontWeight: FontWeight.w600),
           labelLarge: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: AppColors.surface,
           hintStyle: const TextStyle(color: Color(0xFF9AA4B5)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-          border: OutlineInputBorder(borderRadius: AppColors.humanRadius, borderSide: const BorderSide(color: AppColors.line)),
-          enabledBorder: OutlineInputBorder(borderRadius: AppColors.humanRadius, borderSide: const BorderSide(color: AppColors.line)),
-          focusedBorder: OutlineInputBorder(borderRadius: AppColors.humanRadius, borderSide: const BorderSide(color: AppColors.teal, width: 1.6)),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          border: OutlineInputBorder(
+              borderRadius: AppColors.humanRadius,
+              borderSide: const BorderSide(color: AppColors.line)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: AppColors.humanRadius,
+              borderSide: const BorderSide(color: AppColors.line)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: AppColors.humanRadius,
+              borderSide: const BorderSide(color: AppColors.teal, width: 1.6)),
         ),
       ),
       locale: appLocale,
@@ -657,12 +771,15 @@ class _AppRootState extends State<AppRoot> {
     );
   }
 
-  Future<void> _handleIncomingInviteLink(Uri uri, {required String source}) async {
+  Future<void> _handleIncomingInviteLink(Uri uri,
+      {required String source}) async {
     final code = InviteLinks.codeFromUri(uri);
     if (code == null || code.length < 4) return;
 
     final now = DateTime.now();
-    if (_lastHandledInviteCode == code && _lastHandledInviteAt != null && now.difference(_lastHandledInviteAt!).inSeconds < 3) {
+    if (_lastHandledInviteCode == code &&
+        _lastHandledInviteAt != null &&
+        now.difference(_lastHandledInviteAt!).inSeconds < 3) {
       return;
     }
     _lastHandledInviteCode = code;
@@ -679,9 +796,11 @@ class _AppRootState extends State<AppRoot> {
       if (nav == null) return;
 
       if (_session == null) {
-        nav.push(MaterialPageRoute(builder: (_) => AuthScreen(register: false, inviteCode: code)));
+        nav.push(MaterialPageRoute(
+            builder: (_) => AuthScreen(register: false, inviteCode: code)));
       } else {
-        nav.push(MaterialPageRoute(builder: (_) => JoinInviteScreen(inviteCode: code)));
+        nav.push(MaterialPageRoute(
+            builder: (_) => JoinInviteScreen(inviteCode: code)));
       }
     });
   }
@@ -731,9 +850,13 @@ class _AppRootState extends State<AppRoot> {
   @override
   Widget build(BuildContext context) {
     final child = !_ready
-        ? const Scaffold(backgroundColor: AppColors.white, body: CenterLoader(label: 'Cargando...'))
+        ? const Scaffold(
+            backgroundColor: AppColors.white,
+            body: CenterLoader(label: 'Cargando...'))
         : _session == null
-            ? (_showOnboarding ? OnboardingScreen(onFinish: _finishOnboarding) : WelcomeScreen(onShowIntro: _restartOnboarding))
+            ? (_showOnboarding
+                ? OnboardingScreen(onFinish: _finishOnboarding)
+                : WelcomeScreen(onShowIntro: _restartOnboarding))
             : const AuthedShell();
     return AppSurface(child: child);
   }
@@ -745,26 +868,37 @@ class AppSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(color: AppColors.bgShell),
-      child: Stack(
-        children: [
-          const Positioned.fill(child: CustomPaint(painter: GrupliAmbientPainter())),
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 430),
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: AppColors.white,
-                  boxShadow: [BoxShadow(color: AppColors.softShadow, blurRadius: 34, offset: Offset(0, 12))],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final showAmbient = constraints.maxWidth < 720;
+        return DecoratedBox(
+          decoration: const BoxDecoration(color: AppColors.bgShell),
+          child: Stack(
+            children: [
+              if (showAmbient)
+                const Positioned.fill(child: CustomPaint(painter: GrupliAmbientPainter())),
+              Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 430),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: AppColors.white,
+                      boxShadow: [
+                        BoxShadow(
+                            color: AppColors.softShadow,
+                            blurRadius: 26,
+                            offset: Offset(0, 10))
+                      ],
+                    ),
+                    child: child,
+                  ),
                 ),
-                child: child,
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -775,21 +909,21 @@ class GrupliAmbientPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..style = PaintingStyle.fill;
-    paint.color = AppColors.tealSoft.withOpacity(.55);
-    canvas.drawOval(Rect.fromLTWH(-size.width * .28, size.height * .05, size.width * .62, size.height * .28), paint);
-    paint.color = AppColors.orangeSoft.withOpacity(.62);
-    canvas.drawOval(Rect.fromLTWH(size.width * .58, size.height * .16, size.width * .52, size.height * .22), paint);
-    paint.color = AppColors.violetSoft.withOpacity(.48);
-    canvas.drawOval(Rect.fromLTWH(size.width * .12, size.height * .72, size.width * .78, size.height * .2), paint);
-
-    final dot = Paint()..color = const Color(0x08062133);
-    const step = 18.0;
-    for (double y = 0; y < size.height; y += step) {
-      final offset = ((y / step).round().isEven ? 0.0 : 7.0);
-      for (double x = offset; x < size.width; x += step) {
-        canvas.drawCircle(Offset(x, y), .45, dot);
-      }
-    }
+    paint.color = AppColors.tealSoft.withOpacity(.42);
+    canvas.drawOval(
+        Rect.fromLTWH(-size.width * .24, size.height * .06, size.width * .56,
+            size.height * .22),
+        paint);
+    paint.color = AppColors.orangeSoft.withOpacity(.52);
+    canvas.drawOval(
+        Rect.fromLTWH(size.width * .62, size.height * .12, size.width * .34,
+            size.height * .16),
+        paint);
+    paint.color = AppColors.violetSoft.withOpacity(.34);
+    canvas.drawOval(
+        Rect.fromLTWH(size.width * .18, size.height * .76, size.width * .56,
+            size.height * .14),
+        paint);
   }
 
   @override
@@ -801,7 +935,12 @@ class DirectPage extends StatelessWidget {
   final Widget? bottomNavigationBar;
   final EdgeInsetsGeometry padding;
   final bool scroll;
-  const DirectPage({super.key, required this.child, this.bottomNavigationBar, this.padding = const EdgeInsets.fromLTRB(22, 22, 22, 26), this.scroll = true});
+  const DirectPage(
+      {super.key,
+      required this.child,
+      this.bottomNavigationBar,
+      this.padding = const EdgeInsets.fromLTRB(22, 22, 22, 26),
+      this.scroll = true});
 
   @override
   Widget build(BuildContext context) {
@@ -819,11 +958,12 @@ class DirectPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.white,
       body: body,
-      bottomNavigationBar: bottomNavigationBar == null ? null : SafeArea(top: false, child: bottomNavigationBar!),
+      bottomNavigationBar: bottomNavigationBar == null
+          ? null
+          : SafeArea(top: false, child: bottomNavigationBar!),
     );
   }
 }
-
 
 // core/app_data/app_data.dart moved to part file.
 
@@ -833,11 +973,11 @@ class PushNotificationService {
   static bool _listenersReady = false;
 
   static FirebaseOptions get firebaseOptions => const FirebaseOptions(
-    apiKey: AppConfig.firebaseApiKey,
-    appId: AppConfig.firebaseAppId,
-    messagingSenderId: AppConfig.firebaseMessagingSenderId,
-    projectId: AppConfig.firebaseProjectId,
-  );
+        apiKey: AppConfig.firebaseApiKey,
+        appId: AppConfig.firebaseAppId,
+        messagingSenderId: AppConfig.firebaseMessagingSenderId,
+        projectId: AppConfig.firebaseProjectId,
+      );
 
   static String get platformLabel {
     if (kIsWeb) return 'web';
@@ -864,9 +1004,12 @@ class PushNotificationService {
           await Firebase.initializeApp();
         }
       }
-      if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS)) {
+      if (!kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.macOS)) {
         try {
-          await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+          await FirebaseMessaging.instance
+              .setForegroundNotificationPresentationOptions(
             alert: true,
             badge: true,
             sound: true,
@@ -896,7 +1039,8 @@ class PushNotificationService {
       await AppData.logQualityEvent(
         'push_foreground_received',
         screen: 'push',
-        message: message.notification?.title ?? AppData.text(message.data['title'], 'Push recibido'),
+        message: message.notification?.title ??
+            AppData.text(message.data['title'], 'Push recibido'),
         metadata: message.data,
       );
     });
@@ -904,7 +1048,8 @@ class PushNotificationService {
     FirebaseMessaging.onMessageOpenedApp.listen(handleMessageTap);
     FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
       await AppData.registerDeviceToken(token, platformLabel);
-      await AppData.logQualityEvent('push_token_refresh', screen: 'push', message: 'Token actualizado');
+      await AppData.logQualityEvent('push_token_refresh',
+          screen: 'push', message: 'Token actualizado');
     });
 
     FirebaseMessaging.instance.getInitialMessage().then((message) {
@@ -928,11 +1073,13 @@ class PushNotificationService {
         AppData.text(message.data['type']),
       );
       await nav.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId, initialTab: tab)),
+        MaterialPageRoute(
+            builder: (_) => GroupShell(groupId: groupId, initialTab: tab)),
         (route) => route.isFirst,
       );
     } else {
-      await nav.push(MaterialPageRoute(builder: (_) => NotificationsScreen(onChanged: () {})));
+      await nav.push(MaterialPageRoute(
+          builder: (_) => NotificationsScreen(onChanged: () {})));
     }
   }
 
@@ -940,16 +1087,24 @@ class PushNotificationService {
     final ready = await configureIfPossible();
     if (!ready) return null;
     final messaging = FirebaseMessaging.instance;
-    final settings = await messaging.requestPermission(alert: true, badge: true, sound: true);
+    final settings = await messaging.requestPermission(
+        alert: true, badge: true, sound: true);
     if (settings.authorizationStatus == AuthorizationStatus.denied) {
-      await AppData.logQualityEvent('push_permission_denied', screen: 'push', message: 'Permiso denegado');
+      await AppData.logQualityEvent('push_permission_denied',
+          screen: 'push', message: 'Permiso denegado');
       return null;
     }
-    final token = await messaging.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
+    final token = await messaging.getToken(
+        vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty
+            ? AppConfig.firebaseVapidKey.trim()
+            : null);
     if (token != null && token.trim().isNotEmpty) {
       await AppData.registerDeviceToken(token, platformLabel);
       await AppData.updateNotificationSettings({'push_enabled': true});
-      await AppData.logQualityEvent('push_token_registered', screen: 'push', message: 'Token registrado', metadata: {'platform': platformLabel});
+      await AppData.logQualityEvent('push_token_registered',
+          screen: 'push',
+          message: 'Token registrado',
+          metadata: {'platform': platformLabel});
     }
     return token;
   }
@@ -958,9 +1113,15 @@ class PushNotificationService {
     try {
       final ready = await configureIfPossible();
       if (!ready) return;
-      final settings = await FirebaseMessaging.instance.getNotificationSettings();
-      if (settings.authorizationStatus == AuthorizationStatus.denied || settings.authorizationStatus == AuthorizationStatus.notDetermined) return;
-      final token = await FirebaseMessaging.instance.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
+      final settings =
+          await FirebaseMessaging.instance.getNotificationSettings();
+      if (settings.authorizationStatus == AuthorizationStatus.denied ||
+          settings.authorizationStatus == AuthorizationStatus.notDetermined)
+        return;
+      final token = await FirebaseMessaging.instance.getToken(
+          vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty
+              ? AppConfig.firebaseVapidKey.trim()
+              : null);
       if (token != null && token.trim().isNotEmpty) {
         await AppData.registerDeviceToken(token, platformLabel);
       }
@@ -973,14 +1134,16 @@ class PushNotificationService {
     try {
       final ready = await configureIfPossible();
       if (!ready) return;
-      final token = await FirebaseMessaging.instance.getToken(vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty ? AppConfig.firebaseVapidKey.trim() : null);
+      final token = await FirebaseMessaging.instance.getToken(
+          vapidKey: kIsWeb && AppConfig.firebaseVapidKey.trim().isNotEmpty
+              ? AppConfig.firebaseVapidKey.trim()
+              : null);
       if (token != null && token.trim().isNotEmpty) {
         await AppData.disableCurrentDeviceToken(token);
       }
     } catch (_) {}
   }
 }
-
 
 String dateLabel(DateTime date) {
   return DateFormat('dd/MM · HH:mm', appDateLocale).format(date.toLocal());
@@ -991,19 +1154,26 @@ String _cap(String value) {
   return value.substring(0, 1).toUpperCase() + value.substring(1);
 }
 
-String monthTitle(DateTime date) => _cap(DateFormat('MMMM yyyy', appDateLocale).format(date));
-String longDay(DateTime date) => _cap(DateFormat('EEEE dd MMMM', appDateLocale).format(date));
-String longDateTime(DateTime date) => _cap(DateFormat('EEEE dd MMMM \u00B7 HH:mm', appDateLocale).format(date));
-String shortWeekday(DateTime date) => _cap(DateFormat('EEE', appDateLocale).format(date).replaceAll('.', ''));
+String monthTitle(DateTime date) =>
+    _cap(DateFormat('MMMM yyyy', appDateLocale).format(date));
+String longDay(DateTime date) =>
+    _cap(DateFormat('EEEE dd MMMM', appDateLocale).format(date));
+String longDateTime(DateTime date) =>
+    _cap(DateFormat('EEEE dd MMMM \u00B7 HH:mm', appDateLocale).format(date));
+String shortWeekday(DateTime date) =>
+    _cap(DateFormat('EEE', appDateLocale).format(date).replaceAll('.', ''));
 
 String money(double value) {
-  final formatted = NumberFormat.currency(locale: appIntlLocale, symbol: '\u20AC', decimalDigits: 2).format(value.abs());
+  final formatted = NumberFormat.currency(
+          locale: appIntlLocale, symbol: '\u20AC', decimalDigits: 2)
+      .format(value.abs());
   return value < 0 ? '-$formatted' : formatted;
 }
 
 String newLocalUuid() {
   final random = Random.secure();
-  String hex(int length) => List.generate(length, (_) => random.nextInt(16).toRadixString(16)).join();
+  String hex(int length) =>
+      List.generate(length, (_) => random.nextInt(16).toRadixString(16)).join();
   return '${hex(8)}-${hex(4)}-4${hex(3)}-${(8 + random.nextInt(4)).toRadixString(16)}${hex(3)}-${hex(12)}';
 }
 
@@ -1015,26 +1185,37 @@ String eventKind(Map<String, dynamic> event) {
 
   // Importante: los partidos creados desde Torneos/Ligas deben verse como evento especial,
   // no como una quedada normal ni como un partido genérico de fútbol/pádel.
-  if (
-    joined.contains('partido de torneo') ||
-    joined.contains('partido de liga') ||
-    joined.contains('torneo') ||
-    joined.contains('liga') ||
-    joined.contains('copa') ||
-    joined.contains('americano') ||
-    joined.contains('eliminatoria')
-  ) {
+  if (joined.contains('partido de torneo') ||
+      joined.contains('partido de liga') ||
+      joined.contains('torneo') ||
+      joined.contains('liga') ||
+      joined.contains('copa') ||
+      joined.contains('americano') ||
+      joined.contains('eliminatoria')) {
     return 'torneo';
   }
 
-  if (joined.contains('partido') || joined.contains('fútbol') || joined.contains('futbol') || joined.contains('pádel') || joined.contains('padel') || joined.contains('tenis')) return 'partido';
-  if (joined.contains('entrenamiento') || joined.contains('entreno') || joined.contains('gym')) return 'entrenamiento';
-  if (joined.contains('cena') || joined.contains('comida') || joined.contains('bar') || joined.contains('restaurante')) return 'cena';
-  if (joined.contains('reunión') || joined.contains('reunion') || joined.contains('meeting')) return 'reunion';
+  if (joined.contains('partido') ||
+      joined.contains('fútbol') ||
+      joined.contains('futbol') ||
+      joined.contains('pádel') ||
+      joined.contains('padel') ||
+      joined.contains('tenis')) return 'partido';
+  if (joined.contains('entrenamiento') ||
+      joined.contains('entreno') ||
+      joined.contains('gym')) return 'entrenamiento';
+  if (joined.contains('cena') ||
+      joined.contains('comida') ||
+      joined.contains('bar') ||
+      joined.contains('restaurante')) return 'cena';
+  if (joined.contains('reunión') ||
+      joined.contains('reunion') ||
+      joined.contains('meeting')) return 'reunion';
   return 'quedada';
 }
 
-bool eventIsTournamentEvent(Map<String, dynamic> event) => eventKind(event) == 'torneo';
+bool eventIsTournamentEvent(Map<String, dynamic> event) =>
+    eventKind(event) == 'torneo';
 
 Color agendaDayAccentColor(List<Map<String, dynamic>> events) {
   // Para días con torneos usamos teal como color estructural. El dorado queda solo
@@ -1045,20 +1226,26 @@ Color agendaDayAccentColor(List<Map<String, dynamic>> events) {
 
 Color agendaDaySoftColor(List<Map<String, dynamic>> events) {
   if (events.any(eventIsTournamentEvent)) return AppColors.surface;
-  return events.isNotEmpty ? eventKindSoftColor(events.first) : AppColors.tealSoft;
+  return events.isNotEmpty
+      ? eventKindSoftColor(events.first)
+      : AppColors.tealSoft;
 }
 
-List<Map<String, dynamic>> eventsOnSameDay(List<Map<String, dynamic>> events, Map<String, dynamic>? anchor) {
+List<Map<String, dynamic>> eventsOnSameDay(
+    List<Map<String, dynamic>> events, Map<String, dynamic>? anchor) {
   if (anchor == null) return const <Map<String, dynamic>>[];
-  final anchorDate = DateTime.tryParse(AppData.text(anchor['starts_at']))?.toLocal();
+  final anchorDate =
+      DateTime.tryParse(AppData.text(anchor['starts_at']))?.toLocal();
   if (anchorDate == null) return [anchor];
   final result = events.where((event) {
     final date = DateTime.tryParse(AppData.text(event['starts_at']))?.toLocal();
     return date != null && sameDay(date, anchorDate);
   }).toList();
   result.sort((a, b) {
-    final da = DateTime.tryParse(AppData.text(a['starts_at'])) ?? DateTime.fromMillisecondsSinceEpoch(0);
-    final db = DateTime.tryParse(AppData.text(b['starts_at'])) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final da = DateTime.tryParse(AppData.text(a['starts_at'])) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    final db = DateTime.tryParse(AppData.text(b['starts_at'])) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
     return da.compareTo(db);
   });
   return result;
@@ -1068,61 +1255,91 @@ bool eventIsRoutine(Map<String, dynamic> event) {
   if (AppData.text(event['event_series_id']).isNotEmpty) return true;
   final notes = AppData.text(event['notes']).toLowerCase();
   final title = AppData.text(event['title']).toLowerCase();
-  return notes.contains('rutina:') || title.contains('semanal') || title.contains('mensual');
+  return notes.contains('rutina:') ||
+      title.contains('semanal') ||
+      title.contains('mensual');
 }
 
 String eventRoutineBadge(Map<String, dynamic> event) {
   final frequency = AppData.text(event['recurrence_frequency']);
   if (frequency == 'weekly') return appIsEnglish ? 'Every week' : 'Cada semana';
-  if (frequency == 'biweekly') return appIsEnglish ? 'Every 2 weeks' : 'Cada 2 semanas';
+  if (frequency == 'biweekly')
+    return appIsEnglish ? 'Every 2 weeks' : 'Cada 2 semanas';
   if (frequency == 'monthly') return appIsEnglish ? 'Every month' : 'Cada mes';
   final notes = AppData.text(event['notes']);
-  final match = RegExp(r'Rutina:\s*([^·\\n]+)', caseSensitive: false).firstMatch(notes);
-  if (match != null) return _cap(match.group(1)?.trim() ?? (appIsEnglish ? 'routine' : 'rutina'));
+  final match =
+      RegExp(r'Rutina:\s*([^·\\n]+)', caseSensitive: false).firstMatch(notes);
+  if (match != null)
+    return _cap(
+        match.group(1)?.trim() ?? (appIsEnglish ? 'routine' : 'rutina'));
   return appIsEnglish ? 'Routine' : 'Rutina';
 }
 
 String eventKindLabel(Map<String, dynamic> event) {
   switch (eventKind(event)) {
-    case 'partido': return appIsEnglish ? 'Match' : 'Partido';
-    case 'entrenamiento': return appIsEnglish ? 'Training' : 'Entrenamiento';
-    case 'cena': return appIsEnglish ? 'Dinner' : 'Cena';
-    case 'reunion': return appIsEnglish ? 'Meeting' : 'Reunión';
-    case 'torneo': return appIsEnglish ? 'Tournament' : 'Torneo';
-    default: return appIsEnglish ? 'Meetup' : 'Quedada';
+    case 'partido':
+      return appIsEnglish ? 'Match' : 'Partido';
+    case 'entrenamiento':
+      return appIsEnglish ? 'Training' : 'Entrenamiento';
+    case 'cena':
+      return appIsEnglish ? 'Dinner' : 'Cena';
+    case 'reunion':
+      return appIsEnglish ? 'Meeting' : 'Reunión';
+    case 'torneo':
+      return appIsEnglish ? 'Tournament' : 'Torneo';
+    default:
+      return appIsEnglish ? 'Meetup' : 'Quedada';
   }
 }
 
 IconData eventKindIcon(Map<String, dynamic> event) {
   switch (eventKind(event)) {
-    case 'partido': return Icons.sports_soccer_rounded;
-    case 'entrenamiento': return Icons.fitness_center_rounded;
-    case 'cena': return Icons.restaurant_rounded;
-    case 'reunion': return Icons.forum_rounded;
-    case 'torneo': return Icons.emoji_events_rounded;
-    default: return Icons.groups_rounded;
+    case 'partido':
+      return Icons.sports_soccer_rounded;
+    case 'entrenamiento':
+      return Icons.fitness_center_rounded;
+    case 'cena':
+      return Icons.restaurant_rounded;
+    case 'reunion':
+      return Icons.forum_rounded;
+    case 'torneo':
+      return Icons.emoji_events_rounded;
+    default:
+      return Icons.groups_rounded;
   }
 }
 
 Color eventKindColor(Map<String, dynamic> event) {
   switch (eventKind(event)) {
-    case 'partido': return const Color(0xFF1E63A7);
-    case 'entrenamiento': return const Color(0xFF6F4BA4);
-    case 'cena': return const Color(0xFFD97706);
-    case 'reunion': return const Color(0xFF218A4B);
-    case 'torneo': return const Color(0xFFE09B18);
-    default: return AppColors.teal;
+    case 'partido':
+      return const Color(0xFF1E63A7);
+    case 'entrenamiento':
+      return const Color(0xFF6F4BA4);
+    case 'cena':
+      return const Color(0xFFD97706);
+    case 'reunion':
+      return const Color(0xFF218A4B);
+    case 'torneo':
+      return const Color(0xFFE09B18);
+    default:
+      return AppColors.teal;
   }
 }
 
 Color eventKindSoftColor(Map<String, dynamic> event) {
   switch (eventKind(event)) {
-    case 'partido': return const Color(0xFFE8F1FF);
-    case 'entrenamiento': return const Color(0xFFF1EAFE);
-    case 'cena': return const Color(0xFFFFF0D9);
-    case 'reunion': return const Color(0xFFE7F6EC);
-    case 'torneo': return const Color(0xFFFFF5DA);
-    default: return AppColors.tealSoft;
+    case 'partido':
+      return const Color(0xFFE8F1FF);
+    case 'entrenamiento':
+      return const Color(0xFFF1EAFE);
+    case 'cena':
+      return const Color(0xFFFFF0D9);
+    case 'reunion':
+      return const Color(0xFFE7F6EC);
+    case 'torneo':
+      return const Color(0xFFFFF5DA);
+    default:
+      return AppColors.tealSoft;
   }
 }
 
@@ -1151,13 +1368,16 @@ String eventStatusForUser(Map<String, dynamic> event, String userId) {
   if (attendance is! List) return 'pending';
   for (final item in attendance) {
     if (item is! Map) continue;
-    if (item['user_id']?.toString() == userId) return item['status']?.toString() ?? 'pending';
+    if (item['user_id']?.toString() == userId)
+      return item['status']?.toString() ?? 'pending';
   }
   return 'pending';
 }
 
-bool sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
-String calendarDayKey(DateTime day) => '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+bool sameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+String calendarDayKey(DateTime day) =>
+    '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
 
 bool isPowerOfTwo(int value) => value > 0 && (value & (value - 1)) == 0;
 
@@ -1204,40 +1424,68 @@ int eventsInMonth(List<Map<String, dynamic>> events, DateTime month) {
   }).length;
 }
 
-
 String groupTypeValue(String value) {
   final clean = value.trim().toLowerCase();
-  if (clean == 'deporte' || clean == 'amigos' || clean == 'viaje' || clean == 'cartas' || clean == 'otro') return clean;
+  if (clean == 'deporte' ||
+      clean == 'amigos' ||
+      clean == 'viaje' ||
+      clean == 'cartas' ||
+      clean == 'otro') return clean;
   return 'otro';
 }
 
 String groupTypeLabel(String value) {
   switch (groupTypeValue(value)) {
-    case 'deporte': return 'Deporte';
-    case 'amigos': return 'Amigos';
-    case 'viaje': return 'Viaje';
-    case 'cartas': return 'Cartas';
-    default: return 'Otro';
+    case 'deporte':
+      return 'Deporte';
+    case 'amigos':
+      return 'Amigos';
+    case 'viaje':
+      return 'Viaje';
+    case 'cartas':
+      return 'Cartas';
+    default:
+      return 'Otro';
   }
 }
 
 IconData groupTypeIcon(String value) {
   switch (groupTypeValue(value)) {
-    case 'deporte': return Icons.sports_tennis_rounded;
-    case 'amigos': return Icons.groups_2_rounded;
-    case 'viaje': return Icons.flight_takeoff_rounded;
-    case 'cartas': return Icons.style_rounded;
-    default: return Icons.auto_awesome_rounded;
+    case 'deporte':
+      return Icons.sports_tennis_rounded;
+    case 'amigos':
+      return Icons.groups_2_rounded;
+    case 'viaje':
+      return Icons.flight_takeoff_rounded;
+    case 'cartas':
+      return Icons.style_rounded;
+    default:
+      return Icons.auto_awesome_rounded;
   }
 }
 
 String groupTypeDefaultDescription(String value) {
   switch (groupTypeValue(value)) {
-    case 'deporte': return appIsEnglish ? 'Matches, attendance, expenses and tournaments.' : 'Partidos, asistencia, gastos y torneos del grupo.';
-    case 'amigos': return appIsEnglish ? 'Plans, meetups and shared expenses among friends.' : 'Planes, quedadas y gastos compartidos entre amigos.';
-    case 'viaje': return appIsEnglish ? 'Trip expenses, plans and organization.' : 'Gastos, planes y organización del viaje.';
-    case 'cartas': return appIsEnglish ? 'Matches, expenses and leagues for the group.' : 'Partidas, gastos y ligas para el grupo.';
-    default: return appIsEnglish ? 'Plans, expenses and tournaments for the group.' : 'Planes, gastos y torneos del grupo.';
+    case 'deporte':
+      return appIsEnglish
+          ? 'Matches, attendance, expenses and tournaments.'
+          : 'Partidos, asistencia, gastos y torneos del grupo.';
+    case 'amigos':
+      return appIsEnglish
+          ? 'Plans, meetups and shared expenses among friends.'
+          : 'Planes, quedadas y gastos compartidos entre amigos.';
+    case 'viaje':
+      return appIsEnglish
+          ? 'Trip expenses, plans and organization.'
+          : 'Gastos, planes y organización del viaje.';
+    case 'cartas':
+      return appIsEnglish
+          ? 'Matches, expenses and leagues for the group.'
+          : 'Partidas, gastos y ligas para el grupo.';
+    default:
+      return appIsEnglish
+          ? 'Plans, expenses and tournaments for the group.'
+          : 'Planes, gastos y torneos del grupo.';
   }
 }
 
@@ -1261,45 +1509,55 @@ String memberAvatarUrl(Map<String, dynamic> member) {
   return AppData.text(profile['avatar_url']);
 }
 
-Map<String, dynamic>? memberByUserId(List<Map<String, dynamic>> members, String userId) {
+Map<String, dynamic>? memberByUserId(
+    List<Map<String, dynamic>> members, String userId) {
   for (final member in members) {
     if (member['user_id']?.toString() == userId) return member;
   }
   return null;
 }
 
-String financeMemberAvatarUrl(String userId, List<Map<String, dynamic>> members) {
+String financeMemberAvatarUrl(
+    String userId, List<Map<String, dynamic>> members) {
   final member = memberByUserId(members, userId);
   if (member == null) return '';
   return memberAvatarUrl(member);
 }
 
 String initialsFor(String name) {
-  final words = name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+  final words =
+      name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
   if (words.isEmpty) return '?';
   if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
-  return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'.toUpperCase();
+  return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'
+      .toUpperCase();
 }
 
 String attendanceLabel(String status) {
   switch (status) {
-    case 'yes': return 'Va';
-    case 'maybe': return 'Duda';
-    case 'no': return 'No va';
-    default: return 'Sin responder';
+    case 'yes':
+      return 'Va';
+    case 'maybe':
+      return 'Duda';
+    case 'no':
+      return 'No va';
+    default:
+      return 'Sin responder';
   }
 }
 
 Color attendanceColor(String status) {
   switch (status) {
-    case 'yes': return AppColors.green;
-    case 'maybe': return AppColors.amber;
-    case 'no': return AppColors.red;
-    default: return AppColors.muted;
+    case 'yes':
+      return AppColors.green;
+    case 'maybe':
+      return AppColors.amber;
+    case 'no':
+      return AppColors.red;
+    default:
+      return AppColors.muted;
   }
 }
-
-
 
 List<String> defaultTieBreakers(String scoringType) {
   return TournamentEngineV2.defaultTieBreakers(scoringType, 'liga');
@@ -1319,50 +1577,79 @@ Map<String, dynamic> tournamentScheduleConfig(Map<String, dynamic> tournament) {
 
 String tournamentStatusLabel(String status) {
   switch (status) {
-    case 'draft': return 'Borrador';
-    case 'scheduled': return 'Programado';
-    case 'active': return 'En curso';
-    case 'paused': return 'Pausado';
-    case 'finished': return 'Finalizado';
-    case 'cancelled': return 'Cancelado';
-    default: return 'En curso';
+    case 'draft':
+      return 'Borrador';
+    case 'scheduled':
+      return 'Programado';
+    case 'active':
+      return 'En curso';
+    case 'paused':
+      return 'Pausado';
+    case 'finished':
+      return 'Finalizado';
+    case 'cancelled':
+      return 'Cancelado';
+    default:
+      return 'En curso';
   }
 }
 
 Color tournamentStatusColor(String status) {
   switch (status) {
-    case 'finished': return AppColors.green;
-    case 'paused': return AppColors.amber;
-    case 'cancelled': return AppColors.red;
-    case 'draft': return AppColors.muted;
-    case 'scheduled': return AppColors.blue;
-    default: return AppColors.green;
+    case 'finished':
+      return AppColors.green;
+    case 'paused':
+      return AppColors.amber;
+    case 'cancelled':
+      return AppColors.red;
+    case 'draft':
+      return AppColors.muted;
+    case 'scheduled':
+      return AppColors.blue;
+    default:
+      return AppColors.green;
   }
 }
 
 String matchStatusLabel(String status) {
   switch (status) {
-    case 'scheduled': return 'Programado';
-    case 'played': return 'Jugado';
-    case 'postponed': return 'Aplazado';
-    case 'cancelled': return 'Cancelado';
-    case 'no_show': return 'No presentado';
-    case 'walkover': return 'Victoria admin.';
-    case 'bye': return 'Descanso';
-    default: return 'Pendiente';
+    case 'scheduled':
+      return 'Programado';
+    case 'played':
+      return 'Jugado';
+    case 'postponed':
+      return 'Aplazado';
+    case 'cancelled':
+      return 'Cancelado';
+    case 'no_show':
+      return 'No presentado';
+    case 'walkover':
+      return 'Victoria admin.';
+    case 'bye':
+      return 'Descanso';
+    default:
+      return 'Pendiente';
   }
 }
 
 Color matchStatusColor(String status) {
   switch (status) {
-    case 'played': return AppColors.green;
-    case 'scheduled': return AppColors.blue;
-    case 'postponed': return AppColors.amber;
-    case 'cancelled': return AppColors.red;
-    case 'no_show': return AppColors.red;
-    case 'walkover': return AppColors.orange;
-    case 'bye': return AppColors.violet;
-    default: return AppColors.muted;
+    case 'played':
+      return AppColors.green;
+    case 'scheduled':
+      return AppColors.blue;
+    case 'postponed':
+      return AppColors.amber;
+    case 'cancelled':
+      return AppColors.red;
+    case 'no_show':
+      return AppColors.red;
+    case 'walkover':
+      return AppColors.orange;
+    case 'bye':
+      return AppColors.violet;
+    default:
+      return AppColors.muted;
   }
 }
 
@@ -1374,22 +1661,32 @@ String tournamentMatchDateText(Map<String, dynamic> match) {
   return DateFormat('EEE d MMM · HH:mm', appDateLocale).format(dt);
 }
 
-DateTime? tournamentScheduledAtForIndex(Map<String, dynamic>? cfg, int round, int orderInsideRound) {
+DateTime? tournamentScheduledAtForIndex(
+    Map<String, dynamic>? cfg, int round, int orderInsideRound) {
   if (cfg == null || cfg['enabled'] != true) return null;
   final raw = AppData.text(cfg['first_start_at']);
   final first = DateTime.tryParse(raw)?.toLocal();
   if (first == null) return null;
-  final daysBetweenRounds = max(0, AppData.intValue(cfg['days_between_rounds'], 7));
+  final daysBetweenRounds =
+      max(0, AppData.intValue(cfg['days_between_rounds'], 7));
   final interval = max(15, AppData.intValue(cfg['interval_minutes'], 60));
-  final courts = max(1, AppData.intValue(cfg['courts_count'], AppData.intValue(cfg['matches_per_round'], 1)));
+  final courts = max(
+      1,
+      AppData.intValue(
+          cfg['courts_count'], AppData.intValue(cfg['matches_per_round'], 1)));
   final wave = max(0, orderInsideRound) ~/ courts;
-  return first.add(Duration(days: max(0, round - 1) * daysBetweenRounds, minutes: wave * interval));
+  return first.add(Duration(
+      days: max(0, round - 1) * daysBetweenRounds, minutes: wave * interval));
 }
 
-String tournamentCourtNameForIndex(Map<String, dynamic>? cfg, int orderInsideRound) {
+String tournamentCourtNameForIndex(
+    Map<String, dynamic>? cfg, int orderInsideRound) {
   if (cfg == null) return '';
   final base = AppData.text(cfg['court_name']).trim();
-  final courts = max(1, AppData.intValue(cfg['courts_count'], AppData.intValue(cfg['matches_per_round'], 1)));
+  final courts = max(
+      1,
+      AppData.intValue(
+          cfg['courts_count'], AppData.intValue(cfg['matches_per_round'], 1)));
   if (courts <= 1) return base;
   final number = (max(0, orderInsideRound) % courts) + 1;
   if (base.isEmpty) return 'Pista $number';
@@ -1398,9 +1695,12 @@ String tournamentCourtNameForIndex(Map<String, dynamic>? cfg, int orderInsideRou
 }
 
 String tournamentMatchAgendaNotes(Map<String, dynamic> match) {
-  final roundName = AppData.text(match['round_name'], 'Jornada ${AppData.intValue(match['round'], 1)}');
+  final roundName = AppData.text(
+      match['round_name'], 'Jornada ${AppData.intValue(match['round'], 1)}');
   final status = AppData.text(match['status'], 'pending');
-  final courtLine = AppData.text(match['court_name']).isEmpty ? '' : '\nPista/Mesa: ${AppData.text(match['court_name'])}';
+  final courtLine = AppData.text(match['court_name']).isEmpty
+      ? ''
+      : '\nPista/Mesa: ${AppData.text(match['court_name'])}';
   final statusLine = status == 'postponed'
       ? '\nEstado: partido aplazado'
       : status == 'played'
@@ -1411,16 +1711,21 @@ String tournamentMatchAgendaNotes(Map<String, dynamic> match) {
   return 'Partido de torneo · $roundName$statusLine$courtLine$notesLine';
 }
 
-String tournamentMatchAgendaTitle(String tournamentName, Map<String, dynamic> match, Map<String, String> names) {
+String tournamentMatchAgendaTitle(String tournamentName,
+    Map<String, dynamic> match, Map<String, String> names) {
   final a = tournamentMatchSideName(match, names, true);
   final b = tournamentMatchSideName(match, names, false);
   final base = '$tournamentName: $a vs $b';
-  return AppData.text(match['status']) == 'postponed' ? 'Aplazado · $base' : base;
+  return AppData.text(match['status']) == 'postponed'
+      ? 'Aplazado · $base'
+      : base;
 }
 
-bool tournamentMatchHasAgendaEvent(Map<String, dynamic> match) => AppData.text(match['event_id']).isNotEmpty;
+bool tournamentMatchHasAgendaEvent(Map<String, dynamic> match) =>
+    AppData.text(match['event_id']).isNotEmpty;
 
-bool tournamentMatchHasScheduledDate(Map<String, dynamic> match) => AppData.text(match['scheduled_at']).isNotEmpty;
+bool tournamentMatchHasScheduledDate(Map<String, dynamic> match) =>
+    AppData.text(match['scheduled_at']).isNotEmpty;
 
 String tournamentMatchAgendaSyncLabel(Map<String, dynamic> match) {
   final status = AppData.text(match['status'], 'pending');
@@ -1435,7 +1740,8 @@ IconData tournamentMatchAgendaSyncIcon(Map<String, dynamic> match) {
   final status = AppData.text(match['status'], 'pending');
   if (status == 'cancelled') return Icons.event_busy_rounded;
   if (status == 'bye') return Icons.weekend_rounded;
-  if (tournamentMatchHasAgendaEvent(match)) return Icons.event_available_rounded;
+  if (tournamentMatchHasAgendaEvent(match))
+    return Icons.event_available_rounded;
   if (tournamentMatchHasScheduledDate(match)) return Icons.event_note_rounded;
   return Icons.event_rounded;
 }
@@ -1487,7 +1793,6 @@ List<List<(String, String)>> generateRoundRobinIds(List<String> ids) {
   return rounds;
 }
 
-
 class AmericanoGeneratedMatch {
   final int round;
   final int courtIndex;
@@ -1508,7 +1813,8 @@ int recommendedAmericanoRounds(int players, int courts) {
   final activeCourts = max(1, min(courts, players ~/ 4));
   final allPartnerPairs = players * (players - 1) ~/ 2;
   final partnerPairsPerRound = activeCourts * 2;
-  return max(1, min(40, (allPartnerPairs / max(1, partnerPairsPerRound)).ceil()));
+  return max(
+      1, min(40, (allPartnerPairs / max(1, partnerPairsPerRound)).ceil()));
 }
 
 String americanoRulesText(int players, int courts, int rounds) {
@@ -1547,7 +1853,8 @@ List<List<String>> americanoSideSplits(List<String> group) {
   ];
 }
 
-List<AmericanoGeneratedMatch> generateAmericanoRoundsIds(List<String> ids, {required int rounds, required int courts}) {
+List<AmericanoGeneratedMatch> generateAmericanoRoundsIds(List<String> ids,
+    {required int rounds, required int courts}) {
   final clean = ids.where((id) => id.trim().isNotEmpty).toList();
   if (clean.length < 4) return const [];
 
@@ -1566,7 +1873,8 @@ List<AmericanoGeneratedMatch> generateAmericanoRoundsIds(List<String> ids, {requ
     final orderRank = {for (var i = 0; i < shifted.length; i++) shifted[i]: i};
 
     shifted.sort((a, b) {
-      final playedCompare = (playedCounts[a] ?? 0).compareTo(playedCounts[b] ?? 0);
+      final playedCompare =
+          (playedCounts[a] ?? 0).compareTo(playedCounts[b] ?? 0);
       if (playedCompare != 0) return playedCompare;
       final restCompare = (restCounts[b] ?? 0).compareTo(restCounts[a] ?? 0);
       if (restCompare != 0) return restCompare;
@@ -1590,24 +1898,36 @@ List<AmericanoGeneratedMatch> generateAmericanoRoundsIds(List<String> ids, {requ
         for (var b = a + 1; b < remaining.length - 2; b++) {
           for (var c = b + 1; c < remaining.length - 1; c++) {
             for (var d = c + 1; d < remaining.length; d++) {
-              final group = [remaining[a], remaining[b], remaining[c], remaining[d]];
+              final group = [
+                remaining[a],
+                remaining[b],
+                remaining[c],
+                remaining[d]
+              ];
               for (final split in americanoSideSplits(group)) {
                 final p1 = split[0];
                 final p2 = split[1];
                 final q1 = split[2];
                 final q2 = split[3];
 
-                final partnerPenalty = americanoPairCount(partnerCounts, p1, p2) + americanoPairCount(partnerCounts, q1, q2);
+                final partnerPenalty =
+                    americanoPairCount(partnerCounts, p1, p2) +
+                        americanoPairCount(partnerCounts, q1, q2);
                 final opponentPenalty =
                     americanoPairCount(opponentCounts, p1, q1) +
-                    americanoPairCount(opponentCounts, p1, q2) +
-                    americanoPairCount(opponentCounts, p2, q1) +
-                    americanoPairCount(opponentCounts, p2, q2);
+                        americanoPairCount(opponentCounts, p1, q2) +
+                        americanoPairCount(opponentCounts, p2, q1) +
+                        americanoPairCount(opponentCounts, p2, q2);
 
-                final groupPlayed = group.fold<int>(0, (value, id) => value + (playedCounts[id] ?? 0));
-                final groupRested = group.fold<int>(0, (value, id) => value + (restCounts[id] ?? 0));
+                final groupPlayed = group.fold<int>(
+                    0, (value, id) => value + (playedCounts[id] ?? 0));
+                final groupRested = group.fold<int>(
+                    0, (value, id) => value + (restCounts[id] ?? 0));
 
-                final score = (partnerPenalty * 10000) + (opponentPenalty * 80) + (groupPlayed * 12) - (groupRested * 6);
+                final score = (partnerPenalty * 10000) +
+                    (opponentPenalty * 80) +
+                    (groupPlayed * 12) -
+                    (groupRested * 6);
 
                 if (score < bestScore) {
                   bestScore = score;
@@ -1622,7 +1942,12 @@ List<AmericanoGeneratedMatch> generateAmericanoRoundsIds(List<String> ids, {requ
       if (best == null) break;
       final sideA = [best[0], best[1]];
       final sideB = [best[2], best[3]];
-      output.add(AmericanoGeneratedMatch(round: round, courtIndex: court, sideA: sideA, sideB: sideB, resting: resting));
+      output.add(AmericanoGeneratedMatch(
+          round: round,
+          courtIndex: court,
+          sideA: sideA,
+          sideB: sideB,
+          resting: resting));
 
       americanoIncrementPair(partnerCounts, sideA[0], sideA[1]);
       americanoIncrementPair(partnerCounts, sideB[0], sideB[1]);
@@ -1646,9 +1971,14 @@ List<String> americanoSideIds(Map<String, dynamic> match, String key) {
   final details = matchResultDetails(match);
   final raw = details[key];
   if (raw is List) {
-    return raw.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty && e != 'null').toList();
+    return raw
+        .map((e) => e?.toString() ?? '')
+        .where((e) => e.isNotEmpty && e != 'null')
+        .toList();
   }
-  final fallback = key == 'side_a_ids' ? AppData.text(match['team_a']) : AppData.text(match['team_b']);
+  final fallback = key == 'side_a_ids'
+      ? AppData.text(match['team_a'])
+      : AppData.text(match['team_b']);
   if (fallback.isEmpty || fallback == 'null') return const [];
   return [fallback];
 }
@@ -1656,7 +1986,11 @@ List<String> americanoSideIds(Map<String, dynamic> match, String key) {
 List<String> americanoRestIds(Map<String, dynamic> match) {
   final details = matchResultDetails(match);
   final raw = details['rest_ids'];
-  if (raw is List) return raw.map((e) => e?.toString() ?? '').where((e) => e.isNotEmpty && e != 'null').toList();
+  if (raw is List)
+    return raw
+        .map((e) => e?.toString() ?? '')
+        .where((e) => e.isNotEmpty && e != 'null')
+        .toList();
   return const [];
 }
 
@@ -1665,15 +1999,18 @@ bool isAmericanoMatch(Map<String, dynamic> match) {
   return details['americano'] == true;
 }
 
-String tournamentMatchSideName(Map<String, dynamic> match, Map<String, String> names, bool sideA) {
+String tournamentMatchSideName(
+    Map<String, dynamic> match, Map<String, String> names, bool sideA) {
   final ids = isAmericanoMatch(match)
       ? americanoSideIds(match, sideA ? 'side_a_ids' : 'side_b_ids')
       : [AppData.text(match[sideA ? 'team_a' : 'team_b'])];
-  if (ids.isEmpty || ids.first == 'null') return sideA ? 'Pendiente' : 'Pase directo';
+  if (ids.isEmpty || ids.first == 'null')
+    return sideA ? 'Pendiente' : 'Pase directo';
   return ids.map((id) => names[id] ?? 'Pendiente').join(' / ');
 }
 
-String americanoRestText(Map<String, dynamic> match, Map<String, String> names) {
+String americanoRestText(
+    Map<String, dynamic> match, Map<String, String> names) {
   final rest = americanoRestIds(match);
   if (rest.isEmpty) return '';
   return rest.map((id) => names[id] ?? 'Participante').join(', ');
@@ -1695,13 +2032,21 @@ String tournamentFormatLabel(String format) {
 String tournamentFormatSubtitle(String format) {
   switch (format) {
     case 'eliminatoria':
-      return appIsEnglish ? 'Single-elimination bracket: winners advance and losers are out.' : 'Cuadro directo: quien gana avanza y quien pierde queda fuera.';
+      return appIsEnglish
+          ? 'Single-elimination bracket: winners advance and losers are out.'
+          : 'Cuadro directo: quien gana avanza y quien pierde queda fuera.';
     case 'americano':
-      return appIsEnglish ? 'Rounds by court with rotating pairs, rests and an individual ranking.' : 'Rondas por pista con parejas rotativas, descansos y ranking individual.';
+      return appIsEnglish
+          ? 'Rounds by court with rotating pairs, rests and an individual ranking.'
+          : 'Rondas por pista con parejas rotativas, descansos y ranking individual.';
     case 'manual':
-      return appIsEnglish ? 'Manual pairings, custom dates and full control.' : 'Emparejamientos a mano, fechas a medida y control total.';
+      return appIsEnglish
+          ? 'Manual pairings, custom dates and full control.'
+          : 'Emparejamientos a mano, fechas a medida y control total.';
     default:
-      return appIsEnglish ? 'Round robin league with automatic standings.' : 'Liga todos contra todos con clasificación automática.';
+      return appIsEnglish
+          ? 'Round robin league with automatic standings.'
+          : 'Liga todos contra todos con clasificación automática.';
   }
 }
 
@@ -1732,41 +2077,66 @@ String scoringTypeLabel(String type) {
   }
 }
 
-
 String scoringTableContractChip(String type, [dynamic raw]) {
   final model = scoringResultModel(type, raw);
   if (model == 'goals') return appIsEnglish ? 'Goals table' : 'Tabla por goles';
-  if (model == 'sets_games') return appIsEnglish ? 'Sets/games table' : 'Tabla por sets/juegos';
-  if (model == 'sets_points') return appIsEnglish ? 'Sets/points table' : 'Tabla por sets/puntos';
-  if (model == 'total_points') return appIsEnglish ? 'Points table' : 'Tabla por puntos';
-  if (type == 'basketball') return appIsEnglish ? 'Points table' : 'Tabla por puntos';
+  if (model == 'sets_games')
+    return appIsEnglish ? 'Sets/games table' : 'Tabla por sets/juegos';
+  if (model == 'sets_points')
+    return appIsEnglish ? 'Sets/points table' : 'Tabla por sets/puntos';
+  if (model == 'total_points')
+    return appIsEnglish ? 'Points table' : 'Tabla por puntos';
+  if (type == 'basketball')
+    return appIsEnglish ? 'Points table' : 'Tabla por puntos';
   return appIsEnglish ? 'Adapted table' : 'Tabla adaptada';
 }
 
 String scoringTypeSubtitle(String type) {
   switch (type) {
     case 'football':
-      return appIsEnglish ? 'Win = 3 points, draw = 1. Tiebreak by goal difference.' : 'Victoria 3 puntos, empate 1. Desempate por diferencia de goles.';
+      return appIsEnglish
+          ? 'Win = 3 points, draw = 1. Tiebreak by goal difference.'
+          : 'Victoria 3 puntos, empate 1. Desempate por diferencia de goles.';
     case 'tennis_padel':
-      return appIsEnglish ? 'Set-based result: register each set and calculate sets/games for tiebreaks.' : 'Resultado por sets: registra cada set y calcula sets/juegos para desempatar.';
+      return appIsEnglish
+          ? 'Set-based result: register each set and calculate sets/games for tiebreaks.'
+          : 'Resultado por sets: registra cada set y calcula sets/juegos para desempatar.';
     case 'basketball':
-      return appIsEnglish ? 'Win = 2 points. The score represents points scored.' : 'Victoria 2 puntos. El marcador representa puntos anotados.';
+      return appIsEnglish
+          ? 'Win = 2 points. The score represents points scored.'
+          : 'Victoria 2 puntos. El marcador representa puntos anotados.';
     case 'volleyball':
-      return appIsEnglish ? 'Sets to 25 and a short fifth set. Ideal for best of 3 or 5.' : 'Sets a 25 y quinto set corto. Ideal para mejor de 3 o 5.';
+      return appIsEnglish
+          ? 'Sets to 25 and a short fifth set. Ideal for best of 3 or 5.'
+          : 'Sets a 25 y quinto set corto. Ideal para mejor de 3 o 5.';
     case 'ping_pong':
-      return appIsEnglish ? 'Fast sets to 11. The app calculates sets and points for each partial.' : 'Sets rápidos a 11. La app calcula sets y puntos de cada parcial.';
+      return appIsEnglish
+          ? 'Fast sets to 11. The app calculates sets and points for each partial.'
+          : 'Sets rápidos a 11. La app calcula sets y puntos de cada parcial.';
     case 'cards_mus':
-      return appIsEnglish ? 'Win = 1 point. Useful for games, stones, hands or rounds.' : 'Victoria 1 punto. Sirve para juegos, piedras, manos o rondas.';
+      return appIsEnglish
+          ? 'Win = 1 point. Useful for games, stones, hands or rounds.'
+          : 'Victoria 1 punto. Sirve para juegos, piedras, manos o rondas.';
     case 'darts':
-      return appIsEnglish ? 'Direct scoring for 301/501 games or rounds.' : 'Puntuación directa para partidas a 301/501 o rondas.';
+      return appIsEnglish
+          ? 'Direct scoring for 301/501 games or rounds.'
+          : 'Puntuación directa para partidas a 301/501 o rondas.';
     case 'billiards':
-      return appIsEnglish ? 'Games or balls won with a simple score.' : 'Partidas o bolas ganadas con marcador simple.';
+      return appIsEnglish
+          ? 'Games or balls won with a simple score.'
+          : 'Partidas o bolas ganadas con marcador simple.';
     case 'esports':
-      return appIsEnglish ? 'Maps, rounds or points. Flexible for games and online tournaments.' : 'Mapas, rondas o puntos. Flexible para videojuegos y torneos online.';
+      return appIsEnglish
+          ? 'Maps, rounds or points. Flexible for games and online tournaments.'
+          : 'Mapas, rondas o puntos. Flexible para videojuegos y torneos online.';
     case 'custom':
-      return appIsEnglish ? 'Flexible: direct score or by sets/rounds, with editable points and units.' : 'Flexible: marcador directo o por sets/rondas, con puntos y unidades editables.';
+      return appIsEnglish
+          ? 'Flexible: direct score or by sets/rounds, with editable points and units.'
+          : 'Flexible: marcador directo o por sets/rondas, con puntos y unidades editables.';
     default:
-      return appIsEnglish ? 'Simple system: win 3, draw 1, loss 0.' : 'Sistema simple: victoria 3, empate 1, derrota 0.';
+      return appIsEnglish
+          ? 'Simple system: win 3, draw 1, loss 0.'
+          : 'Sistema simple: victoria 3, empate 1, derrota 0.';
   }
 }
 
@@ -1923,26 +2293,41 @@ Map<String, dynamic> resolvedScoringConfig(String type, [dynamic raw]) {
   return base;
 }
 
-int scoringWinPoints(String type, [dynamic raw]) => AppData.intValue(resolvedScoringConfig(type, raw)['win'], 3);
-int scoringDrawPoints(String type, [dynamic raw]) => AppData.intValue(resolvedScoringConfig(type, raw)['draw'], 1);
-int scoringLossPoints(String type, [dynamic raw]) => AppData.intValue(resolvedScoringConfig(type, raw)['loss'], 0);
-String scoringMetricUnit(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['unit'], 'puntos');
-bool scoringAllowDraw(String type, [dynamic raw]) => resolvedScoringConfig(type, raw)['allowDraw'] == true;
-bool scoringUsesSetMode(String type, [dynamic raw]) => scoringResultModel(type, raw).startsWith('sets');
-int scoringBestOf(String type, [dynamic raw]) => max(1, AppData.intValue(resolvedScoringConfig(type, raw)['best_of'], 3));
-String scoringScoreLabel(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['score_label'], scoringMetricUnit(type, raw));
-String scoringSetLabel(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['set_label'], 'juegos');
-String scoringRankingLabel(String type, [dynamic raw]) => AppData.text(resolvedScoringConfig(type, raw)['ranking_label'], 'DIF');
+int scoringWinPoints(String type, [dynamic raw]) =>
+    AppData.intValue(resolvedScoringConfig(type, raw)['win'], 3);
+int scoringDrawPoints(String type, [dynamic raw]) =>
+    AppData.intValue(resolvedScoringConfig(type, raw)['draw'], 1);
+int scoringLossPoints(String type, [dynamic raw]) =>
+    AppData.intValue(resolvedScoringConfig(type, raw)['loss'], 0);
+String scoringMetricUnit(String type, [dynamic raw]) =>
+    AppData.text(resolvedScoringConfig(type, raw)['unit'], 'puntos');
+bool scoringAllowDraw(String type, [dynamic raw]) =>
+    resolvedScoringConfig(type, raw)['allowDraw'] == true;
+bool scoringUsesSetMode(String type, [dynamic raw]) =>
+    scoringResultModel(type, raw).startsWith('sets');
+int scoringBestOf(String type, [dynamic raw]) =>
+    max(1, AppData.intValue(resolvedScoringConfig(type, raw)['best_of'], 3));
+String scoringScoreLabel(String type, [dynamic raw]) => AppData.text(
+    resolvedScoringConfig(type, raw)['score_label'],
+    scoringMetricUnit(type, raw));
+String scoringSetLabel(String type, [dynamic raw]) =>
+    AppData.text(resolvedScoringConfig(type, raw)['set_label'], 'juegos');
+String scoringRankingLabel(String type, [dynamic raw]) =>
+    AppData.text(resolvedScoringConfig(type, raw)['ranking_label'], 'DIF');
 
 String scoringResultModel(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
   final model = AppData.text(cfg['score_model']);
   if (model.isNotEmpty) return model;
-  return AppData.text(cfg['result_mode'], 'simple') == 'sets' ? 'sets_points' : 'manual_points';
+  return AppData.text(cfg['result_mode'], 'simple') == 'sets'
+      ? 'sets_points'
+      : 'manual_points';
 }
 
-bool scoringUsesGameSetMode(String type, [dynamic raw]) => scoringResultModel(type, raw) == 'sets_games';
-bool scoringUsesPointSetMode(String type, [dynamic raw]) => scoringResultModel(type, raw) == 'sets_points';
+bool scoringUsesGameSetMode(String type, [dynamic raw]) =>
+    scoringResultModel(type, raw) == 'sets_games';
+bool scoringUsesPointSetMode(String type, [dynamic raw]) =>
+    scoringResultModel(type, raw) == 'sets_points';
 
 String scoringTableForLabel(String type, [dynamic raw]) {
   switch (scoringResultModel(type, raw)) {
@@ -2024,13 +2409,21 @@ String scoringResultInputTitle(String type, [dynamic raw]) {
     case 'goals':
       return appIsEnglish ? 'Goals result' : 'Resultado por goles';
     case 'sets_games':
-      return appIsEnglish ? 'Sets and games result' : 'Resultado por sets y juegos';
+      return appIsEnglish
+          ? 'Sets and games result'
+          : 'Resultado por sets y juegos';
     case 'sets_points':
-      return appIsEnglish ? 'Sets and points result' : 'Resultado por sets y puntos';
+      return appIsEnglish
+          ? 'Sets and points result'
+          : 'Resultado por sets y puntos';
     case 'total_points':
-      return appIsEnglish ? 'Total points result' : 'Resultado por puntos totales';
+      return appIsEnglish
+          ? 'Total points result'
+          : 'Resultado por puntos totales';
     case 'games':
-      return appIsEnglish ? 'Games/matches result' : 'Resultado por juegos/partidas';
+      return appIsEnglish
+          ? 'Games/matches result'
+          : 'Resultado por juegos/partidas';
     default:
       return appIsEnglish ? 'Editable result' : 'Resultado editable';
   }
@@ -2039,49 +2432,79 @@ String scoringResultInputTitle(String type, [dynamic raw]) {
 String scoringResultInputHelp(String type, [dynamic raw]) {
   switch (scoringResultModel(type, raw)) {
     case 'goals':
-      return appIsEnglish ? "Enter each team's goals. The table will update points, goals for, goals against and difference." : 'Escribe los goles de cada equipo. La tabla actualizar� puntos, goles a favor, goles en contra y diferencia.';
+      return appIsEnglish
+          ? "Enter each team's goals. The table will update points, goals for, goals against and difference."
+          : 'Escribe los goles de cada equipo. La tabla actualizará puntos, goles a favor, goles en contra y diferencia.';
     case 'sets_games':
-      return appIsEnglish ? 'Write each set on a line, for example 6-4 or 7-5. The app calculates sets, games and tiebreaks.' : 'Escribe cada set en una l�nea, por ejemplo 6-4 o 7-5. La app calcula sets, juegos y desempates.';
+      return appIsEnglish
+          ? 'Write each set on a line, for example 6-4 or 7-5. The app calculates sets, games and tiebreaks.'
+          : 'Escribe cada set en una línea, por ejemplo 6-4 o 7-5. La app calcula sets, juegos y desempates.';
     case 'sets_points':
-      return appIsEnglish ? 'Write each partial on a line, for example 25-21 or 15-12. The app calculates sets, points and tiebreaks.' : 'Escribe cada parcial en una l�nea, por ejemplo 25-21 o 15-12. La app calcula sets, puntos y desempates.';
+      return appIsEnglish
+          ? 'Write each partial on a line, for example 25-21 or 15-12. The app calculates sets, points and tiebreaks.'
+          : 'Escribe cada parcial en una línea, por ejemplo 25-21 o 15-12. La app calcula sets, puntos y desempates.';
     case 'total_points':
-      return appIsEnglish ? 'Enter the final score in points. The table will calculate wins and difference.' : 'Escribe el marcador final de puntos. La tabla calcular� victorias y diferencia.';
+      return appIsEnglish
+          ? 'Enter the final score in points. The table will calculate wins and difference.'
+          : 'Escribe el marcador final de puntos. La tabla calculará victorias y diferencia.';
     case 'games':
-      return appIsEnglish ? 'Enter games, matches or maps won by each side.' : 'Escribe juegos, partidas o mapas ganados por cada lado.';
+      return appIsEnglish
+          ? 'Enter games, matches or maps won by each side.'
+          : 'Escribe juegos, partidas o mapas ganados por cada lado.';
     default:
-      return appIsEnglish ? 'Flexible score. The standings will use the rules configured for this tournament.' : 'Marcador flexible. La clasificaci�n usar� las reglas configuradas para este torneo.';
+      return appIsEnglish
+          ? 'Flexible score. The standings will use the rules configured for this tournament.'
+          : 'Marcador flexible. La clasificación usará las reglas configuradas para este torneo.';
   }
 }
 
 String scoringCreationHelp(String type, [dynamic raw]) {
   switch (scoringResultModel(type, raw)) {
     case 'goals':
-      return appIsEnglish ? 'Football: goals-based score. The table uses points, GF, GA and GD.' : 'Fútbol: marcador por goles. La tabla usa puntos, GF, GC y DG.';
+      return appIsEnglish
+          ? 'Football: goals-based score. The table uses points, GF, GA and GD.'
+          : 'Fútbol: marcador por goles. La tabla usa puntos, GF, GC y DG.';
     case 'sets_games':
-      return appIsEnglish ? 'Tennis/Padel: enter full sets. The table uses wins, sets, games and tiebreaks.' : 'Tenis/Pádel: introduces sets completos. La tabla usa victorias, sets, juegos y desempates.';
+      return appIsEnglish
+          ? 'Tennis/Padel: enter full sets. The table uses wins, sets, games and tiebreaks.'
+          : 'Tenis/Pádel: introduces sets completos. La tabla usa victorias, sets, juegos y desempates.';
     case 'sets_points':
-      return appIsEnglish ? 'Volleyball/Ping pong: enter full sets. The table uses wins, sets, points and tiebreaks.' : 'Voleibol/Ping pong: introduces sets completos. La tabla usa victorias, sets, puntos y desempates.';
+      return appIsEnglish
+          ? 'Volleyball/Ping pong: enter full sets. The table uses wins, sets, points and tiebreaks.'
+          : 'Voleibol/Ping pong: introduces sets completos. La tabla usa victorias, sets, puntos y desempates.';
     case 'total_points':
-      return appIsEnglish ? 'Basketball: points-based score. The table uses wins, points for/against and difference.' : 'Baloncesto: marcador por puntos. La tabla usa victorias, puntos a favor/en contra y diferencia.';
+      return appIsEnglish
+          ? 'Basketball: points-based score. The table uses wins, points for/against and difference.'
+          : 'Baloncesto: marcador por puntos. La tabla usa victorias, puntos a favor/en contra y diferencia.';
     default:
       return scoringConfigFullText(type, raw);
   }
 }
 
-
 String scoringEmoji(String type) {
   switch (type) {
-    case 'football': return '⚽';
-    case 'tennis_padel': return '🎾';
-    case 'basketball': return '🏀';
-    case 'volleyball': return '🏐';
-    case 'ping_pong': return '🏓';
-    case 'cards_mus': return '🃏';
-    case 'darts': return '🎯';
-    case 'billiards': return '🎱';
-    case 'esports': return '🎮';
-    case 'custom': return '✨';
-    default: return '⭐';
+    case 'football':
+      return '⚽';
+    case 'tennis_padel':
+      return '🎾';
+    case 'basketball':
+      return '🏀';
+    case 'volleyball':
+      return '🏐';
+    case 'ping_pong':
+      return '🏓';
+    case 'cards_mus':
+      return '🃏';
+    case 'darts':
+      return '🎯';
+    case 'billiards':
+      return '🎱';
+    case 'esports':
+      return '🎮';
+    case 'custom':
+      return '✨';
+    default:
+      return '⭐';
   }
 }
 
@@ -2089,20 +2512,34 @@ String scoringValidationText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
   switch (scoringResultModel(type, cfg)) {
     case 'goals':
-      return appIsEnglish ? 'Real football: goals, draws allowed, GF/GA/GD and league points.' : 'Fútbol real: goles, empate permitido, GF/GC/DG y puntos de liga.';
+      return appIsEnglish
+          ? 'Real football: goals, draws allowed, GF/GA/GD and league points.'
+          : 'Fútbol real: goles, empate permitido, GF/GC/DG y puntos de liga.';
     case 'sets_games':
-      return appIsEnglish ? 'Racket sports: each set stores games. Enter all partial scores to close the match.' : 'Raqueta: cada set guarda juegos. Introduce todos los parciales para cerrar el partido.';
+      return appIsEnglish
+          ? 'Racket sports: each set stores games. Enter all partial scores to close the match.'
+          : 'Raqueta: cada set guarda juegos. Introduce todos los parciales para cerrar el partido.';
     case 'sets_points':
-      return appIsEnglish ? 'Sets: each partial stores points. The match cannot end tied on sets.' : 'Sets: cada parcial guarda puntos. No puede quedar empate a sets.';
+      return appIsEnglish
+          ? 'Sets: each partial stores points. The match cannot end tied on sets.'
+          : 'Sets: cada parcial guarda puntos. No puede quedar empate a sets.';
     case 'total_points':
-      return appIsEnglish ? 'Basketball: total points, no draws, point difference.' : 'Baloncesto: puntos totales, sin empate, diferencia de puntos.';
+      return appIsEnglish
+          ? 'Basketball: total points, no draws, point difference.'
+          : 'Baloncesto: puntos totales, sin empate, diferencia de puntos.';
     default:
-      if (!scoringAllowDraw(type, cfg)) return appIsEnglish ? 'This system cannot end in a draw.' : 'El marcador no puede quedar empatado en este sistema.';
-      return appIsEnglish ? 'This system allows draws and calculates points and difference automatically.' : 'Este sistema permite empate y calcula puntos y diferencia automáticamente.';
+      if (!scoringAllowDraw(type, cfg))
+        return appIsEnglish
+            ? 'This system cannot end in a draw.'
+            : 'El marcador no puede quedar empatado en este sistema.';
+      return appIsEnglish
+          ? 'This system allows draws and calculates points and difference automatically.'
+          : 'Este sistema permite empate y calcula puntos y diferencia automáticamente.';
   }
 }
 
-bool tournamentFeatureIsPremium(String feature) => GrupliPremium.isPremiumFeature(feature);
+bool tournamentFeatureIsPremium(String feature) =>
+    GrupliPremium.isPremiumFeature(feature);
 
 String scoringConfigShortText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
@@ -2110,26 +2547,41 @@ String scoringConfigShortText(String type, [dynamic raw]) {
     case 'goals':
       return appIsEnglish ? 'Goals · GF/GA/GD' : 'Goles · GF/GC/DG';
     case 'sets_games':
-      return appIsEnglish ? 'Sets + games · best of ${scoringBestOf(type, cfg)}' : 'Sets + juegos · mejor de ${scoringBestOf(type, cfg)}';
+      return appIsEnglish
+          ? 'Sets + games · best of ${scoringBestOf(type, cfg)}'
+          : 'Sets + juegos · mejor de ${scoringBestOf(type, cfg)}';
     case 'sets_points':
-      return appIsEnglish ? 'Sets + points · best of ${scoringBestOf(type, cfg)}' : 'Sets + puntos · mejor de ${scoringBestOf(type, cfg)}';
+      return appIsEnglish
+          ? 'Sets + points · best of ${scoringBestOf(type, cfg)}'
+          : 'Sets + puntos · mejor de ${scoringBestOf(type, cfg)}';
     case 'total_points':
-      return appIsEnglish ? 'Total points · difference' : 'Puntos totales · diferencia';
+      return appIsEnglish
+          ? 'Total points · difference'
+          : 'Puntos totales · diferencia';
     default:
-      return appIsEnglish ? 'Win ${scoringWinPoints(type, cfg)} · draw ${scoringDrawPoints(type, cfg)} · loss ${scoringLossPoints(type, cfg)}' : 'Victoria ${scoringWinPoints(type, cfg)} · empate ${scoringDrawPoints(type, cfg)} · derrota ${scoringLossPoints(type, cfg)}';
+      return appIsEnglish
+          ? 'Win ${scoringWinPoints(type, cfg)} · draw ${scoringDrawPoints(type, cfg)} · loss ${scoringLossPoints(type, cfg)}'
+          : 'Victoria ${scoringWinPoints(type, cfg)} · empate ${scoringDrawPoints(type, cfg)} · derrota ${scoringLossPoints(type, cfg)}';
   }
 }
 
-String tournamentClassificationTitle(String format, String scoringType, [dynamic scoringConfig]) {
-  if (format == 'americano') return appIsEnglish ? 'Individual ranking' : 'Ranking individual';
-  if (format == 'eliminatoria') return appIsEnglish ? 'Knockout bracket' : 'Cuadro de eliminatoria';
+String tournamentClassificationTitle(String format, String scoringType,
+    [dynamic scoringConfig]) {
+  if (format == 'americano')
+    return appIsEnglish ? 'Individual ranking' : 'Ranking individual';
+  if (format == 'eliminatoria')
+    return appIsEnglish ? 'Knockout bracket' : 'Cuadro de eliminatoria';
   switch (scoringResultModel(scoringType, scoringConfig)) {
     case 'goals':
       return appIsEnglish ? 'Goals standings' : 'Clasificacion por goles';
     case 'sets_games':
-      return appIsEnglish ? 'Sets/games standings' : 'Clasificacion por sets y juegos';
+      return appIsEnglish
+          ? 'Sets/games standings'
+          : 'Clasificacion por sets y juegos';
     case 'sets_points':
-      return appIsEnglish ? 'Sets/points standings' : 'Clasificacion por sets y puntos';
+      return appIsEnglish
+          ? 'Sets/points standings'
+          : 'Clasificacion por sets y puntos';
     case 'total_points':
       return appIsEnglish ? 'Points standings' : 'Clasificacion por puntos';
     default:
@@ -2143,69 +2595,106 @@ String tournamentClassificationSummary(
   dynamic scoringConfig,
   List<String>? tieBreakers,
 }) {
-  final breakers = tieBreakers ?? TournamentEngineV2.defaultTieBreakers(scoringType, format);
-  final order = standingsOrderTextForScoring(breakers, scoringType, scoringConfig);
+  final breakers =
+      tieBreakers ?? TournamentEngineV2.defaultTieBreakers(scoringType, format);
+  final order =
+      standingsOrderTextForScoring(breakers, scoringType, scoringConfig);
   if (format == 'americano') {
     final unit = scoringUsesGameSetMode(scoringType, scoringConfig)
         ? (appIsEnglish ? 'games' : 'juegos')
         : scoringUsesPointSetMode(scoringType, scoringConfig)
             ? (appIsEnglish ? 'points' : 'puntos')
             : scoringScoreLabel(scoringType, scoringConfig);
-    return appIsEnglish ? 'Individual ranking: each player adds $unit even when partner changes. Order: $order.' : 'Ranking individual: cada jugador suma $unit aunque cambie de pareja. Orden: $order.';
+    return appIsEnglish
+        ? 'Individual ranking: each player adds $unit even when partner changes. Order: $order.'
+        : 'Ranking individual: cada jugador suma $unit aunque cambie de pareja. Orden: $order.';
   }
   if (format == 'eliminatoria') {
-    return appIsEnglish ? 'Single-elimination bracket: each match decides who advances. Tiebreaks follow this order: $order.' : 'Cuadro directo: cada partido decide quien avanza. El desempate sigue este orden: $order.';
+    return appIsEnglish
+        ? 'Single-elimination bracket: each match decides who advances. Tiebreaks follow this order: $order.'
+        : 'Cuadro directo: cada partido decide quien avanza. El desempate sigue este orden: $order.';
   }
   switch (scoringResultModel(scoringType, scoringConfig)) {
     case 'goals':
-      return appIsEnglish ? 'The table prioritizes points and then wins, head-to-head, goal difference, goals for and no-shows. Order: $order.' : 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de goles, goles a favor y no presentados. Orden: $order.';
+      return appIsEnglish
+          ? 'The table prioritizes points and then wins, head-to-head, goal difference, goals for and no-shows. Order: $order.'
+          : 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de goles, goles a favor y no presentados. Orden: $order.';
     case 'sets_games':
-      return appIsEnglish ? 'The table prioritizes points and then wins, head-to-head, set difference, game difference and games for. Order: $order.' : 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de sets, diferencia de juegos y juegos a favor. Orden: $order.';
+      return appIsEnglish
+          ? 'The table prioritizes points and then wins, head-to-head, set difference, game difference and games for. Order: $order.'
+          : 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de sets, diferencia de juegos y juegos a favor. Orden: $order.';
     case 'sets_points':
-      return appIsEnglish ? 'The table prioritizes points and then wins, head-to-head, set difference, point difference and points for. Order: $order.' : 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de sets, diferencia de puntos y puntos a favor. Orden: $order.';
+      return appIsEnglish
+          ? 'The table prioritizes points and then wins, head-to-head, set difference, point difference and points for. Order: $order.'
+          : 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de sets, diferencia de puntos y puntos a favor. Orden: $order.';
     case 'total_points':
-      return appIsEnglish ? 'The table prioritizes wins, point difference and points for. Order: $order.' : 'La tabla prioriza victorias, diferencia de puntos y puntos a favor. Orden: $order.';
+      return appIsEnglish
+          ? 'The table prioritizes wins, point difference and points for. Order: $order.'
+          : 'La tabla prioriza victorias, diferencia de puntos y puntos a favor. Orden: $order.';
     default:
-      return appIsEnglish ? 'The table uses the configured points and tiebreakers for this tournament. Order: $order.' : 'La tabla usa la configuracion de puntos y los desempates definidos para este torneo. Orden: $order.';
+      return appIsEnglish
+          ? 'The table uses the configured points and tiebreakers for this tournament. Order: $order.'
+          : 'La tabla usa la configuracion de puntos y los desempates definidos para este torneo. Orden: $order.';
   }
 }
-
 
 String tieBreakerLabel(String value) {
   switch (value) {
-    case 'points': return appIsEnglish ? 'points' : 'puntos';
-    case 'wins': return appIsEnglish ? 'wins' : 'victorias';
-    case 'direct': return appIsEnglish ? 'head-to-head' : 'directo';
-    case 'difference': return appIsEnglish ? 'difference' : 'diferencia';
-    case 'for': return appIsEnglish ? 'for' : 'a favor';
-    case 'set_difference': return appIsEnglish ? 'sets' : 'sets';
-    case 'game_difference': return appIsEnglish ? 'games' : 'juegos';
-    case 'games_for': return appIsEnglish ? 'games for' : 'juegos a favor';
-    case 'manual': return appIsEnglish ? 'manual' : 'manual';
-    case 'no_shows': return appIsEnglish ? 'no-shows' : 'no presentados';
-    default: return value;
+    case 'points':
+      return appIsEnglish ? 'points' : 'puntos';
+    case 'wins':
+      return appIsEnglish ? 'wins' : 'victorias';
+    case 'direct':
+      return appIsEnglish ? 'head-to-head' : 'directo';
+    case 'difference':
+      return appIsEnglish ? 'difference' : 'diferencia';
+    case 'for':
+      return appIsEnglish ? 'for' : 'a favor';
+    case 'set_difference':
+      return appIsEnglish ? 'sets' : 'sets';
+    case 'game_difference':
+      return appIsEnglish ? 'games' : 'juegos';
+    case 'games_for':
+      return appIsEnglish ? 'games for' : 'juegos a favor';
+    case 'manual':
+      return appIsEnglish ? 'manual' : 'manual';
+    case 'no_shows':
+      return appIsEnglish ? 'no-shows' : 'no presentados';
+    default:
+      return value;
   }
 }
 
-String tieBreakerLabelForScoring(String value, String scoringType, [dynamic raw]) {
+String tieBreakerLabelForScoring(String value, String scoringType,
+    [dynamic raw]) {
   switch (value) {
     case 'set_difference':
       return appIsEnglish ? 'set difference' : 'diferencia de sets';
     case 'game_difference':
-      if (scoringUsesGameSetMode(scoringType, raw)) return appIsEnglish ? 'game difference' : 'diferencia de juegos';
-      if (scoringUsesPointSetMode(scoringType, raw)) return appIsEnglish ? 'set point difference' : 'diferencia de puntos de set';
+      if (scoringUsesGameSetMode(scoringType, raw))
+        return appIsEnglish ? 'game difference' : 'diferencia de juegos';
+      if (scoringUsesPointSetMode(scoringType, raw))
+        return appIsEnglish
+            ? 'set point difference'
+            : 'diferencia de puntos de set';
       return tieBreakerLabel(value);
     case 'games_for':
-      if (scoringUsesGameSetMode(scoringType, raw)) return appIsEnglish ? 'games for' : 'juegos a favor';
-      if (scoringUsesPointSetMode(scoringType, raw)) return appIsEnglish ? 'set points for' : 'puntos de set a favor';
+      if (scoringUsesGameSetMode(scoringType, raw))
+        return appIsEnglish ? 'games for' : 'juegos a favor';
+      if (scoringUsesPointSetMode(scoringType, raw))
+        return appIsEnglish ? 'set points for' : 'puntos de set a favor';
       return tieBreakerLabel(value);
     case 'difference':
-      if (scoringResultModel(scoringType, raw) == 'goals') return appIsEnglish ? 'goal difference' : 'diferencia de goles';
-      if (scoringResultModel(scoringType, raw) == 'total_points') return appIsEnglish ? 'point difference' : 'diferencia de puntos';
+      if (scoringResultModel(scoringType, raw) == 'goals')
+        return appIsEnglish ? 'goal difference' : 'diferencia de goles';
+      if (scoringResultModel(scoringType, raw) == 'total_points')
+        return appIsEnglish ? 'point difference' : 'diferencia de puntos';
       return tieBreakerLabel(value);
     case 'for':
-      if (scoringResultModel(scoringType, raw) == 'goals') return appIsEnglish ? 'goals for' : 'goles a favor';
-      if (scoringResultModel(scoringType, raw) == 'total_points') return appIsEnglish ? 'points for' : 'puntos a favor';
+      if (scoringResultModel(scoringType, raw) == 'goals')
+        return appIsEnglish ? 'goals for' : 'goles a favor';
+      if (scoringResultModel(scoringType, raw) == 'total_points')
+        return appIsEnglish ? 'points for' : 'puntos a favor';
       return tieBreakerLabel(value);
     default:
       return tieBreakerLabel(value);
@@ -2216,24 +2705,40 @@ String scoringConfigFullText(String type, [dynamic raw]) {
   final cfg = resolvedScoringConfig(type, raw);
   switch (scoringResultModel(type, cfg)) {
     case 'goals':
-      return appIsEnglish ? 'The score is recorded in goals. The standings use league points, goals for, goals against and goal difference.' : 'Se registra el marcador en goles. La clasificación usa puntos de liga, goles a favor, goles en contra y diferencia de goles.';
+      return appIsEnglish
+          ? 'The score is recorded in goals. The standings use league points, goals for, goals against and goal difference.'
+          : 'Se registra el marcador en goles. La clasificación usa puntos de liga, goles a favor, goles en contra y diferencia de goles.';
     case 'sets_games':
-      return appIsEnglish ? 'Each set is recorded with its games. The app calculates sets won, total games and tiebreaks.' : 'Se registra cada set con sus juegos. La app calcula sets ganados, juegos totales y desempates.';
+      return appIsEnglish
+          ? 'Each set is recorded with its games. The app calculates sets won, total games and tiebreaks.'
+          : 'Se registra cada set con sus juegos. La app calcula sets ganados, juegos totales y desempates.';
     case 'sets_points':
-      return appIsEnglish ? 'Each set is recorded with its points. The app calculates sets won, total points and tiebreaks.' : 'Se registra cada set con sus puntos. La app calcula sets ganados, puntos totales y desempates.';
+      return appIsEnglish
+          ? 'Each set is recorded with its points. The app calculates sets won, total points and tiebreaks.'
+          : 'Se registra cada set con sus puntos. La app calcula sets ganados, puntos totales y desempates.';
     case 'total_points':
-      return appIsEnglish ? 'The total points score is recorded. The standings use wins, points for/against and difference.' : 'Se registra el marcador total de puntos. La clasificación usa victorias, puntos a favor/en contra y diferencia.';
+      return appIsEnglish
+          ? 'The total points score is recorded. The standings use wins, points for/against and difference.'
+          : 'Se registra el marcador total de puntos. La clasificación usa victorias, puntos a favor/en contra y diferencia.';
     default:
-      return appIsEnglish ? 'Direct score in ${scoringScoreLabel(type, cfg)}. The standings use win ${scoringWinPoints(type, cfg)}, draw ${scoringDrawPoints(type, cfg)} and loss ${scoringLossPoints(type, cfg)}.' : 'Marcador directo en ${scoringScoreLabel(type, cfg)}. La clasificación usa victoria ${scoringWinPoints(type, cfg)}, empate ${scoringDrawPoints(type, cfg)} y derrota ${scoringLossPoints(type, cfg)}.';
+      return appIsEnglish
+          ? 'Direct score in ${scoringScoreLabel(type, cfg)}. The standings use win ${scoringWinPoints(type, cfg)}, draw ${scoringDrawPoints(type, cfg)} and loss ${scoringLossPoints(type, cfg)}.'
+          : 'Marcador directo en ${scoringScoreLabel(type, cfg)}. La clasificación usa victoria ${scoringWinPoints(type, cfg)}, empate ${scoringDrawPoints(type, cfg)} y derrota ${scoringLossPoints(type, cfg)}.';
   }
 }
 
 String standingsHeaderForScoring(String type, [dynamic raw]) {
-  if (scoringUsesSetMode(type, raw)) return appIsEnglish ? 'PTS · GD · ${scoringSetLabel(type, raw).toUpperCase()}' : 'PTS · DP · ${scoringSetLabel(type, raw).toUpperCase()}';
-  return appIsEnglish ? 'PTS · ${scoringRankingLabel(type, raw)} · GP' : 'PTS · ${scoringRankingLabel(type, raw)} · PJ';
+  if (scoringUsesSetMode(type, raw))
+    return appIsEnglish
+        ? 'PTS · GD · ${scoringSetLabel(type, raw).toUpperCase()}'
+        : 'PTS · DP · ${scoringSetLabel(type, raw).toUpperCase()}';
+  return appIsEnglish
+      ? 'PTS · ${scoringRankingLabel(type, raw)} · GP'
+      : 'PTS · ${scoringRankingLabel(type, raw)} · PJ';
 }
 
-String standingDetailText(TeamStanding standing, String scoringType, [dynamic scoringConfig]) {
+String standingDetailText(TeamStanding standing, String scoringType,
+    [dynamic scoringConfig]) {
   final model = scoringResultModel(scoringType, scoringConfig);
   if (standing.americanoRawScore) {
     final unit = scoringUsesGameSetMode(scoringType, scoringConfig)
@@ -2257,31 +2762,36 @@ String standingDetailText(TeamStanding standing, String scoringType, [dynamic sc
   }
 }
 
-String standingMetricText(TeamStanding standing, String scoringType, [dynamic scoringConfig]) {
+String standingMetricText(TeamStanding standing, String scoringType,
+    [dynamic scoringConfig]) {
   if (scoringUsesSetMode(scoringType, scoringConfig)) {
     return '${scoringTableDifferenceLabel(scoringType, scoringConfig)} ${standing.goalDifference} · ${scoringSecondaryDifferenceLabel(scoringType, scoringConfig)} ${standing.secondaryDifference}';
   }
   return 'PTS · ${scoringRankingLabel(scoringType, scoringConfig)} ${standing.goalDifference}';
 }
 
-
 String standingMainStatLabel(String scoringType, [dynamic scoringConfig]) {
   if (scoringUsesGameSetMode(scoringType, scoringConfig)) return 'Sets';
   if (scoringUsesPointSetMode(scoringType, scoringConfig)) return 'Sets';
   if (scoringResultModel(scoringType, scoringConfig) == 'goals') return 'Goles';
-  if (scoringResultModel(scoringType, scoringConfig) == 'total_points') return 'Puntos';
+  if (scoringResultModel(scoringType, scoringConfig) == 'total_points')
+    return 'Puntos';
   return scoringScoreLabel(scoringType, scoringConfig);
 }
 
 String standingSecondaryStatLabel(String scoringType, [dynamic scoringConfig]) {
   if (scoringUsesGameSetMode(scoringType, scoringConfig)) return 'Juegos';
-  if (scoringUsesPointSetMode(scoringType, scoringConfig)) return 'Puntos de set';
-  if (scoringResultModel(scoringType, scoringConfig) == 'goals') return 'Diferencia de goles';
-  if (scoringResultModel(scoringType, scoringConfig) == 'total_points') return 'Diferencia de puntos';
+  if (scoringUsesPointSetMode(scoringType, scoringConfig))
+    return 'Puntos de set';
+  if (scoringResultModel(scoringType, scoringConfig) == 'goals')
+    return 'Diferencia de goles';
+  if (scoringResultModel(scoringType, scoringConfig) == 'total_points')
+    return 'Diferencia de puntos';
   return 'Diferencia';
 }
 
-String standingForAgainstText(TeamStanding standing, String scoringType, [dynamic scoringConfig]) {
+String standingForAgainstText(TeamStanding standing, String scoringType,
+    [dynamic scoringConfig]) {
   if (standing.americanoRawScore) {
     final unit = scoringUsesGameSetMode(scoringType, scoringConfig)
         ? 'juegos'
@@ -2291,12 +2801,16 @@ String standingForAgainstText(TeamStanding standing, String scoringType, [dynami
     return '$unit ${standing.goalsFor}-${standing.goalsAgainst}';
   }
   if (scoringUsesSetMode(scoringType, scoringConfig)) {
-    final secondary = scoringUsesGameSetMode(scoringType, scoringConfig) ? 'juegos' : 'puntos';
+    final secondary = scoringUsesGameSetMode(scoringType, scoringConfig)
+        ? 'juegos'
+        : 'puntos';
     return 'sets ${standing.goalsFor}-${standing.goalsAgainst} · $secondary ${standing.secondaryFor}-${standing.secondaryAgainst}';
   }
   final model = scoringResultModel(scoringType, scoringConfig);
-  if (model == 'goals') return 'GF ${standing.goalsFor} · GC ${standing.goalsAgainst} · DG ${standing.goalDifference}';
-  if (model == 'total_points') return 'PF ${standing.goalsFor} · PC ${standing.goalsAgainst} · DP ${standing.goalDifference}';
+  if (model == 'goals')
+    return 'GF ${standing.goalsFor} · GC ${standing.goalsAgainst} · DG ${standing.goalDifference}';
+  if (model == 'total_points')
+    return 'PF ${standing.goalsFor} · PC ${standing.goalsAgainst} · DP ${standing.goalDifference}';
   return '${scoringScoreLabel(scoringType, scoringConfig)} ${standing.goalsFor}-${standing.goalsAgainst} · DIF ${standing.goalDifference}';
 }
 
@@ -2308,18 +2822,28 @@ String standingWinRateText(TeamStanding standing) {
 
 String tournamentStatsIntroText(String scoringType, [dynamic scoringConfig]) {
   if (scoringUsesGameSetMode(scoringType, scoringConfig)) {
-    return appIsEnglish ? 'The table uses points, wins, sets and real games to rank the standings.' : 'La tabla usa puntos, victorias, sets y juegos reales para ordenar la clasificación.';
+    return appIsEnglish
+        ? 'The table uses points, wins, sets and real games to rank the standings.'
+        : 'La tabla usa puntos, victorias, sets y juegos reales para ordenar la clasificación.';
   }
   if (scoringUsesPointSetMode(scoringType, scoringConfig)) {
-    return appIsEnglish ? 'The table uses points, wins, sets and partial points to rank the standings.' : 'La tabla usa puntos, victorias, sets y puntos de parcial para ordenar la clasificación.';
+    return appIsEnglish
+        ? 'The table uses points, wins, sets and partial points to rank the standings.'
+        : 'La tabla usa puntos, victorias, sets y puntos de parcial para ordenar la clasificación.';
   }
   if (scoringResultModel(scoringType, scoringConfig) == 'goals') {
-    return appIsEnglish ? 'The table uses points, wins, draws, goals for, goals against and difference.' : 'La tabla usa puntos, victorias, empates, goles a favor, goles en contra y diferencia.';
+    return appIsEnglish
+        ? 'The table uses points, wins, draws, goals for, goals against and difference.'
+        : 'La tabla usa puntos, victorias, empates, goles a favor, goles en contra y diferencia.';
   }
   if (scoringResultModel(scoringType, scoringConfig) == 'total_points') {
-    return appIsEnglish ? 'The table uses wins, points for, points against and difference.' : 'La tabla usa victorias, puntos a favor, puntos en contra y diferencia.';
+    return appIsEnglish
+        ? 'The table uses wins, points for, points against and difference.'
+        : 'La tabla usa victorias, puntos a favor, puntos en contra y diferencia.';
   }
-  return appIsEnglish ? 'The table uses points, wins and difference according to the configured score.' : 'La tabla usa puntos, victorias y diferencia según el marcador configurado.';
+  return appIsEnglish
+      ? 'The table uses points, wins and difference according to the configured score.'
+      : 'La tabla usa puntos, victorias y diferencia según el marcador configurado.';
 }
 
 String matchInputLabel(String type, bool local, [dynamic raw]) {
@@ -2343,7 +2867,8 @@ List<Map<String, int>> matchDetailSets(Map<String, dynamic> match) {
   if (rawSets is! List) return const [];
   return rawSets
       .whereType<Map>()
-      .map((e) => {'a': AppData.intValue(e['a']), 'b': AppData.intValue(e['b'])})
+      .map(
+          (e) => {'a': AppData.intValue(e['a']), 'b': AppData.intValue(e['b'])})
       .toList();
 }
 
@@ -2355,7 +2880,8 @@ int matchSetGamesFor(Map<String, dynamic> match, bool local) {
   return total;
 }
 
-String matchPrimaryScoreText(Map<String, dynamic> match, String type, [dynamic raw]) {
+String matchPrimaryScoreText(Map<String, dynamic> match, String type,
+    [dynamic raw]) {
   final a = AppData.intValue(match['score_a']);
   final b = AppData.intValue(match['score_b']);
   if (scoringUsesSetMode(type, raw) && matchDetailSets(match).isNotEmpty) {
@@ -2364,13 +2890,15 @@ String matchPrimaryScoreText(Map<String, dynamic> match, String type, [dynamic r
   return '$a - $b';
 }
 
-String? matchDetailScoreText(Map<String, dynamic> match, String type, [dynamic raw]) {
+String? matchDetailScoreText(Map<String, dynamic> match, String type,
+    [dynamic raw]) {
   if (!scoringUsesSetMode(type, raw)) return null;
   final sets = matchDetailSets(match);
   if (sets.isEmpty) return null;
   final secondaryA = matchSetGamesFor(match, true);
   final secondaryB = matchSetGamesFor(match, false);
-  final secondaryLabel = scoringUsesGameSetMode(type, raw) ? 'juegos' : 'puntos';
+  final secondaryLabel =
+      scoringUsesGameSetMode(type, raw) ? 'juegos' : 'puntos';
   return '$secondaryLabel $secondaryA-$secondaryB · ${sets.map((set) => '${set['a']}-${set['b']}').join(' · ')}';
 }
 
@@ -2402,32 +2930,49 @@ String tournamentMatchLoserId(Map<String, dynamic> match) {
 
 bool eliminationMatchClosed(Map<String, dynamic> match) {
   final status = AppData.text(match['status']);
-  return status == 'played' || status == 'bye' || status == 'walkover' || status == 'no_show';
+  return status == 'played' ||
+      status == 'bye' ||
+      status == 'walkover' ||
+      status == 'no_show';
 }
 
 bool eliminationHasThirdPlace(List<Map<String, dynamic>> matches) {
   return matches.any((m) {
     final details = AppData.asMap(m['result_details']);
-    return AppData.text(details['stage']) == 'third_place' || AppData.text(m['round_name']).toLowerCase().contains('tercer');
+    return AppData.text(details['stage']) == 'third_place' ||
+        AppData.text(m['round_name']).toLowerCase().contains('tercer');
   });
 }
 
 bool canGenerateEliminationNextRound(List<Map<String, dynamic>> matches) {
-  final normal = matches.where((m) => AppData.text(AppData.asMap(m['result_details'])['stage']) != 'third_place').toList();
+  final normal = matches
+      .where((m) =>
+          AppData.text(AppData.asMap(m['result_details'])['stage']) !=
+          'third_place')
+      .toList();
   if (normal.isEmpty) return false;
-  final latestRound = normal.fold<int>(0, (value, m) => max(value, AppData.intValue(m['round'])));
-  final latest = normal.where((m) => AppData.intValue(m['round']) == latestRound).toList();
+  final latestRound = normal.fold<int>(
+      0, (value, m) => max(value, AppData.intValue(m['round'])));
+  final latest =
+      normal.where((m) => AppData.intValue(m['round']) == latestRound).toList();
   if (latest.length <= 1) return false;
   return latest.every(eliminationMatchClosed);
 }
 
 bool canCreateEliminationThirdPlace(List<Map<String, dynamic>> matches) {
   if (eliminationHasThirdPlace(matches)) return false;
-  final normal = matches.where((m) => AppData.text(AppData.asMap(m['result_details'])['stage']) != 'third_place').toList();
-  final rounds = normal.map((m) => AppData.intValue(m['round'])).toSet().toList()..sort();
+  final normal = matches
+      .where((m) =>
+          AppData.text(AppData.asMap(m['result_details'])['stage']) !=
+          'third_place')
+      .toList();
+  final rounds =
+      normal.map((m) => AppData.intValue(m['round'])).toSet().toList()..sort();
   for (final round in rounds.reversed) {
-    final roundMatches = normal.where((m) => AppData.intValue(m['round']) == round).toList();
-    if (roundMatches.length == 2) return roundMatches.every(eliminationMatchClosed);
+    final roundMatches =
+        normal.where((m) => AppData.intValue(m['round']) == round).toList();
+    if (roundMatches.length == 2)
+      return roundMatches.every(eliminationMatchClosed);
   }
   return false;
 }
@@ -2446,11 +2991,15 @@ String teamTypeLabel(String type) {
 List<Map<String, dynamic>> tournamentTeams(Map<String, dynamic> tournament) {
   final value = tournament['tournament_teams'];
   if (value is! List) return [];
-  final teams = value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  final teams =
+      value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
   teams.sort((a, b) {
-    final seedCompare = AppData.intValue(a['seed'], 999999).compareTo(AppData.intValue(b['seed'], 999999));
+    final seedCompare = AppData.intValue(a['seed'], 999999)
+        .compareTo(AppData.intValue(b['seed'], 999999));
     if (seedCompare != 0) return seedCompare;
-    return AppData.text(a['name']).toLowerCase().compareTo(AppData.text(b['name']).toLowerCase());
+    return AppData.text(a['name'])
+        .toLowerCase()
+        .compareTo(AppData.text(b['name']).toLowerCase());
   });
   return teams;
 }
@@ -2458,15 +3007,20 @@ List<Map<String, dynamic>> tournamentTeams(Map<String, dynamic> tournament) {
 List<Map<String, dynamic>> tournamentMatches(Map<String, dynamic> tournament) {
   final value = tournament['matches'];
   if (value is! List) return [];
-  final matches = value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  final matches =
+      value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
   matches.sort((a, b) {
-    final roundCompare = AppData.intValue(a['round']).compareTo(AppData.intValue(b['round']));
+    final roundCompare =
+        AppData.intValue(a['round']).compareTo(AppData.intValue(b['round']));
     if (roundCompare != 0) return roundCompare;
-    final orderCompare = AppData.intValue(a['order_index']).compareTo(AppData.intValue(b['order_index']));
+    final orderCompare = AppData.intValue(a['order_index'])
+        .compareTo(AppData.intValue(b['order_index']));
     if (orderCompare != 0) return orderCompare;
-    final dateCompare = AppData.text(a['scheduled_at']).compareTo(AppData.text(b['scheduled_at']));
+    final dateCompare = AppData.text(a['scheduled_at'])
+        .compareTo(AppData.text(b['scheduled_at']));
     if (dateCompare != 0) return dateCompare;
-    return AppData.text(a['created_at']).compareTo(AppData.text(b['created_at']));
+    return AppData.text(a['created_at'])
+        .compareTo(AppData.text(b['created_at']));
   });
   return matches;
 }
@@ -2477,9 +3031,11 @@ String teamName(String? id, Map<String, String> names) {
 }
 
 Map<String, String> teamNameMap(List<Map<String, dynamic>> teams) {
-  return {for (final team in teams) team['id'].toString(): AppData.text(team['name'], 'Participante')};
+  return {
+    for (final team in teams)
+      team['id'].toString(): AppData.text(team['name'], 'Participante')
+  };
 }
-
 
 Map<String, dynamic> matchResultDetails(Map<String, dynamic> match) {
   final raw = match['result_details'];
@@ -2490,12 +3046,16 @@ Map<String, dynamic> matchResultDetails(Map<String, dynamic> match) {
 List<Map<String, dynamic>> matchResultHistory(Map<String, dynamic> match) {
   final history = matchResultDetails(match)['history'];
   if (history is List) {
-    return history.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+    return history
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
   }
   return <Map<String, dynamic>>[];
 }
 
-List<Map<String, dynamic>> matchHistoryWithEntry(Map<String, dynamic> current, String action, String note) {
+List<Map<String, dynamic>> matchHistoryWithEntry(
+    Map<String, dynamic> current, String action, String note) {
   final history = matchResultHistory(current);
   history.add({
     'at': DateTime.now().toUtc().toIso8601String(),
@@ -2511,7 +3071,8 @@ List<Map<String, dynamic>> matchHistoryWithEntry(Map<String, dynamic> current, S
 
 bool matchCountsForStandings(Map<String, dynamic> match) {
   final status = AppData.text(match['status'], 'pending');
-  if (status == 'played' || status == 'no_show' || status == 'walkover') return true;
+  if (status == 'played' || status == 'no_show' || status == 'walkover')
+    return true;
   return AppData.text(match['winner_team_id']).isNotEmpty &&
       AppData.text(match['team_a']).isNotEmpty &&
       AppData.text(match['team_b']).isNotEmpty &&
@@ -2520,29 +3081,46 @@ bool matchCountsForStandings(Map<String, dynamic> match) {
       status != 'bye';
 }
 
-String matchSpecialResultText(Map<String, dynamic> match, Map<String, String> names) {
+String matchSpecialResultText(
+    Map<String, dynamic> match, Map<String, String> names) {
   final details = matchResultDetails(match);
   final special = AppData.text(details['special_result']);
   if (special.isEmpty) return '';
   final winner = names[AppData.text(match['winner_team_id'])] ?? 'Ganador';
-  final loser = names[AppData.text(details['loser_team_id'])] ?? names[AppData.text(details['no_show_team_id'])] ?? 'Rival';
-  if (special == 'no_show') return appIsEnglish ? '$loser did not show up · $winner wins' : '$loser no se presentó · gana $winner';
-  if (special == 'walkover') return appIsEnglish ? 'Administrative win for $winner' : 'Victoria administrativa para $winner';
+  final loser = names[AppData.text(details['loser_team_id'])] ??
+      names[AppData.text(details['no_show_team_id'])] ??
+      'Rival';
+  if (special == 'no_show')
+    return appIsEnglish
+        ? '$loser did not show up · $winner wins'
+        : '$loser no se presentó · gana $winner';
+  if (special == 'walkover')
+    return appIsEnglish
+        ? 'Administrative win for $winner'
+        : 'Victoria administrativa para $winner';
   return AppData.text(details['label'], special);
 }
 
-List<String> tournamentTieBreakers(Map<String, dynamic> tournament, String scoringType) {
+List<String> tournamentTieBreakers(
+    Map<String, dynamic> tournament, String scoringType) {
   final raw = tournament['tie_breakers'];
   if (raw is List) {
-    final values = raw.map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList();
+    final values =
+        raw.map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList();
     if (values.isNotEmpty) return values;
   }
-  return TournamentEngineV2.defaultTieBreakers(scoringType, AppData.text(tournament['format'], 'liga'));
+  return TournamentEngineV2.defaultTieBreakers(
+      scoringType, AppData.text(tournament['format'], 'liga'));
 }
 
 int _compareDesc(int a, int b) => b.compareTo(a);
 
-int _directTieBreakerCompare(TeamStanding a, TeamStanding b, List<Map<String, dynamic>> matches, String scoringType, Map<String, dynamic>? scoringConfig) {
+int _directTieBreakerCompare(
+    TeamStanding a,
+    TeamStanding b,
+    List<Map<String, dynamic>> matches,
+    String scoringType,
+    Map<String, dynamic>? scoringConfig) {
   var aPoints = 0;
   var bPoints = 0;
   var aDiff = 0;
@@ -2558,7 +3136,8 @@ int _directTieBreakerCompare(TeamStanding a, TeamStanding b, List<Map<String, dy
     if (!matchCountsForStandings(match)) continue;
     final teamA = AppData.text(match['team_a']);
     final teamB = AppData.text(match['team_b']);
-    final sameDuel = (teamA == a.id && teamB == b.id) || (teamA == b.id && teamB == a.id);
+    final sameDuel =
+        (teamA == a.id && teamB == b.id) || (teamA == b.id && teamB == a.id);
     if (!sameDuel) continue;
     final rawA = AppData.intValue(match['score_a']);
     final rawB = AppData.intValue(match['score_b']);
@@ -2646,42 +3225,79 @@ String standingsOrderText(List<String> tieBreakers) {
   return tieBreakers.map(tieBreakerLabel).join(' → ');
 }
 
-String standingsOrderTextForScoring(List<String> tieBreakers, String scoringType, [dynamic scoringConfig]) {
-  return tieBreakers.map((value) => tieBreakerLabelForScoring(value, scoringType, scoringConfig)).join(' → ');
+String standingsOrderTextForScoring(
+    List<String> tieBreakers, String scoringType,
+    [dynamic scoringConfig]) {
+  return tieBreakers
+      .map((value) =>
+          tieBreakerLabelForScoring(value, scoringType, scoringConfig))
+      .join(' → ');
 }
 
-String standingRankReason(int index, List<TeamStanding> standings, List<String> tieBreakers, String scoringType, Map<String, dynamic>? scoringConfig) {
+String standingRankReason(
+    int index,
+    List<TeamStanding> standings,
+    List<String> tieBreakers,
+    String scoringType,
+    Map<String, dynamic>? scoringConfig) {
   final current = standings[index];
   final diffLabel = scoringTableDifferenceLabel(scoringType, scoringConfig);
-  final diffValue = current.goalDifference >= 0 ? '+${current.goalDifference}' : '${current.goalDifference}';
+  final diffValue = current.goalDifference >= 0
+      ? '+${current.goalDifference}'
+      : '${current.goalDifference}';
   if (index == 0) {
     if (current.americanoRawScore) {
-      return appIsEnglish ? 'Leads the individual ranking with ${current.points} accumulated pts and ${current.wins} wins.' : 'Lidera el ranking individual con ${current.points} pts acumulados y ${current.wins} victorias.';
+      return appIsEnglish
+          ? 'Leads the individual ranking with ${current.points} accumulated pts and ${current.wins} wins.'
+          : 'Lidera el ranking individual con ${current.points} pts acumulados y ${current.wins} victorias.';
     }
-    return appIsEnglish ? 'Leads with ${current.points} pts · ${current.wins} wins · $diffLabel $diffValue.' : 'Lidera con ${current.points} pts · ${current.wins} victorias · $diffLabel $diffValue.';
+    return appIsEnglish
+        ? 'Leads with ${current.points} pts · ${current.wins} wins · $diffLabel $diffValue.'
+        : 'Lidera con ${current.points} pts · ${current.wins} victorias · $diffLabel $diffValue.';
   }
   final previous = standings[index - 1];
   if (current.points != previous.points) {
-    return appIsEnglish ? '${previous.name} is ahead on points (${previous.points} vs ${current.points}).' : '${previous.name} está por delante por puntos (${previous.points} vs ${current.points}).';
+    return appIsEnglish
+        ? '${previous.name} is ahead on points (${previous.points} vs ${current.points}).'
+        : '${previous.name} está por delante por puntos (${previous.points} vs ${current.points}).';
   }
   for (final breaker in tieBreakers) {
     if (breaker == 'points') continue;
-    if (breaker == 'wins' && current.wins != previous.wins) return appIsEnglish ? 'Tiebreak by wins: ${previous.wins} vs ${current.wins}.' : 'Desempate por victorias: ${previous.wins} vs ${current.wins}.';
-    if ((breaker == 'difference' || breaker == 'set_difference') && current.goalDifference != previous.goalDifference) {
-      return appIsEnglish ? 'Tiebreak by ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalDifference} vs ${current.goalDifference}.' : 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalDifference} vs ${current.goalDifference}.';
+    if (breaker == 'wins' && current.wins != previous.wins)
+      return appIsEnglish
+          ? 'Tiebreak by wins: ${previous.wins} vs ${current.wins}.'
+          : 'Desempate por victorias: ${previous.wins} vs ${current.wins}.';
+    if ((breaker == 'difference' || breaker == 'set_difference') &&
+        current.goalDifference != previous.goalDifference) {
+      return appIsEnglish
+          ? 'Tiebreak by ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalDifference} vs ${current.goalDifference}.'
+          : 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalDifference} vs ${current.goalDifference}.';
     }
     if (breaker == 'for' && current.goalsFor != previous.goalsFor) {
-      return appIsEnglish ? 'Tiebreak by ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalsFor} vs ${current.goalsFor}.' : 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalsFor} vs ${current.goalsFor}.';
+      return appIsEnglish
+          ? 'Tiebreak by ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalsFor} vs ${current.goalsFor}.'
+          : 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.goalsFor} vs ${current.goalsFor}.';
     }
-    if (breaker == 'game_difference' && current.secondaryDifference != previous.secondaryDifference) {
-      return appIsEnglish ? 'Tiebreak by ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryDifference} vs ${current.secondaryDifference}.' : 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryDifference} vs ${current.secondaryDifference}.';
+    if (breaker == 'game_difference' &&
+        current.secondaryDifference != previous.secondaryDifference) {
+      return appIsEnglish
+          ? 'Tiebreak by ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryDifference} vs ${current.secondaryDifference}.'
+          : 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryDifference} vs ${current.secondaryDifference}.';
     }
-    if (breaker == 'games_for' && current.secondaryFor != previous.secondaryFor) {
-      return appIsEnglish ? 'Tiebreak by ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryFor} vs ${current.secondaryFor}.' : 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryFor} vs ${current.secondaryFor}.';
+    if (breaker == 'games_for' &&
+        current.secondaryFor != previous.secondaryFor) {
+      return appIsEnglish
+          ? 'Tiebreak by ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryFor} vs ${current.secondaryFor}.'
+          : 'Desempate por ${tieBreakerLabelForScoring(breaker, scoringType, scoringConfig)}: ${previous.secondaryFor} vs ${current.secondaryFor}.';
     }
-    if (breaker == 'direct') return appIsEnglish ? 'Same score: head-to-head is checked before moving to difference.' : 'Mismo puntaje: se revisa enfrentamiento directo antes de seguir con la diferencia.';
+    if (breaker == 'direct')
+      return appIsEnglish
+          ? 'Same score: head-to-head is checked before moving to difference.'
+          : 'Mismo puntaje: se revisa enfrentamiento directo antes de seguir con la diferencia.';
   }
-  return appIsEnglish ? 'Same score. The next configured criterion or alphabetical order applies.' : 'Mismo puntaje. Se aplica el siguiente criterio configurado o el orden alfabético.';
+  return appIsEnglish
+      ? 'Same score. The next configured criterion or alphabetical order applies.'
+      : 'Mismo puntaje. Se aplica el siguiente criterio configurado o el orden alfabético.';
 }
 
 String matchHistoryEntryText(Map<String, dynamic> item) {
@@ -2689,8 +3305,10 @@ String matchHistoryEntryText(Map<String, dynamic> item) {
   final note = AppData.text(item['note']);
   final raw = AppData.text(item['at']);
   final dt = DateTime.tryParse(raw)?.toLocal();
-  final date = dt == null ? '' : DateFormat('d MMM HH:mm', appDateLocale).format(dt);
-  return [if (date.isNotEmpty) date, action, if (note.isNotEmpty) note].join(' · ');
+  final date =
+      dt == null ? '' : DateFormat('d MMM HH:mm', appDateLocale).format(dt);
+  return [if (date.isNotEmpty) date, action, if (note.isNotEmpty) note]
+      .join(' · ');
 }
 
 List<TeamStanding> calculateStandings(
@@ -2708,7 +3326,8 @@ List<TeamStanding> calculateStandings(
       ),
   };
   final setMode = scoringUsesSetMode(scoringType, scoringConfig);
-  final breakers = tieBreakers.isEmpty ? defaultTieBreakers(scoringType) : tieBreakers;
+  final breakers =
+      tieBreakers.isEmpty ? defaultTieBreakers(scoringType) : tieBreakers;
 
   for (final match in matches) {
     if (!matchCountsForStandings(match)) continue;
@@ -2722,15 +3341,19 @@ List<TeamStanding> calculateStandings(
     if (isAmericanoMatch(match)) {
       final sideA = americanoSideIds(match, 'side_a_ids');
       final sideB = americanoSideIds(match, 'side_b_ids');
-      final aRows = sideA.map((id) => table[id]).whereType<TeamStanding>().toList();
-      final bRows = sideB.map((id) => table[id]).whereType<TeamStanding>().toList();
+      final aRows =
+          sideA.map((id) => table[id]).whereType<TeamStanding>().toList();
+      final bRows =
+          sideB.map((id) => table[id]).whereType<TeamStanding>().toList();
       if (aRows.isEmpty || bRows.isEmpty) continue;
       for (final row in [...aRows, ...bRows]) {
         row.americanoRawScore = true;
       }
 
       final hasSetDetails = matchDetailSets(match).isNotEmpty;
-      final hasRoundScoreDetails = details.containsKey('round_score_a') || details.containsKey('round_score_b') || AppData.text(details['score_model']) == 'americano_round';
+      final hasRoundScoreDetails = details.containsKey('round_score_a') ||
+          details.containsKey('round_score_b') ||
+          AppData.text(details['score_model']) == 'americano_round';
       final americanoScoreA = hasRoundScoreDetails
           ? AppData.intValue(details['round_score_a'], scoreA)
           : setMode && hasSetDetails
@@ -2818,7 +3441,8 @@ List<TeamStanding> calculateStandings(
     }
 
     if (special == 'no_show') {
-      final loserId = AppData.text(details['loser_team_id'], AppData.text(details['no_show_team_id']));
+      final loserId = AppData.text(
+          details['loser_team_id'], AppData.text(details['no_show_team_id']));
       if (loserId == aId) {
         a.noShows++;
       } else if (loserId == bId) {
@@ -2850,7 +3474,8 @@ List<TeamStanding> calculateStandings(
   }
 
   final rows = table.values.toList();
-  rows.sort((a, b) => compareTeamStandings(a, b, matches, breakers, scoringType, scoringConfig));
+  rows.sort((a, b) => compareTeamStandings(
+      a, b, matches, breakers, scoringType, scoringConfig));
   return rows;
 }
 
@@ -2877,7 +3502,8 @@ class TeamStanding {
   double get winRate => played <= 0 ? 0 : wins / played;
 }
 
-Future<void> showToast(BuildContext context, String message, {bool danger = false}) async {
+Future<void> showToast(BuildContext context, String message,
+    {bool danger = false}) async {
   if (!context.mounted) return;
   final cleanMessage = danger ? humanizeError(message) : message;
   ScaffoldMessenger.of(context).clearSnackBars();
@@ -2904,9 +3530,12 @@ Future<bool?> showConfirmDialog(
       title: Text(title),
       content: Text(message),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+        TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar')),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: danger ? AppColors.red : AppColors.teal),
+          style: FilledButton.styleFrom(
+              backgroundColor: danger ? AppColors.red : AppColors.teal),
           onPressed: () => Navigator.pop(context, true),
           child: Text(confirm),
         ),
@@ -2915,20 +3544,25 @@ Future<bool?> showConfirmDialog(
   );
 }
 
-
 class InviteLinks {
   static String normalizeCode(String value) {
-    final clean = value.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    final clean =
+        value.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
     return clean.length > 24 ? clean.substring(0, 24) : clean;
   }
 
-  static String joinUrl(String code) => '${AppConfig.appBaseUrl}/join/${normalizeCode(code)}';
-  static String appSchemeUrl(String code) => 'grupli://join/${normalizeCode(code)}';
+  static String joinUrl(String code) =>
+      '${AppConfig.appBaseUrl}/join/${normalizeCode(code)}';
+  static String appSchemeUrl(String code) =>
+      'grupli://join/${normalizeCode(code)}';
 
   static String? codeFromUri(Uri uri) {
-    final segments = uri.pathSegments.where((s) => s.trim().isNotEmpty).toList();
+    final segments =
+        uri.pathSegments.where((s) => s.trim().isNotEmpty).toList();
 
-    if (uri.scheme.toLowerCase() == 'grupli' && uri.host.toLowerCase() == 'join' && segments.isNotEmpty) {
+    if (uri.scheme.toLowerCase() == 'grupli' &&
+        uri.host.toLowerCase() == 'join' &&
+        segments.isNotEmpty) {
       final code = normalizeCode(segments.first);
       return code.length >= 4 ? code : null;
     }
@@ -2988,27 +3622,18 @@ class PendingInviteStore {
   }
 }
 
-
-
 // features/onboarding/onboarding.dart moved to part file.
-
 
 // features/auth/auth.dart moved to part file.
 
-
 // features/groups/groups.dart moved to part file.
-
 
 // features/agenda/agenda.dart moved to part file.
 
-
 // features/finances/finances.dart moved to part file.
-
 
 // features/tournaments/tournaments.dart moved to part file.
 
-
 // features/profile/profile_members_admin.dart moved to part file.
-
 
 // core/widgets/shared_widgets.dart moved to part file.

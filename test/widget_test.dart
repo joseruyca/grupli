@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/main.dart';
+import 'package:grupli/main.dart';
 
 void main() {
   testWidgets('muestra la pantalla de configuración pendiente', (tester) async {

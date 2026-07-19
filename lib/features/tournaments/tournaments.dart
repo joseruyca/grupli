@@ -261,7 +261,7 @@ class TournamentDetailHero extends StatelessWidget {
               Text(AppData.text(tournament['status'], 'active') == 'finished' ? 'Finalizada' : 'En curso', style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800, fontSize: 12)),
             ]),
             const SizedBox(height: 4),
-            Text(total == 0 ? 'Genera los partidos para empezar.' : '$played de $total resultados registrados', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
+            Text(total == 0 ? 'Genera partidos para empezar.' : '$played de $total resultados registrados', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
             const SizedBox(height: 5),
             Text(classificationTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800, fontSize: 12)),
           ])),
@@ -369,7 +369,7 @@ class TournamentOverviewPanel extends StatelessWidget {
             ? 'Crea el calendario para ver jornadas, fechas y resultados.'
             : pendingAll.isEmpty
                 ? 'Todos los partidos están jugados. Revisa la tabla y finaliza desde Ajustes.'
-                : 'Toca un partido para registrar resultado, cambiar fecha o aplazarlo.';
+                : 'Toca un partido para registrar resultado o moverlo.';
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       TournamentNextStepCard(title: nextTitle, body: nextBody, icon: teams.length < 2 ? Icons.group_add_rounded : matches.isEmpty ? Icons.auto_awesome_motion_rounded : pendingAll.isEmpty ? Icons.verified_rounded : Icons.sports_score_rounded),
       const SizedBox(height: 12),
@@ -398,7 +398,7 @@ class TournamentOverviewPanel extends StatelessWidget {
         SectionHeader(title: 'Último resultado'),
         const SizedBox(height: 8),
         if (matches.where(matchCountsForStandings).isEmpty)
-          EmptySlim(icon: Icons.sports_score_rounded, title: 'Sin resultados', body: 'Toca un partido para meter marcador.')
+          EmptySlim(icon: Icons.sports_score_rounded, title: 'Sin resultados', body: 'Toca un partido para registrar marcador.')
         else
           TournamentLatestResultCard(match: matches.where(matchCountsForStandings).last, names: names, scoringType: AppData.text(tournament['scoring_type'], 'general'), scoringConfig: tournament['scoring_config']),
         const SizedBox(height: 16),
@@ -1689,9 +1689,9 @@ class TournamentSettingsEditPanel extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Panel de edición', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
+            Text('Panel de ajustes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
             SizedBox(height: 4),
-            Text('Edita jugadores, fechas y partidos desde Ajustes para no saturar el resumen.', style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.25)),
+            Text('Ajusta lo esencial sin salir del torneo.', style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.25)),
           ])),
         ]),
         const SizedBox(height: 12),
@@ -1766,7 +1766,7 @@ class TournamentSettingsPanel extends StatelessWidget {
       AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const Text('Editar torneo', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         const SizedBox(height: 8),
-        const Text('Cambia nombre, deporte y reglas. Si ya hay resultados, las reglas se bloquean para no romper la clasificación.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
+        const Text('Cambia nombre, deporte y reglas. Si ya hay resultados, las reglas se bloquean.', style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
         const SizedBox(height: 12),
         SecondaryButton(label: 'Editar nombre / deporte / reglas', icon: Icons.edit_note_rounded, onTap: onEditTournament),
         const SizedBox(height: 8),
@@ -1841,7 +1841,7 @@ class TournamentTeamsPanel extends StatelessWidget {
                 ? 'Jugadores participantes'
                 : 'Equipos participantes';
     final subtitle = isAmericano
-        ? 'Ranking individual: no crees parejas fijas, Grupli las rota.'
+        ? 'Ranking individual. Grupli rota las parejas.'
         : teamType == 'pareja'
             ? 'Cada fila es una pareja. Mantén el formato Ana / Javi.'
             : teamType == 'individual'

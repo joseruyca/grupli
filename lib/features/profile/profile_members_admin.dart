@@ -16,7 +16,9 @@ class _MembersScreenState extends State<MembersScreen> {
     future = AppData.members(widget.group['id'].toString());
   }
 
-  void reload() => setState(() { future = AppData.members(widget.group['id'].toString()); });
+  void reload() => setState(() {
+        future = AppData.members(widget.group['id'].toString());
+      });
 
   Map<String, dynamic>? _me(List<Map<String, dynamic>> members) {
     final uid = AppData.user?.id;
@@ -26,7 +28,8 @@ class _MembersScreenState extends State<MembersScreen> {
     return null;
   }
 
-  String _myRole(List<Map<String, dynamic>> members) => AppData.text(_me(members)?['role'], 'member');
+  String _myRole(List<Map<String, dynamic>> members) =>
+      AppData.text(_me(members)?['role'], 'member');
 
   bool _canManage(List<Map<String, dynamic>> members) {
     final role = _myRole(members);
@@ -38,7 +41,12 @@ class _MembersScreenState extends State<MembersScreen> {
     try {
       await AppData.updateMemberRole(member['id'].toString(), role);
       reload();
-      if (mounted) await showToast(context, role == 'admin' ? '$name ahora es admin.' : '$name vuelve a ser miembro.');
+      if (mounted)
+        await showToast(
+            context,
+            role == 'admin'
+                ? '$name ahora es admin.'
+                : '$name vuelve a ser miembro.');
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -50,10 +58,16 @@ class _MembersScreenState extends State<MembersScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(tr(context, es: 'Expulsar a $name', en: 'Remove $name')),
-        content: Text(tr(context, es: 'Esta persona perderá acceso al grupo. Podrá volver si recibe una nueva invitación.', en: 'This person will lose access to the group. They can come back if they get a new invite.')),
+        content: Text(tr(context,
+            es: 'Esta persona perderá acceso al grupo. Podrá volver si recibe una nueva invitación.',
+            en: 'This person will lose access to the group. They can come back if they get a new invite.')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(tr(context, es: 'Expulsar', en: 'Remove'))),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(tr(context, es: 'Expulsar', en: 'Remove'))),
         ],
       ),
     );
@@ -61,7 +75,12 @@ class _MembersScreenState extends State<MembersScreen> {
     try {
       await AppData.removeMember(member['id'].toString());
       reload();
-      if (mounted) await showToast(context, tr(context, es: '$name ya no está en el grupo.', en: '$name is no longer in the group.'));
+      if (mounted)
+        await showToast(
+            context,
+            tr(context,
+                es: '$name ya no está en el grupo.',
+                en: '$name is no longer in the group.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -69,17 +88,28 @@ class _MembersScreenState extends State<MembersScreen> {
 
   Future<void> _leaveGroup(String groupName, bool isOwner) async {
     if (isOwner) {
-      await showToast(context, tr(context, es: 'El owner no puede salir sin transferir o eliminar el grupo.', en: 'The owner cannot leave without transferring or deleting the group.'), danger: true);
+      await showToast(
+          context,
+          tr(context,
+              es: 'El owner no puede salir sin transferir o eliminar el grupo.',
+              en: 'The owner cannot leave without transferring or deleting the group.'),
+          danger: true);
       return;
     }
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(tr(context, es: 'Salir del grupo', en: 'Leave group')),
-        content: Text(tr(context, es: 'Vas a salir de $groupName. Para volver necesitarás una invitación.', en: 'You are about to leave $groupName. You will need an invite to come back.')),
+        content: Text(tr(context,
+            es: 'Vas a salir de $groupName. Para volver necesitarás una invitación.',
+            en: 'You are about to leave $groupName. You will need an invite to come back.')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(tr(context, es: 'Salir', en: 'Leave'))),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(tr(context, es: 'Salir', en: 'Leave'))),
         ],
       ),
     );
@@ -88,7 +118,10 @@ class _MembersScreenState extends State<MembersScreen> {
       await AppData.leaveGroup(widget.group['id'].toString());
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
-      await showToast(context, tr(context, es: 'Has salido del grupo.', en: 'You have left the group.'));
+      await showToast(
+          context,
+          tr(context,
+              es: 'Has salido del grupo.', en: 'You have left the group.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -100,68 +133,133 @@ class _MembersScreenState extends State<MembersScreen> {
     final code = AppData.text(widget.group['invite_code'], '------');
     return DirectPage(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        PageHeader(title: tr(context, es: 'Miembros', en: 'Members'), subtitle: tr(context, es: 'Personas, roles y permisos del grupo.', en: 'People, roles and group permissions.'), leading: true),
+        PageHeader(
+            title: tr(context, es: 'Miembros', en: 'Members'),
+            subtitle: tr(context,
+                es: 'Personas, roles y permisos del grupo.',
+                en: 'People, roles and group permissions.'),
+            leading: true),
         const SizedBox(height: 14),
         InviteAccessCard(groupName: groupName, code: code, compact: false),
         const SizedBox(height: 14),
         FutureBuilder<List<Map<String, dynamic>>>(
           future: future,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) return CenterLoader(label: tr(context, es: 'Cargando miembros...', en: 'Loading members...'));
-            if (snapshot.hasError) return ErrorBlock(message: humanError(snapshot.error), onRetry: reload);
+            if (snapshot.connectionState == ConnectionState.waiting)
+              return CenterLoader(
+                  label: tr(context,
+                      es: 'Cargando miembros...', en: 'Loading members...'));
+            if (snapshot.hasError)
+              return ErrorBlock(
+                  message: humanError(snapshot.error), onRetry: reload);
             final members = snapshot.data ?? [];
-            final admins = members.where((m) => ['owner', 'admin'].contains(AppData.text(m['role']))).toList();
-            final regular = members.where((m) => AppData.text(m['role']) == 'member').toList();
+            final admins = members
+                .where(
+                    (m) => ['owner', 'admin'].contains(AppData.text(m['role'])))
+                .toList();
+            final regular = members
+                .where((m) => AppData.text(m['role']) == 'member')
+                .toList();
             final canManage = _canManage(members);
             final myRole = _myRole(members);
             final isOwner = myRole == 'owner';
-            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(child: StatCard(icon: Icons.groups_rounded, value: members.length.toString(), label: tr(context, es: 'Total', en: 'Total'), color: AppColors.teal)),
-                const SizedBox(width: 10),
-                Expanded(child: StatCard(icon: Icons.admin_panel_settings_rounded, value: admins.length.toString(), label: tr(context, es: 'Admins', en: 'Admins'), color: AppColors.violet)),
-                const SizedBox(width: 10),
-                Expanded(child: StatCard(icon: Icons.person_outline_rounded, value: regular.length.toString(), label: tr(context, es: 'Miembros', en: 'Members'), color: AppColors.orange)),
-              ]),
-              const SizedBox(height: 16),
-              RoleInfoCard(role: myRole),
-              const SizedBox(height: 18),
-              SectionHeader(title: tr(context, es: 'Owner y administradores', en: 'Owner and admins')),
-              const SizedBox(height: 8),
-              ...admins.map((m) => ManageMemberCard(member: m, canManage: canManage, onRole: _changeRole, onRemove: _remove)),
-              const SizedBox(height: 16),
-              SectionHeader(title: tr(context, es: 'Miembros', en: 'Members')),
-              const SizedBox(height: 8),
-              if (regular.isEmpty)
-                  EmptySlim(icon: Icons.person_add_alt_1_rounded, title: tr(context, es: 'Aún no hay miembros normales', en: 'There are no regular members yet'), body: tr(context, es: 'Invita a tu grupo con el código cuando esté listo.', en: 'Invite people with the code when it is ready.'))
-              else
-                ...regular.map((m) => ManageMemberCard(member: m, canManage: canManage, onRole: _changeRole, onRemove: _remove)),
-              const SizedBox(height: 16),
-              PermissionMatrixCard(),
-              const SizedBox(height: 16),
-              if (isOwner)
-                AppCard(
-                  color: AppColors.tealSoft,
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Icon(Icons.shield_rounded, color: AppColors.teal),
-                    SizedBox(width: 10),
-                    Expanded(child: Text(tr(context, es: 'Eres owner del grupo. Puedes gestionar miembros y eliminar el grupo desde Ajustes.', en: 'You are the group owner. You can manage members and delete the group from Settings.'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.3))),
+            return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Expanded(
+                        child: StatCard(
+                            icon: Icons.groups_rounded,
+                            value: members.length.toString(),
+                            label: tr(context, es: 'Total', en: 'Total'),
+                            color: AppColors.teal)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                        child: StatCard(
+                            icon: Icons.admin_panel_settings_rounded,
+                            value: admins.length.toString(),
+                            label: tr(context, es: 'Admins', en: 'Admins'),
+                            color: AppColors.violet)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                        child: StatCard(
+                            icon: Icons.person_outline_rounded,
+                            value: regular.length.toString(),
+                            label: tr(context, es: 'Miembros', en: 'Members'),
+                            color: AppColors.orange)),
                   ]),
-                )
-              else
-                DangerButton(
-                  label: tr(context, es: 'Salir del grupo', en: 'Leave group'),
-                  icon: Icons.logout_rounded,
-                  onTap: () => _leaveGroup(groupName, isOwner),
-                ),
-            ]);
+                  const SizedBox(height: 16),
+                  RoleInfoCard(role: myRole),
+                  const SizedBox(height: 18),
+                  SectionHeader(
+                      title: tr(context,
+                          es: 'Owner y administradores',
+                          en: 'Owner and admins')),
+                  const SizedBox(height: 8),
+                  ...admins.map((m) => ManageMemberCard(
+                      member: m,
+                      canManage: canManage,
+                      onRole: _changeRole,
+                      onRemove: _remove)),
+                  const SizedBox(height: 16),
+                  SectionHeader(
+                      title: tr(context, es: 'Miembros', en: 'Members')),
+                  const SizedBox(height: 8),
+                  if (regular.isEmpty)
+                    EmptySlim(
+                        icon: Icons.person_add_alt_1_rounded,
+                        title: tr(context,
+                            es: 'Aún no hay miembros normales',
+                            en: 'There are no regular members yet'),
+                        body: tr(context,
+                            es:
+                                'Invita a tu grupo con el código cuando esté listo.',
+                            en:
+                                'Invite people with the code when it is ready.'))
+                  else
+                    ...regular.map((m) => ManageMemberCard(
+                        member: m,
+                        canManage: canManage,
+                        onRole: _changeRole,
+                        onRemove: _remove)),
+                  const SizedBox(height: 16),
+                  PermissionMatrixCard(),
+                  const SizedBox(height: 16),
+                  if (isOwner)
+                    AppCard(
+                      color: AppColors.tealSoft,
+                      child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.shield_rounded, color: AppColors.teal),
+                            SizedBox(width: 10),
+                            Expanded(
+                                child: Text(
+                                    tr(context,
+                                        es:
+                                            'Eres owner del grupo. Puedes gestionar miembros y eliminar el grupo desde Ajustes.',
+                                        en:
+                                            'You are the group owner. You can manage members and delete the group from Settings.'),
+                                    style: const TextStyle(
+                                        color: AppColors.ink,
+                                        fontWeight: FontWeight.w800,
+                                        height: 1.3))),
+                          ]),
+                    )
+                  else
+                    DangerButton(
+                      label:
+                          tr(context, es: 'Salir del grupo', en: 'Leave group'),
+                      icon: Icons.logout_rounded,
+                      onTap: () => _leaveGroup(groupName, isOwner),
+                    ),
+                ]);
           },
         ),
       ]),
     );
   }
 }
-
 
 class GroupSettingsScreen extends StatefulWidget {
   final Map<String, dynamic> group;
@@ -189,9 +287,13 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   void initState() {
     super.initState();
     group = Map<String, dynamic>.from(widget.group);
-    nameController = TextEditingController(text: AppData.text(group['name'], 'Grupo'));
-    descriptionController = TextEditingController(text: AppData.text(group['description'], groupTypeDefaultDescription(AppData.text(group['type'], 'otro'))));
-    timezoneController = TextEditingController(text: AppData.text(group['timezone'], 'Europe/Madrid'));
+    nameController =
+        TextEditingController(text: AppData.text(group['name'], 'Grupo'));
+    descriptionController = TextEditingController(
+        text: AppData.text(group['description'],
+            groupTypeDefaultDescription(AppData.text(group['type'], 'otro'))));
+    timezoneController = TextEditingController(
+        text: AppData.text(group['timezone'], 'Europe/Madrid'));
     rulesController = TextEditingController(text: AppData.text(group['rules']));
     type = groupTypeValue(AppData.text(group['type'], 'otro'));
     currency = AppData.text(group['currency'], 'EUR').toUpperCase();
@@ -231,7 +333,8 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         group['rules'] = rulesController.text.trim();
       });
       widget.onChanged?.call();
-      await showToast(context, tr(context, es: 'Grupo actualizado.', en: 'Group updated.'));
+      await showToast(
+          context, tr(context, es: 'Grupo actualizado.', en: 'Group updated.'));
     } catch (e) {
       if (!mounted) return;
       await showToast(context, humanError(e), danger: true);
@@ -244,25 +347,33 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     setState(() => savingCover = true);
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 88, maxWidth: 2400);
+      final picked = await picker.pickImage(
+          source: ImageSource.gallery, imageQuality: 88, maxWidth: 2400);
       if (picked == null) return;
       final raw = await picked.readAsBytes();
       if (!mounted) return;
-      final framed = await Navigator.of(context).push<Uint8List>(MaterialPageRoute(
+      final framed =
+          await Navigator.of(context).push<Uint8List>(MaterialPageRoute(
         builder: (_) => ImageFrameEditorScreen(
           bytes: raw,
           title: tr(context, es: 'Ajustar portada', en: 'Adjust cover'),
-          helper: tr(context, es: 'Arrastra y pellizca la imagen para dejar el banner bien encuadrado.', en: 'Drag and pinch the image to frame the banner.'),
+          helper: tr(context,
+              es: 'Arrastra y pellizca la imagen para dejar el banner bien encuadrado.',
+              en: 'Drag and pinch the image to frame the banner.'),
           aspectRatio: 16 / 7,
           outputWidth: 1600,
         ),
       ));
       if (framed == null) return;
-      final url = await AppData.uploadGroupCoverBytes(group['id'].toString(), framed, 'group-cover.png');
+      final url = await AppData.uploadGroupCoverBytes(
+          group['id'].toString(), framed, 'group-cover.png');
       if (!mounted) return;
       setState(() => group['cover_url'] = url);
       widget.onChanged?.call();
-      await showToast(context, tr(context, es: 'Foto del grupo actualizada.', en: 'Group photo updated.'));
+      await showToast(
+          context,
+          tr(context,
+              es: 'Foto del grupo actualizada.', en: 'Group photo updated.'));
     } catch (e) {
       if (!mounted) return;
       await showToast(context, humanError(e), danger: true);
@@ -278,7 +389,10 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       if (!mounted) return;
       setState(() => group['cover_url'] = null);
       widget.onChanged?.call();
-      await showToast(context, tr(context, es: 'Foto del grupo eliminada.', en: 'Group photo removed.'));
+      await showToast(
+          context,
+          tr(context,
+              es: 'Foto del grupo eliminada.', en: 'Group photo removed.'));
     } catch (e) {
       if (!mounted) return;
       await showToast(context, humanError(e), danger: true);
@@ -291,18 +405,22 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     final confirm = await showConfirmDialog(
       context,
       title: tr(context, es: 'Regenerar código', en: 'Regenerate code'),
-      message: tr(context, es: 'El código anterior dejará de servir para nuevas invitaciones. Los miembros actuales seguirán dentro.', en: 'The previous code will stop working for new invites. Current members will stay in the group.'),
+      message: tr(context,
+          es: 'El código anterior dejará de servir para nuevas invitaciones. Los miembros actuales seguirán dentro.',
+          en: 'The previous code will stop working for new invites. Current members will stay in the group.'),
       confirm: tr(context, es: 'Regenerar', en: 'Regenerate'),
       danger: true,
     );
     if (confirm != true) return;
     setState(() => regeneratingCode = true);
     try {
-      final code = await AppData.regenerateGroupInviteCode(group['id'].toString());
+      final code =
+          await AppData.regenerateGroupInviteCode(group['id'].toString());
       if (!mounted) return;
       setState(() => group['invite_code'] = code);
       widget.onChanged?.call();
-      await showToast(context, tr(context, es: 'Código regenerado.', en: 'Code regenerated.'));
+      await showToast(context,
+          tr(context, es: 'Código regenerado.', en: 'Code regenerated.'));
     } catch (e) {
       if (!mounted) return;
       await showToast(context, humanError(e), danger: true);
@@ -314,7 +432,12 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   Future<void> deleteGroupFlow() async {
     final isOwner = AppData.text(group['owner_id']) == AppData.user?.id;
     if (!isOwner) {
-      await showToast(context, tr(context, es: 'Solo el owner puede eliminar este grupo.', en: 'Only the owner can delete this group.'), danger: true);
+      await showToast(
+          context,
+          tr(context,
+              es: 'Solo el owner puede eliminar este grupo.',
+              en: 'Only the owner can delete this group.'),
+          danger: true);
       return;
     }
 
@@ -323,20 +446,39 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(tr(context, es: 'Eliminar grupo', en: 'Delete group')),
-        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(tr(context, es: 'Vas a eliminar "${AppData.text(group['name'], 'este grupo')}".', en: 'You are about to delete "${AppData.text(group['name'], 'this group')}".')),
-          const SizedBox(height: 10),
-          Text(tr(context, es: 'Se eliminarán sus miembros, eventos, asistencias, gastos, liquidaciones, torneos y notificaciones relacionadas.', en: 'Its members, events, attendance, expenses, settlements, tournaments and related notifications will be deleted.')),
-          const SizedBox(height: 14),
-          Text(tr(context, es: 'Escribe ELIMINAR GRUPO para confirmar.', en: 'Type DELETE GROUP to confirm.'), style: const TextStyle(fontWeight: FontWeight.w900)),
-          const SizedBox(height: 8),
-          TextField(controller: controller, textCapitalization: TextCapitalization.characters, decoration: InputDecoration(hintText: appIsEnglish ? 'DELETE GROUP' : 'ELIMINAR GRUPO')),
-        ]),
+        content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr(context,
+                  es: 'Vas a eliminar "${AppData.text(group['name'], 'este grupo')}".',
+                  en: 'You are about to delete "${AppData.text(group['name'], 'this group')}".')),
+              const SizedBox(height: 10),
+              Text(tr(context,
+                  es: 'Se eliminarán sus miembros, eventos, asistencias, gastos, liquidaciones, torneos y notificaciones relacionadas.',
+                  en: 'Its members, events, attendance, expenses, settlements, tournaments and related notifications will be deleted.')),
+              const SizedBox(height: 14),
+              Text(
+                  tr(context,
+                      es: 'Escribe ELIMINAR GRUPO para confirmar.',
+                      en: 'Type DELETE GROUP to confirm.'),
+                  style: const TextStyle(fontWeight: FontWeight.w900)),
+              const SizedBox(height: 8),
+              TextField(
+                  controller: controller,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                      hintText:
+                          appIsEnglish ? 'DELETE GROUP' : 'ELIMINAR GRUPO')),
+            ]),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.red),
-            onPressed: () => Navigator.pop(context, controller.text.trim().toUpperCase() == 'ELIMINAR GRUPO'),
+            onPressed: () => Navigator.pop(context,
+                controller.text.trim().toUpperCase() == 'ELIMINAR GRUPO'),
             child: Text(tr(context, es: 'Eliminar', en: 'Delete')),
           ),
         ],
@@ -345,7 +487,13 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     final typed = controller.text;
     controller.dispose();
     if (confirmed != true) {
-      if (typed.trim().isNotEmpty && mounted) await showToast(context, tr(context, es: 'Escribe ELIMINAR GRUPO exactamente para eliminarlo.', en: 'Type DELETE GROUP exactly to delete it.'), danger: true);
+      if (typed.trim().isNotEmpty && mounted)
+        await showToast(
+            context,
+            tr(context,
+                es: 'Escribe ELIMINAR GRUPO exactamente para eliminarlo.',
+                en: 'Type DELETE GROUP exactly to delete it.'),
+            danger: true);
       return;
     }
 
@@ -353,68 +501,154 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       await AppData.deleteGroup(group['id'].toString(), 'ELIMINAR GRUPO');
       widget.onChanged?.call();
       if (!mounted) return;
-      await showToast(context, tr(context, es: 'Grupo eliminado.', en: 'Group deleted.'));
+      await showToast(
+          context, tr(context, es: 'Grupo eliminado.', en: 'Group deleted.'));
       if (mounted) Navigator.of(context).pop('deleted');
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
   }
 
-  @override Widget build(BuildContext context) {
+  @override
+  Widget build(BuildContext context) {
     final name = AppData.text(group['name'], 'Grupo');
     final code = AppData.text(group['invite_code'], '------');
-    return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: tr(context, es: 'Ajustes del grupo', en: 'Group settings'), subtitle: tr(context, es: 'Identidad, invitaciones y permisos de $name', en: 'Identity, invites and permissions for $name'), leading: true),
+    return DirectPage(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      PageHeader(
+          title: tr(context, es: 'Ajustes del grupo', en: 'Group settings'),
+          subtitle: tr(context,
+              es: 'Identidad, invitaciones y permisos de $name',
+              en: 'Identity, invites and permissions for $name'),
+          leading: true),
       const SizedBox(height: 16),
-      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      AppCard(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Container(width: 46, height: 46, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.groups_rounded, color: AppColors.teal)),
+          Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                  color: AppColors.tealSoft,
+                  borderRadius: BorderRadius.circular(16)),
+              child: const Icon(Icons.groups_rounded, color: AppColors.teal)),
           const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(tr(context, es: 'Información básica', en: 'Basic info'), style: Theme.of(context).textTheme.titleMedium),
-            Text(tr(context, es: 'Nombre, descripción, portada y reglas del grupo.', en: 'Group name, description, cover and rules.'), style: Theme.of(context).textTheme.bodyMedium),
-          ])),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(tr(context, es: 'Información básica', en: 'Basic info'),
+                    style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                    tr(context,
+                        es: 'Nombre, descripción, portada y reglas del grupo.',
+                        en: 'Group name, description, cover and rules.'),
+                    style: Theme.of(context).textTheme.bodyMedium),
+              ])),
         ]),
         const SizedBox(height: 16),
         FieldLabel(tr(context, es: 'Nombre del grupo', en: 'Group name')),
-        TextField(controller: nameController, textInputAction: TextInputAction.next, decoration: InputDecoration(hintText: tr(context, es: 'Nombre del grupo', en: 'Group name'))),
-
+        TextField(
+            controller: nameController,
+            textInputAction: TextInputAction.next,
+            decoration: InputDecoration(
+                hintText:
+                    tr(context, es: 'Nombre del grupo', en: 'Group name'))),
         const SizedBox(height: 12),
         FieldLabel(tr(context, es: 'Descripción', en: 'Description')),
-        TextField(controller: descriptionController, maxLines: 3, decoration: InputDecoration(hintText: tr(context, es: 'Explica para qué se usa este grupo', en: 'Explain what this group is for'))),
+        TextField(
+            controller: descriptionController,
+            maxLines: 3,
+            decoration: InputDecoration(
+                hintText: tr(context,
+                    es: 'Explica para qué se usa este grupo',
+                    en: 'Explain what this group is for'))),
         const SizedBox(height: 12),
         StatusNotice(
           icon: Icons.tune_rounded,
-          title: tr(context, es: 'Idioma y moneda', en: 'Language and currency'),
-          body: tr(context, es: 'Por ahora Grupli trabaja en español y euros. Estos ajustes se activarán cuando estén cerrados en toda la app.', en: 'For now, Grupli works in Spanish and euros. These settings will be enabled once they are ready across the app.'),
+          title:
+              tr(context, es: 'Idioma y moneda', en: 'Language and currency'),
+          body: tr(context,
+              es: 'Por ahora Grupli trabaja en español y euros. Estos ajustes se activarán cuando estén cerrados en toda la app.',
+              en: 'For now, Grupli works in Spanish and euros. These settings will be enabled once they are ready across the app.'),
         ),
         const SizedBox(height: 12),
         FieldLabel(tr(context, es: 'Zona horaria', en: 'Time zone')),
-        TextField(controller: timezoneController, decoration: const InputDecoration(prefixIcon: Icon(Icons.schedule_rounded), hintText: 'Europe/Madrid')),
+        TextField(
+            controller: timezoneController,
+            decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.schedule_rounded),
+                hintText: 'Europe/Madrid')),
         const SizedBox(height: 12),
-        PrimaryButton(label: savingInfo ? tr(context, es: 'Guardando...', en: 'Saving...') : tr(context, es: 'Guardar cambios', en: 'Save changes'), icon: Icons.save_rounded, loading: savingInfo, onTap: saveInfo),
+        PrimaryButton(
+            label: savingInfo
+                ? tr(context, es: 'Guardando...', en: 'Saving...')
+                : tr(context, es: 'Guardar cambios', en: 'Save changes'),
+            icon: Icons.save_rounded,
+            loading: savingInfo,
+            onTap: saveInfo),
       ])),
       const SizedBox(height: 16),
-      GroupCoverSettingsCard(group: group, saving: savingCover, onChange: changeCover, onRemove: removeCover),
+      GroupCoverSettingsCard(
+          group: group,
+          saving: savingCover,
+          onChange: changeCover,
+          onRemove: removeCover),
       const SizedBox(height: 16),
-      InviteAccessCard(groupName: name, code: code, compact: true, onRegenerate: regeneratingCode ? null : regenerateInviteCode),
+      InviteAccessCard(
+          groupName: name,
+          code: code,
+          compact: true,
+          onRegenerate: regeneratingCode ? null : regenerateInviteCode),
       const SizedBox(height: 16),
-      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      AppCard(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         FieldLabel(tr(context, es: 'Reglas del grupo', en: 'Group rules')),
-        TextField(controller: rulesController, minLines: 2, maxLines: 5, decoration: InputDecoration(hintText: tr(context, es: 'Ej. Confirmar asistencia antes del jueves, gastos con ticket...', en: 'E.g. Confirm attendance before Thursday, expenses with receipt...'))),
+        TextField(
+            controller: rulesController,
+            minLines: 2,
+            maxLines: 5,
+            decoration: InputDecoration(
+                hintText: tr(context,
+                    es: 'Ej. Confirmar asistencia antes del jueves, gastos con ticket...',
+                    en: 'E.g. Confirm attendance before Thursday, expenses with receipt...'))),
         const SizedBox(height: 12),
-        SecondaryButton(label: tr(context, es: 'Guardar reglas', en: 'Save rules'), icon: Icons.rule_rounded, onTap: saveInfo),
+        SecondaryButton(
+            label: tr(context, es: 'Guardar reglas', en: 'Save rules'),
+            icon: Icons.rule_rounded,
+            onTap: saveInfo),
       ])),
       const SizedBox(height: 16),
       SectionHeader(title: tr(context, es: 'Premium', en: 'Premium')),
       const SizedBox(height: 8),
       PremiumGroupPreviewCard(group: group),
       const SizedBox(height: 16),
-      SectionHeader(title: tr(context, es: 'Administración', en: 'Administration')),
+      SectionHeader(
+          title: tr(context, es: 'Administración', en: 'Administration')),
       const SizedBox(height: 8),
-      SettingsRow(icon: Icons.groups_rounded, title: tr(context, es: 'Miembros y roles', en: 'Members and roles'), subtitle: tr(context, es: 'Owner, admins y miembros', en: 'Owner, admins and members'), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
-      SettingsRow(icon: Icons.verified_user_rounded, title: tr(context, es: 'Permisos', en: 'Permissions'), subtitle: tr(context, es: 'Qué puede hacer cada rol', en: 'What each role can do'), onTap: () => showPermissionSheet(context)),
-      SettingsRow(icon: Icons.delete_outline_rounded, title: tr(context, es: 'Eliminar grupo', en: 'Delete group'), subtitle: tr(context, es: 'Solo owner · elimina eventos, gastos y torneos', en: 'Owner only · removes events, expenses and tournaments'), danger: true, onTap: deleteGroupFlow),
+      SettingsRow(
+          icon: Icons.groups_rounded,
+          title: tr(context, es: 'Miembros y roles', en: 'Members and roles'),
+          subtitle: tr(context,
+              es: 'Owner, admins y miembros', en: 'Owner, admins and members'),
+          onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => MembersScreen(group: group)))),
+      SettingsRow(
+          icon: Icons.verified_user_rounded,
+          title: tr(context, es: 'Permisos', en: 'Permissions'),
+          subtitle: tr(context,
+              es: 'Qué puede hacer cada rol', en: 'What each role can do'),
+          onTap: () => showPermissionSheet(context)),
+      SettingsRow(
+          icon: Icons.delete_outline_rounded,
+          title: tr(context, es: 'Eliminar grupo', en: 'Delete group'),
+          subtitle: tr(context,
+              es: 'Solo owner · elimina eventos, gastos y torneos',
+              en: 'Owner only · removes events, expenses and tournaments'),
+          danger: true,
+          onTap: deleteGroupFlow),
     ]));
   }
 }
@@ -429,14 +663,48 @@ class PremiumGroupPreviewCard extends StatelessWidget {
     return AppCard(
       color: entitlement.active ? AppColors.tealSoft : AppColors.faint,
       padding: const EdgeInsets.all(14),
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => PremiumGroupScreen(group: group))),
+      onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => PremiumGroupScreen(group: group))),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)), child: Icon(entitlement.active ? Icons.workspace_premium_rounded : Icons.workspace_premium_rounded, color: entitlement.active ? AppColors.teal : AppColors.orange)),
+        Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+                color: Colors.white, borderRadius: BorderRadius.circular(16)),
+            child: Icon(
+                entitlement.active
+                    ? Icons.workspace_premium_rounded
+                    : Icons.workspace_premium_rounded,
+                color: entitlement.active ? AppColors.teal : AppColors.orange)),
         const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(entitlement.active ? tr(context, es: 'Grupli Premium activo', en: 'Grupli Premium active') : tr(context, es: 'Grupli Premium preparado', en: 'Grupli Premium ready'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+              entitlement.active
+                  ? tr(context,
+                      es: 'Grupli Premium activo', en: 'Grupli Premium active')
+                  : tr(context,
+                      es: 'Grupli Premium preparado',
+                      en: 'Grupli Premium ready'),
+              style: const TextStyle(
+                  color: AppColors.ink, fontWeight: FontWeight.w900)),
           const SizedBox(height: 4),
-          Text(entitlement.active ? tr(context, es: 'Este grupo tiene activadas las funciones Premium.', en: 'This group has Premium features enabled.') : tr(context, es: 'Pagos aún desactivados. Dejamos lista la estructura para activar Premium por grupo más adelante.', en: 'Payments are still off. We have left the structure ready to enable Premium per group later.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 12)),
+          Text(
+              entitlement.active
+                  ? tr(context,
+                      es: 'Este grupo tiene activadas las funciones Premium.',
+                      en: 'This group has Premium features enabled.')
+                  : tr(context,
+                      es:
+                          'Pagos aún desactivados. Dejamos lista la estructura para activar Premium por grupo más adelante.',
+                      en:
+                          'Payments are still off. We have left the structure ready to enable Premium per group later.'),
+              style: const TextStyle(
+                  color: AppColors.muted,
+                  fontWeight: FontWeight.w700,
+                  height: 1.25,
+                  fontSize: 12)),
         ])),
         const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
       ]),
@@ -452,6 +720,12 @@ class PremiumGroupScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = AppData.text(group['name'], 'Grupo');
     final entitlement = GrupliPremium.entitlementForGroup(group);
+    final highlights = <PremiumFeatureDefinition>[
+      GrupliPremium.feature('unlimited_active_tournaments'),
+      GrupliPremium.feature('advanced_stats'),
+      GrupliPremium.feature('finance_insights'),
+      GrupliPremium.feature('ad_free'),
+    ];
     return DirectPage(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -459,286 +733,162 @@ class PremiumGroupScreen extends StatelessWidget {
           PageHeader(
             title: tr(context, es: 'Grupli Premium', en: 'Grupli Premium'),
             subtitle: entitlement.active
-                ? tr(context, es: 'Premium ya está activo en $name y toda la app se verá sin anuncios para este grupo.', en: 'Premium is already active in $name and the whole app will be ad-free for this group.')
-                : tr(context, es: 'Premium es por grupo: una sola compra activa la experiencia para todos los miembros de $name.', en: 'Premium is per group: one purchase unlocks the experience for all members of $name.'),
+                ? tr(context,
+                    es: 'Premium ya está activo en $name.',
+                    en: 'Premium is already active in $name.')
+                : tr(context,
+                    es: 'Una sola compra activa Premium para todos los miembros de $name.',
+                    en: 'One purchase unlocks Premium for all members of $name.'),
             leading: true,
           ),
           const SizedBox(height: 16),
           AppCard(
-            color: entitlement.active ? AppColors.tealSoft : AppColors.orangeSoft,
+            color:
+                entitlement.active ? AppColors.tealSoft : AppColors.orangeSoft,
             padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Icon(
-                        entitlement.active ? Icons.verified_rounded : Icons.lock_clock_rounded,
-                        color: entitlement.active ? AppColors.teal : AppColors.orange,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            entitlement.label,
-                            style: const TextStyle(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  entitlement.active
+                      ? Icons.verified_rounded
+                      : Icons.lock_clock_rounded,
+                  color: entitlement.active ? AppColors.teal : AppColors.orange,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(entitlement.label,
+                          style: const TextStyle(
                               color: AppColors.ink,
                               fontWeight: FontWeight.w900,
-                              fontSize: 18,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            GrupliPremium.billingEnabled
-                                ? tr(context, es: 'Pagos conectados y listos para la tienda elegida.', en: 'Payments are connected and ready for the chosen store.')
-                                : tr(context, es: 'La capa técnica ya está preparada para conectar compras más adelante.', en: 'The technical layer is ready to connect purchases later.'),
-                            style: const TextStyle(
-                              color: AppColors.muted,
-                              fontWeight: FontWeight.w800,
-                              height: 1.25,
-                            ),
-                          ),
-                        ],
+                              fontSize: 18)),
+                      const SizedBox(height: 4),
+                      Text(
+                        entitlement.active
+                            ? tr(context,
+                                es:
+                                    'Sin anuncios y con funciones Premium activas.',
+                                en: 'Ad-free with Premium features active.')
+                            : tr(context,
+                                es: 'Listo para activar cuando conectemos compras.',
+                                en: 'Ready to activate when purchases go live.'),
+                        style: const TextStyle(
+                            color: AppColors.muted,
+                            fontWeight: FontWeight.w800,
+                            height: 1.25),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                StatusNotice(
-                  icon: Icons.shield_outlined,
-                  title: tr(context, es: 'Acceso centralizado', en: 'Centralized access'),
-                  body: tr(context, es: 'El backend decidirá el estado real del grupo. La interfaz solo mostrará el resultado, nunca lo inventará.', en: 'The backend will decide the real group status. The interface will only show the result, never invent it.'),
-                ),
-              ],
-            ),
+                    ]),
+              ),
+            ]),
           ),
           const SizedBox(height: 16),
-          SectionHeader(title: tr(context, es: 'Cómo se venderá', en: 'How it will be sold')),
+          SectionHeader(
+              title: tr(context, es: 'Qué desbloquea', en: 'What it unlocks')),
           const SizedBox(height: 8),
           AppCard(
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tr(context, es: 'Pasarelas previstas', en: 'Planned gateways'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    ...GrupliPremium.mobileBillingRoutes.map((route) => TournamentRuleChip(label: route)),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(tr(context, es: 'La web quedará separada como canal futuro, no mezclada con el flujo de la app móvil.', en: 'The web will stay separate as a future channel, not mixed into the mobile app flow.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    ...GrupliPremium.webBillingRoutes.map((route) => TournamentRuleChip(label: route)),
-                  ],
-                ),
+                for (int i = 0; i < highlights.length; i++) ...[
+                  _PremiumFeatureRow(feature: highlights[i]),
+                  if (i != highlights.length - 1)
+                    const Divider(height: 1, indent: 60, color: AppColors.line),
+                ],
               ],
             ),
           ),
           const SizedBox(height: 16),
-          SectionHeader(title: tr(context, es: 'Dónde irán los anuncios', en: 'Where ads will go')),
-          const SizedBox(height: 8),
-          ...GrupliPremium.adPlacements.map(
-            (placement) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: AppCard(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: AppColors.tealSoft,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(Icons.auto_awesome_rounded, color: AppColors.teal, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  placement.screen,
-                                  style: const TextStyle(
-                                    color: AppColors.ink,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                              if (placement.hiddenByPremium)
-                                Padding(
-                                  padding: EdgeInsets.only(left: 8),
-                                  child: TournamentRuleChip(label: tr(context, es: 'Sin anuncios con Premium', en: 'No ads with Premium')),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            placement.placement,
-                            style: const TextStyle(
-                              color: AppColors.orange,
-                              fontWeight: FontWeight.w800,
-                              height: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            placement.behavior,
-                            style: const TextStyle(
-                              color: AppColors.muted,
-                              fontWeight: FontWeight.w700,
-                              height: 1.25,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          SectionHeader(title: tr(context, es: 'Gratis seguirá siendo útil', en: 'Free will stay useful')),
-          const SizedBox(height: 8),
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(tr(context, es: 'Incluido gratis', en: 'Included free'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 10),
-                ...GrupliPremium.freeTournamentPrinciples.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            item,
-                            style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, height: 1.25),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          SectionHeader(title: tr(context, es: 'Premium futuro', en: 'Future Premium')),
-          const SizedBox(height: 8),
-          ...GrupliPremium.features.map(
-            (feature) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: AppCard(
-                padding: const EdgeInsets.all(13),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.faint,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(feature.icon, color: AppColors.orange, size: 21),
-                    ),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            feature.title,
-                            style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            feature.description,
-                            style: const TextStyle(
-                              color: AppColors.muted,
-                              fontWeight: FontWeight.w700,
-                              height: 1.25,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
           AppCard(
             color: AppColors.faint,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(tr(context, es: 'Reglas de producto', en: 'Product rules'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 8),
-                ...GrupliPremium.monetizationRules.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.check_circle_rounded, color: AppColors.teal, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            item,
-                            style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, height: 1.25),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            padding: const EdgeInsets.all(14),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                  tr(context,
+                      es: 'Sin anuncios para el grupo',
+                      en: 'No ads for the group'),
+                  style: const TextStyle(
+                      color: AppColors.ink, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              Text(
+                tr(context,
+                    es: 'Cuando Premium esté activo, la app se mantiene limpia para este grupo y el flujo gratis sigue disponible para todos.',
+                    en: 'When Premium is active, the app stays clean for this group and the free flow remains available for everyone.'),
+                style: const TextStyle(
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25),
+              ),
+            ]),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           PrimaryButton(
-            label: GrupliPremium.billingEnabled ? tr(context, es: 'Gestionar Premium', en: 'Manage Premium') : tr(context, es: 'Premium preparado', en: 'Premium ready'),
+            label: GrupliPremium.billingEnabled
+                ? tr(context, es: 'Gestionar Premium', en: 'Manage Premium')
+                : tr(context, es: 'Premium preparado', en: 'Premium ready'),
             icon: Icons.workspace_premium_rounded,
             onTap: () => showToast(
               context,
               GrupliPremium.billingEnabled
-                  ? tr(context, es: 'Las compras ya pueden gestionarse desde la capa conectada.', en: 'Purchases can now be managed from the connected layer.')
-                  : tr(context, es: 'La arquitectura de Premium está lista para conectar pagos más adelante.', en: 'The Premium architecture is ready to connect payments later.'),
+                  ? tr(context,
+                      es:
+                          'Las compras ya pueden gestionarse desde la capa conectada.',
+                      en:
+                          'Purchases can now be managed from the connected layer.')
+                  : tr(context,
+                      es: 'Premium está preparado para conectar pagos más adelante.',
+                      en: 'Premium is ready to connect payments later.'),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumFeatureRow extends StatelessWidget {
+  final PremiumFeatureDefinition feature;
+  const _PremiumFeatureRow({required this.feature});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+                color: AppColors.orangeSoft,
+                borderRadius: BorderRadius.circular(13)),
+            child: Icon(feature.icon, color: AppColors.orange, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(feature.title,
+                  style: const TextStyle(
+                      color: AppColors.ink, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 3),
+              Text(feature.description,
+                  style: const TextStyle(
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                      fontSize: 12.5)),
+            ]),
           ),
         ],
       ),
@@ -751,7 +901,12 @@ class GroupCoverSettingsCard extends StatelessWidget {
   final bool saving;
   final VoidCallback onChange;
   final VoidCallback onRemove;
-  const GroupCoverSettingsCard({super.key, required this.group, required this.saving, required this.onChange, required this.onRemove});
+  const GroupCoverSettingsCard(
+      {super.key,
+      required this.group,
+      required this.saving,
+      required this.onChange,
+      required this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -765,30 +920,53 @@ class GroupCoverSettingsCard extends StatelessWidget {
             height: 128,
             width: double.infinity,
             decoration: const BoxDecoration(
-              gradient: LinearGradient(colors: [Color(0xFF073A57), Color(0xFF0B6B8F)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+              gradient: LinearGradient(
+                  colors: [Color(0xFF073A57), Color(0xFF0B6B8F)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight),
             ),
             child: cover.isNotEmpty
-                ? Image.network(cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.image_rounded, color: Colors.white, size: 34)))
-                : const Center(child: Icon(Icons.image_rounded, color: Colors.white, size: 34)),
+                ? Image.network(cover,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Center(
+                        child: Icon(Icons.image_rounded,
+                            color: Colors.white, size: 34)))
+                : const Center(
+                    child: Icon(Icons.image_rounded,
+                        color: Colors.white, size: 34)),
           ),
         ),
         const SizedBox(height: 12),
-        Text(tr(context, es: 'Foto del grupo', en: 'Group photo'), style: Theme.of(context).textTheme.titleMedium),
+        Text(tr(context, es: 'Foto del grupo', en: 'Group photo'),
+            style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 4),
-        Text(tr(context, es: 'Dale identidad al grupo en Inicio y Mis grupos.', en: 'Give the group identity in Home and My groups.'), style: Theme.of(context).textTheme.bodyMedium),
+        Text(
+            tr(context,
+                es: 'Dale identidad al grupo en Inicio y Mis grupos.',
+                en: 'Give the group identity in Home and My groups.'),
+            style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: SecondaryButton(label: saving ? tr(context, es: 'Guardando...', en: 'Saving...') : tr(context, es: 'Cambiar foto', en: 'Change photo'), icon: Icons.photo_camera_rounded, onTap: saving ? () {} : onChange)),
+          Expanded(
+              child: SecondaryButton(
+                  label: saving
+                      ? tr(context, es: 'Guardando...', en: 'Saving...')
+                      : tr(context, es: 'Cambiar foto', en: 'Change photo'),
+                  icon: Icons.photo_camera_rounded,
+                  onTap: saving ? () {} : onChange)),
           if (cover.isNotEmpty) ...[
             const SizedBox(width: 10),
-            Expanded(child: DangerButton(label: tr(context, es: 'Quitar', en: 'Remove'), icon: Icons.delete_outline_rounded, onTap: saving ? () {} : onRemove)),
+            Expanded(
+                child: DangerButton(
+                    label: tr(context, es: 'Quitar', en: 'Remove'),
+                    icon: Icons.delete_outline_rounded,
+                    onTap: saving ? () {} : onRemove)),
           ],
         ]),
       ]),
     );
   }
 }
-
 
 class GroupAlertBell extends StatelessWidget {
   final Map<String, dynamic> group;
@@ -811,7 +989,8 @@ class GroupAlertBell extends StatelessWidget {
       builder: (context, snapshot) {
         final groupId = group['id']?.toString();
         final notifications = (snapshot.data ?? const <Map<String, dynamic>>[])
-            .where((n) => groupId == null || n['group_id']?.toString() == groupId)
+            .where(
+                (n) => groupId == null || n['group_id']?.toString() == groupId)
             .take(12)
             .toList();
         final unread = notifications.where((n) => n['read_at'] == null).length;
@@ -821,7 +1000,9 @@ class GroupAlertBell extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             CircleIconButton(
-              icon: count > 0 ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
+              icon: count > 0
+                  ? Icons.notifications_active_rounded
+                  : Icons.notifications_none_rounded,
               onTap: () => showGroupAlertsSheet(
                 context,
                 group: group,
@@ -836,7 +1017,8 @@ class GroupAlertBell extends StatelessWidget {
                 right: -2,
                 top: -4,
                 child: Container(
-                  constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                  constraints:
+                      const BoxConstraints(minWidth: 18, minHeight: 18),
                   padding: const EdgeInsets.symmetric(horizontal: 5),
                   decoration: BoxDecoration(
                     color: AppColors.red,
@@ -844,7 +1026,11 @@ class GroupAlertBell extends StatelessWidget {
                     border: Border.all(color: Colors.white, width: 2),
                   ),
                   alignment: Alignment.center,
-                  child: Text(count > 9 ? '9+' : count.toString(), style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w900)),
+                  child: Text(count > 9 ? '9+' : count.toString(),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900)),
                 ),
               ),
           ],
@@ -895,14 +1081,16 @@ class GroupAlertsSheet extends StatelessWidget {
     required this.onChanged,
   });
 
-  Future<void> _openNotification(BuildContext context, Map<String, dynamic> notification) async {
+  Future<void> _openNotification(
+      BuildContext context, Map<String, dynamic> notification) async {
     final id = notification['id']?.toString();
     if (id != null && id.isNotEmpty) await AppData.markNotificationRead(id);
     if (context.mounted) Navigator.of(context).pop();
     onChanged();
     final groupId = notification['group_id']?.toString();
     if (groupId != null && groupId.isNotEmpty && rootContext.mounted) {
-      await Navigator.of(rootContext).push(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)));
+      await Navigator.of(rootContext).push(
+          MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)));
       onChanged();
     }
   }
@@ -914,25 +1102,46 @@ class GroupAlertsSheet extends StatelessWidget {
       top: false,
       child: Container(
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .72),
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .72),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(28),
           border: Border.all(color: AppColors.lineSoft),
-          boxShadow: const [BoxShadow(color: Color(0x24102033), blurRadius: 34, offset: Offset(0, 16))],
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x24102033), blurRadius: 34, offset: Offset(0, 16))
+          ],
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const SizedBox(height: 10),
-          Container(width: 44, height: 5, decoration: BoxDecoration(color: AppColors.line, borderRadius: BorderRadius.circular(99))),
+          Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                  color: AppColors.line,
+                  borderRadius: BorderRadius.circular(99))),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 16, 10, 10),
             child: Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(tr(context, es: 'Avisos del grupo', en: 'Group alerts'), style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 3),
-                Text(AppData.text(group['name'], 'Grupo'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700)),
-              ])),
-              IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close_rounded)),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(
+                        tr(context, es: 'Avisos del grupo', en: 'Group alerts'),
+                        style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 3),
+                    Text(AppData.text(group['name'], 'Grupo'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: AppColors.muted,
+                            fontWeight: FontWeight.w700)),
+                  ])),
+              IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded)),
             ]),
           ),
           Flexible(
@@ -941,26 +1150,40 @@ class GroupAlertsSheet extends StatelessWidget {
               shrinkWrap: true,
               children: [
                 if (!hasContent)
-                  EmptySlim(icon: Icons.notifications_none_rounded, title: tr(context, es: 'Sin avisos pendientes', en: 'No pending notifications'), body: tr(context, es: 'Cuando haya respuestas, gastos o cambios importantes aparecerán aquí.', en: 'When there are replies, expenses or important changes, they will appear here.')),
+                  EmptySlim(
+                      icon: Icons.notifications_none_rounded,
+                      title: tr(context,
+                          es: 'Sin avisos pendientes',
+                          en: 'No pending notifications'),
+                      body: tr(context,
+                          es: 'Cuando haya respuestas, gastos o cambios importantes aparecerán aquí.',
+                          en: 'When there are replies, expenses or important changes, they will appear here.')),
                 if (pendingEvents.isNotEmpty) ...[
-                  _SheetLabel(tr(context, es: 'Respuestas pendientes', en: 'Pending replies')),
+                  _SheetLabel(tr(context,
+                      es: 'Respuestas pendientes', en: 'Pending replies')),
                   ...pendingEvents.take(6).map((event) => PendingDecisionRow(
-                    event: event,
-                    onTap: () async {
-                      Navigator.of(context).pop();
-                      await onEventOpen(event);
-                    },
-                  )),
+                        event: event,
+                        onTap: () async {
+                          Navigator.of(context).pop();
+                          await onEventOpen(event);
+                        },
+                      )),
                   const SizedBox(height: 8),
                 ],
                 if (notifications.isNotEmpty) ...[
-                  _SheetLabel(tr(context, es: 'Notificaciones', en: 'Notifications')),
+                  _SheetLabel(
+                      tr(context, es: 'Notificaciones', en: 'Notifications')),
                   AppCard(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Column(children: [
                       for (int i = 0; i < notifications.length; i++) ...[
-                        NotificationListRow(notification: notifications[i], onTap: () => _openNotification(context, notifications[i])),
-                        if (i != notifications.length - 1) const Divider(height: 1, indent: 64, color: AppColors.line),
+                        NotificationListRow(
+                            notification: notifications[i],
+                            onTap: () =>
+                                _openNotification(context, notifications[i])),
+                        if (i != notifications.length - 1)
+                          const Divider(
+                              height: 1, indent: 64, color: AppColors.line),
                       ],
                     ]),
                   ),
@@ -980,19 +1203,27 @@ class _SheetLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(2, 12, 2, 8),
-    child: Text(text, style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: .2)),
-  );
+        padding: const EdgeInsets.fromLTRB(2, 12, 2, 8),
+        child: Text(text,
+            style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                letterSpacing: .2)),
+      );
 }
 
 class PendingDecisionRow extends StatelessWidget {
   final Map<String, dynamic> event;
   final VoidCallback onTap;
-  const PendingDecisionRow({super.key, required this.event, required this.onTap});
+  const PendingDecisionRow(
+      {super.key, required this.event, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final date = DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+    final date =
+        DateTime.tryParse(event['starts_at']?.toString() ?? '')?.toLocal() ??
+            DateTime.now();
     final color = eventKindColor(event);
     return AppCard(
       onTap: onTap,
@@ -1001,14 +1232,28 @@ class PendingDecisionRow extends StatelessWidget {
         Container(
           width: 40,
           height: 42,
-          decoration: BoxDecoration(color: eventKindSoftColor(event), borderRadius: BorderRadius.circular(14)),
+          decoration: BoxDecoration(
+              color: eventKindSoftColor(event),
+              borderRadius: BorderRadius.circular(14)),
           child: Icon(notificationIcon('event'), color: color, size: 20),
         ),
         const SizedBox(width: 11),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(AppData.text(event['title'], 'Evento'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(AppData.text(event['title'], 'Evento'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w900, color: AppColors.ink)),
           const SizedBox(height: 3),
-          Text('${longDateTime(date)} · responde asistencia', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+          Text('${longDateTime(date)} · responde asistencia',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700)),
         ])),
         const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
       ]),
@@ -1050,7 +1295,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (!mounted) return;
     if (groupId != null && groupId.isNotEmpty) {
       final tab = notificationGroupTab(notification);
-      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId, initialTab: tab)));
+      await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => GroupShell(groupId: groupId, initialTab: tab)));
       widget.onChanged();
       reload();
     }
@@ -1067,43 +1313,81 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           future: future,
           builder: (context, snapshot) {
             final notifications = snapshot.data ?? [];
-            final unread = notifications.where((n) => n['read_at'] == null).length;
+            final unread =
+                notifications.where((n) => n['read_at'] == null).length;
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
               children: [
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(child: PageHeader(title: tr(context, es: 'Avisos', en: 'Notifications'), subtitle: unread == 0 ? tr(context, es: 'Todo leído en tus grupos.', en: 'Everything read in your groups.') : tr(context, es: '$unread aviso${unread == 1 ? '' : 's'} sin leer', en: '$unread unread notification${unread == 1 ? '' : 's'}'), leading: false)),
+                  Expanded(
+                      child: PageHeader(
+                          title: tr(context, es: 'Avisos', en: 'Notifications'),
+                          subtitle: unread == 0
+                              ? tr(context,
+                                  es: 'Todo leído en tus grupos.',
+                                  en: 'Everything read in your groups.')
+                              : tr(context,
+                                  es: '$unread aviso${unread == 1 ? '' : 's'} sin leer',
+                                  en: '$unread unread notification${unread == 1 ? '' : 's'}'),
+                          leading: false)),
                   if (unread > 0)
-                    TextButton(onPressed: markAll, child: Text(tr(context, es: 'Leer todo', en: 'Mark all read'))),
+                    TextButton(
+                        onPressed: markAll,
+                        child: Text(
+                            tr(context, es: 'Leer todo', en: 'Mark all read'))),
                 ]),
                 const SizedBox(height: 12),
                 PushStatusCard(onEnable: () async {
-                  final token = await PushNotificationService.enableForCurrentDevice();
+                  final token =
+                      await PushNotificationService.enableForCurrentDevice();
                   if (!mounted) return;
                   if (token == null) {
-                    await showToast(context, tr(context, es: 'No se pudieron activar las notificaciones en este dispositivo.', en: 'Could not enable notifications on this device.'), danger: true);
+                    await showToast(
+                        context,
+                        tr(context,
+                            es: 'No se pudieron activar las notificaciones en este dispositivo.',
+                            en: 'Could not enable notifications on this device.'),
+                        danger: true);
                   } else {
-                      await showToast(context, tr(context, es: 'Notificaciones push activadas en este dispositivo.', en: 'Push notifications enabled on this device.'));
+                    await showToast(
+                        context,
+                        tr(context,
+                            es: 'Notificaciones push activadas en este dispositivo.',
+                            en: 'Push notifications enabled on this device.'));
                   }
                 }),
                 const SizedBox(height: 16),
                 if (snapshot.connectionState == ConnectionState.waiting)
-                  CenterLoader(label: tr(context, es: 'Cargando avisos...', en: 'Loading notifications...'))
+                  CenterLoader(
+                      label: tr(context,
+                          es: 'Cargando avisos...',
+                          en: 'Loading notifications...'))
                 else if (snapshot.hasError)
-                  ErrorBlock(message: tr(context, es: 'No se pudieron cargar los avisos. Inténtalo de nuevo.', en: 'Could not load notifications. Please try again.'), onRetry: reload)
+                  ErrorBlock(
+                      message: tr(context,
+                          es: 'No se pudieron cargar los avisos. Inténtalo de nuevo.',
+                          en: 'Could not load notifications. Please try again.'),
+                      onRetry: reload)
                 else if (notifications.isEmpty)
                   EmptyBlock(
                     icon: Icons.notifications_none_rounded,
-                    title: tr(context, es: 'Sin avisos todavía', en: 'No notifications yet'),
-                    body: tr(context, es: 'Cuando alguien cree una quedada, añada un gasto, registre un resultado o entre al grupo, aparecerá aquí.', en: 'When someone creates an event, adds an expense, records a result or joins the group, it will appear here.'),
+                    title: tr(context,
+                        es: 'Sin avisos todavía', en: 'No notifications yet'),
+                    body: tr(context,
+                        es: 'Cuando alguien cree una quedada, añada un gasto, registre un resultado o entre al grupo, aparecerá aquí.',
+                        en: 'When someone creates an event, adds an expense, records a result or joins the group, it will appear here.'),
                   )
                 else
                   AppCard(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Column(children: [
                       for (int i = 0; i < notifications.length; i++) ...[
-                        NotificationListRow(notification: notifications[i], onTap: () => openNotification(notifications[i])),
-                        if (i != notifications.length - 1) const Divider(height: 1, indent: 64, color: AppColors.line),
+                        NotificationListRow(
+                            notification: notifications[i],
+                            onTap: () => openNotification(notifications[i])),
+                        if (i != notifications.length - 1)
+                          const Divider(
+                              height: 1, indent: 64, color: AppColors.line),
                       ],
                     ]),
                   ),
@@ -1129,18 +1413,39 @@ class PushStatusCard extends StatelessWidget {
         Container(
           width: 44,
           height: 44,
-          decoration: BoxDecoration(color: configured ? AppColors.white : AppColors.tealSoft, borderRadius: BorderRadius.circular(15)),
-          child: Icon(configured ? Icons.notifications_active_rounded : Icons.notifications_none_rounded, color: AppColors.teal),
+          decoration: BoxDecoration(
+              color: configured ? AppColors.white : AppColors.tealSoft,
+              borderRadius: BorderRadius.circular(15)),
+          child: Icon(
+              configured
+                  ? Icons.notifications_active_rounded
+                  : Icons.notifications_none_rounded,
+              color: AppColors.teal),
         ),
         const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(tr(context, es: 'Notificaciones del dispositivo', en: 'Device notifications'), style: Theme.of(context).textTheme.titleMedium),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+              tr(context,
+                  es: 'Notificaciones del dispositivo',
+                  en: 'Device notifications'),
+              style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
-          Text(tr(context, es: 'Activa este dispositivo para recibir avisos importantes de tus grupos.', en: 'Enable this device to receive important alerts from your groups.'), style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+              tr(context,
+                  es: 'Activa este dispositivo para recibir avisos importantes de tus grupos.',
+                  en: 'Enable this device to receive important alerts from your groups.'),
+              style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(onPressed: onEnable, icon: const Icon(Icons.power_settings_new_rounded), label: Text(tr(context, es: 'Activar en este dispositivo', en: 'Enable on this device'))),
+            child: TextButton.icon(
+                onPressed: onEnable,
+                icon: const Icon(Icons.power_settings_new_rounded),
+                label: Text(tr(context,
+                    es: 'Activar en este dispositivo',
+                    en: 'Enable on this device'))),
           ),
         ])),
       ]),
@@ -1151,14 +1456,17 @@ class PushStatusCard extends StatelessWidget {
 class NotificationListRow extends StatelessWidget {
   final Map<String, dynamic> notification;
   final VoidCallback onTap;
-  const NotificationListRow({super.key, required this.notification, required this.onTap});
+  const NotificationListRow(
+      {super.key, required this.notification, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final unread = notification['read_at'] == null;
     final type = AppData.text(notification['type'], 'general');
     final color = notificationColor(type);
-    final created = DateTime.tryParse(notification['created_at']?.toString() ?? '')?.toLocal();
+    final created =
+        DateTime.tryParse(notification['created_at']?.toString() ?? '')
+            ?.toLocal();
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -1168,21 +1476,50 @@ class NotificationListRow extends StatelessWidget {
             Container(
               width: 40,
               height: 40,
-              decoration: BoxDecoration(color: color.withOpacity(.12), borderRadius: BorderRadius.circular(14)),
+              decoration: BoxDecoration(
+                  color: color.withOpacity(.12),
+                  borderRadius: BorderRadius.circular(14)),
               child: Icon(notificationIcon(type), color: color, size: 21),
             ),
             if (unread)
-              Positioned(right: 0, top: 0, child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle))),
+              Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                          color: AppColors.red, shape: BoxShape.circle))),
           ]),
           const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(child: Text(AppData.text(notification['title'], 'Aviso'), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: unread ? FontWeight.w900 : FontWeight.w800, color: AppColors.ink))),
-              if (created != null) Text(notificationTime(created), style: const TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700)),
-            ]),
-            const SizedBox(height: 4),
-            Text(AppData.text(notification['body'], 'Hay una novedad en tu grupo.'), maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyMedium),
-          ])),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Row(children: [
+                  Expanded(
+                      child: Text(AppData.text(notification['title'], 'Aviso'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontWeight:
+                                  unread ? FontWeight.w900 : FontWeight.w800,
+                              color: AppColors.ink))),
+                  if (created != null)
+                    Text(notificationTime(created),
+                        style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700)),
+                ]),
+                const SizedBox(height: 4),
+                Text(
+                    AppData.text(
+                        notification['body'], 'Hay una novedad en tu grupo.'),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium),
+              ])),
           const SizedBox(width: 6),
           const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
         ]),
@@ -1191,13 +1528,25 @@ class NotificationListRow extends StatelessWidget {
   }
 }
 
-
 int notificationGroupTabFromValues(String routeType, String type) {
   final value = AppData.text(routeType, AppData.text(type)).toLowerCase();
-  if (value.contains('event') || value.contains('agenda') || value.contains('attendance') || value.contains('calendar')) return 1;
-  if (value.contains('finance') || value.contains('expense') || value.contains('settlement') || value.contains('payment') || value.contains('gasto')) return 2;
-  if (value.contains('tournament') || value.contains('match') || value.contains('torneo') || value.contains('resultado')) return 3;
-  if (value.contains('member') || value.contains('grupo') || value.contains('group') || value.contains('invite')) return 4;
+  if (value.contains('event') ||
+      value.contains('agenda') ||
+      value.contains('attendance') ||
+      value.contains('calendar')) return 1;
+  if (value.contains('finance') ||
+      value.contains('expense') ||
+      value.contains('settlement') ||
+      value.contains('payment') ||
+      value.contains('gasto')) return 2;
+  if (value.contains('tournament') ||
+      value.contains('match') ||
+      value.contains('torneo') ||
+      value.contains('resultado')) return 3;
+  if (value.contains('member') ||
+      value.contains('grupo') ||
+      value.contains('group') ||
+      value.contains('invite')) return 4;
   return 0;
 }
 
@@ -1237,7 +1586,6 @@ String notificationTime(DateTime date) {
   if (diff.inDays < 7) return '${diff.inDays}d';
   return DateFormat('dd/MM', appDateLocale).format(date);
 }
-
 
 class SupportTicketScreen extends StatefulWidget {
   final Map<String, dynamic>? group;
@@ -1282,8 +1630,15 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
       );
       title.clear();
       description.clear();
-      setState(() { myTicketsFuture = AppData.mySupportTickets(); });
-      if (mounted) await showToast(context, tr(context, es: 'Reporte enviado. Gracias. El equipo lo revisará desde el panel admin.', en: 'Report sent. Thanks. The team will review it from the admin panel.'));
+      setState(() {
+        myTicketsFuture = AppData.mySupportTickets();
+      });
+      if (mounted)
+        await showToast(
+            context,
+            tr(context,
+                es: 'Reporte enviado. Gracias. El equipo lo revisará desde el panel admin.',
+                en: 'Report sent. Thanks. The team will review it from the admin panel.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     } finally {
@@ -1294,36 +1649,82 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
   @override
   Widget build(BuildContext context) {
     final groupName = AppData.text(widget.group?['name'], 'Cuenta general');
-    return DirectPage(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeader(title: tr(context, es: 'Ayuda y soporte', en: 'Help & support'), subtitle: tr(context, es: 'Reporta errores, dudas o sugerencias sin salir de Grupli.', en: 'Report bugs, questions or suggestions without leaving Grupli.'), leading: true),
+    return DirectPage(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      PageHeader(
+          title: tr(context, es: 'Ayuda y soporte', en: 'Help & support'),
+          subtitle: tr(context,
+              es: 'Reporta errores, dudas o sugerencias sin salir de Grupli.',
+              en: 'Report bugs, questions or suggestions without leaving Grupli.'),
+          leading: true),
       const SizedBox(height: 14),
       AppCard(
         padding: const EdgeInsets.all(16),
         color: AppColors.tealSoft,
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(width: 44, height: 44, decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.support_agent_rounded, color: AppColors.teal)),
+          Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(15)),
+              child: const Icon(Icons.support_agent_rounded,
+                  color: AppColors.teal)),
           const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(tr(context, es: 'Enviar reporte', en: 'Send report'), style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(tr(context, es: 'Zona: $groupName · ${AppConfig.appVersion}', en: 'Scope: $groupName · ${AppConfig.appVersion}'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800)),
-          ])),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(tr(context, es: 'Enviar reporte', en: 'Send report'),
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                    tr(context,
+                        es: 'Zona: $groupName · ${AppConfig.appVersion}',
+                        en: 'Scope: $groupName · ${AppConfig.appVersion}'),
+                    style: const TextStyle(
+                        color: AppColors.muted, fontWeight: FontWeight.w800)),
+              ])),
         ]),
       ),
       const SizedBox(height: 14),
-      AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      AppCard(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         FieldLabel(tr(context, es: 'Tipo de reporte', en: 'Report type')),
         DropdownButtonFormField<String>(
           value: type,
           items: [
-            DropdownMenuItem(value: 'bug', child: Text(tr(context, es: 'Bug o fallo', en: 'Bug or issue'))),
-            DropdownMenuItem(value: 'cuenta', child: Text(tr(context, es: 'Cuenta / acceso', en: 'Account / access'))),
-            DropdownMenuItem(value: 'grupo', child: Text(tr(context, es: 'Grupo / invitación', en: 'Group / invite'))),
-            DropdownMenuItem(value: 'evento', child: Text(tr(context, es: 'Evento / asistencia', en: 'Event / attendance'))),
-            DropdownMenuItem(value: 'finanzas', child: Text(tr(context, es: 'Finanzas / pagos', en: 'Finances / payments'))),
-            DropdownMenuItem(value: 'torneo', child: Text(tr(context, es: 'Torneos / resultados', en: 'Tournaments / results'))),
-            DropdownMenuItem(value: 'sugerencia', child: Text(tr(context, es: 'Sugerencia', en: 'Suggestion'))),
-            DropdownMenuItem(value: 'otro', child: Text(tr(context, es: 'Otro', en: 'Other'))),
+            DropdownMenuItem(
+                value: 'bug',
+                child:
+                    Text(tr(context, es: 'Bug o fallo', en: 'Bug or issue'))),
+            DropdownMenuItem(
+                value: 'cuenta',
+                child: Text(tr(context,
+                    es: 'Cuenta / acceso', en: 'Account / access'))),
+            DropdownMenuItem(
+                value: 'grupo',
+                child: Text(tr(context,
+                    es: 'Grupo / invitación', en: 'Group / invite'))),
+            DropdownMenuItem(
+                value: 'evento',
+                child: Text(tr(context,
+                    es: 'Evento / asistencia', en: 'Event / attendance'))),
+            DropdownMenuItem(
+                value: 'finanzas',
+                child: Text(tr(context,
+                    es: 'Finanzas / pagos', en: 'Finances / payments'))),
+            DropdownMenuItem(
+                value: 'torneo',
+                child: Text(tr(context,
+                    es: 'Torneos / resultados', en: 'Tournaments / results'))),
+            DropdownMenuItem(
+                value: 'sugerencia',
+                child: Text(tr(context, es: 'Sugerencia', en: 'Suggestion'))),
+            DropdownMenuItem(
+                value: 'otro',
+                child: Text(tr(context, es: 'Otro', en: 'Other'))),
           ],
           onChanged: (v) => setState(() => type = v ?? 'bug'),
         ),
@@ -1332,38 +1733,76 @@ class _SupportTicketScreenState extends State<SupportTicketScreen> {
         DropdownButtonFormField<String>(
           value: priority,
           items: [
-            DropdownMenuItem(value: 'low', child: Text(tr(context, es: 'Baja', en: 'Low'))),
-            DropdownMenuItem(value: 'normal', child: Text(tr(context, es: 'Normal', en: 'Normal'))),
-            DropdownMenuItem(value: 'high', child: Text(tr(context, es: 'Alta', en: 'High'))),
-            DropdownMenuItem(value: 'critical', child: Text(tr(context, es: 'Crítica', en: 'Critical'))),
+            DropdownMenuItem(
+                value: 'low', child: Text(tr(context, es: 'Baja', en: 'Low'))),
+            DropdownMenuItem(
+                value: 'normal',
+                child: Text(tr(context, es: 'Normal', en: 'Normal'))),
+            DropdownMenuItem(
+                value: 'high',
+                child: Text(tr(context, es: 'Alta', en: 'High'))),
+            DropdownMenuItem(
+                value: 'critical',
+                child: Text(tr(context, es: 'Crítica', en: 'Critical'))),
           ],
           onChanged: (v) => setState(() => priority = v ?? 'normal'),
         ),
         const SizedBox(height: 12),
         FieldLabel(tr(context, es: 'Título', en: 'Title')),
-        TextField(controller: title, decoration: InputDecoration(hintText: tr(context, es: 'Ej. No me deja marcar un pago', en: 'E.g. I cannot mark a payment'))),
+        TextField(
+            controller: title,
+            decoration: InputDecoration(
+                hintText: tr(context,
+                    es: 'Ej. No me deja marcar un pago',
+                    en: 'E.g. I cannot mark a payment'))),
         const SizedBox(height: 12),
         FieldLabel(tr(context, es: 'Descripción', en: 'Description')),
-        TextField(controller: description, minLines: 4, maxLines: 7, decoration: InputDecoration(hintText: tr(context, es: 'Cuenta qué ha pasado, en qué pantalla y qué esperabas que ocurriera.', en: 'Explain what happened, on which screen and what you expected to happen.'))),
+        TextField(
+            controller: description,
+            minLines: 4,
+            maxLines: 7,
+            decoration: InputDecoration(
+                hintText: tr(context,
+                    es: 'Cuenta qué ha pasado, en qué pantalla y qué esperabas que ocurriera.',
+                    en: 'Explain what happened, on which screen and what you expected to happen.'))),
         const SizedBox(height: 16),
-        PrimaryButton(label: tr(context, es: 'Enviar reporte', en: 'Send report'), icon: Icons.send_rounded, loading: loading, onTap: submit),
+        PrimaryButton(
+            label: tr(context, es: 'Enviar reporte', en: 'Send report'),
+            icon: Icons.send_rounded,
+            loading: loading,
+            onTap: submit),
       ])),
       const SizedBox(height: 18),
-      SectionHeader(title: tr(context, es: 'Tus reportes recientes', en: 'Your recent reports')),
+      SectionHeader(
+          title: tr(context,
+              es: 'Tus reportes recientes', en: 'Your recent reports')),
       const SizedBox(height: 8),
       FutureBuilder<List<Map<String, dynamic>>>(
         future: myTicketsFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) return CenterLoader(label: tr(context, es: 'Cargando reportes...', en: 'Loading reports...'));
+          if (snapshot.connectionState == ConnectionState.waiting)
+            return CenterLoader(
+                label: tr(context,
+                    es: 'Cargando reportes...', en: 'Loading reports...'));
           final tickets = snapshot.data ?? [];
-          if (tickets.isEmpty) return EmptySlim(icon: Icons.inbox_rounded, title: tr(context, es: 'Sin reportes todavía', en: 'No reports yet'), body: tr(context, es: 'Cuando envíes algo aparecerá aquí.', en: 'When you send something, it will appear here.'));
-          return Column(children: tickets.take(5).map((ticket) => SupportTicketCard(ticket: ticket)).toList());
+          if (tickets.isEmpty)
+            return EmptySlim(
+                icon: Icons.inbox_rounded,
+                title: tr(context,
+                    es: 'Sin reportes todavía', en: 'No reports yet'),
+                body: tr(context,
+                    es: 'Cuando envíes algo aparecerá aquí.',
+                    en: 'When you send something, it will appear here.'));
+          return Column(
+              children: tickets
+                  .take(5)
+                  .map((ticket) => SupportTicketCard(ticket: ticket))
+                  .toList());
         },
       ),
     ]));
   }
 }
-
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -1389,39 +1828,58 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   void reload() => setState(load);
 
-  Future<void> changeStatus(Map<String, dynamic> ticket, String status, {String? note}) async {
+  Future<void> changeStatus(Map<String, dynamic> ticket, String status,
+      {String? note}) async {
     final role = await AppData.currentAppAdminRole();
-      if (role == 'viewer' || role.isEmpty) {
-      if (mounted) await showToast(context, tr(context, es: 'Tu rol puede ver métricas, pero no modificar reportes.', en: 'Your role can see metrics, but cannot modify reports.'), danger: true);
+    if (role == 'viewer' || role.isEmpty) {
+      if (mounted)
+        await showToast(
+            context,
+            tr(context,
+                es: 'Tu rol puede ver métricas, pero no modificar reportes.',
+                en: 'Your role can see metrics, but cannot modify reports.'),
+            danger: true);
       return;
     }
     try {
-      await AppData.updateSupportTicketStatus(ticket['id'].toString(), status, note: note);
+      await AppData.updateSupportTicketStatus(ticket['id'].toString(), status,
+          note: note);
       reload();
-      if (mounted) await showToast(context, tr(context, es: 'Reporte actualizado.', en: 'Report updated.'));
+      if (mounted)
+        await showToast(context,
+            tr(context, es: 'Reporte actualizado.', en: 'Report updated.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
   }
 
   Future<void> replyToTicket(Map<String, dynamic> ticket) async {
-    final controller = TextEditingController(text: AppData.text(ticket['admin_note']));
+    final controller =
+        TextEditingController(text: AppData.text(ticket['admin_note']));
     final note = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(tr(context, es: 'Responder reporte', en: 'Reply to report')),
+        title:
+            Text(tr(context, es: 'Responder reporte', en: 'Reply to report')),
         content: TextField(
           controller: controller,
           minLines: 4,
           maxLines: 7,
           decoration: InputDecoration(
-            hintText: tr(context, es: 'Escribe una respuesta visible para el usuario...', en: 'Write a reply visible to the user...'),
+            hintText: tr(context,
+                es: 'Escribe una respuesta visible para el usuario...',
+                en: 'Write a reply visible to the user...'),
           ),
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: Text(tr(context, es: 'Guardar respuesta', en: 'Save reply'))),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text),
+              child:
+                  Text(tr(context, es: 'Guardar respuesta', en: 'Save reply'))),
         ],
       ),
     );
@@ -1436,18 +1894,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final label = status == 'blocked' ? 'bloquear' : 'activar';
     final ok = await confirmAction(
       context,
-      title: tr(context, es: '¿${label[0].toUpperCase()}${label.substring(1)} usuario?', en: '${label[0].toUpperCase()}${label.substring(1)} user?'),
+      title: tr(context,
+          es: '¿${label[0].toUpperCase()}${label.substring(1)} usuario?',
+          en: '${label[0].toUpperCase()}${label.substring(1)} user?'),
       body: status == 'blocked'
-          ? tr(context, es: 'El usuario podrá seguir existiendo en base de datos, pero quedará marcado como bloqueado para soporte/admin.', en: 'The user can still exist in the database, but will be marked as blocked for support/admin.')
-          : tr(context, es: 'El usuario volverá a aparecer como activo.', en: 'The user will appear active again.'),
+          ? tr(context,
+              es:
+                  'El usuario podrá seguir existiendo en base de datos, pero quedará marcado como bloqueado para soporte/admin.',
+              en:
+                  'The user can still exist in the database, but will be marked as blocked for support/admin.')
+          : tr(context,
+              es: 'El usuario volverá a aparecer como activo.',
+              en: 'The user will appear active again.'),
       danger: status == 'blocked',
-      confirmLabel: status == 'blocked' ? tr(context, es: 'Bloquear', en: 'Block') : tr(context, es: 'Activar', en: 'Activate'),
+      confirmLabel: status == 'blocked'
+          ? tr(context, es: 'Bloquear', en: 'Block')
+          : tr(context, es: 'Activar', en: 'Activate'),
     );
     if (ok != true) return;
     try {
       await AppData.adminSetUserStatus(email, status);
       reload();
-      if (mounted) await showToast(context, status == 'blocked' ? tr(context, es: 'Usuario bloqueado.', en: 'User blocked.') : tr(context, es: 'Usuario activado.', en: 'User activated.'));
+      if (mounted)
+        await showToast(
+            context,
+            status == 'blocked'
+                ? tr(context, es: 'Usuario bloqueado.', en: 'User blocked.')
+                : tr(context, es: 'Usuario activado.', en: 'User activated.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -1455,86 +1928,210 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return DirectPage(child: FutureBuilder<_AdminDashboardData>(
+    return DirectPage(
+        child: FutureBuilder<_AdminDashboardData>(
       future: future,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return CenterLoader(label: tr(context, es: 'Cargando panel admin...', en: 'Loading admin panel...'));
-        if (snapshot.hasError) return ErrorBlock(message: humanError(snapshot.error), onRetry: reload);
+        if (snapshot.connectionState == ConnectionState.waiting)
+          return CenterLoader(
+              label: tr(context,
+                  es: 'Cargando panel admin...', en: 'Loading admin panel...'));
+        if (snapshot.hasError)
+          return ErrorBlock(
+              message: humanError(snapshot.error), onRetry: reload);
         final data = snapshot.data ?? _AdminDashboardData.empty();
         final overview = data.overview;
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          PageHeader(title: tr(context, es: 'Panel admin', en: 'Admin panel'), subtitle: tr(context, es: 'Soporte, usuarios, grupos y calidad de Grupli.', en: 'Support, users, groups and Grupli quality.'), leading: true),
+          PageHeader(
+              title: tr(context, es: 'Panel admin', en: 'Admin panel'),
+              subtitle: tr(context,
+                  es: 'Soporte, usuarios, grupos y calidad de Grupli.',
+                  en: 'Support, users, groups and Grupli quality.'),
+              leading: true),
           const SizedBox(height: 10),
           AdminRoleInfoCard(role: data.role),
           const SizedBox(height: 12),
           AdminOverviewHero(overview: overview),
           const SizedBox(height: 12),
           Row(children: [
-            Expanded(child: AdminMetricCard(label: tr(context, es: 'Usuarios', en: 'Users'), value: '${AppData.intValue(overview['users'])}', icon: Icons.people_alt_rounded, color: AppColors.teal)),
+            Expanded(
+                child: AdminMetricCard(
+                    label: tr(context, es: 'Usuarios', en: 'Users'),
+                    value: '${AppData.intValue(overview['users'])}',
+                    icon: Icons.people_alt_rounded,
+                    color: AppColors.teal)),
             const SizedBox(width: 9),
-            Expanded(child: AdminMetricCard(label: tr(context, es: 'Grupos', en: 'Groups'), value: '${AppData.intValue(overview['groups'])}', icon: Icons.groups_rounded, color: AppColors.violet)),
+            Expanded(
+                child: AdminMetricCard(
+                    label: tr(context, es: 'Grupos', en: 'Groups'),
+                    value: '${AppData.intValue(overview['groups'])}',
+                    icon: Icons.groups_rounded,
+                    color: AppColors.violet)),
           ]),
           const SizedBox(height: 9),
           Row(children: [
-            Expanded(child: AdminMetricCard(label: tr(context, es: 'Reportes', en: 'Reports'), value: '${AppData.intValue(overview['open_tickets'])}', icon: Icons.support_agent_rounded, color: AppColors.orange)),
+            Expanded(
+                child: AdminMetricCard(
+                    label: tr(context, es: 'Reportes', en: 'Reports'),
+                    value: '${AppData.intValue(overview['open_tickets'])}',
+                    icon: Icons.support_agent_rounded,
+                    color: AppColors.orange)),
             const SizedBox(width: 9),
-            Expanded(child: AdminMetricCard(label: tr(context, es: 'Críticos', en: 'Critical'), value: '${AppData.intValue(overview['critical_tickets'])}', icon: Icons.warning_amber_rounded, color: AppColors.red)),
+            Expanded(
+                child: AdminMetricCard(
+                    label: tr(context, es: 'Críticos', en: 'Critical'),
+                    value: '${AppData.intValue(overview['critical_tickets'])}',
+                    icon: Icons.warning_amber_rounded,
+                    color: AppColors.red)),
           ]),
           const SizedBox(height: 14),
-          AdminSectionTabs(index: section, role: data.role, onChanged: (i) => setState(() => section = i)),
+          AdminSectionTabs(
+              index: section,
+              role: data.role,
+              onChanged: (i) => setState(() => section = i)),
           const SizedBox(height: 14),
           if (section == 0) ...[
             SectionHeader(
-              title: tr(context, es: 'Reportes de usuarios', en: 'User reports'),
-              action: data.isViewer ? tr(context, es: 'Solo lectura', en: 'Read only') : filter == 'open' ? tr(context, es: 'Ver todos', en: 'View all') : tr(context, es: 'Abiertos', en: 'Open'),
-              onTap: data.isViewer ? null : () { setState(() { filter = filter == 'open' ? 'all' : 'open'; load(); }); },
+              title:
+                  tr(context, es: 'Reportes de usuarios', en: 'User reports'),
+              action: data.isViewer
+                  ? tr(context, es: 'Solo lectura', en: 'Read only')
+                  : filter == 'open'
+                      ? tr(context, es: 'Ver todos', en: 'View all')
+                      : tr(context, es: 'Abiertos', en: 'Open'),
+              onTap: data.isViewer
+                  ? null
+                  : () {
+                      setState(() {
+                        filter = filter == 'open' ? 'all' : 'open';
+                        load();
+                      });
+                    },
             ),
             const SizedBox(height: 8),
             if (data.isViewer)
-              EmptySlim(icon: Icons.visibility_rounded, title: tr(context, es: 'Modo viewer', en: 'Viewer mode'), body: tr(context, es: 'Puedes ver métricas y estado general, pero no detalles sensibles ni acciones de soporte.', en: 'You can see metrics and overall status, but not sensitive details or support actions.'))
+              EmptySlim(
+                  icon: Icons.visibility_rounded,
+                  title: tr(context, es: 'Modo viewer', en: 'Viewer mode'),
+                  body: tr(context,
+                      es: 'Puedes ver métricas y estado general, pero no detalles sensibles ni acciones de soporte.',
+                      en: 'You can see metrics and overall status, but not sensitive details or support actions.'))
             else if (data.tickets.isEmpty)
-              EmptySlim(icon: Icons.verified_rounded, title: filter == 'open' ? tr(context, es: 'No hay reportes abiertos', en: 'No open reports') : tr(context, es: 'No hay reportes', en: 'No reports'), body: tr(context, es: 'Cuando un usuario reporte algo aparecerá aquí.', en: 'When a user reports something, it will appear here.'))
+              EmptySlim(
+                  icon: Icons.verified_rounded,
+                  title: filter == 'open'
+                      ? tr(context,
+                          es: 'No hay reportes abiertos', en: 'No open reports')
+                      : tr(context, es: 'No hay reportes', en: 'No reports'),
+                  body: tr(context,
+                      es: 'Cuando un usuario reporte algo aparecerá aquí.',
+                      en: 'When a user reports something, it will appear here.'))
             else
               ...data.tickets.map((ticket) => AdminTicketCard(
-                ticket: ticket,
-                canHandle: data.canHandleSupport,
-                onStatus: (status) => changeStatus(ticket, status),
-                onReply: data.canHandleSupport ? () => replyToTicket(ticket) : null,
-              )),
+                    ticket: ticket,
+                    canHandle: data.canHandleSupport,
+                    onStatus: (status) => changeStatus(ticket, status),
+                    onReply: data.canHandleSupport
+                        ? () => replyToTicket(ticket)
+                        : null,
+                  )),
           ] else if (section == 1) ...[
-            SectionHeader(title: tr(context, es: 'Usuarios', en: 'Users'), action: data.isOwner ? '${data.users.length}' : tr(context, es: 'Owner', en: 'Owner')),
+            SectionHeader(
+                title: tr(context, es: 'Usuarios', en: 'Users'),
+                action: data.isOwner
+                    ? '${data.users.length}'
+                    : tr(context, es: 'Owner', en: 'Owner')),
             const SizedBox(height: 8),
             if (!data.isOwner)
-              EmptySlim(icon: Icons.lock_rounded, title: tr(context, es: 'Solo owner', en: 'Owner only'), body: tr(context, es: 'Los usuarios son información sensible. Support y viewer no pueden gestionarlos.', en: 'Users are sensitive information. Support and viewer cannot manage them.'))
+              EmptySlim(
+                  icon: Icons.lock_rounded,
+                  title: tr(context, es: 'Solo owner', en: 'Owner only'),
+                  body: tr(context,
+                      es:
+                          'Los usuarios son información sensible. Support y viewer no pueden gestionarlos.',
+                      en:
+                          'Users are sensitive information. Support and viewer cannot manage them.'))
             else if (data.users.isEmpty)
-              EmptySlim(icon: Icons.people_alt_rounded, title: tr(context, es: 'Sin usuarios visibles', en: 'No visible users'), body: tr(context, es: 'Todavía no hay usuarios para mostrar.', en: 'There are no users to show yet.'))
+              EmptySlim(
+                  icon: Icons.people_alt_rounded,
+                  title: tr(context,
+                      es: 'Sin usuarios visibles', en: 'No visible users'),
+                  body: tr(context,
+                      es: 'Todavía no hay usuarios para mostrar.',
+                      en: 'There are no users to show yet.'))
             else
-              ...data.users.map((u) => AdminUserCard(user: u, onBlock: () => setUserStatus(u, 'blocked'), onActivate: () => setUserStatus(u, 'active'))),
+              ...data.users.map((u) => AdminUserCard(
+                  user: u,
+                  onBlock: () => setUserStatus(u, 'blocked'),
+                  onActivate: () => setUserStatus(u, 'active'))),
           ] else if (section == 2) ...[
-            SectionHeader(title: tr(context, es: 'Grupos', en: 'Groups'), action: data.isOwner ? '${data.groups.length}' : tr(context, es: 'Owner', en: 'Owner')),
+            SectionHeader(
+                title: tr(context, es: 'Grupos', en: 'Groups'),
+                action: data.isOwner
+                    ? '${data.groups.length}'
+                    : tr(context, es: 'Owner', en: 'Owner')),
             const SizedBox(height: 8),
             if (!data.isOwner)
-              EmptySlim(icon: Icons.lock_rounded, title: tr(context, es: 'Solo owner', en: 'Owner only'), body: tr(context, es: 'La vista completa de grupos queda reservada al owner.', en: 'The full groups view is reserved for the owner.'))
+              EmptySlim(
+                  icon: Icons.lock_rounded,
+                  title: tr(context, es: 'Solo owner', en: 'Owner only'),
+                  body: tr(context,
+                      es:
+                          'La vista completa de grupos queda reservada al owner.',
+                      en: 'The full groups view is reserved for the owner.'))
             else if (data.groups.isEmpty)
-              EmptySlim(icon: Icons.groups_rounded, title: tr(context, es: 'Sin grupos visibles', en: 'No visible groups'), body: tr(context, es: 'Cuando se creen grupos aparecerán aquí.', en: 'When groups are created, they will appear here.'))
+              EmptySlim(
+                  icon: Icons.groups_rounded,
+                  title: tr(context,
+                      es: 'Sin grupos visibles', en: 'No visible groups'),
+                  body: tr(context,
+                      es: 'Cuando se creen grupos aparecerán aquí.',
+                      en: 'When groups are created, they will appear here.'))
             else
               ...data.groups.map((g) => AdminGroupCard(group: g)),
           ] else if (section == 3) ...[
-            SectionHeader(title: tr(context, es: 'Dispositivos push', en: 'Push devices'), action: data.isOwner ? '${data.devices.length}' : tr(context, es: 'Owner', en: 'Owner')),
+            SectionHeader(
+                title: tr(context, es: 'Dispositivos push', en: 'Push devices'),
+                action: data.isOwner
+                    ? '${data.devices.length}'
+                    : tr(context, es: 'Owner', en: 'Owner')),
             const SizedBox(height: 8),
             if (!data.isOwner)
-              EmptySlim(icon: Icons.lock_rounded, title: tr(context, es: 'Solo owner', en: 'Owner only'), body: tr(context, es: 'Los tokens/dispositivos son datos técnicos sensibles.', en: 'Tokens/devices are sensitive technical data.'))
+              EmptySlim(
+                  icon: Icons.lock_rounded,
+                  title: tr(context, es: 'Solo owner', en: 'Owner only'),
+                  body: tr(context,
+                      es:
+                          'Los tokens/dispositivos son datos técnicos sensibles.',
+                      en: 'Tokens/devices are sensitive technical data.'))
             else if (data.devices.isEmpty)
-              EmptySlim(icon: Icons.phone_android_rounded, title: tr(context, es: 'Sin dispositivos', en: 'No devices'), body: tr(context, es: 'Aparecerán cuando los usuarios activen notificaciones en su móvil.', en: 'They will appear when users enable notifications on their phone.'))
+              EmptySlim(
+                  icon: Icons.phone_android_rounded,
+                  title: tr(context, es: 'Sin dispositivos', en: 'No devices'),
+                  body: tr(context,
+                      es: 'Aparecerán cuando los usuarios activen notificaciones en su móvil.',
+                      en: 'They will appear when users enable notifications on their phone.'))
             else
               ...data.devices.map((d) => AdminDeviceCard(device: d)),
           ] else ...[
-            SectionHeader(title: tr(context, es: 'Actividad y calidad', en: 'Activity & quality'), action: '${data.qualityEvents.length}'),
+            SectionHeader(
+                title: tr(context,
+                    es: 'Actividad y calidad', en: 'Activity & quality'),
+                action: '${data.qualityEvents.length}'),
             const SizedBox(height: 8),
             if (data.qualityEvents.isEmpty)
-              EmptySlim(icon: Icons.insights_rounded, title: tr(context, es: 'Sin eventos todavía', en: 'No events yet'), body: tr(context, es: 'Se guardarán reportes y señales internas útiles.', en: 'Useful internal reports and signals will be stored here.'))
+              EmptySlim(
+                  icon: Icons.insights_rounded,
+                  title: tr(context,
+                      es: 'Sin eventos todavía', en: 'No events yet'),
+                  body: tr(context,
+                      es: 'Se guardarán reportes y señales internas útiles.',
+                      en:
+                          'Useful internal reports and signals will be stored here.'))
             else
-              ...data.qualityEvents.take(20).map((event) => QualityEventCard(event: event)),
+              ...data.qualityEvents
+                  .take(20)
+                  .map((event) => QualityEventCard(event: event)),
           ],
         ]);
       },
@@ -1559,7 +2156,14 @@ class _AdminDashboardData {
     required this.devices,
     this.role = '',
   });
-  static _AdminDashboardData empty() => const _AdminDashboardData(overview: {}, tickets: [], qualityEvents: [], users: [], groups: [], devices: [], role: '');
+  static _AdminDashboardData empty() => const _AdminDashboardData(
+      overview: {},
+      tickets: [],
+      qualityEvents: [],
+      users: [],
+      groups: [],
+      devices: [],
+      role: '');
   bool get isOwner => role == 'owner';
   bool get canHandleSupport => role == 'owner' || role == 'support';
   bool get isViewer => role == 'viewer';
@@ -1568,11 +2172,19 @@ class _AdminDashboardData {
     final isOwner = role == 'owner';
     final results = await Future.wait([
       AppData.adminOverview(),
-      role == 'viewer' ? Future.value(<Map<String, dynamic>>[]) : AppData.adminSupportTickets(status: status),
+      role == 'viewer'
+          ? Future.value(<Map<String, dynamic>>[])
+          : AppData.adminSupportTickets(status: status),
       AppData.adminQualityEvents(),
-      isOwner ? AppData.adminUsersOverview() : Future.value(<Map<String, dynamic>>[]),
-      isOwner ? AppData.adminGroupsOverview() : Future.value(<Map<String, dynamic>>[]),
-      isOwner ? AppData.adminDevicesOverview() : Future.value(<Map<String, dynamic>>[]),
+      isOwner
+          ? AppData.adminUsersOverview()
+          : Future.value(<Map<String, dynamic>>[]),
+      isOwner
+          ? AppData.adminGroupsOverview()
+          : Future.value(<Map<String, dynamic>>[]),
+      isOwner
+          ? AppData.adminDevicesOverview()
+          : Future.value(<Map<String, dynamic>>[]),
     ]);
     return _AdminDashboardData(
       overview: AppData.asMap(results[0]),
@@ -1596,31 +2208,66 @@ class SupportTicketCard extends StatelessWidget {
     final group = AppData.asMap(ticket['groups']);
     return Padding(
       padding: const EdgeInsets.only(bottom: 9),
-      child: AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: AppCard(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Container(width: 40, height: 40, decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(14)), child: Icon(ticketTypeIcon(AppData.text(ticket['type'])), color: color)),
+          Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                  color: color.withOpacity(.10),
+                  borderRadius: BorderRadius.circular(14)),
+              child: Icon(ticketTypeIcon(AppData.text(ticket['type'])),
+                  color: color)),
           const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(AppData.text(ticket['title'], 'Reporte'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
-            const SizedBox(height: 3),
-            Text('${ticketStatusLabel(status)} · ${AppData.text(group['name'], 'Cuenta general')}', style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
-          ])),
-          _MiniChip(text: ticketPriorityLabel(AppData.text(ticket['priority'], 'normal')), color: ticketPriorityColor(AppData.text(ticket['priority'], 'normal'))),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(AppData.text(ticket['title'], 'Reporte'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w900, color: AppColors.ink)),
+                const SizedBox(height: 3),
+                Text(
+                    '${ticketStatusLabel(status)} · ${AppData.text(group['name'], 'Cuenta general')}',
+                    style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+              ])),
+          _MiniChip(
+              text: ticketPriorityLabel(
+                  AppData.text(ticket['priority'], 'normal')),
+              color: ticketPriorityColor(
+                  AppData.text(ticket['priority'], 'normal'))),
         ]),
         if (AppData.text(ticket['admin_note']).isNotEmpty) ...[
           const SizedBox(height: 10),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.teal.withOpacity(.14))),
-            child: Text(tr(context, es: 'Respuesta de soporte: ${AppData.text(ticket['admin_note'])}', en: 'Support reply: ${AppData.text(ticket['admin_note'])}'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.3)),
+            decoration: BoxDecoration(
+                color: AppColors.tealSoft,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.teal.withOpacity(.14))),
+            child: Text(
+                tr(context,
+                    es:
+                        'Respuesta de soporte: ${AppData.text(ticket['admin_note'])}',
+                    en: 'Support reply: ${AppData.text(ticket['admin_note'])}'),
+                style: const TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w800,
+                    height: 1.3)),
           ),
         ],
       ])),
     );
   }
 }
-
 
 class AdminRoleInfoCard extends StatelessWidget {
   final String role;
@@ -1629,23 +2276,62 @@ class AdminRoleInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = role.isEmpty ? 'viewer' : role;
-    final color = normalized == 'owner' ? AppColors.orange : normalized == 'support' ? AppColors.teal : AppColors.violet;
-    final title = normalized == 'owner' ? tr(context, es: 'Owner de la app', en: 'App owner') : normalized == 'support' ? tr(context, es: 'Soporte', en: 'Support') : tr(context, es: 'Viewer', en: 'Viewer');
-    final body = normalized == 'owner'
-        ? tr(context, es: 'Control total: usuarios, grupos, reportes, métricas y acciones críticas.', en: 'Full control: users, groups, reports, metrics and critical actions.')
+    final color = normalized == 'owner'
+        ? AppColors.orange
         : normalized == 'support'
-            ? tr(context, es: 'Puede ver y responder reportes, sin tocar acciones críticas de usuarios.', en: 'Can view and reply to reports, without touching critical user actions.')
-            : tr(context, es: 'Solo métricas y estado general. No puede modificar información sensible.', en: 'Metrics and general status only. Cannot modify sensitive information.');
+            ? AppColors.teal
+            : AppColors.violet;
+    final title = normalized == 'owner'
+        ? tr(context, es: 'Owner de la app', en: 'App owner')
+        : normalized == 'support'
+            ? tr(context, es: 'Soporte', en: 'Support')
+            : tr(context, es: 'Viewer', en: 'Viewer');
+    final body = normalized == 'owner'
+        ? tr(context,
+            es:
+                'Control total: usuarios, grupos, reportes, métricas y acciones críticas.',
+            en:
+                'Full control: users, groups, reports, metrics and critical actions.')
+        : normalized == 'support'
+            ? tr(context,
+                es:
+                    'Puede ver y responder reportes, sin tocar acciones críticas de usuarios.',
+                en:
+                    'Can view and reply to reports, without touching critical user actions.')
+            : tr(context,
+                es: 'Solo métricas y estado general. No puede modificar información sensible.',
+                en: 'Metrics and general status only. Cannot modify sensitive information.');
     return AppCard(
       padding: const EdgeInsets.all(13),
       color: color.withOpacity(.08),
       child: Row(children: [
-        Container(width: 42, height: 42, decoration: BoxDecoration(color: color.withOpacity(.14), borderRadius: BorderRadius.circular(14)), child: Icon(normalized == 'owner' ? Icons.workspace_premium_rounded : normalized == 'support' ? Icons.support_agent_rounded : Icons.visibility_rounded, color: color)),
+        Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+                color: color.withOpacity(.14),
+                borderRadius: BorderRadius.circular(14)),
+            child: Icon(
+                normalized == 'owner'
+                    ? Icons.workspace_premium_rounded
+                    : normalized == 'support'
+                        ? Icons.support_agent_rounded
+                        : Icons.visibility_rounded,
+                color: color)),
         const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title,
+              style: const TextStyle(
+                  color: AppColors.ink, fontWeight: FontWeight.w900)),
           const SizedBox(height: 3),
-          Text(body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12.5, height: 1.25)),
+          Text(body,
+              style: const TextStyle(
+                  color: AppColors.muted,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                  height: 1.25)),
         ])),
         _MiniChip(text: normalized.toUpperCase(), color: color),
       ]),
@@ -1665,12 +2351,44 @@ class AdminOverviewHero extends StatelessWidget {
       color: good ? AppColors.greenSoft : AppColors.tealDark,
       padding: const EdgeInsets.all(16),
       child: Row(children: [
-        Container(width: 48, height: 48, decoration: BoxDecoration(color: good ? AppColors.white : Colors.white.withOpacity(.13), borderRadius: BorderRadius.circular(16)), child: Icon(good ? Icons.verified_rounded : Icons.admin_panel_settings_rounded, color: good ? AppColors.green : Colors.white)),
+        Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+                color: good ? AppColors.white : Colors.white.withOpacity(.13),
+                borderRadius: BorderRadius.circular(16)),
+            child: Icon(
+                good
+                    ? Icons.verified_rounded
+                    : Icons.admin_panel_settings_rounded,
+                color: good ? AppColors.green : Colors.white)),
         const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(good ? tr(context, es: 'Todo controlado', en: 'All clear') : tr(context, es: '$open reportes abiertos', en: '$open open reports'), style: TextStyle(color: good ? AppColors.ink : Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+              good
+                  ? tr(context, es: 'Todo controlado', en: 'All clear')
+                  : tr(context,
+                      es: '$open reportes abiertos', en: '$open open reports'),
+              style: TextStyle(
+                  color: good ? AppColors.ink : Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18)),
           const SizedBox(height: 4),
-          Text(critical > 0 ? tr(context, es: '$critical críticos necesitan revisión prioritaria.', en: '$critical critical items need priority review.') : tr(context, es: 'Revisa soporte, usuarios y señales de calidad desde aquí.', en: 'Review support, users and quality signals from here.'), style: TextStyle(color: good ? AppColors.muted : const Color(0xDFFFFFFF), fontWeight: FontWeight.w700)),
+          Text(
+              critical > 0
+                  ? tr(context,
+                      es: '$critical críticos necesitan revisión prioritaria.',
+                      en: '$critical critical items need priority review.')
+                  : tr(context,
+                      es:
+                          'Revisa soporte, usuarios y señales de calidad desde aquí.',
+                      en:
+                          'Review support, users and quality signals from here.'),
+              style: TextStyle(
+                  color: good ? AppColors.muted : const Color(0xDFFFFFFF),
+                  fontWeight: FontWeight.w700)),
         ])),
       ]),
     );
@@ -1682,19 +2400,45 @@ class AdminMetricCard extends StatelessWidget {
   final String value;
   final IconData icon;
   final Color color;
-  const AdminMetricCard({super.key, required this.label, required this.value, required this.icon, required this.color});
+  const AdminMetricCard(
+      {super.key,
+      required this.label,
+      required this.value,
+      required this.icon,
+      required this.color});
   @override
   Widget build(BuildContext context) => AppCard(
-    padding: const EdgeInsets.all(14),
-    child: Row(children: [
-      Container(width: 38, height: 38, decoration: BoxDecoration(color: color.withOpacity(.11), borderRadius: BorderRadius.circular(13)), child: Icon(icon, color: color, size: 20)),
-      const SizedBox(width: 10),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink, fontSize: 19)),
-        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
-      ])),
-    ]),
-  );
+        padding: const EdgeInsets.all(14),
+        child: Row(children: [
+          Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                  color: color.withOpacity(.11),
+                  borderRadius: BorderRadius.circular(13)),
+              child: Icon(icon, color: color, size: 20)),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.ink,
+                        fontSize: 19)),
+                Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: AppColors.muted,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12)),
+              ])),
+        ]),
+      );
 }
 
 class AdminTicketCard extends StatelessWidget {
@@ -1702,56 +2446,128 @@ class AdminTicketCard extends StatelessWidget {
   final bool canHandle;
   final ValueChanged<String> onStatus;
   final VoidCallback? onReply;
-  const AdminTicketCard({super.key, required this.ticket, this.canHandle = true, required this.onStatus, this.onReply});
+  const AdminTicketCard(
+      {super.key,
+      required this.ticket,
+      this.canHandle = true,
+      required this.onStatus,
+      this.onReply});
   @override
   Widget build(BuildContext context) {
     final profile = AppData.asMap(ticket['profiles']);
     final group = AppData.asMap(ticket['groups']);
     final status = AppData.text(ticket['status'], 'open');
     final priority = AppData.text(ticket['priority'], 'normal');
-    final name = AppData.text(profile['full_name'], AppData.text(profile['email'], 'Usuario'));
+    final name = AppData.text(
+        profile['full_name'], AppData.text(profile['email'], 'Usuario'));
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: AppCard(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          ProfileAvatar(name: name, avatarUrl: AppData.text(profile['avatar_url']), radius: 21),
+          ProfileAvatar(
+              name: name,
+              avatarUrl: AppData.text(profile['avatar_url']),
+              radius: 21),
           const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(child: Text(AppData.text(ticket['title'], 'Reporte'), style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
-              _MiniChip(text: ticketPriorityLabel(priority), color: ticketPriorityColor(priority)),
-            ]),
-            const SizedBox(height: 3),
-            Text('${ticketTypeLabel(AppData.text(ticket['type']))} · ${AppData.text(group['name'], 'Cuenta general')} · ${ticketStatusLabel(status)}', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
-          ])),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Row(children: [
+                  Expanded(
+                      child: Text(AppData.text(ticket['title'], 'Reporte'),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.ink))),
+                  _MiniChip(
+                      text: ticketPriorityLabel(priority),
+                      color: ticketPriorityColor(priority)),
+                ]),
+                const SizedBox(height: 3),
+                Text(
+                    '${ticketTypeLabel(AppData.text(ticket['type']))} · ${AppData.text(group['name'], 'Cuenta general')} · ${ticketStatusLabel(status)}',
+                    style: const TextStyle(
+                        color: AppColors.muted,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12)),
+              ])),
         ]),
         const SizedBox(height: 10),
-        Text(AppData.text(ticket['description'], 'Sin descripción'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, height: 1.35)),
+        Text(AppData.text(ticket['description'], 'Sin descripción'),
+            style: const TextStyle(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w700,
+                height: 1.35)),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8, children: [
-          _MiniChip(text: AppData.text(ticket['app_version'], AppConfig.appVersion), color: AppColors.teal),
-          _MiniChip(text: AppData.text(ticket['device_info'], 'dispositivo'), color: AppColors.violet),
-          _MiniChip(text: AppData.text(ticket['screen'], 'app'), color: AppColors.muted),
+          _MiniChip(
+              text: AppData.text(ticket['app_version'], AppConfig.appVersion),
+              color: AppColors.teal),
+          _MiniChip(
+              text: AppData.text(ticket['device_info'], 'dispositivo'),
+              color: AppColors.violet),
+          _MiniChip(
+              text: AppData.text(ticket['screen'], 'app'),
+              color: AppColors.muted),
         ]),
         if (AppData.text(ticket['admin_note']).isNotEmpty) ...[
           const SizedBox(height: 10),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: AppColors.greenSoft, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.green.withOpacity(.15))),
-            child: Text(tr(context, es: 'Respuesta admin: ${AppData.text(ticket['admin_note'])}', en: 'Admin reply: ${AppData.text(ticket['admin_note'])}'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, height: 1.3)),
+            decoration: BoxDecoration(
+                color: AppColors.greenSoft,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.green.withOpacity(.15))),
+            child: Text(
+                tr(context,
+                    es:
+                        'Respuesta admin: ${AppData.text(ticket['admin_note'])}',
+                    en: 'Admin reply: ${AppData.text(ticket['admin_note'])}'),
+                style: const TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w800,
+                    height: 1.3)),
           ),
         ],
         const SizedBox(height: 12),
         if (canHandle)
           Wrap(spacing: 8, runSpacing: 8, children: [
-            SizedBox(width: 130, child: SecondaryButton(label: tr(context, es: 'Revisando', en: 'Reviewing'), icon: Icons.search_rounded, onTap: () => onStatus('reviewing'))),
-            SizedBox(width: 130, child: PrimaryButton(label: tr(context, es: 'Resolver', en: 'Resolve'), icon: Icons.check_rounded, onTap: () => onStatus('resolved'))),
-            SizedBox(width: 120, child: SecondaryButton(label: tr(context, es: 'Cerrar', en: 'Close'), icon: Icons.archive_rounded, onTap: () => onStatus('closed'))),
-            if (onReply != null) SizedBox(width: 130, child: SecondaryButton(label: tr(context, es: 'Responder', en: 'Reply'), icon: Icons.reply_rounded, onTap: () => onReply!.call())),
+            SizedBox(
+                width: 130,
+                child: SecondaryButton(
+                    label: tr(context, es: 'Revisando', en: 'Reviewing'),
+                    icon: Icons.search_rounded,
+                    onTap: () => onStatus('reviewing'))),
+            SizedBox(
+                width: 130,
+                child: PrimaryButton(
+                    label: tr(context, es: 'Resolver', en: 'Resolve'),
+                    icon: Icons.check_rounded,
+                    onTap: () => onStatus('resolved'))),
+            SizedBox(
+                width: 120,
+                child: SecondaryButton(
+                    label: tr(context, es: 'Cerrar', en: 'Close'),
+                    icon: Icons.archive_rounded,
+                    onTap: () => onStatus('closed'))),
+            if (onReply != null)
+              SizedBox(
+                  width: 130,
+                  child: SecondaryButton(
+                      label: tr(context, es: 'Responder', en: 'Reply'),
+                      icon: Icons.reply_rounded,
+                      onTap: () => onReply!.call())),
           ])
         else
-          EmptySlim(icon: Icons.visibility_rounded, title: tr(context, es: 'Solo lectura', en: 'Read only'), body: tr(context, es: 'Tu rol no permite modificar reportes.', en: 'Your role cannot modify reports.')),
+          EmptySlim(
+              icon: Icons.visibility_rounded,
+              title: tr(context, es: 'Solo lectura', en: 'Read only'),
+              body: tr(context,
+                  es: 'Tu rol no permite modificar reportes.',
+                  en: 'Your role cannot modify reports.')),
       ])),
     );
   }
@@ -1769,34 +2585,76 @@ class QualityEventCard extends StatelessWidget {
       child: AppCard(
         padding: const EdgeInsets.all(12),
         child: Row(children: [
-          Container(width: 36, height: 36, decoration: BoxDecoration(color: AppColors.blueSoft, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.insights_rounded, color: AppColors.blue, size: 19)),
+          Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                  color: AppColors.blueSoft,
+                  borderRadius: BorderRadius.circular(13)),
+              child: const Icon(Icons.insights_rounded,
+                  color: AppColors.blue, size: 19)),
           const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(AppData.text(event['event_type'], 'evento'), style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
-            const SizedBox(height: 2),
-            Text('${AppData.text(profile['email'], 'usuario')} · ${AppData.text(group['name'], 'sin grupo')} · ${AppData.text(event['screen'], 'app')}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
-          ])),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(AppData.text(event['event_type'], 'evento'),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w900, color: AppColors.ink)),
+                const SizedBox(height: 2),
+                Text(
+                    '${AppData.text(profile['email'], 'usuario')} · ${AppData.text(group['name'], 'sin grupo')} · ${AppData.text(event['screen'], 'app')}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: AppColors.muted,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12)),
+              ])),
         ]),
       ),
     );
   }
 }
 
-
 class AdminSectionTabs extends StatelessWidget {
   final int index;
   final String role;
   final ValueChanged<int> onChanged;
-  const AdminSectionTabs({super.key, required this.index, required this.role, required this.onChanged});
+  const AdminSectionTabs(
+      {super.key,
+      required this.index,
+      required this.role,
+      required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
     final items = [
-      (Icons.support_agent_rounded, tr(context, es: 'Reportes', en: 'Reports'), AppColors.orange),
-      (Icons.people_alt_rounded, tr(context, es: 'Usuarios', en: 'Users'), AppColors.teal),
-      (Icons.groups_rounded, tr(context, es: 'Grupos', en: 'Groups'), AppColors.violet),
-      (Icons.phone_android_rounded, tr(context, es: 'Dispositivos', en: 'Devices'), AppColors.blue),
-      (Icons.insights_rounded, tr(context, es: 'Actividad', en: 'Activity'), AppColors.green),
+      (
+        Icons.support_agent_rounded,
+        tr(context, es: 'Reportes', en: 'Reports'),
+        AppColors.orange
+      ),
+      (
+        Icons.people_alt_rounded,
+        tr(context, es: 'Usuarios', en: 'Users'),
+        AppColors.teal
+      ),
+      (
+        Icons.groups_rounded,
+        tr(context, es: 'Grupos', en: 'Groups'),
+        AppColors.violet
+      ),
+      (
+        Icons.phone_android_rounded,
+        tr(context, es: 'Dispositivos', en: 'Devices'),
+        AppColors.blue
+      ),
+      (
+        Icons.insights_rounded,
+        tr(context, es: 'Actividad', en: 'Activity'),
+        AppColors.green
+      ),
     ];
     return SizedBox(
       height: 44,
@@ -1815,12 +2673,24 @@ class AdminSectionTabs extends StatelessWidget {
                 color: selected ? item.$3 : AppColors.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: selected ? item.$3 : AppColors.line),
-                boxShadow: selected ? [BoxShadow(color: item.$3.withOpacity(.22), blurRadius: 14, offset: const Offset(0, 7))] : null,
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                            color: item.$3.withOpacity(.22),
+                            blurRadius: 14,
+                            offset: const Offset(0, 7))
+                      ]
+                    : null,
               ),
               child: Row(children: [
-                Icon(item.$1, size: 17, color: selected ? Colors.white : item.$3),
+                Icon(item.$1,
+                    size: 17, color: selected ? Colors.white : item.$3),
                 const SizedBox(width: 7),
-                Text(item.$2, style: TextStyle(color: selected ? Colors.white : AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12)),
+                Text(item.$2,
+                    style: TextStyle(
+                        color: selected ? Colors.white : AppColors.ink,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12)),
               ]),
             ),
           );
@@ -1836,11 +2706,16 @@ class AdminUserCard extends StatelessWidget {
   final Map<String, dynamic> user;
   final VoidCallback onBlock;
   final VoidCallback onActivate;
-  const AdminUserCard({super.key, required this.user, required this.onBlock, required this.onActivate});
+  const AdminUserCard(
+      {super.key,
+      required this.user,
+      required this.onBlock,
+      required this.onActivate});
 
   @override
   Widget build(BuildContext context) {
-    final name = AppData.text(user['full_name'], AppData.text(user['email'], 'Usuario'));
+    final name =
+        AppData.text(user['full_name'], AppData.text(user['email'], 'Usuario'));
     final email = AppData.text(user['email'], 'sin email');
     final status = AppData.text(user['status'], 'active');
     final role = AppData.text(user['admin_role'], '');
@@ -1851,25 +2726,64 @@ class AdminUserCard extends StatelessWidget {
         padding: const EdgeInsets.all(13),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            ProfileAvatar(name: name, avatarUrl: AppData.text(user['avatar_url']), radius: 22),
+            ProfileAvatar(
+                name: name,
+                avatarUrl: AppData.text(user['avatar_url']),
+                radius: 22),
             const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 2),
-              Text(email, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
-            ])),
-            _MiniChip(text: isBlocked ? 'BLOQUEADO' : 'ACTIVO', color: isBlocked ? AppColors.red : AppColors.green),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: AppColors.ink, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 2),
+                  Text(email,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12)),
+                ])),
+            _MiniChip(
+                text: isBlocked ? 'BLOQUEADO' : 'ACTIVO',
+                color: isBlocked ? AppColors.red : AppColors.green),
           ]),
           const SizedBox(height: 10),
           Wrap(spacing: 7, runSpacing: 7, children: [
-            if (role.isNotEmpty) _MiniChip(text: role.toUpperCase(), color: role == 'owner' ? AppColors.orange : role == 'support' ? AppColors.teal : AppColors.violet),
-            _MiniChip(text: '${AppData.intValue(user['groups_count'])} grupos', color: AppColors.violet),
-            _MiniChip(text: '${AppData.intValue(user['devices_count'])} dispositivos', color: AppColors.blue),
-            _MiniChip(text: AppData.text(user['last_seen_at']).isEmpty ? 'sin actividad push' : 'push visto', color: AppColors.muted),
+            if (role.isNotEmpty)
+              _MiniChip(
+                  text: role.toUpperCase(),
+                  color: role == 'owner'
+                      ? AppColors.orange
+                      : role == 'support'
+                          ? AppColors.teal
+                          : AppColors.violet),
+            _MiniChip(
+                text: '${AppData.intValue(user['groups_count'])} grupos',
+                color: AppColors.violet),
+            _MiniChip(
+                text: '${AppData.intValue(user['devices_count'])} dispositivos',
+                color: AppColors.blue),
+            _MiniChip(
+                text: AppData.text(user['last_seen_at']).isEmpty
+                    ? 'sin actividad push'
+                    : 'push visto',
+                color: AppColors.muted),
           ]),
           const SizedBox(height: 10),
           Row(children: [
-            Expanded(child: SecondaryButton(label: isBlocked ? 'Activar' : 'Bloquear', icon: isBlocked ? Icons.lock_open_rounded : Icons.block_rounded, onTap: isBlocked ? onActivate : onBlock)),
+            Expanded(
+                child: SecondaryButton(
+                    label: isBlocked ? 'Activar' : 'Bloquear',
+                    icon: isBlocked
+                        ? Icons.lock_open_rounded
+                        : Icons.block_rounded,
+                    onTap: isBlocked ? onActivate : onBlock)),
           ]),
         ]),
       ),
@@ -1884,26 +2798,58 @@ class AdminGroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = AppData.text(group['name'], 'Grupo');
-    final ownerEmail = AppData.text(group['owner_email'], 'owner no disponible');
+    final ownerEmail =
+        AppData.text(group['owner_email'], 'owner no disponible');
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: AppCard(
         padding: const EdgeInsets.all(13),
         child: Row(children: [
-          Container(width: 46, height: 46, decoration: BoxDecoration(color: AppColors.violetSoft, borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.groups_rounded, color: AppColors.violet)),
+          Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                  color: AppColors.violetSoft,
+                  borderRadius: BorderRadius.circular(15)),
+              child: const Icon(Icons.groups_rounded, color: AppColors.violet)),
           const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 3),
-            Text('Owner: $ownerEmail', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
-            const SizedBox(height: 8),
-            Wrap(spacing: 7, runSpacing: 7, children: [
-              _MiniChip(text: '${AppData.intValue(group['members_count'])} miembros', color: AppColors.teal),
-              _MiniChip(text: '${AppData.intValue(group['events_count'])} eventos', color: AppColors.orange),
-              _MiniChip(text: '${AppData.intValue(group['expenses_count'])} gastos', color: AppColors.green),
-              _MiniChip(text: '${AppData.intValue(group['tournaments_count'])} torneos', color: AppColors.red),
-            ]),
-          ])),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: AppColors.ink, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 3),
+                Text('Owner: $ownerEmail',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: AppColors.muted,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12)),
+                const SizedBox(height: 8),
+                Wrap(spacing: 7, runSpacing: 7, children: [
+                  _MiniChip(
+                      text:
+                          '${AppData.intValue(group['members_count'])} miembros',
+                      color: AppColors.teal),
+                  _MiniChip(
+                      text:
+                          '${AppData.intValue(group['events_count'])} eventos',
+                      color: AppColors.orange),
+                  _MiniChip(
+                      text:
+                          '${AppData.intValue(group['expenses_count'])} gastos',
+                      color: AppColors.green),
+                  _MiniChip(
+                      text:
+                          '${AppData.intValue(group['tournaments_count'])} torneos',
+                      color: AppColors.red),
+                ]),
+              ])),
         ]),
       ),
     );
@@ -1922,18 +2868,48 @@ class AdminDeviceCard extends StatelessWidget {
       child: AppCard(
         padding: const EdgeInsets.all(13),
         child: Row(children: [
-          Container(width: 42, height: 42, decoration: BoxDecoration(color: enabled ? AppColors.blueSoft : AppColors.faint, borderRadius: BorderRadius.circular(14)), child: Icon(enabled ? Icons.notifications_active_rounded : Icons.notifications_off_rounded, color: enabled ? AppColors.blue : AppColors.muted)),
+          Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                  color: enabled ? AppColors.blueSoft : AppColors.faint,
+                  borderRadius: BorderRadius.circular(14)),
+              child: Icon(
+                  enabled
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_off_rounded,
+                  color: enabled ? AppColors.blue : AppColors.muted)),
           const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(AppData.text(device['email'], 'Usuario'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 3),
-            Text('${AppData.text(device['platform'], 'plataforma')} · ${AppData.text(device['app_version'], AppConfig.appVersion)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
-            const SizedBox(height: 7),
-            Wrap(spacing: 7, runSpacing: 7, children: [
-              _MiniChip(text: enabled ? 'activo' : 'apagado', color: enabled ? AppColors.green : AppColors.muted),
-              _MiniChip(text: AppData.text(device['last_seen_at']).isEmpty ? 'sin last seen' : 'last seen', color: AppColors.blue),
-            ]),
-          ])),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(AppData.text(device['email'], 'Usuario'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: AppColors.ink, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 3),
+                Text(
+                    '${AppData.text(device['platform'], 'plataforma')} · ${AppData.text(device['app_version'], AppConfig.appVersion)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: AppColors.muted,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12)),
+                const SizedBox(height: 7),
+                Wrap(spacing: 7, runSpacing: 7, children: [
+                  _MiniChip(
+                      text: enabled ? 'activo' : 'apagado',
+                      color: enabled ? AppColors.green : AppColors.muted),
+                  _MiniChip(
+                      text: AppData.text(device['last_seen_at']).isEmpty
+                          ? 'sin last seen'
+                          : 'last seen',
+                      color: AppColors.blue),
+                ]),
+              ])),
         ]),
       ),
     );
@@ -1942,70 +2918,101 @@ class AdminDeviceCard extends StatelessWidget {
 
 IconData ticketTypeIcon(String type) {
   switch (type) {
-    case 'cuenta': return Icons.person_outline_rounded;
-    case 'grupo': return Icons.groups_rounded;
-    case 'evento': return Icons.event_rounded;
-    case 'finanzas': return Icons.account_balance_wallet_rounded;
-    case 'torneo': return Icons.emoji_events_rounded;
-    case 'sugerencia': return Icons.lightbulb_outline_rounded;
-    default: return Icons.bug_report_rounded;
+    case 'cuenta':
+      return Icons.person_outline_rounded;
+    case 'grupo':
+      return Icons.groups_rounded;
+    case 'evento':
+      return Icons.event_rounded;
+    case 'finanzas':
+      return Icons.account_balance_wallet_rounded;
+    case 'torneo':
+      return Icons.emoji_events_rounded;
+    case 'sugerencia':
+      return Icons.lightbulb_outline_rounded;
+    default:
+      return Icons.bug_report_rounded;
   }
 }
 
 String ticketTypeLabel(String type) {
   switch (type) {
-    case 'cuenta': return appIsEnglish ? 'Account' : 'Cuenta';
-    case 'grupo': return appIsEnglish ? 'Group' : 'Grupo';
-    case 'evento': return appIsEnglish ? 'Event' : 'Evento';
-    case 'finanzas': return appIsEnglish ? 'Finances' : 'Finanzas';
-    case 'torneo': return appIsEnglish ? 'Tournament' : 'Torneo';
-    case 'sugerencia': return appIsEnglish ? 'Suggestion' : 'Sugerencia';
-    case 'otro': return appIsEnglish ? 'Other' : 'Otro';
-    default: return appIsEnglish ? 'Bug' : 'Bug';
+    case 'cuenta':
+      return appIsEnglish ? 'Account' : 'Cuenta';
+    case 'grupo':
+      return appIsEnglish ? 'Group' : 'Grupo';
+    case 'evento':
+      return appIsEnglish ? 'Event' : 'Evento';
+    case 'finanzas':
+      return appIsEnglish ? 'Finances' : 'Finanzas';
+    case 'torneo':
+      return appIsEnglish ? 'Tournament' : 'Torneo';
+    case 'sugerencia':
+      return appIsEnglish ? 'Suggestion' : 'Sugerencia';
+    case 'otro':
+      return appIsEnglish ? 'Other' : 'Otro';
+    default:
+      return appIsEnglish ? 'Bug' : 'Bug';
   }
 }
 
 String ticketStatusLabel(String status) {
   switch (status) {
-    case 'reviewing': return appIsEnglish ? 'Reviewing' : 'En revisión';
-    case 'resolved': return appIsEnglish ? 'Resolved' : 'Resuelto';
-    case 'closed': return appIsEnglish ? 'Closed' : 'Cerrado';
-    default: return appIsEnglish ? 'Open' : 'Abierto';
+    case 'reviewing':
+      return appIsEnglish ? 'Reviewing' : 'En revisión';
+    case 'resolved':
+      return appIsEnglish ? 'Resolved' : 'Resuelto';
+    case 'closed':
+      return appIsEnglish ? 'Closed' : 'Cerrado';
+    default:
+      return appIsEnglish ? 'Open' : 'Abierto';
   }
 }
 
 Color ticketStatusColor(String status) {
   switch (status) {
-    case 'reviewing': return AppColors.blue;
-    case 'resolved': return AppColors.green;
-    case 'closed': return AppColors.muted;
-    default: return AppColors.orange;
+    case 'reviewing':
+      return AppColors.blue;
+    case 'resolved':
+      return AppColors.green;
+    case 'closed':
+      return AppColors.muted;
+    default:
+      return AppColors.orange;
   }
 }
 
 String ticketPriorityLabel(String priority) {
   switch (priority) {
-    case 'critical': return appIsEnglish ? 'Critical' : 'Crítica';
-    case 'high': return appIsEnglish ? 'High' : 'Alta';
-    case 'low': return appIsEnglish ? 'Low' : 'Baja';
-    default: return appIsEnglish ? 'Normal' : 'Normal';
+    case 'critical':
+      return appIsEnglish ? 'Critical' : 'Crítica';
+    case 'high':
+      return appIsEnglish ? 'High' : 'Alta';
+    case 'low':
+      return appIsEnglish ? 'Low' : 'Baja';
+    default:
+      return appIsEnglish ? 'Normal' : 'Normal';
   }
 }
 
 Color ticketPriorityColor(String priority) {
   switch (priority) {
-    case 'critical': return AppColors.red;
-    case 'high': return AppColors.orange;
-    case 'low': return AppColors.muted;
-    default: return AppColors.teal;
+    case 'critical':
+      return AppColors.red;
+    case 'high':
+      return AppColors.orange;
+    case 'low':
+      return AppColors.muted;
+    default:
+      return AppColors.teal;
   }
 }
-
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onChanged;
   final ValueChanged<int>? onNavigateRoot;
-  const ProfileScreen({super.key, required this.onChanged, this.onNavigateRoot});
+  const ProfileScreen(
+      {super.key, required this.onChanged, this.onNavigateRoot});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -2046,8 +3053,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: Text(tr(context, es: 'Guardar', en: 'Save'))),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text),
+              child: Text(tr(context, es: 'Guardar', en: 'Save'))),
         ],
       ),
     );
@@ -2074,11 +3085,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (picked == null) return;
       final raw = await picked.readAsBytes();
       if (!mounted) return;
-      final framed = await Navigator.of(context).push<Uint8List>(MaterialPageRoute(
+      final framed =
+          await Navigator.of(context).push<Uint8List>(MaterialPageRoute(
         builder: (_) => ImageFrameEditorScreen(
           bytes: raw,
           title: tr(context, es: 'Ajustar foto', en: 'Adjust photo'),
-          helper: tr(context, es: 'Arrastra y pellizca para centrar tu foto dentro del círculo.', en: 'Drag and pinch to center your photo inside the circle.'),
+          helper: tr(context,
+              es: 'Arrastra y pellizca para centrar tu foto dentro del círculo.',
+              en: 'Drag and pinch to center your photo inside the circle.'),
           aspectRatio: 1,
           outputWidth: 900,
           circularPreview: true,
@@ -2087,10 +3101,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (framed == null) return;
       await AppData.uploadAvatarBytes(framed, 'avatar.png');
       reload();
-      if (mounted) await showToast(context, tr(context, es: 'Foto actualizada.', en: 'Photo updated.'));
+      if (mounted)
+        await showToast(context,
+            tr(context, es: 'Foto actualizada.', en: 'Photo updated.'));
     } catch (e) {
       if (mounted) {
-        await showToast(context, tr(context, es: 'No se ha podido subir la foto. Inténtalo de nuevo.', en: 'Could not upload the photo. Please try again.'), danger: true);
+        await showToast(
+            context,
+            tr(context,
+                es: 'No se ha podido subir la foto. Inténtalo de nuevo.',
+                en: 'Could not upload the photo. Please try again.'),
+            danger: true);
       }
     } finally {
       if (mounted) setState(() => photoLoading = false);
@@ -2101,14 +3122,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final ok = await confirmAction(
       context,
       title: tr(context, es: '¿Quitar foto?', en: 'Remove photo?'),
-      body: tr(context, es: 'Volverás al avatar con iniciales. Puedes subir otra foto cuando quieras.', en: 'You will go back to the initials avatar. You can upload another photo anytime.'),
+      body: tr(context,
+          es: 'Volverás al avatar con iniciales. Puedes subir otra foto cuando quieras.',
+          en: 'You will go back to the initials avatar. You can upload another photo anytime.'),
       danger: true,
     );
     if (ok != true) return;
     try {
       await AppData.removeAvatar();
       reload();
-      if (mounted) await showToast(context, tr(context, es: 'Foto eliminada.', en: 'Photo removed.'));
+      if (mounted)
+        await showToast(
+            context, tr(context, es: 'Foto eliminada.', en: 'Photo removed.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -2118,7 +3143,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final ok = await confirmAction(
       context,
       title: tr(context, es: '¿Cerrar sesión?', en: 'Sign out?'),
-      body: tr(context, es: 'Podrás volver a entrar con tu correo cuando quieras.', en: 'You can sign in again with your email anytime.'),
+      body: tr(context,
+          es: 'Podrás volver a entrar con tu correo cuando quieras.',
+          en: 'You can sign in again with your email anytime.'),
       danger: true,
       confirmLabel: tr(context, es: 'Cerrar sesión', en: 'Sign out'),
     );
@@ -2136,25 +3163,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(tr(context, es: 'Esta acción elimina tu cuenta de Grupli, tu perfil, tu foto, tus dispositivos, tus avisos y tu acceso a los grupos.', en: 'This will delete your Grupli account, your profile, your photo, your devices, your notifications and your access to groups.')),
+            Text(tr(context,
+                es: 'Esta acción elimina tu cuenta de Grupli, tu perfil, tu foto, tus dispositivos, tus avisos y tu acceso a los grupos.',
+                en: 'This will delete your Grupli account, your profile, your photo, your devices, your notifications and your access to groups.')),
             const SizedBox(height: 10),
-            Text(tr(context, es: 'Si eres owner de algún grupo, esos grupos también se eliminarán con sus eventos, gastos y torneos.', en: 'If you own any group, those groups will also be deleted with their events, expenses and tournaments.')),
+            Text(tr(context,
+                es: 'Si eres owner de algún grupo, esos grupos también se eliminarán con sus eventos, gastos y torneos.',
+                en: 'If you own any group, those groups will also be deleted with their events, expenses and tournaments.')),
             const SizedBox(height: 14),
-            Text(tr(context, es: 'Escribe ELIMINAR para confirmar.', en: 'Type DELETE to confirm.'), style: const TextStyle(fontWeight: FontWeight.w900)),
+            Text(
+                tr(context,
+                    es: 'Escribe ELIMINAR para confirmar.',
+                    en: 'Type DELETE to confirm.'),
+                style: const TextStyle(fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
             TextField(
               controller: controller,
               textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(hintText: tr(context, es: 'ELIMINAR', en: 'DELETE')),
+              decoration: InputDecoration(
+                  hintText: tr(context, es: 'ELIMINAR', en: 'DELETE')),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.red),
-            onPressed: () => Navigator.pop(context, controller.text.trim().toUpperCase() == 'ELIMINAR'),
-            child: Text(tr(context, es: 'Eliminar cuenta', en: 'Delete account')),
+            onPressed: () => Navigator.pop(
+                context, controller.text.trim().toUpperCase() == 'ELIMINAR'),
+            child:
+                Text(tr(context, es: 'Eliminar cuenta', en: 'Delete account')),
           ),
         ],
       ),
@@ -2163,14 +3203,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     controller.dispose();
     if (confirmed != true) {
       if (typed.trim().isNotEmpty && mounted) {
-        await showToast(context, tr(context, es: 'Para eliminar la cuenta debes escribir ELIMINAR exactamente.', en: 'To delete the account, you must type DELETE exactly.'), danger: true);
+        await showToast(
+            context,
+            tr(context,
+                es: 'Para eliminar la cuenta debes escribir ELIMINAR exactamente.',
+                en: 'To delete the account, you must type DELETE exactly.'),
+            danger: true);
       }
       return;
     }
 
     try {
       await AppData.deleteMyAccount('ELIMINAR');
-      if (mounted) await showToast(context, tr(context, es: 'Cuenta eliminada.', en: 'Account deleted.'));
+      if (mounted)
+        await showToast(context,
+            tr(context, es: 'Cuenta eliminada.', en: 'Account deleted.'));
     } catch (e) {
       if (mounted) await showToast(context, humanError(e), danger: true);
     }
@@ -2194,24 +3241,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   await AppData.updateNotificationSettings({key: value});
                   setSheetState(() {});
                 }
-                return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  SheetTitle(icon: Icons.notifications_active_outlined, title: tr(context, es: 'Notificaciones', en: 'Notifications'), body: tr(context, es: 'Elige qué avisos quieres recibir de tus grupos.', en: 'Choose which alerts you want to receive from your groups.')),
-                  const SizedBox(height: 12),
-                  NotificationPreferenceSwitch(icon: Icons.event_available_rounded, title: tr(context, es: 'Eventos', en: 'Events'), body: tr(context, es: 'Nuevas quedadas, cambios y cancelaciones', en: 'New events, changes and cancellations'), value: enabled('notify_events'), onChanged: (v) => toggle('notify_events', v)),
-                  NotificationPreferenceSwitch(icon: Icons.account_balance_wallet_rounded, title: tr(context, es: 'Finanzas', en: 'Finances'), body: tr(context, es: 'Gastos nuevos y pagos importantes', en: 'New expenses and important payments'), value: enabled('notify_expenses'), onChanged: (v) => toggle('notify_expenses', v)),
-                  NotificationPreferenceSwitch(icon: Icons.emoji_events_rounded, title: tr(context, es: 'Torneos', en: 'Tournaments'), body: tr(context, es: 'Torneos, partidos y resultados', en: 'Tournaments, matches and results'), value: enabled('notify_tournaments'), onChanged: (v) => toggle('notify_tournaments', v)),
-                  NotificationPreferenceSwitch(icon: Icons.groups_rounded, title: tr(context, es: 'Miembros', en: 'Members'), body: tr(context, es: 'Entradas al grupo y cambios de rol', en: 'Group joins and role changes'), value: enabled('notify_members'), onChanged: (v) => toggle('notify_members', v)),
-                  const SizedBox(height: 12),
-                  PrimaryButton(label: tr(context, es: 'Activar push en este dispositivo', en: 'Enable push on this device'), icon: Icons.notifications_active_rounded, onTap: () async {
-                    final token = await PushNotificationService.enableForCurrentDevice();
-                    if (!mounted) return;
-                    if (token == null) {
-                      await showToast(context, tr(context, es: 'No se pudieron activar las notificaciones en este dispositivo.', en: 'Could not enable notifications on this device.'), danger: true);
-                    } else {
-                      await showToast(context, tr(context, es: 'Notificaciones activadas en este dispositivo.', en: 'Notifications enabled on this device.'));
-                    }
-                  }),
-                ]);
+
+                return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SheetTitle(
+                          icon: Icons.notifications_active_outlined,
+                          title: tr(context,
+                              es: 'Notificaciones', en: 'Notifications'),
+                          body: tr(context,
+                              es: 'Elige qué avisos quieres recibir de tus grupos.',
+                              en: 'Choose which alerts you want to receive from your groups.')),
+                      const SizedBox(height: 12),
+                      NotificationPreferenceSwitch(
+                          icon: Icons.event_available_rounded,
+                          title: tr(context, es: 'Eventos', en: 'Events'),
+                          body: tr(context,
+                              es: 'Nuevas quedadas, cambios y cancelaciones',
+                              en: 'New events, changes and cancellations'),
+                          value: enabled('notify_events'),
+                          onChanged: (v) => toggle('notify_events', v)),
+                      NotificationPreferenceSwitch(
+                          icon: Icons.account_balance_wallet_rounded,
+                          title: tr(context, es: 'Finanzas', en: 'Finances'),
+                          body: tr(context,
+                              es: 'Gastos nuevos y pagos importantes',
+                              en: 'New expenses and important payments'),
+                          value: enabled('notify_expenses'),
+                          onChanged: (v) => toggle('notify_expenses', v)),
+                      NotificationPreferenceSwitch(
+                          icon: Icons.emoji_events_rounded,
+                          title: tr(context, es: 'Torneos', en: 'Tournaments'),
+                          body: tr(context,
+                              es: 'Torneos, partidos y resultados',
+                              en: 'Tournaments, matches and results'),
+                          value: enabled('notify_tournaments'),
+                          onChanged: (v) => toggle('notify_tournaments', v)),
+                      NotificationPreferenceSwitch(
+                          icon: Icons.groups_rounded,
+                          title: tr(context, es: 'Miembros', en: 'Members'),
+                          body: tr(context,
+                              es: 'Entradas al grupo y cambios de rol',
+                              en: 'Group joins and role changes'),
+                          value: enabled('notify_members'),
+                          onChanged: (v) => toggle('notify_members', v)),
+                      const SizedBox(height: 12),
+                      PrimaryButton(
+                          label: tr(context,
+                              es: 'Activar push en este dispositivo',
+                              en: 'Enable push on this device'),
+                          icon: Icons.notifications_active_rounded,
+                          onTap: () async {
+                            final token = await PushNotificationService
+                                .enableForCurrentDevice();
+                            if (!mounted) return;
+                            if (token == null) {
+                              await showToast(
+                                  context,
+                                  tr(context,
+                                      es: 'No se pudieron activar las notificaciones en este dispositivo.',
+                                      en: 'Could not enable notifications on this device.'),
+                                  danger: true);
+                            } else {
+                              await showToast(
+                                  context,
+                                  tr(context,
+                                      es: 'Notificaciones activadas en este dispositivo.',
+                                      en: 'Notifications enabled on this device.'));
+                            }
+                          }),
+                    ]);
               },
             ),
           );
@@ -2226,14 +3326,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
       showDragHandle: true,
       builder: (context) => Padding(
         padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          SheetTitle(icon: Icons.lock_outline_rounded, title: tr(context, es: 'Privacidad y seguridad', en: 'Privacy & security'), body: tr(context, es: 'Grupli está pensada para grupos cerrados. Nadie entra sin invitación o código.', en: 'Grupli is designed for closed groups. Nobody joins without an invite or code.')),
-          SizedBox(height: 12),
-          PreferencePreviewRow(icon: Icons.verified_user_rounded, title: tr(context, es: 'Cuenta protegida', en: 'Protected account'), body: tr(context, es: 'Acceso seguro y sesión privada', en: 'Secure access and private session')),
-          PreferencePreviewRow(icon: Icons.groups_rounded, title: tr(context, es: 'Grupos privados', en: 'Private groups'), body: tr(context, es: 'El contenido del grupo queda limitado a sus miembros', en: 'Group content is limited to its members')),
-          PreferencePreviewRow(icon: Icons.admin_panel_settings_rounded, title: tr(context, es: 'Roles claros', en: 'Clear roles'), body: tr(context, es: 'Owner, admins y miembros tienen permisos separados', en: 'Owner, admins and members have separate permissions')),
-          PreferencePreviewRow(icon: Icons.delete_outline_rounded, title: tr(context, es: 'Eliminación de cuenta', en: 'Account deletion'), body: tr(context, es: 'Puedes iniciar el borrado de cuenta desde Perfil con confirmación explícita', en: 'You can start account deletion from Profile with explicit confirmation')),
-        ]),
+        child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SheetTitle(
+                  icon: Icons.lock_outline_rounded,
+                  title: tr(context,
+                      es: 'Privacidad y seguridad', en: 'Privacy & security'),
+                  body: tr(context,
+                      es: 'Grupli está pensada para grupos cerrados. Nadie entra sin invitación o código.',
+                      en: 'Grupli is designed for closed groups. Nobody joins without an invite or code.')),
+              SizedBox(height: 12),
+              PreferencePreviewRow(
+                  icon: Icons.verified_user_rounded,
+                  title: tr(context,
+                      es: 'Cuenta protegida', en: 'Protected account'),
+                  body: tr(context,
+                      es: 'Acceso seguro y sesión privada',
+                      en: 'Secure access and private session')),
+              PreferencePreviewRow(
+                  icon: Icons.groups_rounded,
+                  title:
+                      tr(context, es: 'Grupos privados', en: 'Private groups'),
+                  body: tr(context,
+                      es: 'El contenido del grupo queda limitado a sus miembros',
+                      en: 'Group content is limited to its members')),
+              PreferencePreviewRow(
+                  icon: Icons.admin_panel_settings_rounded,
+                  title: tr(context, es: 'Roles claros', en: 'Clear roles'),
+                  body: tr(context,
+                      es: 'Owner, admins y miembros tienen permisos separados',
+                      en: 'Owner, admins and members have separate permissions')),
+              PreferencePreviewRow(
+                  icon: Icons.delete_outline_rounded,
+                  title: tr(context,
+                      es: 'Eliminación de cuenta', en: 'Account deletion'),
+                  body: tr(context,
+                      es: 'Puedes iniciar el borrado de cuenta desde Perfil con confirmación explícita',
+                      en: 'You can start account deletion from Profile with explicit confirmation')),
+            ]),
       ),
     );
   }
@@ -2246,74 +3378,111 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheetState) => Padding(
           padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            SheetTitle(
-              icon: Icons.language_rounded,
-              title: tr(context, es: 'Idioma', en: 'Language'),
-              body: tr(context, es: 'Elige el idioma de la app. Si dejas Automático, se usará el del dispositivo.', en: 'Choose the app language. If you leave it on Auto, the device language will be used.'),
-            ),
-            const SizedBox(height: 8),
-            RadioListTile<Locale?>(
-              value: null,
-              groupValue: selected,
-              onChanged: (value) => setSheetState(() => selected = null),
-              title: Text(tr(context, es: 'Automático', en: 'Automatic')),
-              subtitle: Text(tr(context, es: 'Usar el idioma del dispositivo', en: 'Use the device language')),
-            ),
-            RadioListTile<Locale?>(
-              value: const Locale('es'),
-              groupValue: selected,
-              onChanged: (value) => setSheetState(() => selected = const Locale('es')),
-              title: Text(tr(context, es: 'Español', en: 'Spanish')),
-              subtitle: Text(tr(context, es: 'Interfaz en español', en: 'Spanish interface')),
-            ),
-            RadioListTile<Locale?>(
-              value: const Locale('en'),
-              groupValue: selected,
-              onChanged: (value) => setSheetState(() => selected = const Locale('en')),
-              title: Text(tr(context, es: 'English', en: 'English')),
-              subtitle: Text(tr(context, es: 'App in English', en: 'App in English')),
-            ),
-            const SizedBox(height: 8),
-            PrimaryButton(
-              label: tr(context, es: 'Guardar idioma', en: 'Save language'),
-              icon: Icons.check_rounded,
-              onTap: () async {
-                await saveStoredAppLocale(selected);
-                if (mounted) {
-                  setState(() {});
-                  Navigator.pop(sheetContext);
-                  await showToast(context, tr(context, es: 'Idioma actualizado.', en: 'Language updated.'));
-                }
-              },
-            ),
-          ]),
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SheetTitle(
+                  icon: Icons.language_rounded,
+                  title: tr(context, es: 'Idioma', en: 'Language'),
+                  body: tr(context,
+                      es: 'Elige el idioma de la app. Si dejas Automático, se usará el del dispositivo.',
+                      en: 'Choose the app language. If you leave it on Auto, the device language will be used.'),
+                ),
+                const SizedBox(height: 8),
+                RadioListTile<Locale?>(
+                  value: null,
+                  groupValue: selected,
+                  onChanged: (value) => setSheetState(() => selected = null),
+                  title: Text(tr(context, es: 'Automático', en: 'Automatic')),
+                  subtitle: Text(tr(context,
+                      es: 'Usar el idioma del dispositivo',
+                      en: 'Use the device language')),
+                ),
+                RadioListTile<Locale?>(
+                  value: const Locale('es'),
+                  groupValue: selected,
+                  onChanged: (value) =>
+                      setSheetState(() => selected = const Locale('es')),
+                  title: Text(tr(context, es: 'Español', en: 'Spanish')),
+                  subtitle: Text(tr(context,
+                      es: 'Interfaz en español', en: 'Spanish interface')),
+                ),
+                RadioListTile<Locale?>(
+                  value: const Locale('en'),
+                  groupValue: selected,
+                  onChanged: (value) =>
+                      setSheetState(() => selected = const Locale('en')),
+                  title: Text(tr(context, es: 'English', en: 'English')),
+                  subtitle: Text(
+                      tr(context, es: 'App in English', en: 'App in English')),
+                ),
+                const SizedBox(height: 8),
+                PrimaryButton(
+                  label: tr(context, es: 'Guardar idioma', en: 'Save language'),
+                  icon: Icons.check_rounded,
+                  onTap: () async {
+                    await saveStoredAppLocale(selected);
+                    if (mounted) {
+                      setState(() {});
+                      Navigator.pop(sheetContext);
+                      await showToast(
+                          context,
+                          tr(context,
+                              es: 'Idioma actualizado.',
+                              en: 'Language updated.'));
+                    }
+                  },
+                ),
+              ]),
         ),
       ),
     );
   }
 
   Future<void> openSupport() async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SupportTicketScreen(screen: 'perfil')));
+    await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => const SupportTicketScreen(screen: 'perfil')));
     reload();
   }
 
   Future<void> openAdminPanel() async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminDashboardScreen()));
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const AdminDashboardScreen()));
     reload();
   }
 
   Future<void> openProfileGroup(Map<String, dynamic> group) async {
     final groupId = group['id']?.toString() ?? '';
     if (groupId.isEmpty) return;
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)));
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => GroupShell(groupId: groupId)));
     reload();
   }
 
   Future<void> openAllGroups(List<Map<String, dynamic>> groups) async {
     await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ProfileAllGroupsScreen(groups: groups, onOpenGroup: openProfileGroup),
+      builder: (_) =>
+          ProfileAllGroupsScreen(groups: groups, onOpenGroup: openProfileGroup),
     ));
+    reload();
+  }
+
+  Future<void> openSubscription(List<Map<String, dynamic>> groups) async {
+    if (groups.isEmpty) {
+      await showToast(
+          context,
+          tr(context,
+              es: 'Crea o únete a un grupo para ver Premium.',
+              en: 'Create or join a group to see Premium.'));
+      return;
+    }
+    final activeGroups = groups
+        .where((group) => GrupliPremium.entitlementForGroup(group).active)
+        .toList();
+    final target = activeGroups.isNotEmpty ? activeGroups.first : groups.first;
+    await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => PremiumGroupScreen(group: target)));
     reload();
   }
 
@@ -2333,88 +3502,223 @@ class _ProfileScreenState extends State<ProfileScreen> {
         future: future,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return CenterLoader(label: tr(context, es: 'Cargando perfil...', en: 'Loading profile...'));
+            return CenterLoader(
+                label: tr(context,
+                    es: 'Cargando perfil...', en: 'Loading profile...'));
           }
           if (snapshot.hasError) {
-            return ErrorBlock(message: humanError(snapshot.error), onRetry: reload);
+            return ErrorBlock(
+                message: humanError(snapshot.error), onRetry: reload);
           }
 
           final data = snapshot.data ?? _ProfileData.empty();
           final name = data.name;
           final email = data.email;
           final avatarUrl = data.avatarUrl;
-          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              RoundBackButton(onTap: goBackFromProfile),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(tr(context, es: 'Perfil', en: 'Profile'), style: Theme.of(context).textTheme.headlineMedium),
-                const SizedBox(height: 4),
-                Text(tr(context, es: 'Tu cuenta, foto, grupos y ajustes básicos.', en: 'Your account, photo, groups and basic settings.'), style: Theme.of(context).textTheme.bodyMedium),
-              ])),
-              CircleIconButton(icon: Icons.refresh_rounded, onTap: reload),
-            ]),
-            const SizedBox(height: 16),
-            AppCard(
-              padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
-              child: Column(children: [
-                Stack(alignment: Alignment.bottomRight, children: [
-                  ProfileAvatar(name: name, avatarUrl: avatarUrl, radius: 54),
-                  Material(
-                    color: AppColors.teal,
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: changePhoto,
-                      child: SizedBox(
-                        width: 36,
-                        height: 36,
-                        child: photoLoading
-                            ? const Padding(
-                                padding: EdgeInsets.all(9),
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 18),
-                      ),
-                    ),
-                  ),
+          return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(children: [
+                  RoundBackButton(onTap: goBackFromProfile),
+                  const SizedBox(width: 12),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(tr(context, es: 'Perfil', en: 'Profile'),
+                            style: Theme.of(context).textTheme.headlineMedium),
+                        const SizedBox(height: 4),
+                        Text(
+                            tr(context,
+                                es: 'Tu cuenta, foto, grupos y ajustes básicos.',
+                                en: 'Your account, photo, groups and basic settings.'),
+                            style: Theme.of(context).textTheme.bodyMedium),
+                      ])),
+                  CircleIconButton(icon: Icons.refresh_rounded, onTap: reload),
                 ]),
-                const SizedBox(height: 14),
-                Text(name, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 3),
-                Text(email, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 16),
+                AppCard(
+                  padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+                  child: Column(children: [
+                    Stack(alignment: Alignment.bottomRight, children: [
+                      ProfileAvatar(
+                          name: name, avatarUrl: avatarUrl, radius: 54),
+                      Material(
+                        color: AppColors.teal,
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: changePhoto,
+                          child: SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: photoLoading
+                                ? const Padding(
+                                    padding: EdgeInsets.all(9),
+                                    child: InlineLoader(
+                                        size: 18, color: Colors.white),
+                                  )
+                                : const Icon(Icons.camera_alt_rounded,
+                                    color: Colors.white, size: 18),
+                          ),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 14),
+                    Text(name,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 3),
+                    Text(email,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium),
+                    const SizedBox(height: 8),
+                  ]),
+                ),
+                const SizedBox(height: 18),
+                SectionHeader(title: tr(context, es: 'Cuenta', en: 'Account')),
                 const SizedBox(height: 8),
-              ]),
-            ),
-            const SizedBox(height: 18),
-            SectionHeader(title: tr(context, es: 'Cuenta', en: 'Account')),
-            const SizedBox(height: 8),
-            SettingsRow(icon: Icons.edit_rounded, title: tr(context, es: 'Nombre visible', en: 'Display name'), subtitle: name, onTap: () => editName(name)),
-            SettingsRow(icon: Icons.photo_camera_rounded, title: tr(context, es: 'Cambiar foto', en: 'Change photo'), subtitle: photoLoading ? tr(context, es: 'Subiendo imagen...', en: 'Uploading image...') : tr(context, es: 'Elige una imagen de tu dispositivo', en: 'Choose an image from your device'), onTap: changePhoto),
-            if (avatarUrl.isNotEmpty)
-              SettingsRow(icon: Icons.delete_outline_rounded, title: tr(context, es: 'Quitar foto', en: 'Remove photo'), subtitle: tr(context, es: 'Volver al avatar con iniciales', en: 'Go back to the initials avatar'), danger: true, onTap: removePhoto),
-            const SizedBox(height: 8),
-            SectionHeader(title: tr(context, es: 'Tus grupos', en: 'Your groups'), action: tr(context, es: 'Ver todos', en: 'View all'), onTap: () => openAllGroups(data.groups)),
-            const SizedBox(height: 8),
-            if (data.groups.isEmpty)
-              EmptySlim(icon: Icons.groups_rounded, title: tr(context, es: 'Aún no tienes grupos', en: 'You do not have any groups yet'), body: tr(context, es: 'Crea o únete a un grupo desde Inicio.', en: 'Create or join a group from Home.'))
-            else
-              ...data.groups.take(3).map((group) => ProfileGroupMiniCard(group: group, onTap: () => openProfileGroup(group))),
-            if (data.groups.length > 3)
-              SettingsRow(icon: Icons.more_horiz_rounded, title: tr(context, es: 'Ver todos los grupos', en: 'View all groups'), subtitle: tr(context, es: '${data.groups.length} grupos en total', en: '${data.groups.length} groups total'), onTap: () => openAllGroups(data.groups)),
-            const SizedBox(height: 8),
-            SectionHeader(title: tr(context, es: 'Ajustes', en: 'Settings')),
-            const SizedBox(height: 8),
-            SettingsRow(icon: Icons.notifications_none_rounded, title: tr(context, es: 'Notificaciones', en: 'Notifications'), subtitle: tr(context, es: 'Eventos, gastos y torneos', en: 'Events, expenses and tournaments'), onTap: showNotificationsSheet),
-            SettingsRow(icon: Icons.language_rounded, title: tr(context, es: 'Idioma', en: 'Language'), subtitle: appLocaleOverride.value == null ? tr(context, es: 'Automático', en: 'Automatic') : (appLocale.languageCode == 'en' ? 'English' : 'Español'), onTap: showLanguageSheet),
-            SettingsRow(icon: Icons.lock_outline_rounded, title: tr(context, es: 'Privacidad y seguridad', en: 'Privacy & security'), subtitle: tr(context, es: 'Grupos cerrados, roles y acceso privado', en: 'Closed groups, roles and private access'), onTap: showPrivacySheet),
-            SettingsRow(icon: Icons.help_outline_rounded, title: tr(context, es: 'Ayuda y soporte', en: 'Help & support'), subtitle: tr(context, es: 'Reportar bugs, dudas o sugerencias', en: 'Report bugs, questions or suggestions'), onTap: openSupport),
-            if (data.isAdmin)
-              SettingsRow(icon: Icons.admin_panel_settings_rounded, title: tr(context, es: 'Panel admin', en: 'Admin panel'), subtitle: tr(context, es: 'Roles, reportes, métricas y calidad de Grupli', en: 'Roles, reports, metrics and Grupli quality'), onTap: openAdminPanel),
-            SettingsRow(icon: Icons.delete_forever_rounded, title: tr(context, es: 'Eliminar cuenta', en: 'Delete account'), subtitle: tr(context, es: 'Borra tu cuenta y datos personales de Grupli', en: 'Delete your account and personal Grupli data'), danger: true, onTap: deleteAccountFlow),
-            const SizedBox(height: 10),
-            DangerButton(label: tr(context, es: 'Cerrar sesión', en: 'Sign out'), icon: Icons.logout_rounded, onTap: confirmSignOut),
-          ]);
+                SettingsRow(
+                    icon: Icons.edit_rounded,
+                    title:
+                        tr(context, es: 'Nombre visible', en: 'Display name'),
+                    subtitle: name,
+                    onTap: () => editName(name)),
+                SettingsRow(
+                    icon: Icons.photo_camera_rounded,
+                    title: tr(context, es: 'Cambiar foto', en: 'Change photo'),
+                    subtitle: photoLoading
+                        ? tr(context,
+                            es: 'Subiendo imagen...', en: 'Uploading image...')
+                        : tr(context,
+                            es: 'Elige una imagen de tu dispositivo',
+                            en: 'Choose an image from your device'),
+                    onTap: changePhoto),
+                if (avatarUrl.isNotEmpty)
+                  SettingsRow(
+                      icon: Icons.delete_outline_rounded,
+                      title: tr(context, es: 'Quitar foto', en: 'Remove photo'),
+                      subtitle: tr(context,
+                          es: 'Volver al avatar con iniciales',
+                          en: 'Go back to the initials avatar'),
+                      danger: true,
+                      onTap: removePhoto),
+                const SizedBox(height: 8),
+                SectionHeader(
+                    title: tr(context, es: 'Suscripción', en: 'Subscription')),
+                const SizedBox(height: 8),
+                SettingsRow(
+                  icon: Icons.workspace_premium_rounded,
+                  title:
+                      tr(context, es: 'Premium del grupo', en: 'Group Premium'),
+                  subtitle: data.groups.isEmpty
+                      ? tr(context,
+                          es: 'Aún no tienes grupos. Crea o únete a uno para activarlo.',
+                          en: 'You do not have any groups yet. Create or join one to activate it.')
+                      : (() {
+                          final activePremium = data.groups
+                              .where((group) =>
+                                  GrupliPremium.entitlementForGroup(group)
+                                      .active)
+                              .length;
+                          if (activePremium > 0) {
+                            return tr(context,
+                                es: '$activePremium grupo${activePremium == 1 ? '' : 's'} ya tiene Premium activo.',
+                                en: '$activePremium group${activePremium == 1 ? '' : 's'} already have Premium active.');
+                          }
+                          return tr(context,
+                              es: '${data.groups.length} grupos listos para activar Premium.',
+                              en: '${data.groups.length} groups ready for Premium.');
+                        })(),
+                  onTap: () => openSubscription(data.groups),
+                ),
+                const SizedBox(height: 8),
+                SectionHeader(
+                    title: tr(context, es: 'Tus grupos', en: 'Your groups'),
+                    action: tr(context, es: 'Ver todos', en: 'View all'),
+                    onTap: () => openAllGroups(data.groups)),
+                const SizedBox(height: 8),
+                if (data.groups.isEmpty)
+                  EmptySlim(
+                      icon: Icons.groups_rounded,
+                      title: tr(context,
+                          es: 'Aún no tienes grupos',
+                          en: 'You do not have any groups yet'),
+                      body: tr(context,
+                          es: 'Crea o únete a un grupo desde Inicio.',
+                          en: 'Create or join a group from Home.'))
+                else
+                  ...data.groups.take(3).map((group) => ProfileGroupMiniCard(
+                      group: group, onTap: () => openProfileGroup(group))),
+                if (data.groups.length > 3)
+                  SettingsRow(
+                      icon: Icons.more_horiz_rounded,
+                      title: tr(context,
+                          es: 'Ver todos los grupos', en: 'View all groups'),
+                      subtitle: tr(context,
+                          es: '${data.groups.length} grupos en total',
+                          en: '${data.groups.length} groups total'),
+                      onTap: () => openAllGroups(data.groups)),
+                const SizedBox(height: 8),
+                SectionHeader(
+                    title: tr(context, es: 'Ajustes', en: 'Settings')),
+                const SizedBox(height: 8),
+                SettingsRow(
+                    icon: Icons.notifications_none_rounded,
+                    title:
+                        tr(context, es: 'Notificaciones', en: 'Notifications'),
+                    subtitle: tr(context,
+                        es: 'Eventos, gastos y torneos',
+                        en: 'Events, expenses and tournaments'),
+                    onTap: showNotificationsSheet),
+                SettingsRow(
+                    icon: Icons.language_rounded,
+                    title: tr(context, es: 'Idioma', en: 'Language'),
+                    subtitle: appLocaleOverride.value == null
+                        ? tr(context, es: 'Automático', en: 'Automatic')
+                        : (appLocale.languageCode == 'en'
+                            ? 'English'
+                            : 'Español'),
+                    onTap: showLanguageSheet),
+                SettingsRow(
+                    icon: Icons.lock_outline_rounded,
+                    title: tr(context,
+                        es: 'Privacidad y seguridad', en: 'Privacy & security'),
+                    subtitle: tr(context,
+                        es: 'Grupos cerrados, roles y acceso privado',
+                        en: 'Closed groups, roles and private access'),
+                    onTap: showPrivacySheet),
+                SettingsRow(
+                    icon: Icons.help_outline_rounded,
+                    title: tr(context,
+                        es: 'Ayuda y soporte', en: 'Help & support'),
+                    subtitle: tr(context,
+                        es: 'Reportar bugs, dudas o sugerencias',
+                        en: 'Report bugs, questions or suggestions'),
+                    onTap: openSupport),
+                if (data.isAdmin)
+                  SettingsRow(
+                      icon: Icons.admin_panel_settings_rounded,
+                      title: tr(context, es: 'Panel admin', en: 'Admin panel'),
+                      subtitle: tr(context,
+                          es: 'Roles, reportes, métricas y calidad de Grupli',
+                          en: 'Roles, reports, metrics and Grupli quality'),
+                      onTap: openAdminPanel),
+                SettingsRow(
+                    icon: Icons.delete_forever_rounded,
+                    title: tr(context,
+                        es: 'Eliminar cuenta', en: 'Delete account'),
+                    subtitle: tr(context,
+                        es: 'Borra tu cuenta y datos personales de Grupli',
+                        en: 'Delete your account and personal Grupli data'),
+                    danger: true,
+                    onTap: deleteAccountFlow),
+                const SizedBox(height: 10),
+                DangerButton(
+                    label: tr(context, es: 'Cerrar sesión', en: 'Sign out'),
+                    icon: Icons.logout_rounded,
+                    onTap: confirmSignOut),
+              ]);
         },
       ),
     );
@@ -2424,19 +3728,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class ProfileAllGroupsScreen extends StatelessWidget {
   final List<Map<String, dynamic>> groups;
   final Future<void> Function(Map<String, dynamic> group) onOpenGroup;
-  const ProfileAllGroupsScreen({super.key, required this.groups, required this.onOpenGroup});
+  const ProfileAllGroupsScreen(
+      {super.key, required this.groups, required this.onOpenGroup});
 
   @override
   Widget build(BuildContext context) {
     return DirectPage(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        PageHeader(title: tr(context, es: 'Tus grupos', en: 'Your groups'), subtitle: tr(context, es: '${groups.length} grupos en total. Toca uno para abrirlo.', en: '${groups.length} groups total. Tap one to open it.'), leading: true),
+        PageHeader(
+            title: tr(context, es: 'Tus grupos', en: 'Your groups'),
+            subtitle: tr(context,
+                es: '${groups.length} grupos en total. Toca uno para abrirlo.',
+                en: '${groups.length} groups total. Tap one to open it.'),
+            leading: true),
         const SizedBox(height: 14),
         if (groups.isEmpty)
-          EmptyBlock(icon: Icons.groups_rounded, title: tr(context, es: 'Aún no tienes grupos', en: 'You do not have any groups yet'), body: tr(context, es: 'Crea o únete a un grupo desde Inicio.', en: 'Create or join a group from Home.'))
+          EmptyBlock(
+              icon: Icons.groups_rounded,
+              title: tr(context,
+                  es: 'Aún no tienes grupos',
+                  en: 'You do not have any groups yet'),
+              body: tr(context,
+                  es: 'Crea o únete a un grupo desde Inicio.',
+                  en: 'Create or join a group from Home.'))
         else
-          ...groups.map((group) => ProfileGroupMiniCard(group: group, onTap: () => onOpenGroup(group))),
+          ...groups.map((group) => ProfileGroupMiniCard(
+              group: group, onTap: () => onOpenGroup(group))),
       ]),
     );
   }
@@ -2447,9 +3765,11 @@ class _ProfileData {
   final List<Map<String, dynamic>> groups;
   final bool isAdmin;
 
-  const _ProfileData({required this.profile, required this.groups, this.isAdmin = false});
+  const _ProfileData(
+      {required this.profile, required this.groups, this.isAdmin = false});
 
-  static _ProfileData empty() => const _ProfileData(profile: {}, groups: [], isAdmin: false);
+  static _ProfileData empty() =>
+      const _ProfileData(profile: {}, groups: [], isAdmin: false);
 
   static Future<_ProfileData> load() async {
     final results = await Future.wait([
@@ -2475,17 +3795,22 @@ class _ProfileData {
 
   String get avatarUrl => AppData.text(profile['avatar_url']);
 
-  int get adminGroups => groups.where((g) => ['owner', 'admin'].contains(AppData.text(g['role']))).length;
-  int get totalEvents => groups.fold<int>(0, (sum, g) => sum + AppData.intValue(g['events_count']));
+  int get adminGroups => groups
+      .where((g) => ['owner', 'admin'].contains(AppData.text(g['role'])))
+      .length;
+  int get totalEvents => groups.fold<int>(
+      0, (sum, g) => sum + AppData.intValue(g['events_count']));
 }
-
-
 
 class ProfileAvatar extends StatelessWidget {
   final String name;
   final String avatarUrl;
   final double radius;
-  const ProfileAvatar({super.key, required this.name, required this.avatarUrl, this.radius = 24});
+  const ProfileAvatar(
+      {super.key,
+      required this.name,
+      required this.avatarUrl,
+      this.radius = 24});
 
   @override
   Widget build(BuildContext context) {
@@ -2518,7 +3843,11 @@ class TinyStat extends StatelessWidget {
   final IconData icon;
   final String value;
   final String label;
-  const TinyStat({super.key, required this.icon, required this.value, required this.label});
+  const TinyStat(
+      {super.key,
+      required this.icon,
+      required this.value,
+      required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -2532,8 +3861,16 @@ class TinyStat extends StatelessWidget {
       child: Column(children: [
         Icon(icon, color: AppColors.teal, size: 18),
         const SizedBox(height: 6),
-        Text(value, style: const TextStyle(color: AppColors.ink, fontSize: 18, fontWeight: FontWeight.w900)),
-        Text(label, style: const TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700)),
+        Text(value,
+            style: const TextStyle(
+                color: AppColors.ink,
+                fontSize: 18,
+                fontWeight: FontWeight.w900)),
+        Text(label,
+            style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 11,
+                fontWeight: FontWeight.w700)),
       ]),
     );
   }
@@ -2543,24 +3880,34 @@ class AccountStatusPill extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  const AccountStatusPill({super.key, required this.icon, required this.label, required this.color});
+  const AccountStatusPill(
+      {super.key,
+      required this.icon,
+      required this.label,
+      required this.color});
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-    decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(99), border: Border.all(color: color.withOpacity(.18))),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 15, color: color),
-      const SizedBox(width: 6),
-      Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12)),
-    ]),
-  );
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+            color: color.withOpacity(.10),
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(color: color.withOpacity(.18))),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 6),
+          Text(label,
+              style: TextStyle(
+                  color: color, fontWeight: FontWeight.w900, fontSize: 12)),
+        ]),
+      );
 }
 
 class ProfileGroupMiniCard extends StatelessWidget {
   final Map<String, dynamic> group;
   final VoidCallback onTap;
-  const ProfileGroupMiniCard({super.key, required this.group, required this.onTap});
+  const ProfileGroupMiniCard(
+      {super.key, required this.group, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -2577,18 +3924,33 @@ class ProfileGroupMiniCard extends StatelessWidget {
           Container(
             width: 42,
             height: 42,
-            decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(15)),
+            decoration: BoxDecoration(
+                color: AppColors.tealSoft,
+                borderRadius: BorderRadius.circular(15)),
             child: const Icon(Icons.groups_rounded, color: AppColors.teal),
           ),
           const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink))),
-              RoleBadge(role: role),
-            ]),
-            const SizedBox(height: 4),
-            Text('$members miembros · $events eventos', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
-          ])),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Row(children: [
+                  Expanded(
+                      child: Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.ink))),
+                  RoleBadge(role: role),
+                ]),
+                const SizedBox(height: 4),
+                Text('$members miembros · $events eventos',
+                    style: const TextStyle(
+                        color: AppColors.muted,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12)),
+              ])),
         ]),
       ),
     );
@@ -2599,48 +3961,58 @@ class SheetTitle extends StatelessWidget {
   final IconData icon;
   final String title;
   final String body;
-  const SheetTitle({super.key, required this.icon, required this.title, required this.body});
+  const SheetTitle(
+      {super.key, required this.icon, required this.title, required this.body});
 
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(16)),
-      child: Icon(icon, color: AppColors.teal),
-    ),
-    const SizedBox(height: 12),
-    Text(title, style: Theme.of(context).textTheme.titleLarge),
-    const SizedBox(height: 6),
-    Text(body, style: Theme.of(context).textTheme.bodyMedium),
-  ]);
+  Widget build(BuildContext context) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+              color: AppColors.tealSoft,
+              borderRadius: BorderRadius.circular(16)),
+          child: Icon(icon, color: AppColors.teal),
+        ),
+        const SizedBox(height: 12),
+        Text(title, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 6),
+        Text(body, style: Theme.of(context).textTheme.bodyMedium),
+      ]);
 }
 
 class PreferencePreviewRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String body;
-  const PreferencePreviewRow({super.key, required this.icon, required this.title, required this.body});
+  const PreferencePreviewRow(
+      {super.key, required this.icon, required this.title, required this.body});
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 9),
-    child: AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      child: Row(children: [
-        Icon(icon, color: AppColors.teal),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
-          const SizedBox(height: 2),
-          Text(body, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
-        ])),
-      ]),
-    ),
-  );
+        padding: const EdgeInsets.only(bottom: 9),
+        child: AppCard(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          child: Row(children: [
+            Icon(icon, color: AppColors.teal),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w900, color: AppColors.ink)),
+                  const SizedBox(height: 2),
+                  Text(body,
+                      style: const TextStyle(
+                          color: AppColors.muted, fontSize: 12)),
+                ])),
+          ]),
+        ),
+      );
 }
-
-
 
 class NotificationPreferenceSwitch extends StatelessWidget {
   final IconData icon;
@@ -2648,27 +4020,50 @@ class NotificationPreferenceSwitch extends StatelessWidget {
   final String body;
   final bool value;
   final ValueChanged<bool> onChanged;
-  const NotificationPreferenceSwitch({super.key, required this.icon, required this.title, required this.body, required this.value, required this.onChanged});
+  const NotificationPreferenceSwitch(
+      {super.key,
+      required this.icon,
+      required this.title,
+      required this.body,
+      required this.value,
+      required this.onChanged});
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 9),
-    child: AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(children: [
-        Container(width: 38, height: 38, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: AppColors.teal, size: 20)),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.ink)),
-          const SizedBox(height: 2),
-          Text(body, style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
-        ])),
-        Switch(value: value, activeColor: AppColors.teal, onChanged: onChanged),
-      ]),
-    ),
-  );
+        padding: const EdgeInsets.only(bottom: 9),
+        child: AppCard(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(children: [
+            Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                    color: AppColors.tealSoft,
+                    borderRadius: BorderRadius.circular(14)),
+                child: Icon(icon, color: AppColors.teal, size: 20)),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w900, color: AppColors.ink)),
+                  const SizedBox(height: 2),
+                  Text(body,
+                      style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700)),
+                ])),
+            Switch(
+                value: value,
+                activeColor: AppColors.teal,
+                onChanged: onChanged),
+          ]),
+        ),
+      );
 }
-
 
 class SmartPromptCard extends StatelessWidget {
   final IconData icon;
@@ -2703,7 +4098,9 @@ class SmartPromptCard extends StatelessWidget {
           child: Icon(icon, color: color, size: 22),
         ),
         const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           Text(body, style: Theme.of(context).textTheme.bodyMedium),
@@ -2714,7 +4111,9 @@ class SmartPromptCard extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(actionLabel, style: TextStyle(color: color, fontWeight: FontWeight.w900)),
+                Text(actionLabel,
+                    style:
+                        TextStyle(color: color, fontWeight: FontWeight.w900)),
                 const SizedBox(width: 4),
                 Icon(Icons.arrow_forward_rounded, size: 18, color: color),
               ]),
@@ -2744,24 +4143,109 @@ void showGroupQuickActionsSheet(
       child: Container(
         margin: const EdgeInsets.all(14),
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-        decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(28), boxShadow: const [BoxShadow(color: Color(0x1C061A2A), blurRadius: 32, offset: Offset(0, 14))]),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.tealSoft, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.tune_rounded, color: AppColors.teal)),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
-              Text(tr(context, es: 'Acciones rápidas del grupo', en: 'Quick group actions'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 12)),
-            ])),
-          ]),
-          const SizedBox(height: 12),
-          SettingsRow(icon: Icons.edit_rounded, title: tr(context, es: 'Editar grupo', en: 'Edit group'), subtitle: tr(context, es: 'Nombre, portada y ajustes', en: 'Name, cover and settings'), onTap: () { Navigator.pop(sheetContext); onSettings(); }),
-          SettingsRow(icon: Icons.groups_rounded, title: tr(context, es: 'Miembros', en: 'Members'), subtitle: tr(context, es: 'Roles, admins y expulsiones', en: 'Roles, admins and removals'), onTap: () { Navigator.pop(sheetContext); onMembers(); }),
-          SettingsRow(icon: Icons.link_rounded, title: tr(context, es: 'Copiar enlace', en: 'Copy link'), subtitle: InviteLinks.joinUrl(code), onTap: () { Navigator.pop(sheetContext); copyInviteLink(context, code); }),
-          SettingsRow(icon: Icons.share_rounded, title: tr(context, es: 'Compartir invitación', en: 'Share invite'), subtitle: tr(context, es: 'Enviar por WhatsApp u otra app', en: 'Send via WhatsApp or another app'), onTap: () { Navigator.pop(sheetContext); Share.share(inviteText(name, code)); }),
-          SettingsRow(icon: Icons.more_horiz_rounded, title: tr(context, es: 'Ver todo', en: 'View all'), subtitle: tr(context, es: 'Invitaciones, permisos y privacidad', en: 'Invites, permissions and privacy'), onTap: () { Navigator.pop(sheetContext); onMore(); }),
-          SettingsRow(icon: Icons.support_agent_rounded, title: tr(context, es: 'Reportar problema', en: 'Report a problem'), subtitle: tr(context, es: 'Enviar incidencia sobre este grupo', en: 'Send an issue report about this group'), onTap: () { Navigator.pop(sheetContext); onReport(); }),
-        ]),
+        decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x1C061A2A),
+                  blurRadius: 32,
+                  offset: Offset(0, 14))
+            ]),
+        child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                        color: AppColors.tealSoft,
+                        borderRadius: BorderRadius.circular(14)),
+                    child:
+                        const Icon(Icons.tune_rounded, color: AppColors.teal)),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium),
+                      Text(
+                          tr(context,
+                              es: 'Acciones rápidas del grupo',
+                              en: 'Quick group actions'),
+                          style: const TextStyle(
+                              color: AppColors.muted,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12)),
+                    ])),
+              ]),
+              const SizedBox(height: 12),
+              SettingsRow(
+                  icon: Icons.edit_rounded,
+                  title: tr(context, es: 'Editar grupo', en: 'Edit group'),
+                  subtitle: tr(context,
+                      es: 'Nombre, portada y ajustes',
+                      en: 'Name, cover and settings'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    onSettings();
+                  }),
+              SettingsRow(
+                  icon: Icons.groups_rounded,
+                  title: tr(context, es: 'Miembros', en: 'Members'),
+                  subtitle: tr(context,
+                      es: 'Roles, admins y expulsiones',
+                      en: 'Roles, admins and removals'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    onMembers();
+                  }),
+              SettingsRow(
+                  icon: Icons.link_rounded,
+                  title: tr(context, es: 'Copiar enlace', en: 'Copy link'),
+                  subtitle: InviteLinks.joinUrl(code),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    copyInviteLink(context, code);
+                  }),
+              SettingsRow(
+                  icon: Icons.share_rounded,
+                  title: tr(context,
+                      es: 'Compartir invitación', en: 'Share invite'),
+                  subtitle: tr(context,
+                      es: 'Enviar por WhatsApp u otra app',
+                      en: 'Send via WhatsApp or another app'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    Share.share(inviteText(name, code));
+                  }),
+              SettingsRow(
+                  icon: Icons.more_horiz_rounded,
+                  title: tr(context, es: 'Ver todo', en: 'View all'),
+                  subtitle: tr(context,
+                      es: 'Invitaciones, permisos y privacidad',
+                      en: 'Invites, permissions and privacy'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    onMore();
+                  }),
+              SettingsRow(
+                  icon: Icons.support_agent_rounded,
+                  title: tr(context,
+                      es: 'Reportar problema', en: 'Report a problem'),
+                  subtitle: tr(context,
+                      es: 'Enviar incidencia sobre este grupo',
+                      en: 'Send an issue report about this group'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    onReport();
+                  }),
+            ]),
       ),
     ),
   );

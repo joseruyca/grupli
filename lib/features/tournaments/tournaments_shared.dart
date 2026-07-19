@@ -63,12 +63,12 @@ class TournamentUxCommandCenter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasActivity = activeCount > 0 || nextCount > 0 || latestResults > 0;
-    final title = hasActivity ? (appIsEnglish ? 'What is next' : 'Qué toca ahora') : (appIsEnglish ? 'Start a clear competition' : 'Empieza una competición clara');
+    final title = hasActivity ? (appIsEnglish ? "What's next" : 'Qué toca ahora') : (appIsEnglish ? 'Start a competition' : 'Empieza la competición');
     final body = nextCount > 0
-        ? '$nextCount ${nextCount == 1 ? 'partido pendiente' : 'partidos pendientes'} para revisar. Lo importante queda arriba, sin esconderlo entre tablas.'
+        ? '$nextCount ${nextCount == 1 ? 'partido pendiente' : 'partidos pendientes'} para revisar.'
         : activeCount > 0
-            ? '$activeCount ${activeCount == 1 ? 'competición activa' : 'competiciones activas'} en marcha. Entra para registrar resultados o ajustar jornadas.'
-            : 'Crea una liga, eliminatoria, americano o manual. Grupli ordena partidos, tabla y resultados sin hacerlo pesado.';
+            ? '$activeCount ${activeCount == 1 ? 'competición activa' : 'competiciones activas'} en marcha.'
+            : 'Crea una liga, eliminatoria, americano o manual.';
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: AppCard(
@@ -152,21 +152,21 @@ class TournamentDetailNextStepCard extends StatelessWidget {
     final title = needsTeams
         ? 'Faltan participantes'
         : matches.isEmpty
-            ? 'Falta crear el calendario'
+            ? 'Falta el calendario'
             : unscheduled > 0
-                ? 'Faltan fechas por poner'
+                ? 'Faltan fechas'
                 : pending > 0
-                    ? 'Hay resultados pendientes'
-                    : 'Competición lista para revisar';
+                    ? 'Resultados pendientes'
+                    : 'Todo listo';
     final body = needsTeams
         ? 'Añade al menos dos participantes para poder generar partidos sin confusión.'
         : matches.isEmpty
-            ? 'Genera partidos cuando tengas equipos y reglas claras. Si es manual, podrás ajustarlos después.'
+            ? 'Crea el calendario para ver los cruces.'
             : unscheduled > 0
-                ? '$unscheduled ${unscheduled == 1 ? 'partido no tiene fecha' : 'partidos no tienen fecha'}. Mueve la jornada completa o ajusta fechas en bloque.'
+                ? '$unscheduled ${unscheduled == 1 ? 'partido sin fecha' : 'partidos sin fecha'}.'
                 : pending > 0
-                    ? '$pending ${pending == 1 ? 'partido espera resultado' : 'partidos esperan resultado'}. Entra en Partidos y registra solo lo necesario.'
-                    : standings.isEmpty ? 'No hay tabla disponible todavía.' : 'El líder actual es ${standings.first.name}. Revisa tabla, stats o finaliza cuando esté todo claro.';
+                    ? '$pending ${pending == 1 ? 'partido pendiente' : 'partidos pendientes'}.'
+                    : standings.isEmpty ? 'Sin tabla todavía.' : 'Líder: ${standings.first.name}.';
     final icon = needsTeams
         ? Icons.group_add_rounded
         : matches.isEmpty
@@ -444,9 +444,9 @@ class TournamentCreationHeroCard extends StatelessWidget {
       ),
       const SizedBox(width: 12),
       const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Configura tu torneo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
+        Text('Prepara tu torneo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
         SizedBox(height: 5),
-        Text('Elige deporte, formato y participantes. Grupli ajusta el resto.', style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.25)),
+        Text('Deporte, formato y participantes en un solo flujo.', style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.25)),
       ])),
     ]),
   );
@@ -482,10 +482,10 @@ class TournamentQuickTemplateGrid extends StatelessWidget {
   const TournamentQuickTemplateGrid({super.key, required this.selected, required this.onChanged, this.allowedValues});
 
   static final templates = [
-    TournamentQuickTemplate('league', '', 'Liga', appIsEnglish ? 'Rounds and standings' : 'Jornadas y clasificación'),
-    TournamentQuickTemplate('americano_padel', '', 'Americano', appIsEnglish ? 'Rounds and individual ranking' : 'Rondas y ranking individual'),
-    TournamentQuickTemplate('quick_cup', '', 'Eliminatoria', appIsEnglish ? 'Bracket, semifinal and final' : 'Cuadro, semifinal y final'),
-    TournamentQuickTemplate('manual_day', '', 'Manual', appIsEnglish ? 'You decide the matches' : 'Tú decides los partidos'),
+    TournamentQuickTemplate('league', '', 'Liga', appIsEnglish ? 'Rounds and table' : 'Jornadas y tabla'),
+    TournamentQuickTemplate('americano_padel', '', 'Americano', appIsEnglish ? 'Rotations and ranking' : 'Rotación y ranking'),
+    TournamentQuickTemplate('quick_cup', '', 'Eliminatoria', appIsEnglish ? 'Bracket and final' : 'Cuadro y final'),
+    TournamentQuickTemplate('manual_day', '', 'Manual', appIsEnglish ? 'Cruces manuales' : 'Cruces manuales'),
   ];
 
   @override
@@ -557,9 +557,9 @@ class TournamentAdvancedToggleCard extends StatelessWidget {
       ),
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(enabled ? (appIsEnglish ? 'Advanced mode on' : 'Modo avanzado activo') : (appIsEnglish ? 'Quick mode recommended' : 'Modo rápido recomendado'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        Text(enabled ? (appIsEnglish ? 'Advanced mode on' : 'Modo avanzado') : (appIsEnglish ? 'Quick setup recommended' : 'Configuración rápida recomendada'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         const SizedBox(height: 3),
-        Text(enabled ? (appIsEnglish ? 'You can tweak format, rounds, legs, brackets and rules.' : 'Puedes tocar formato, rondas, vueltas, cruces y reglas.') : (appIsEnglish ? 'You keep the same steps, but the app hides technical settings and applies safe defaults.' : 'Sigues los mismos pasos, pero la app oculta ajustes técnicos y aplica valores seguros.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+        Text(enabled ? (appIsEnglish ? 'You can tweak format, rounds, brackets and rules.' : 'Puedes ajustar formato, rondas, cruces y reglas.') : (appIsEnglish ? 'Same flow, fewer technical settings.' : 'Mismo flujo, menos ajustes técnicos.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
       ])),
       Switch(value: enabled, activeThumbColor: AppColors.orange, onChanged: onChanged),
     ]),
@@ -577,7 +577,7 @@ class TournamentQuickModeInfoCard extends StatelessWidget {
       Icon(Icons.info_outline_rounded, color: AppColors.teal, size: 20),
       SizedBox(width: 9),
       Expanded(child: Text(
-        appIsEnglish ? 'Quick mode: pick League, Americano, Knockout or Manual and follow the same flow, without unnecessary technical settings.' : 'Modo rápido: eliges Liga, Americano, Eliminatoria o Manual y sigues el mismo proceso, pero sin ajustes técnicos innecesarios.',
+        appIsEnglish ? 'Quick mode: pick League, Americano, Knockout or Manual and follow the same flow.' : 'Modo rápido: eliges Liga, Americano, Eliminatoria o Manual y sigues el mismo flujo.',
         style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12),
       )),
     ]),
@@ -598,7 +598,7 @@ class TournamentSimpleFormatSummary extends StatelessWidget {
       Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: Center(child: Text(scoringEmoji(scoringType), style: const TextStyle(fontSize: 23)))),
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${scoringTypeLabel(scoringType)} - ${tournamentFormatLabel(format)}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        Text('${scoringTypeLabel(scoringType)} · ${tournamentFormatLabel(format)}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         const SizedBox(height: 4),
         Wrap(spacing: 6, runSpacing: 6, children: [
           TournamentRuleChip(label: teamTypeLabel(teamType)),
@@ -633,10 +633,10 @@ class TournamentSimpleFormatConfigCard extends StatelessWidget {
       Text(format == 'americano' ? 'Americano' : 'Liga', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
       const SizedBox(height: 10),
       if (format == 'americano')
-        TournamentCounterRow(label: 'Rondas', value: rounds <= 0 ? 5 : rounds, min: 1, max: 20, onChanged: onRoundsChanged, helper: 'Ranking individual')
+        TournamentCounterRow(label: 'Rondas', value: rounds <= 0 ? 5 : rounds, min: 1, max: 20, onChanged: onRoundsChanged, helper: 'Ranking')
       else
-        TournamentCounterRow(label: 'Jornadas', value: rounds, min: 0, max: 30, zeroLabel: 'Todas', onChanged: onRoundsChanged, helper: 'Liga completa'),
-      TournamentCounterRow(label: 'Pistas / mesas', value: courts, min: 1, max: 12, onChanged: onCourtsChanged, helper: courts <= 1 ? 'Una a la vez' : 'En paralelo'),
+        TournamentCounterRow(label: 'Jornadas', value: rounds, min: 0, max: 30, zeroLabel: 'Todas', onChanged: onRoundsChanged, helper: 'Completa'),
+      TournamentCounterRow(label: 'Pistas / mesas', value: courts, min: 1, max: 12, onChanged: onCourtsChanged, helper: courts <= 1 ? 'Una' : 'Varias'),
     ]));
   }
 }
