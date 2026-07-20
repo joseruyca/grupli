@@ -2049,7 +2049,7 @@ class BottomBar extends StatelessWidget {
           )
         : NavigationBar(
             backgroundColor: Colors.white,
-            indicatorColor: AppColors.teal,
+            indicatorColor: AppColors.tealSoft,
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             selectedIndex: index,
             onDestinationSelected: onTap,
@@ -2057,8 +2057,16 @@ class BottomBar extends StatelessWidget {
               final spec = items[i];
               final color = navColorFor(i, items.length);
               return NavigationDestination(
-                icon: Icon(spec.icon, color: color),
-                selectedIcon: Icon(spec.icon, color: Colors.white),
+                icon: Icon(spec.icon, color: AppColors.muted),
+                selectedIcon: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(.14),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(spec.icon, color: color, size: 18),
+                ),
                 label: spec.label,
               );
             }),
@@ -2070,7 +2078,13 @@ class BottomBar extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: AppColors.lineSoft),
-        boxShadow: const [BoxShadow(color: Color(0x14111B34), blurRadius: 28, offset: Offset(0, -4))],
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14111B34),
+            blurRadius: 28,
+            offset: Offset(0, -4),
+          )
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),

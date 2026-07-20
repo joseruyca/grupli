@@ -590,13 +590,14 @@ class _GrupliAppState extends State<GrupliApp> {
         ),
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: AppColors.white,
-          indicatorColor: AppColors.teal,
+          indicatorColor: AppColors.tealSoft,
           labelTextStyle: MaterialStateProperty.resolveWith((states) {
             final selected = states.contains(MaterialState.selected);
             return TextStyle(
-              fontSize: 11,
+              fontSize: 11.2,
               fontWeight: FontWeight.w900,
-              color: selected ? Colors.white : AppColors.muted,
+              color: selected ? AppColors.ink : AppColors.muted,
+              letterSpacing: -.05,
             );
           }),
         ),

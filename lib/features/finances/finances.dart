@@ -226,16 +226,6 @@ class _FinancesTabState extends State<FinancesTab> {
                     onCreate: openCreate,
                   ),
                   const SizedBox(height: 12),
-                  premium.canUse('finance_insights')
-                      ? FinanceAdvancedInsightsCard(
-                          summary: summary,
-                          data: data,
-                          onOpen: () => openFinanceInsights(data),
-                        )
-                      : FinancePremiumTeaserCard(
-                          onOpen: () => openFinanceInsights(data),
-                        ),
-                  const SizedBox(height: 12),
                   FinanceSegmentedTabs(index: financeSection, onChanged: (i) => setState(() => financeSection = i > 1 ? 1 : i)),
                   const SizedBox(height: 14),
                   if (financeSection == 0) ...[
@@ -318,6 +308,12 @@ class _FinancesTabState extends State<FinancesTab> {
                           ],
                         ]),
                       ),
+                  ],
+                  if (!premium.canUse('finance_insights')) ...[
+                    const SizedBox(height: 14),
+                    FinancePremiumTeaserCard(
+                      onOpen: () => openFinanceInsights(data),
+                    ),
                   ],
                 ],
               ),
