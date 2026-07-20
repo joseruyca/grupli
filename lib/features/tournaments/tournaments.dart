@@ -1327,7 +1327,7 @@ class TournamentStandingsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (standings.isEmpty) return EmptySlim(icon: Icons.table_chart_rounded, title: 'Sin clasificacion todavia', body: 'Registra resultados para calcular la clasificacion.');
+    if (standings.isEmpty) return EmptySlim(icon: Icons.table_chart_rounded, title: 'Sin clasificación todavía', body: 'Registra resultados para calcular la clasificación.');
     final isAmericano = matches.any(isAmericanoMatch);
     final setMode = scoringUsesSetMode(scoringType, scoringConfig);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1431,7 +1431,7 @@ class TournamentTieBreakersCompactCard extends StatelessWidget {
       Container(width: 32, height: 32, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.rule_rounded, color: AppColors.teal, size: 18)),
       const SizedBox(width: 9),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Orden de clasificacion', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12)),
+        const Text('Orden de clasificación', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 12)),
         const SizedBox(height: 3),
         Text(standingsOrderTextForScoring(tieBreakers, scoringType, scoringConfig), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.25, fontSize: 11.5)),
       ])),
@@ -1453,7 +1453,7 @@ class TournamentTieBreakersInfoCard extends StatelessWidget {
       Container(width: 36, height: 36, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13)), child: const Icon(Icons.rule_rounded, color: AppColors.blue, size: 20)),
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Orden de clasificacion', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
+        const Text('Orden de clasificación', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         const SizedBox(height: 4),
         Text(standingsOrderTextForScoring(tieBreakers, scoringType, scoringConfig), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25)),
       ])),

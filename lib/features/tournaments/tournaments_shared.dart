@@ -8,25 +8,33 @@ class TournamentGroupHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AppCard(
     color: AppColors.navyDeep,
-    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-    child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-      Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(18)),
-        child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 25),
-      ),
-      const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(appIsEnglish ? 'Tournaments' : 'Torneos', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -.6)),
-        const SizedBox(height: 4),
-        Text(
-          appIsEnglish ? 'Competitions for $subtitle' : 'Competiciones de $subtitle',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800, fontSize: 13),
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(18)),
+          child: const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 26),
         ),
-      ])),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(appIsEnglish ? 'Tournaments' : 'Torneos', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -.6)),
+          const SizedBox(height: 4),
+          Text(
+            appIsEnglish ? 'Competitions for $subtitle' : 'Competiciones de $subtitle',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w800, fontSize: 13),
+          ),
+        ])),
+      ]),
+      const SizedBox(height: 12),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        _TournamentSignalChip(label: appIsEnglish ? 'Results' : 'Resultados', color: AppColors.green),
+        _TournamentSignalChip(label: appIsEnglish ? 'Table' : 'Tabla', color: AppColors.teal),
+        _TournamentSignalChip(label: appIsEnglish ? 'Matches' : 'Partidos', color: AppColors.amber),
+      ]),
     ]),
   );
 }
@@ -63,12 +71,14 @@ class TournamentUxCommandCenter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasActivity = activeCount > 0 || nextCount > 0 || latestResults > 0;
-    final title = hasActivity ? (appIsEnglish ? "What's next" : 'Qué toca ahora') : (appIsEnglish ? 'Start a competition' : 'Empieza la competición');
+    final title = hasActivity ? (appIsEnglish ? 'What is next' : 'Qué toca ahora') : (appIsEnglish ? 'Start a competition' : 'Empieza la competición');
     final body = nextCount > 0
-        ? '$nextCount ${nextCount == 1 ? 'partido pendiente' : 'partidos pendientes'} para revisar.'
+        ? '$nextCount ${nextCount == 1 ? (appIsEnglish ? 'match to review' : 'partido por revisar') : (appIsEnglish ? 'matches to review' : 'partidos por revisar')}'
         : activeCount > 0
-            ? '$activeCount ${activeCount == 1 ? 'competición activa' : 'competiciones activas'} en marcha.'
-            : 'Crea una liga, eliminatoria, americano o manual.';
+            ? '$activeCount ${activeCount == 1 ? (appIsEnglish ? 'active competition' : 'competición activa') : (appIsEnglish ? 'active competitions' : 'competiciones activas')}'
+            : appIsEnglish
+                ? 'Create a league, knockout, Americano or manual setup.'
+                : 'Crea una liga, eliminatoria, americano o manual.';
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: AppCard(
@@ -88,15 +98,22 @@ class TournamentUxCommandCenter extends StatelessWidget {
               Text(title, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17.5, height: 1.08, letterSpacing: -.2)),
               const SizedBox(height: 5),
               Text(body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.32, fontSize: 13.2)),
+              if (latestResults > 0) ...[
+                const SizedBox(height: 10),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  _TournamentSignalChip(label: '$latestResults ${appIsEnglish ? 'recent results' : 'resultados recientes'}', color: AppColors.green),
+                  _TournamentSignalChip(label: '$nextCount ${appIsEnglish ? 'pending' : 'pendientes'}', color: AppColors.amber),
+                ]),
+              ],
             ])),
           ]),
           const SizedBox(height: 14),
           Row(children: [
-            Expanded(child: TournamentMiniMetric(label: 'Activas', value: '$activeCount', color: AppColors.navTournaments)),
+            Expanded(child: TournamentMiniMetric(label: appIsEnglish ? 'Active' : 'Activas', value: '$activeCount', color: AppColors.navTournaments)),
             const SizedBox(width: 8),
             Expanded(child: TournamentMiniMetric(label: appIsEnglish ? 'Pending' : 'Pendientes', value: '$nextCount', color: AppColors.amber)),
             const SizedBox(width: 8),
-            Expanded(child: TournamentMiniMetric(label: appIsEnglish ? 'Finished' : 'Finalizadas', value: '$finishedCount', color: AppColors.blue)),
+            Expanded(child: TournamentMiniMetric(label: appIsEnglish ? 'Done' : 'Finalizadas', value: '$finishedCount', color: AppColors.blue)),
           ]),
           const SizedBox(height: 14),
           PrimaryButton(label: appIsEnglish ? 'Create tournament or league' : 'Crear torneo o liga', icon: Icons.add_rounded, onTap: onCreate),
@@ -150,23 +167,23 @@ class TournamentDetailNextStepCard extends StatelessWidget {
     final unscheduled = matches.where((m) => AppData.text(m['scheduled_at']).isEmpty).length;
     final needsTeams = teams.length < 2;
     final title = needsTeams
-        ? 'Faltan participantes'
+        ? (appIsEnglish ? 'Add participants' : 'Faltan participantes')
         : matches.isEmpty
-            ? 'Falta el calendario'
+            ? (appIsEnglish ? 'Schedule is missing' : 'Falta el calendario')
             : unscheduled > 0
-                ? 'Faltan fechas'
+                ? (appIsEnglish ? 'Missing dates' : 'Faltan fechas')
                 : pending > 0
-                    ? 'Resultados pendientes'
-                    : 'Todo listo';
+                    ? (appIsEnglish ? 'Results pending' : 'Resultados pendientes')
+                    : (appIsEnglish ? 'Ready to wrap up' : 'Todo listo');
     final body = needsTeams
-        ? 'Añade al menos dos participantes para poder generar partidos sin confusión.'
+        ? (appIsEnglish ? 'Add at least two teams, pairs or players.' : 'Añade al menos dos participantes para generar partidos sin confusión.')
         : matches.isEmpty
-            ? 'Crea el calendario para ver los cruces.'
+            ? (appIsEnglish ? 'Create the schedule to see the matchups.' : 'Crea el calendario para ver los cruces.')
             : unscheduled > 0
-                ? '$unscheduled ${unscheduled == 1 ? 'partido sin fecha' : 'partidos sin fecha'}.'
+                ? '$unscheduled ${unscheduled == 1 ? (appIsEnglish ? 'match without date' : 'partido sin fecha') : (appIsEnglish ? 'matches without date' : 'partidos sin fecha')}.'
                 : pending > 0
-                    ? '$pending ${pending == 1 ? 'partido pendiente' : 'partidos pendientes'}.'
-                    : standings.isEmpty ? 'Sin tabla todavía.' : 'Líder: ${standings.first.name}.';
+                    ? '$pending ${pending == 1 ? (appIsEnglish ? 'match pending' : 'partido pendiente') : (appIsEnglish ? 'matches pending' : 'partidos pendientes')}.'
+                    : standings.isEmpty ? (appIsEnglish ? 'No standings yet.' : 'Sin tabla todavía.') : (appIsEnglish ? 'Leader: ' : 'Líder: ') + standings.first.name + '.';
     final icon = needsTeams
         ? Icons.group_add_rounded
         : matches.isEmpty
@@ -179,12 +196,12 @@ class TournamentDetailNextStepCard extends StatelessWidget {
     final actionLabel = needsTeams
         ? (appIsEnglish ? 'Add participants' : 'Añadir participantes')
         : matches.isEmpty
-            ? 'Generar partidos'
+            ? (appIsEnglish ? 'Generate matches' : 'Generar partidos')
             : unscheduled > 0
-                ? 'Programar fechas'
+                ? (appIsEnglish ? 'Set dates' : 'Programar fechas')
                 : pending > 0
-                    ? 'Ver partidos'
-                    : 'Revisar tabla';
+                    ? (appIsEnglish ? 'View matches' : 'Ver partidos')
+                    : (appIsEnglish ? 'Check table' : 'Revisar tabla');
     final action = needsTeams
         ? onAddParticipants
         : matches.isEmpty
@@ -205,9 +222,9 @@ class TournamentDetailNextStepCard extends StatelessWidget {
           Text(body, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.32, fontSize: 12.8)),
           const SizedBox(height: 10),
           Wrap(spacing: 7, runSpacing: 7, children: [
-            _TournamentSignalChip(label: '${teams.length} participantes', color: AppColors.blue),
-            _TournamentSignalChip(label: '${matches.length} partidos', color: AppColors.navTournaments),
-            _TournamentSignalChip(label: '$pending pendientes', color: AppColors.amber),
+            _TournamentSignalChip(label: '${teams.length} ${appIsEnglish ? 'participants' : 'participantes'}', color: AppColors.blue),
+            _TournamentSignalChip(label: '${matches.length} ${appIsEnglish ? 'matches' : 'partidos'}', color: AppColors.navTournaments),
+            _TournamentSignalChip(label: '$pending ${appIsEnglish ? 'pending' : 'pendientes'}', color: AppColors.amber),
             _TournamentSignalChip(label: tournamentFormatLabel(format), color: AppColors.teal),
           ]),
         ])),
@@ -302,27 +319,36 @@ class TournamentDashboardMatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final score = item.played ? '${AppData.intValue(item.match['score_a'])} - ${AppData.intValue(item.match['score_b'])}' : 'Pendiente';
+    final score = item.played ? '${AppData.intValue(item.match['score_a'])} - ${AppData.intValue(item.match['score_b'])}' : (appIsEnglish ? 'Pending' : 'Pendiente');
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
         onTap: onTap,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         child: Row(children: [
-          SizedBox(width: 44, child: Text('J${AppData.intValue(item.match['round'], 1)}', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w900, fontSize: 12))),
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(color: AppColors.faint, borderRadius: BorderRadius.circular(14)),
+            child: Center(child: Text('J${AppData.intValue(item.match['round'], 1)}', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w900, fontSize: 12))),
+          ),
+          const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(AppData.text(item.tournament['name'], 'Torneo'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, fontSize: 11)),
-            const SizedBox(height: 2),
-            Text('${item.teamA}  vs  ${item.teamB}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.05)),
-            const SizedBox(height: 2),
-            Text(tournamentMatchDateText(item.match), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 10)),
+            const SizedBox(height: 3),
+            Text('${item.teamA}  vs  ${item.teamB}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, height: 1.08)),
+            const SizedBox(height: 3),
+            Row(children: [
+              Expanded(child: Text(tournamentMatchDateText(item.match), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 10.5))),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(color: item.played ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(999)),
+                child: Text(score, style: TextStyle(color: item.played ? AppColors.green : AppColors.orange, fontWeight: FontWeight.w900, fontSize: 11)),
+              ),
+            ]),
           ])),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-            decoration: BoxDecoration(color: item.played ? AppColors.greenSoft : AppColors.orangeSoft, borderRadius: BorderRadius.circular(999)),
-            child: Text(score, style: TextStyle(color: item.played ? AppColors.green : AppColors.orange, fontWeight: FontWeight.w900, fontSize: 11)),
-          ),
+          const SizedBox(width: 4),
           const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
         ]),
       ),
@@ -364,7 +390,7 @@ class TournamentCleanEmptyState extends StatelessWidget {
       const SizedBox(height: 14),
       Text(appIsEnglish ? 'No competitions yet' : 'Todavía no hay competiciones', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 19, letterSpacing: -.2)),
       const SizedBox(height: 6),
-      Text(appIsEnglish ? 'Create a league, knockout or manual tournament. Grupli helps with matches, results and standings.' : 'Crea una liga, una eliminatoria o un torneo manual. Grupli te ayudará con los partidos, resultados y clasificación.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.35)),
+      Text(appIsEnglish ? 'Create a league, knockout or manual tournament. Matches, results and table stay together.' : 'Crea una liga, una eliminatoria o un torneo manual. Partidos, resultados y tabla quedan juntos.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.35)),
       const SizedBox(height: 16),
       PrimaryButton(label: appIsEnglish ? 'Create tournament or league' : 'Crear torneo o liga', icon: Icons.add_rounded, onTap: onCreate),
     ]),
@@ -402,7 +428,7 @@ class TournamentEmptyState extends StatelessWidget {
       const SizedBox(height: 12),
       Text(appIsEnglish ? 'Create your first tournament' : 'Crea tu primer torneo', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
       const SizedBox(height: 5),
-      Text(appIsEnglish ? 'League, knockout, Americano or manual. With matches, table and stats.' : 'Liga, eliminatoria, americano o manual. Con partidos, tabla y estadísticas.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
+      Text(appIsEnglish ? 'League, knockout, Americano or manual. Matches, table and stats in one flow.' : 'Liga, eliminatoria, americano o manual. Partidos, tabla y estadísticas en un solo flujo.', style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, height: 1.3)),
       const SizedBox(height: 14),
       PrimaryButton(label: appIsEnglish ? 'Create tournament or league' : 'Crear torneo o liga', icon: Icons.add_rounded, onTap: onCreate),
     ]),
@@ -446,7 +472,7 @@ class TournamentCreationHeroCard extends StatelessWidget {
       const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Prepara tu torneo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.1)),
         SizedBox(height: 5),
-        Text('Deporte, formato y participantes en un solo flujo.', style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.25)),
+        Text('Deporte, formato y participantes en un flujo corto.', style: TextStyle(color: Color(0xDFFFFFFF), fontWeight: FontWeight.w700, height: 1.25)),
       ])),
     ]),
   );
@@ -559,7 +585,7 @@ class TournamentAdvancedToggleCard extends StatelessWidget {
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(enabled ? (appIsEnglish ? 'Advanced mode on' : 'Modo avanzado') : (appIsEnglish ? 'Quick setup recommended' : 'Configuración rápida recomendada'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900)),
         const SizedBox(height: 3),
-        Text(enabled ? (appIsEnglish ? 'You can tweak format, rounds, brackets and rules.' : 'Puedes ajustar formato, rondas, cruces y reglas.') : (appIsEnglish ? 'Same flow, fewer technical settings.' : 'Mismo flujo, menos ajustes técnicos.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
+        Text(enabled ? (appIsEnglish ? 'Adjust format, rounds, bracket and rules.' : 'Ajusta formato, rondas, cuadro y reglas.') : (appIsEnglish ? 'Same flow, fewer technical settings.' : 'Mismo flujo, menos ajustes técnicos.'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 12)),
       ])),
       Switch(value: enabled, activeThumbColor: AppColors.orange, onChanged: onChanged),
     ]),
@@ -577,7 +603,7 @@ class TournamentQuickModeInfoCard extends StatelessWidget {
       Icon(Icons.info_outline_rounded, color: AppColors.teal, size: 20),
       SizedBox(width: 9),
       Expanded(child: Text(
-        appIsEnglish ? 'Quick mode: pick League, Americano, Knockout or Manual and follow the same flow.' : 'Modo rápido: eliges Liga, Americano, Eliminatoria o Manual y sigues el mismo flujo.',
+        appIsEnglish ? 'Quick mode keeps the setup short: choose a format and continue.' : 'El modo rápido deja el alta corta: eliges formato y sigues.',
         style: TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12),
       )),
     ]),
