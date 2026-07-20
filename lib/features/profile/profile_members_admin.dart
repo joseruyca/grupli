@@ -1,4 +1,4 @@
-part of grupli_app;
+﻿part of grupli_app;
 
 class MembersScreen extends StatefulWidget {
   final Map<String, dynamic> group;
@@ -3375,67 +3375,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await showModalBottomSheet(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) => Padding(
-          padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
-          child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SheetTitle(
-                  icon: Icons.language_rounded,
-                  title: tr(context, es: 'Idioma', en: 'Language'),
-                  body: tr(context,
-                      es: 'Elige el idioma de la app. Si dejas Automático, se usará el del dispositivo.',
-                      en: 'Choose the app language. If you leave it on Auto, the device language will be used.'),
-                ),
-                const SizedBox(height: 8),
-                RadioListTile<Locale?>(
-                  value: null,
-                  groupValue: selected,
-                  onChanged: (value) => setSheetState(() => selected = null),
-                  title: Text(tr(context, es: 'Automático', en: 'Automatic')),
-                  subtitle: Text(tr(context,
-                      es: 'Usar el idioma del dispositivo',
-                      en: 'Use the device language')),
-                ),
-                RadioListTile<Locale?>(
-                  value: const Locale('es'),
-                  groupValue: selected,
-                  onChanged: (value) =>
-                      setSheetState(() => selected = const Locale('es')),
-                  title: Text(tr(context, es: 'Español', en: 'Spanish')),
-                  subtitle: Text(tr(context,
-                      es: 'Interfaz en español', en: 'Spanish interface')),
-                ),
-                RadioListTile<Locale?>(
-                  value: const Locale('en'),
-                  groupValue: selected,
-                  onChanged: (value) =>
-                      setSheetState(() => selected = const Locale('en')),
-                  title: Text(tr(context, es: 'English', en: 'English')),
-                  subtitle: Text(
-                      tr(context, es: 'App in English', en: 'App in English')),
-                ),
-                const SizedBox(height: 8),
-                PrimaryButton(
-                  label: tr(context, es: 'Guardar idioma', en: 'Save language'),
-                  icon: Icons.check_rounded,
-                  onTap: () async {
-                    await saveStoredAppLocale(selected);
-                    if (mounted) {
-                      setState(() {});
-                      Navigator.pop(sheetContext);
-                      await showToast(
-                          context,
-                          tr(context,
-                              es: 'Idioma actualizado.',
-                              en: 'Language updated.'));
-                    }
-                  },
-                ),
-              ]),
-        ),
+        builder: (sheetContext, setSheetState) {
+          final bottomInset = MediaQuery.of(sheetContext).viewInsets.bottom;
+          final maxHeight = MediaQuery.of(sheetContext).size.height * .88;
+          return ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(22, 10, 22, 22 + bottomInset),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SheetTitle(
+                    icon: Icons.language_rounded,
+                    title: tr(context, es: 'Idioma', en: 'Language'),
+                    body: tr(context,
+                        es: 'Elige el idioma de la app. Si dejas Automático, se usará el del dispositivo.',
+                        en: 'Choose the app language. If you leave it on Auto, the device language will be used.'),
+                  ),
+                  const SizedBox(height: 8),
+                  RadioListTile<Locale?>(
+                    value: null,
+                    contentPadding: EdgeInsets.zero,
+                    groupValue: selected,
+                    onChanged: (value) => setSheetState(() => selected = null),
+                    title: Text(tr(context, es: 'Automático', en: 'Automatic')),
+                    subtitle: Text(tr(context,
+                        es: 'Usar el idioma del dispositivo',
+                        en: 'Use the device language')),
+                  ),
+                  RadioListTile<Locale?>(
+                    value: const Locale('es'),
+                    contentPadding: EdgeInsets.zero,
+                    groupValue: selected,
+                    onChanged: (value) =>
+                        setSheetState(() => selected = const Locale('es')),
+                    title: Text(tr(context, es: 'Español', en: 'Spanish')),
+                    subtitle: Text(tr(context,
+                        es: 'Interfaz en español', en: 'Spanish interface')),
+                  ),
+                  RadioListTile<Locale?>(
+                    value: const Locale('en'),
+                    contentPadding: EdgeInsets.zero,
+                    groupValue: selected,
+                    onChanged: (value) =>
+                        setSheetState(() => selected = const Locale('en')),
+                    title: Text(tr(context, es: 'English', en: 'English')),
+                    subtitle: Text(
+                        tr(context, es: 'App in English', en: 'App in English')),
+                  ),
+                  const SizedBox(height: 8),
+                  PrimaryButton(
+                    label: tr(context, es: 'Guardar idioma', en: 'Save language'),
+                    icon: Icons.check_rounded,
+                    onTap: () async {
+                      await saveStoredAppLocale(selected);
+                      if (mounted) {
+                        setState(() {});
+                        Navigator.pop(sheetContext);
+                        await showToast(
+                            context,
+                            tr(context,
+                                es: 'Idioma actualizado.',
+                                en: 'Language updated.'));
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -4250,3 +4263,8 @@ void showGroupQuickActionsSheet(
     ),
   );
 }
+
+
+
+
+
