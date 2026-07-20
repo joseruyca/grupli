@@ -531,7 +531,8 @@ class _GrupliAppState extends State<GrupliApp> {
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.bgShell,
-        fontFamily: null,
+        fontFamily: 'SF Pro Display',
+        fontFamilyFallback: const ['Roboto', 'Helvetica Neue', 'Arial'],
         colorScheme: ColorScheme.fromSeed(
                 seedColor: AppColors.teal, surface: AppColors.surface)
             .copyWith(
@@ -870,32 +871,32 @@ class AppSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final showAmbient = constraints.maxWidth < 720;
-        return DecoratedBox(
-          decoration: const BoxDecoration(color: AppColors.bgShell),
-          child: Stack(
-            children: [
-              if (showAmbient)
-                const Positioned.fill(child: CustomPaint(painter: GrupliAmbientPainter())),
-              Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 430),
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: AppColors.white,
-                      boxShadow: [
-                        BoxShadow(
-                            color: AppColors.softShadow,
-                            blurRadius: 26,
-                            offset: Offset(0, 10))
-                      ],
-                    ),
-                    child: child,
-                  ),
+        final wideLayout = constraints.maxWidth > 700;
+        return Container(
+          color: AppColors.bgShell,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: Container(
+                margin: EdgeInsets.symmetric(
+                  horizontal: wideLayout ? 16 : 0,
+                  vertical: wideLayout ? 16 : 0,
                 ),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: wideLayout ? BorderRadius.circular(30) : BorderRadius.zero,
+                  border: wideLayout ? Border.all(color: AppColors.lineSoft) : null,
+                  boxShadow: const [
+                    BoxShadow(
+                      color: AppColors.softShadow,
+                      blurRadius: 26,
+                      offset: Offset(0, 10),
+                    )
+                  ],
+                ),
+                child: child,
               ),
-            ],
+            ),
           ),
         );
       },

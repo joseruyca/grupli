@@ -1724,8 +1724,10 @@ class _CalendarTabState extends State<CalendarTab> {
                 ),
               ),
             ],
-            const SizedBox(height: 10),
-            EventTypeLegend(events: visibleEvents),
+            if (visibleEvents.length > 1) ...[
+              const SizedBox(height: 10),
+              EventTypeLegend(events: visibleEvents),
+            ],
             const SizedBox(height: 14),
             if (selectedEvents.isNotEmpty) ...[
               SectionHeader(

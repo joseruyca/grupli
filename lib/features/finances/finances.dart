@@ -1812,17 +1812,17 @@ class FinanceHumanNextStepCard extends StatelessWidget {
     final clean = summary.pendingAmount <= 0.01;
     final firstDebt = summary.settlements.isEmpty ? null : summary.settlements.first;
     final title = clean
-        ? tr(context, es: 'Las cuentas respiran', en: 'The books are breathing')
+        ? tr(context, es: 'Todo está cuadrado', en: 'All settled')
         : firstDebt != null
             ? tr(context, es: 'Siguiente pago claro', en: 'Clear next payment')
             : tr(context, es: 'Hay saldo pendiente', en: 'There is still a balance');
     final body = clean
         ? expensesCount == 0
-            ? tr(context, es: 'Aún no hay gastos. Cuando alguien pague algo, Grupli te dirá quién debe qué.', en: 'There are no expenses yet. When someone pays for something, Grupli will tell you who owes what.')
-            : tr(context, es: '$expensesCount ${expensesCount == 1 ? 'movimiento registrado' : 'movimientos registrados'} y ningún pago pendiente.', en: '$expensesCount ${expensesCount == 1 ? 'recorded activity' : 'recorded activities'} and no pending payment.')
+            ? tr(context, es: 'Añade el primer gasto para empezar a repartir.', en: 'Add the first expense to start splitting costs.')
+            : tr(context, es: '$expensesCount ${expensesCount == 1 ? 'movimiento' : 'movimientos'} y todo al día.', en: '$expensesCount ${expensesCount == 1 ? 'entry' : 'entries'} and everything is up to date.')
         : firstDebt != null
-            ? tr(context, es: '${firstDebt.fromName} paga a ${firstDebt.toName} ${money(firstDebt.amount)}. Con eso el grupo se acerca a cero.', en: '${firstDebt.fromName} pays ${firstDebt.toName} ${money(firstDebt.amount)}. That brings the group closer to zero.')
-            : tr(context, es: 'Revisa los saldos para entender qué queda por compensar.', en: 'Check balances to see what still needs to be settled.');
+            ? tr(context, es: '${firstDebt.fromName} paga a ${firstDebt.toName} ${money(firstDebt.amount)}.', en: '${firstDebt.fromName} pays ${firstDebt.toName} ${money(firstDebt.amount)}.')
+            : tr(context, es: 'Revisa los saldos pendientes.', en: 'Check the pending balances.');
     return AppCard(
       color: AppColors.surfaceWarm,
       accentColor: clean ? AppColors.green : AppColors.navFinance,
@@ -1869,7 +1869,7 @@ class FinancePremiumTeaserCard extends StatelessWidget {
                 height: 46,
                 decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(15)),
+                    borderRadius: AppColors.humanRadius),
                 child: const Icon(Icons.workspace_premium_rounded,
                     color: AppColors.orange, size: 22)),
             const SizedBox(width: 12),
@@ -1887,8 +1887,8 @@ class FinancePremiumTeaserCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                       tr(context,
-                          es: 'Sin anuncios y más contexto de un vistazo.',
-                          en: 'No ads and more context at a glance.'),
+                          es: 'Más contexto, sin anuncios.',
+                          en: 'More context, no ads.'),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -1901,7 +1901,6 @@ class FinancePremiumTeaserCard extends StatelessWidget {
           Wrap(spacing: 8, runSpacing: 8, children: [
             TournamentRuleChip(label: tr(context, es: 'Sin anuncios', en: 'No ads')),
             TournamentRuleChip(label: tr(context, es: 'Más contexto', en: 'More context')),
-            TournamentRuleChip(label: tr(context, es: 'Más claro', en: 'Clearer view')),
           ]),
           const SizedBox(height: 10),
           SecondaryButton(
@@ -1946,7 +1945,7 @@ class FinanceAdvancedInsightsCard extends StatelessWidget {
       accentColor: AppColors.teal,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(width: 46, height: 46, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.insights_rounded, color: AppColors.teal, size: 22)),
+          Container(width: 46, height: 46, decoration: BoxDecoration(color: Colors.white, borderRadius: AppColors.humanRadius), child: const Icon(Icons.insights_rounded, color: AppColors.teal, size: 22)),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(tr(context, es: 'Análisis avanzado', en: 'Advanced insights'), style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900, fontSize: 17)),
@@ -1963,11 +1962,18 @@ class FinanceAdvancedInsightsCard extends StatelessWidget {
           Expanded(child: FinanceMiniMetric(icon: Icons.person_rounded, label: tr(context, es: 'Más ha adelantado', en: 'Top payer'), value: topPayer == null ? '—' : money(topPayer.value), color: AppColors.green)),
         ]),
         const SizedBox(height: 10),
-        Text(tr(context, es: 'Más aporta: $topPayerLabel', en: 'Top contributor: $topPayerLabel'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
-        const SizedBox(height: 4),
-        Text(tr(context, es: 'Mayor gasto: $biggestLabel', en: 'Largest spend: $biggestLabel'), style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
-        const SizedBox(height: 4),
-        Text(tr(context, es: 'Sin anuncios y con información extra para quien organiza más a menudo.', en: 'No ads and extra insight for frequent organizers.'), style: const TextStyle(color: AppColors.orange, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
+        Text(
+          tr(
+            context,
+            es: 'Más aporta: $topPayerLabel · Mayor gasto: $biggestLabel',
+            en: 'Top contributor: $topPayerLabel · Largest spend: $biggestLabel',
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12),
+        ),
+        const SizedBox(height: 6),
+        Text(tr(context, es: 'Sin anuncios y más lectura útil para quien organiza a menudo.', en: 'No ads and more useful reading for frequent organizers.'), style: const TextStyle(color: AppColors.orange, fontWeight: FontWeight.w800, height: 1.25, fontSize: 12)),
         const SizedBox(height: 10),
         SecondaryButton(label: tr(context, es: 'Abrir análisis', en: 'Open insights'), icon: Icons.insights_rounded, onTap: onOpen),
       ]),

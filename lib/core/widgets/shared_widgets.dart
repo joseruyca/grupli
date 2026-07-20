@@ -1468,7 +1468,7 @@ class EventMetaChip extends StatelessWidget {
     return Container(
       constraints: const BoxConstraints(maxWidth: 190),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(.72), borderRadius: BorderRadius.circular(99), border: Border.all(color: color.withOpacity(.14))),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(.72), borderRadius: AppColors.humanRadius, border: Border.all(color: color.withOpacity(.14))),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 15, color: color),
         const SizedBox(width: 5),
@@ -1603,19 +1603,19 @@ class _SecondaryButtonState extends State<SecondaryButton> {
 class DangerButton extends StatelessWidget {
   final String label; final IconData icon; final VoidCallback onTap;
   const DangerButton({super.key, required this.label, required this.icon, required this.onTap});
-  @override Widget build(BuildContext context) => SizedBox(width: double.infinity, height: 54, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(foregroundColor: AppColors.red, side: const BorderSide(color: Color(0xFFFFC7C7)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), onPressed: onTap, icon: Icon(icon), label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900))));
+  @override Widget build(BuildContext context) => SizedBox(width: double.infinity, height: 54, child: OutlinedButton.icon(style: OutlinedButton.styleFrom(foregroundColor: AppColors.red, side: const BorderSide(color: Color(0xFFFFC7C7)), shape: RoundedRectangleBorder(borderRadius: AppColors.humanRadius)), onPressed: onTap, icon: Icon(icon), label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900))));
 }
 
 class WhiteButton extends StatelessWidget {
   final String label; final VoidCallback onTap;
   const WhiteButton({super.key, required this.label, required this.onTap});
-  @override Widget build(BuildContext context) => SizedBox(height: 48, child: FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.teal, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))), onPressed: onTap, child: Text(label, style: const TextStyle(fontWeight: FontWeight.w900))));
+  @override Widget build(BuildContext context) => SizedBox(height: 48, child: FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: AppColors.teal, shape: RoundedRectangleBorder(borderRadius: AppColors.humanRadius)), onPressed: onTap, child: Text(label, style: const TextStyle(fontWeight: FontWeight.w900))));
 }
 
 class SocialButton extends StatelessWidget {
   final String label; final String icon; final VoidCallback onTap;
   const SocialButton({super.key, required this.label, required this.icon, required this.onTap});
-  @override Widget build(BuildContext context) => SizedBox(width: double.infinity, height: 46, child: OutlinedButton(style: OutlinedButton.styleFrom(foregroundColor: AppColors.ink, side: const BorderSide(color: AppColors.line), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: onTap, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text(icon, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const SizedBox(width: 12), Text(label, style: const TextStyle(fontWeight: FontWeight.w800))])));
+  @override Widget build(BuildContext context) => SizedBox(width: double.infinity, height: 46, child: OutlinedButton(style: OutlinedButton.styleFrom(foregroundColor: AppColors.ink, side: const BorderSide(color: AppColors.line), shape: RoundedRectangleBorder(borderRadius: AppColors.humanRadius)), onPressed: onTap, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text(icon, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const SizedBox(width: 12), Text(label, style: const TextStyle(fontWeight: FontWeight.w800))])));
 }
 
 class AppCard extends StatefulWidget {
@@ -1681,8 +1681,16 @@ class RoundBackButton extends StatelessWidget {
   @override Widget build(BuildContext context) => Container(
     width: 42,
     height: 44,
-    decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.line), boxShadow: const [BoxShadow(color: Color(0x08111B34), blurRadius: 12, offset: Offset(0, 4))]),
-    child: IconButton(icon: const Icon(Icons.arrow_back_rounded, size: 20), onPressed: onTap ?? () => Navigator.of(context).maybePop()),
+    decoration: BoxDecoration(
+      color: AppColors.white,
+      borderRadius: AppColors.humanRadius,
+      border: Border.all(color: AppColors.line),
+      boxShadow: const [BoxShadow(color: Color(0x08111B34), blurRadius: 12, offset: Offset(0, 4))],
+    ),
+    child: IconButton(
+      icon: const Icon(Icons.arrow_back_rounded, size: 19),
+      onPressed: onTap ?? () => Navigator.of(context).maybePop(),
+    ),
   );
 }
 
@@ -1700,7 +1708,7 @@ class OwnProfileButton extends StatelessWidget {
         final name = AppData.text(profile['full_name'], AppData.user?.email?.split('@').first ?? 'Perfil');
         final avatar = AppData.text(profile['avatar_url']);
         return InkWell(
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: AppColors.humanRadius,
           onTap: onTap,
           child: Container(
             width: 42,
@@ -1708,7 +1716,7 @@ class OwnProfileButton extends StatelessWidget {
             padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
               color: AppColors.white,
-              shape: BoxShape.circle,
+              borderRadius: AppColors.humanRadius,
               border: Border.all(color: AppColors.line),
               boxShadow: const [BoxShadow(color: Color(0x07111B34), blurRadius: 12, offset: Offset(0, 4))],
             ),
@@ -1728,11 +1736,11 @@ class CircleIconButton extends StatelessWidget {
     height: 44,
     decoration: BoxDecoration(
       color: filled ? AppColors.navHome : AppColors.white,
-      shape: BoxShape.circle,
+      borderRadius: AppColors.humanRadius,
       border: filled ? null : Border.all(color: AppColors.line),
       boxShadow: filled ? const [BoxShadow(color: Color(0x33053A59), blurRadius: 18, offset: Offset(0, 8))] : const [BoxShadow(color: Color(0x07111B34), blurRadius: 12, offset: Offset(0, 4))],
     ),
-    child: IconButton(onPressed: onTap, icon: Icon(icon, size: 20, color: filled ? Colors.white : AppColors.ink)),
+    child: IconButton(onPressed: onTap, icon: Icon(icon, size: 19, color: filled ? Colors.white : AppColors.ink)),
   );
 }
 
@@ -2139,11 +2147,12 @@ class CenterLoader extends StatelessWidget {
                   Container(
                     width: 46,
                     height: 46,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: AppColors.tealSoft,
-                      shape: BoxShape.circle,
+                      borderRadius: AppColors.humanRadius,
+                      border: Border.all(color: const Color(0x220E6B73)),
                     ),
-                    child: const Icon(Icons.groups_rounded, color: AppColors.teal),
+                    child: const Icon(Icons.auto_awesome_rounded, color: AppColors.teal),
                   ),
                   const SizedBox(height: 14),
                   Text(
@@ -2192,7 +2201,8 @@ class InlineLoader extends StatelessWidget {
         width: size,
         height: size,
         child: CircularProgressIndicator(
-          strokeWidth: 2,
+          strokeWidth: 2.4,
+          strokeCap: StrokeCap.round,
           color: color,
         ),
       );
@@ -2211,8 +2221,8 @@ class SlimProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ClipRRect(
-        borderRadius: BorderRadius.circular(999),
-        child: LinearProgressIndicator(
+      borderRadius: BorderRadius.circular(999),
+      child: LinearProgressIndicator(
           minHeight: minHeight,
           color: color,
           backgroundColor: backgroundColor,
@@ -4236,17 +4246,17 @@ class RoleBadge extends StatelessWidget {
     final text = role == 'owner' ? 'OWNER' : role == 'admin' ? 'ADMIN' : 'MIEMBRO';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: BorderRadius.circular(99)),
+      decoration: BoxDecoration(color: color.withOpacity(.10), borderRadius: AppColors.humanRadius),
       child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 10.5)),
     );
   }
 }
 
-class SettingsRow extends StatelessWidget { final IconData icon; final String title; final String subtitle; final VoidCallback onTap; final bool danger; const SettingsRow({super.key, required this.icon, required this.title, required this.subtitle, required this.onTap, this.danger = false}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 9), child: AppCard(onTap: onTap, child: Row(children: [Icon(icon, color: danger ? AppColors.red : AppColors.ink), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(fontWeight: FontWeight.w900, color: danger ? AppColors.red : AppColors.ink)), Text(subtitle, style: const TextStyle(color: AppColors.muted, fontSize: 12))])), const Icon(Icons.chevron_right_rounded, color: AppColors.muted)]))); }
+class SettingsRow extends StatelessWidget { final IconData icon; final String title; final String subtitle; final VoidCallback onTap; final bool danger; const SettingsRow({super.key, required this.icon, required this.title, required this.subtitle, required this.onTap, this.danger = false}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 9), child: AppCard(onTap: onTap, child: Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: danger ? AppColors.redSoft : AppColors.tealSoft, borderRadius: AppColors.humanRadius), child: Icon(icon, color: danger ? AppColors.red : AppColors.teal, size: 20)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(fontWeight: FontWeight.w900, color: danger ? AppColors.red : AppColors.ink)), Text(subtitle, style: const TextStyle(color: AppColors.muted, fontSize: 12))])), const Icon(Icons.chevron_right_rounded, color: AppColors.muted)]))); }
 
 class MetaLine extends StatelessWidget { final IconData icon; final String text; const MetaLine({super.key, required this.icon, required this.text}); @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(bottom: 3), child: Row(children: [Icon(icon, size: 15, color: AppColors.muted), const SizedBox(width: 5), Expanded(child: Text(text, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)))])); }
 
-class AttendancePick extends StatelessWidget { final String label; final int count; final bool selected; final Color color; final VoidCallback onTap; const AttendancePick({super.key, required this.label, required this.count, required this.selected, required this.color, required this.onTap}); @override Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(15), child: Container(padding: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: selected ? color.withOpacity(.10) : Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: selected ? color : AppColors.line)), child: Column(children: [Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: color), const SizedBox(height: 4), Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900)), Text(count.toString(), style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 18))]))); }
+class AttendancePick extends StatelessWidget { final String label; final int count; final bool selected; final Color color; final VoidCallback onTap; const AttendancePick({super.key, required this.label, required this.count, required this.selected, required this.color, required this.onTap}); @override Widget build(BuildContext context) => InkWell(onTap: onTap, borderRadius: AppColors.humanRadius, child: Container(padding: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: selected ? color.withOpacity(.10) : Colors.white, borderRadius: AppColors.humanRadius, border: Border.all(color: selected ? color : AppColors.line)), child: Column(children: [Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: color), const SizedBox(height: 4), Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w900)), Text(count.toString(), style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 18))]))); }
 
 class StatusNotice extends StatelessWidget {
   final bool ok;
