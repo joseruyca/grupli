@@ -183,7 +183,7 @@ class TournamentDetailNextStepCard extends StatelessWidget {
                 ? '$unscheduled ${unscheduled == 1 ? (appIsEnglish ? 'match without date' : 'partido sin fecha') : (appIsEnglish ? 'matches without date' : 'partidos sin fecha')}.'
                 : pending > 0
                     ? '$pending ${pending == 1 ? (appIsEnglish ? 'match pending' : 'partido pendiente') : (appIsEnglish ? 'matches pending' : 'partidos pendientes')}.'
-                    : standings.isEmpty ? (appIsEnglish ? 'No standings yet.' : 'Sin tabla todavía.') : (appIsEnglish ? 'Leader: ' : 'Líder: ') + standings.first.name + '.';
+                    : standings.isEmpty ? (appIsEnglish ? 'No standings yet.' : 'Sin tabla todavía.') : '${appIsEnglish ? 'Leader: ' : 'Líder: '}${standings.first.name}.';
     final icon = needsTeams
         ? Icons.group_add_rounded
         : matches.isEmpty

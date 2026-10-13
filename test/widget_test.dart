@@ -1,8 +1,10 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:grupli/main.dart';
 
 void main() {
+  setUp(() { appLocale = const Locale('es'); });
   testWidgets('muestra la pantalla de configuración pendiente', (tester) async {
     await tester.pumpWidget(const GrupliConfigurationMissingApp());
 

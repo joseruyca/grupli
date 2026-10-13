@@ -618,114 +618,36 @@ class AppData {
   }
 
   static Future<String> createExpense(String groupId, String concept, double amount, String paidBy, List<String> participantIds, String note) async {
-    final participantSet = <String>{...participantIds, paidBy};
-    final participants = participantSet.where((id) => id.trim().isNotEmpty).toList();
-    final share = participants.isEmpty ? amount : amount / participants.length;
-    return createExpenseWithShares(
-      groupId,
-      concept,
-      amount,
-      paidBy,
-      {for (final id in participants) id: double.parse(share.toStringAsFixed(2))},
-      note,
-    );
+    return createExpenseWithShares(groupId, concept, amount, paidBy,
+      FinanceMoney.splitEqual(amount, {...participantIds, paidBy}), note);
   }
-
   static Future<String> createExpenseWithShares(String groupId, String concept, double amount, String paidBy, Map<String, double> shares, String note) async {
-    final current = user?.id;
-    final cleanShares = <String, double>{};
-    shares.forEach((id, value) {
-      if (id.trim().isEmpty) return;
-      final cleanValue = double.parse(max(0, value).toStringAsFixed(2));
-      if (cleanValue > 0 || id == paidBy) cleanShares[id] = cleanValue;
+    if (!FinanceMoney.matchesTotal(amount, shares.values)) throw Exception('shares_total_mismatch');
+    final id = await sb.rpc('grupli_save_expense', params: {
+      'p_group_id': groupId, 'p_expense_id': null, 'p_concept': concept.trim(),
+      'p_amount': amount, 'p_paid_by': paidBy, 'p_shares': shares, 'p_note': note.trim(),
     });
-    cleanShares.putIfAbsent(paidBy, () => 0);
-    final expense = await sb.from('expenses').insert({
-      'group_id': groupId,
-      'concept': concept.trim(),
-      'amount': double.parse(amount.toStringAsFixed(2)),
-      'paid_by': paidBy,
-      'created_by': current,
-      'note': note.trim().isEmpty ? null : note.trim(),
-      'status': 'pending',
-    }).select('id').single();
-    final expenseId = expense['id'].toString();
-    final rows = cleanShares.entries.map((entry) => {
-      'expense_id': expenseId,
-      'user_id': entry.key,
-      'share_amount': double.parse(entry.value.toStringAsFixed(2)),
-      'paid': entry.key == paidBy,
-    }).toList();
-    if (rows.isNotEmpty) await sb.from('expense_participants').insert(rows);
-    return expenseId;
+    return id.toString();
   }
-
   static Future<void> setExpenseParticipantPaid(String expenseId, String userId, bool paid) async {
-    await sb.from('expense_participants').update({'paid': paid}).eq('expense_id', expenseId).eq('user_id', userId);
-    final rows = asList(await sb.from('expense_participants').select('paid').eq('expense_id', expenseId));
-    final allPaid = rows.isNotEmpty && rows.every((row) => row['paid'] == true);
-    await sb.from('expenses').update({
-      'status': allPaid ? 'paid' : 'pending',
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', expenseId);
+    await sb.rpc('grupli_expense_action', params: {'p_expense_id': expenseId, 'p_action': 'participant', 'p_user_id': userId, 'p_paid': paid});
   }
-
   static Future<void> markExpenseSettled(String expenseId) async {
-    await sb.from('expense_participants').update({'paid': true}).eq('expense_id', expenseId);
-    await sb.from('expenses').update({'status': 'paid', 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', expenseId);
+    await sb.rpc('grupli_expense_action', params: {'p_expense_id': expenseId, 'p_action': 'settle'});
   }
-
   static Future<void> reopenExpense(String expenseId) async {
-    final expense = await sb.from('expenses').select('paid_by').eq('id', expenseId).single();
-    final paidBy = expense['paid_by']?.toString();
-    await sb.from('expense_participants').update({'paid': false}).eq('expense_id', expenseId);
-    if (paidBy != null && paidBy.isNotEmpty) {
-      await sb.from('expense_participants').update({'paid': true}).eq('expense_id', expenseId).eq('user_id', paidBy);
-    }
-    await sb.from('expenses').update({'status': 'pending', 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', expenseId);
+    await sb.rpc('grupli_expense_action', params: {'p_expense_id': expenseId, 'p_action': 'reopen'});
   }
-
   static Future<void> deleteExpense(String expenseId) async {
-    await sb.from('expenses').delete().eq('id', expenseId);
+    await sb.rpc('grupli_expense_action', params: {'p_expense_id': expenseId, 'p_action': 'delete'});
   }
-
-  static Future<void> updateExpenseWithShares(
-    String expenseId,
-    String concept,
-    double amount,
-    String paidBy,
-    Map<String, double> shares,
-    String note,
-  ) async {
-    final cleanShares = <String, double>{};
-    shares.forEach((id, value) {
-      if (id.trim().isEmpty) return;
-      final cleanValue = double.parse(max(0, value).toStringAsFixed(2));
-      if (cleanValue > 0 || id == paidBy) cleanShares[id] = cleanValue;
+  static Future<void> updateExpenseWithShares(String expenseId, String concept, double amount, String paidBy, Map<String, double> shares, String note) async {
+    if (!FinanceMoney.matchesTotal(amount, shares.values)) throw Exception('shares_total_mismatch');
+    final expense = await sb.from('expenses').select('group_id').eq('id', expenseId).single();
+    await sb.rpc('grupli_save_expense', params: {
+      'p_group_id': expense['group_id'], 'p_expense_id': expenseId, 'p_concept': concept.trim(),
+      'p_amount': amount, 'p_paid_by': paidBy, 'p_shares': shares, 'p_note': note.trim(),
     });
-    cleanShares.putIfAbsent(paidBy, () => 0);
-
-    await sb.from('expenses').update({
-      'concept': concept.trim(),
-      'amount': double.parse(amount.toStringAsFixed(2)),
-      'paid_by': paidBy,
-      'note': note.trim().isEmpty ? null : note.trim(),
-      'status': 'pending',
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', expenseId);
-
-    await sb.from('expense_participants').delete().eq('expense_id', expenseId);
-
-    final rows = cleanShares.entries.map((entry) => {
-      'expense_id': expenseId,
-      'user_id': entry.key,
-      'share_amount': double.parse(entry.value.toStringAsFixed(2)),
-      'paid': entry.key == paidBy,
-    }).toList();
-
-    if (rows.isNotEmpty) {
-      await sb.from('expense_participants').insert(rows);
-    }
   }
 
   static Future<List<Map<String, dynamic>>> settlementPayments(String groupId) async {

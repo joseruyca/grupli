@@ -25,3 +25,33 @@ jobs:
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - run: flutter test
       - run: flutter build web --release --no-tree-shake-icons --no-wasm-dry-run
+  database:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: isolated-qa-only
+          POSTGRES_DB: grupli_qa
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: isolated-qa-only
+      PGDATABASE: grupli_qa
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/all_in_one.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/patches/20261013_finance_security.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/patches/20261013_finance_security.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/finance_security.sql

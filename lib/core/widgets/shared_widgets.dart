@@ -4474,6 +4474,12 @@ Future<bool?> confirmAction(
 }
 
 String humanError(Object? error) {
+  final message = error.toString();
+  if (message.contains('shares_total_mismatch')) return appIsEnglish ? 'The split must match the exact expense total.' : 'El reparto debe sumar exactamente el importe del gasto.';
+  if (message.contains('expense_has_payments')) return appIsEnglish ? 'Reopen this expense explicitly before changing its split.' : 'Reabre expresamente el gasto antes de cambiar su reparto: tiene pagos registrados.';
+  if (message.contains('permission_denied') || message.contains('row-level security')) return appIsEnglish ? 'You do not have permission to make this change.' : 'No tienes permiso para realizar este cambio.';
+  if (message.contains('participant_not_in_group') || message.contains('payer_not_in_group')) return appIsEnglish ? 'Choose people who belong to this group.' : 'Selecciona personas que pertenezcan a este grupo.';
+
   return humanizeError(error?.toString() ?? '');
 }
 

@@ -433,12 +433,13 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
 
   void syncCustomShares(List<Map<String, dynamic>> members) {
     final ids = selected.toList();
-    final equal = ids.isEmpty ? 0.0 : amountValue / ids.length;
+    final equalShares = ids.isEmpty ? <String, double>{} : FinanceMoney.splitEqual(amountValue, ids);
     for (final member in members) {
       final id = member['user_id'].toString();
       final controller = customShares.putIfAbsent(id, () => TextEditingController());
       if (selected.contains(id) && controller.text.trim().isEmpty) {
-        controller.text = equal > 0 ? equal.toStringAsFixed(2).replaceAll('.', ',') : '';
+        final share = equalShares[id] ?? 0.0;
+        controller.text = share > 0 ? share.toStringAsFixed(2).replaceAll('.', ',') : '';
       }
       if (!selected.contains(id)) controller.text = '';
     }
@@ -452,18 +453,8 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
     if (splitMode == 'custom') {
       return {for (final id in selected) id: double.parse(customShareFor(id).toStringAsFixed(2))};
     }
-    final ids = selected.toList();
-    if (ids.isEmpty) return {};
-    final totalCents = (amountValue * 100).round();
-    final base = totalCents ~/ ids.length;
-    var remainder = totalCents - (base * ids.length);
-    final result = <String, double>{};
-    for (final id in ids) {
-      final cents = base + (remainder > 0 ? 1 : 0);
-      if (remainder > 0) remainder--;
-      result[id] = double.parse((cents / 100).toStringAsFixed(2));
-    }
-    return result;
+    if (selected.isEmpty) return {};
+    return FinanceMoney.splitEqual(amountValue, selected);
   }
 
   Future<void> save(List<Map<String, dynamic>> members) async {
@@ -474,7 +465,7 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
     }
     if (splitMode == 'custom') {
       final total = customTotal();
-      if ((total - value).abs() > .05) {
+      if (FinanceMoney.cents(total) != FinanceMoney.cents(value)) {
         await showToast(context, tr(context, es: 'Los importes personalizados deben sumar ${money(value)}.', en: 'Custom amounts must add up to ${money(value)}.'), danger: true);
         return;
       }
@@ -1387,13 +1378,13 @@ class FinanceSplitPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ok = !customMode || diff.abs() <= .05;
+    final ok = !customMode || diff.abs() < .005;
     final color = ok ? AppColors.teal : AppColors.red;
     final text = participants == 0
         ? tr(context, es: 'Elige al menos un participante.', en: 'Choose at least one participant.')
         : customMode
             ? (ok ? tr(context, es: 'Reparto manual equilibrado · total ${money(customTotal)}', en: 'Balanced manual split · total ${money(customTotal)}') : tr(context, es: 'Faltan/sobran ${money(diff.abs())} para cuadrar el total', en: '${money(diff.abs())} missing/excess to balance the total'))
-            : tr(context, es: '$participants participantes · cada uno debe ${money(equalShare)} · luego se optimiza en Saldos', en: '$participants participants · each owes ${money(equalShare)} · then it is optimized in Balances');
+            : tr(context, es: '$participants participantes · reparto a partes iguales con ajuste de céntimos', en: '$participants participants · equal split with remaining cents allocated');
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
