@@ -54,4 +54,5 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/all_in_one.sql
           psql -v ON_ERROR_STOP=1 -f supabase/patches/20261013_finance_security.sql
           psql -v ON_ERROR_STOP=1 -f supabase/patches/20261013_finance_security.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/patches/20261013_group_ownership.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/finance_security.sql

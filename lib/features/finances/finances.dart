@@ -1105,8 +1105,8 @@ class FinanceBalanceBarRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final positive = value > 0.01;
-    final negative = value < -0.01;
+    final positive = value >= 0.01;
+    final negative = value <= -0.01;
     final color = positive ? AppColors.green : negative ? AppColors.red : AppColors.muted;
     final label = positive ? tr(context, es: 'le deben', en: 'owe') : negative ? tr(context, es: 'debe', en: 'owes') : tr(context, es: 'en equilibrio', en: 'even');
     final factor = max(.12, min(1.0, value.abs() / max(1.0, maxValue)));
@@ -1181,7 +1181,7 @@ class SettlementPaymentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final myId = AppData.user?.id ?? '';
+    final myId = currentUserId ?? AppData.user?.id ?? '';
     final title = debt.fromId == myId
         ? tr(context, es: 'Pagas a ${debt.toName}', en: 'You pay ${debt.toName}')
         : debt.toId == myId
@@ -1437,11 +1437,11 @@ class FinanceSummary {
 
   double get settlementAmount => double.parse(settlements.fold<double>(0, (sum, debt) => sum + debt.amount).toStringAsFixed(2));
 
-  int get peopleWithBalance => balances.values.where((value) => value.abs() > 0.01).length;
+  int get peopleWithBalance => balances.values.where((value) => value.abs() >= 0.01).length;
 
-  int get debtorsCount => balances.values.where((value) => value < -0.01).length;
+  int get debtorsCount => balances.values.where((value) => value <= -0.01).length;
 
-  int get creditorsCount => balances.values.where((value) => value > 0.01).length;
+  int get creditorsCount => balances.values.where((value) => value >= 0.01).length;
 
   double get compensatedAmount {
     final value = pendingAmount - settlementAmount;
@@ -1449,12 +1449,12 @@ class FinanceSummary {
   }
 
   List<MapEntry<String, double>> get sortedBalances {
-    final list = balances.entries.where((entry) => entry.value.abs() > 0.01).toList();
+    final list = balances.entries.where((entry) => entry.value.abs() >= 0.01).toList();
     list.sort((a, b) => b.value.abs().compareTo(a.value.abs()));
     return list;
   }
 
-  factory FinanceSummary.from(List<Map<String, dynamic>> expenses, List<Map<String, dynamic>> members, List<Map<String, dynamic>> settlementPayments) {
+  factory FinanceSummary.from(List<Map<String, dynamic>> expenses, List<Map<String, dynamic>> members, List<Map<String, dynamic>> settlementPayments, {String? currentUserId}) {
     final names = <String, String>{};
     final avatars = <String, String>{};
     final balances = <String, double>{};
@@ -1506,8 +1506,8 @@ class FinanceSummary {
     }
 
     final settlements = buildSettlements(balances, names, avatars);
-    final netPending = balances.values.where((value) => value > 0.01).fold<double>(0, (sum, value) => sum + value);
-    final myId = AppData.user?.id ?? '';
+    final netPending = balances.values.where((value) => value >= 0.01).fold<double>(0, (sum, value) => sum + value);
+    final myId = currentUserId ?? AppData.user?.id ?? '';
     return FinanceSummary(
       names: names,
       avatars: avatars,
@@ -1745,8 +1745,8 @@ class BalanceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = value > 0.01 ? AppColors.green : value < -0.01 ? AppColors.red : AppColors.muted;
-    final label = value > 0.01 ? 'Le deben' : value < -0.01 ? 'Debe' : 'En equilibrio';
+    final color = value >= 0.01 ? AppColors.green : value <= -0.01 ? AppColors.red : AppColors.muted;
+    final label = value >= 0.01 ? 'Le deben' : value <= -0.01 ? 'Debe' : 'En equilibrio';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       child: Row(children: [

@@ -51,6 +51,10 @@ class _TournamentsTabState extends State<TournamentsTab> {
   }
 
   Future<void> openCreate() async {
+    if (!groupCanManage(widget.group)) {
+      await showToast(context, tr(context, es: 'Un administrador del grupo puede crear la competición.', en: 'A group admin can create the competition.'), danger: true);
+      return;
+    }
     final created = await Navigator.of(context).push<bool>(MaterialPageRoute(
       builder: (_) => TournamentCreateSimpleScreen(group: widget.group),
     ));
@@ -1066,6 +1070,7 @@ class TournamentSimpleMatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canManage = groupCanManage(group);
     final names = teamNameMap(teams);
     final aName = tournamentMatchSideName(match, names, true);
     final bName = tournamentMatchSideName(match, names, false);
@@ -1083,7 +1088,7 @@ class TournamentSimpleMatchCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
         accentColor: played ? AppColors.green : statusColor,
-        onTap: () => showMatchResultDialog(context, match: match, teams: teams, scoringType: scoringType, scoringConfig: scoringConfig, onChanged: onChanged),
+        onTap: canManage ? () => showMatchResultDialog(context, match: match, teams: teams, scoringType: scoringType, scoringConfig: scoringConfig, onChanged: onChanged) : () => showMatchHistoryDialog(context, match: match),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
@@ -1140,17 +1145,17 @@ class TournamentSimpleMatchCard extends StatelessWidget {
                 }
               },
               itemBuilder: (context) => [
-                const PopupMenuItem(value: 'result', child: Text('Registrar resultado')),
-                if (specialAllowed) const PopupMenuItem(value: 'special', child: Text('No presentado / victoria admin.')),
-                const PopupMenuItem(value: 'schedule', child: Text('Cambiar fecha / pista')),
-                const PopupMenuItem(value: 'move_up', child: Text('Subir en la jornada')),
-                const PopupMenuItem(value: 'move_down', child: Text('Bajar en la jornada')),
+                PopupMenuItem(enabled: canManage, value: 'result', child: Text('Registrar resultado')),
+                if (specialAllowed) PopupMenuItem(enabled: canManage, value: 'special', child: Text('No presentado / victoria admin.')),
+                PopupMenuItem(enabled: canManage, value: 'schedule', child: Text('Cambiar fecha / pista')),
+                PopupMenuItem(enabled: canManage, value: 'move_up', child: Text('Subir en la jornada')),
+                PopupMenuItem(enabled: canManage, value: 'move_down', child: Text('Bajar en la jornada')),
                 if (matchResultHistory(match).isNotEmpty) const PopupMenuItem(value: 'history', child: Text('Ver historial')),
                 if (AppData.text(match['event_id']).isNotEmpty) const PopupMenuItem(value: 'open_event', child: Text('Abrir en Agenda')),
-                const PopupMenuItem(value: 'postponed', child: Text('Marcar aplazado')),
-                const PopupMenuItem(value: 'cancelled', child: Text('Cancelar partido')),
-                const PopupMenuItem(value: 'pending', child: Text('Volver a pendiente')),
-                if (matchCountsForStandings(match)) const PopupMenuItem(value: 'reopen', child: Text('Borrar resultado')),
+                PopupMenuItem(enabled: canManage, value: 'postponed', child: Text('Marcar aplazado')),
+                PopupMenuItem(enabled: canManage, value: 'cancelled', child: Text('Cancelar partido')),
+                PopupMenuItem(enabled: canManage, value: 'pending', child: Text('Volver a pendiente')),
+                if (matchCountsForStandings(match)) PopupMenuItem(enabled: canManage, value: 'reopen', child: Text('Borrar resultado')),
               ],
             ),
           ]),
@@ -1171,7 +1176,7 @@ class TournamentSimpleMatchCard extends StatelessWidget {
               if (restText.isNotEmpty) 'Descansan: $restText',
             ].join(' · '), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w700, fontSize: 11)),
           ],
-          if (group != null && status != 'bye') ...[
+          if (canManage && group != null && status != 'bye') ...[
             const SizedBox(height: 8),
             Row(children: [
               Expanded(child: FilledButton.icon(

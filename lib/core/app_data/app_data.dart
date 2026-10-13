@@ -228,7 +228,14 @@ class AppData {
 
   static Future<Map<String, dynamic>> group(String groupId) async {
     final res = await sb.from('groups').select().eq('id', groupId).single();
-    return asMap(res);
+    final result = asMap(res);
+    final membership = await sb.from('group_members').select('role').eq('group_id', groupId).eq('user_id', user!.id).single();
+    result['role'] = membership['role'];
+    return result;
+  }
+
+  static Future<void> transferGroup(String groupId, String newOwner) async {
+    await sb.rpc('grupli_transfer_group', params: {'p_group_id': groupId, 'p_new_owner': newOwner});
   }
 
   static Future<void> updateGroupInfo(
@@ -1220,7 +1227,7 @@ class AppData {
     final other = sameRound[targetIndex];
     final currentOrder = intValue(current['order_index']);
     final otherOrder = intValue(other['order_index']);
-    await sb.from('matches').update({'order_index': otherOrder, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', matchId);
+    await sb.from('matches').update({'order_index': otherOrder, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', matchId).select('id').single();
     await sb.from('matches').update({'order_index': currentOrder, 'updated_at': DateTime.now().toUtc().toIso8601String()}).eq('id', other['id']);
   }
 
@@ -1508,7 +1515,7 @@ class AppData {
       'played_at': DateTime.now().toUtc().toIso8601String(),
       'updated_by': user?.id,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', matchId);
+    }).eq('id', matchId).select('id').single();
   }
 
   static Future<void> setSpecialMatchResult(
@@ -1550,7 +1557,7 @@ class AppData {
       'played_at': DateTime.now().toUtc().toIso8601String(),
       'updated_by': user?.id,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', matchId);
+    }).eq('id', matchId).select('id').single();
   }
 
   static Future<void> reopenMatch(String matchId) async {
@@ -1572,7 +1579,7 @@ class AppData {
       'played_at': null,
       'updated_by': user?.id,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', matchId);
+    }).eq('id', matchId).select('id').single();
   }
 
   static Future<void> updateMatchSchedule(String matchId, DateTime? scheduledAt, int durationMinutes, String location, String courtName, String notes) async {
@@ -1595,7 +1602,7 @@ class AppData {
       'result_details': nextDetails,
       'updated_by': user?.id,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', matchId);
+    }).eq('id', matchId).select('id').single();
 
     if (eventId.isNotEmpty && scheduledAt == null) {
       try { await cancelEvent(eventId); } catch (_) {}

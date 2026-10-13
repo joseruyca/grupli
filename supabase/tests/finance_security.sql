@@ -51,4 +51,22 @@ do $$ begin
  raise notice 'PASS signed-out caller cannot write expenses';
 end $$;
 reset role;
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000002',true);
+set local role authenticated;
+do $$ begin
+ begin perform public.grupli_transfer_group('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000003'); raise exception 'QA member transfer allowed'; exception when others then if sqlerrm<>'permission_denied' then raise; end if; end;
+ raise notice 'PASS member cannot transfer ownership';
+end $$;
+reset role;
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true);
+set local role authenticated;
+do $$ begin
+ begin perform public.grupli_transfer_group('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000004'); raise exception 'QA outsider ownership allowed'; exception when others then if sqlerrm<>'new_owner_not_in_group' then raise; end if; end;
+ begin update public.groups set owner_id='10000000-0000-0000-0000-000000000002' where id='20000000-0000-0000-0000-000000000001'; raise exception 'QA direct transfer allowed'; exception when others then if sqlerrm<>'ownership_transfer_required' then raise; end if; end;
+ perform public.grupli_transfer_group('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002');
+ if not exists(select 1 from public.groups where id='20000000-0000-0000-0000-000000000001' and owner_id= '10000000-0000-0000-0000-000000000002') then raise exception 'QA owner mismatch'; end if;
+ if not exists(select 1 from public.group_members where group_id='20000000-0000-0000-0000-000000000001' and user_id='10000000-0000-0000-0000-000000000001' and role='admin') then raise exception 'QA old owner role mismatch'; end if;
+ raise notice 'PASS ownership transfer preserves group and changes roles atomically';
+end $$;
+reset role;
 rollback;

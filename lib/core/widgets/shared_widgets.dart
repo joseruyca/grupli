@@ -4526,3 +4526,10 @@ void showCodeSheet(BuildContext context, String code, String groupName) {
 
 
 
+
+// UI hint only. Database policies are the source of authorization.
+bool groupCanManage(Map<String, dynamic>? group) {
+  if (group == null || AppData.user == null) return false;
+  return ['owner', 'admin'].contains(AppData.text(group['role'])) ||
+      AppData.text(group['owner_id']) == AppData.user!.id;
+}
