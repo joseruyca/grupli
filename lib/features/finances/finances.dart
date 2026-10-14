@@ -1181,7 +1181,7 @@ class SettlementPaymentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final myId = currentUserId ?? AppData.user?.id ?? '';
+    final myId = AppData.user?.id ?? '';
     final title = debt.fromId == myId
         ? tr(context, es: 'Pagas a ${debt.toName}', en: 'You pay ${debt.toName}')
         : debt.toId == myId
