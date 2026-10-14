@@ -7,7 +7,7 @@ void main() {
         {'user_id':'a','share_amount':0.01,'paid':true},
         {'user_id':'b','share_amount':0.01,'paid':false},
       ]},
-    ],[],[],currentUserId:'b');
+    ],[{'user_id':'a','profiles':{'full_name':'A'}},{'user_id':'b','profiles':{'full_name':'B'}}],[],currentUserId:'b');
     expect(summary.balances['a'],0.01);
     expect(summary.balances['b'],-0.01);
     expect(summary.peopleWithBalance,2);

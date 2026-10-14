@@ -920,10 +920,10 @@ class FinanceMyStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = summary.myNet > 0.01 ? AppColors.green : summary.myNet < -0.01 ? AppColors.red : AppColors.teal;
-    final title = summary.myNet > 0.01
+    final color = summary.myNet >= 0.01 ? AppColors.green : summary.myNet <= -0.01 ? AppColors.red : AppColors.teal;
+    final title = summary.myNet >= 0.01
         ? tr(context, es: 'Te deben ${money(summary.myNet)}', en: 'You are owed ${money(summary.myNet)}')
-        : summary.myNet < -0.01
+        : summary.myNet <= -0.01
             ? tr(context, es: 'Debes ${money(-summary.myNet)}', en: 'You owe ${money(-summary.myNet)}')
             : tr(context, es: 'Tú estás a cero', en: 'You are settled');
     final body = settlements.isEmpty
@@ -1304,7 +1304,7 @@ class FinanceAutoBalanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasPending = summary.pendingAmount > 0.01;
+    final hasPending = summary.pendingAmount >= 0.01;
     final color = hasPending ? AppColors.teal : AppColors.green;
     final title = hasPending ? tr(context, es: 'Cuentas compensadas', en: 'Balanced accounts') : tr(context, es: 'Todo cuadrado', en: 'All settled');
     final body = hasPending
@@ -1711,13 +1711,13 @@ String financeMemberName(String userId, List<Map<String, dynamic>> members) {
 }
 
 String _financeMainTitle(FinanceSummary summary) {
-  if (summary.pendingAmount <= 0.01) {
+  if (summary.pendingAmount < 0.01) {
     return appIsEnglish ? 'All settled' : 'Todo está cuadrado';
   }
-  if (summary.myNet > 0.01) {
+  if (summary.myNet >= 0.01) {
     return appIsEnglish ? 'You are owed ${money(summary.myNet)}' : 'Te deben ${money(summary.myNet)}';
   }
-  if (summary.myNet < -0.01) {
+  if (summary.myNet <= -0.01) {
     return appIsEnglish ? 'You owe ${money(-summary.myNet)}' : 'Debes ${money(-summary.myNet)}';
   }
   return appIsEnglish ? 'There are pending payments' : 'Hay pagos pendientes';
@@ -1796,7 +1796,7 @@ class FinanceHumanNextStepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final clean = summary.pendingAmount <= 0.01;
+    final clean = summary.pendingAmount < 0.01;
     final firstDebt = summary.settlements.isEmpty ? null : summary.settlements.first;
     final title = clean
         ? tr(context, es: 'Todo está cuadrado', en: 'All settled')
