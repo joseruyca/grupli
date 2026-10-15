@@ -1,7 +1,8 @@
 # Supabase desde GitHub Actions
 
-El flujo `Grupli Supabase` prueba los parches en PostgreSQL temporal. Un push solo
-ejecuta pruebas. No modifica producción, no ejecuta SQL arbitrario y no usa un
+El flujo `Grupli Supabase` prueba los parches en PostgreSQL temporal. Un push
+ejecuta pruebas y comprueba la conexión real sin cambiar el esquema ni los datos.
+No ejecuta SQL arbitrario y no usa un
 token personal de Supabase con acceso a otros proyectos.
 
 ## Configuración inicial por el propietario

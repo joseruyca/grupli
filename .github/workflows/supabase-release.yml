@@ -55,7 +55,7 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f supabase/tests/finance_security.sql
   production:
     needs: test
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

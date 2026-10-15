@@ -10,14 +10,25 @@ PROJECT = 'izusbttdgtwbnuyzjrpw'
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class ReleaseError(Exception):
+    """Only fixed, non-secret diagnostics may use this exception."""
+
+
 def connection(raw):
     uri = urlsplit(raw)
     host = uri.hostname or ''
-    if (uri.scheme not in ('postgres', 'postgresql')
-            or not host.endswith('.pooler.supabase.com')
-            or uri.port != 5432 or unquote(uri.username or '') != 'postgres.' + PROJECT
-            or uri.path != '/postgres' or not uri.password or uri.fragment):
-        raise ValueError('Use the Session pooler connection for Grupli on port 5432.')
+    if uri.scheme not in ('postgres', 'postgresql'):
+        raise ReleaseError('URL_SCHEME: expected a PostgreSQL URI, without quotes or code fences.')
+    if not host.endswith('.pooler.supabase.com'):
+        raise ReleaseError('URL_HOST: select Session pooler, not Direct connection.')
+    if uri.port != 5432:
+        raise ReleaseError('URL_PORT: select Session pooler on port 5432.')
+    if unquote(uri.username or '') != 'postgres.' + PROJECT:
+        raise ReleaseError('URL_PROJECT: expected the Session pooler user of Grupli.')
+    if uri.path != '/postgres' or not uri.password or uri.fragment:
+        raise ReleaseError('URL_FORMAT: check database name and percent-encode password symbols.')
+    if '[YOUR-PASSWORD]' in raw:
+        raise ReleaseError('URL_PASSWORD_PLACEHOLDER: replace the password placeholder.')
     return {'PGHOST': host, 'PGPORT': '5432', 'PGDATABASE': 'postgres',
             'PGUSER': unquote(uri.username), 'PGPASSWORD': unquote(uri.password),
             'PGSSLMODE': 'verify-full', 'PGCONNECT_TIMEOUT': '15'}
@@ -48,11 +59,14 @@ def main():
         raise ValueError('Expected check or apply.')
     raw = os.environ.pop('GRUPLI_DATABASE_URL', '')
     cert = os.environ.pop('GRUPLI_DATABASE_CA_CERT', '')
-    if not raw or not cert:
-        raise ValueError('Add GRUPLI_DATABASE_URL and GRUPLI_DATABASE_CA_CERT to GitHub Actions secrets.')
-    settings = connection(raw)
+    if not raw:
+        raise ReleaseError('MISSING_URL: add repository secret GRUPLI_DATABASE_URL.')
+    if not cert:
+        raise ReleaseError('MISSING_CA: add repository secret GRUPLI_DATABASE_CA_CERT.')
+    settings = connection(raw.strip())
     if '-----BEGIN CERTIFICATE-----' not in cert or 'PRIVATE KEY' in cert:
-        raise ValueError('Expected the public Supabase CA certificate in PEM format.')
+        raise ReleaseError('CA_FORMAT: paste the complete PEM public certificate text, not a file path.')
+    print('PASS: both secrets present; Session pooler project, port and certificate header checked.', flush=True)
     sql = "begin; set local statement_timeout='30s'; set local lock_timeout='10s';\n"
     sql += "select pg_advisory_xact_lock(719204510);\n" + CHECK
     if mode == 'apply':
@@ -71,7 +85,22 @@ def main():
                                 input=sql, text=True, capture_output=True, env=env, timeout=120)
     if result.returncode:
         # Do not echo libpq errors, which can contain hosts, users or secret fragments.
-        raise RuntimeError('Database operation failed. No success confirmed. Check connection, certificate, network restrictions and finance prerequisite.')
+        error = result.stderr.lower()
+        reason = 'DATABASE: connection or SQL operation failed; no success confirmed.'
+        for needle, message in [
+            ('password authentication failed', 'DB_PASSWORD: PostgreSQL rejected the database password.'),
+            ('tenant or user not found', 'DB_TENANT: Session pooler host and user do not identify the project.'),
+            ('certificate verify failed', 'DB_CERTIFICATE: certificate verification failed; use the project CA certificate.'),
+            ('root certificate file', 'DB_CA_FILE: CA certificate could not be read or parsed.'),
+            ('could not translate host name', 'DB_DNS: Session pooler host could not be resolved.'),
+            ('timeout expired', 'DB_TIMEOUT: server did not respond within the connection timeout.'),
+            ('finance prerequisite missing', 'DB_PREREQUISITE: finance update is absent from this database.'),
+            ('permission denied', 'DB_PERMISSION: database role lacks required permissions.'),
+        ]:
+            if needle in error:
+                reason = message
+                break
+        raise ReleaseError(reason)
     print('PASS: verified TLS connection and finance prerequisite.' if mode == 'check'
           else 'PASS: ownership patch committed; trigger and RPC permissions verified.')
 
@@ -79,6 +108,9 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+    except ReleaseError as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)
     except (ValueError, RuntimeError, subprocess.TimeoutExpired):
         print('Release stopped. Check the two Actions secrets, Session pooler on port 5432, CA certificate and project access. No success confirmed.', file=sys.stderr)
         sys.exit(1)
