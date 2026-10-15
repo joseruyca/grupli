@@ -1,0 +1,70 @@
+name: Grupli Supabase
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/supabase-release.yml'
+      - 'scripts/supabase_release.py'
+      - 'supabase/patches/**'
+      - 'supabase/tests/**'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'Aplicar la transferencia segura de grupos a Grupli'
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: grupli-supabase-release
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: isolated-qa-only
+          POSTGRES_DB: grupli_qa
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: isolated-qa-only
+      PGDATABASE: grupli_qa
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Test both patches in isolated PostgreSQL
+        run: |
+          python3 -m py_compile scripts/supabase_release.py
+          psql -X -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/all_in_one.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/patches/20261013_finance_security.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/patches/20261013_group_ownership.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/patches/20261013_group_ownership.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/tests/finance_security.sql
+  production:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Check encrypted connection or apply fixed patch
+        env:
+          GRUPLI_DATABASE_URL: ${{ secrets.GRUPLI_DATABASE_URL }}
+          GRUPLI_DATABASE_CA_CERT: ${{ secrets.GRUPLI_DATABASE_CA_CERT }}
+          RELEASE_MODE: ${{ inputs.apply && 'apply' || 'check' }}
+        run: python3 scripts/supabase_release.py "$RELEASE_MODE"
