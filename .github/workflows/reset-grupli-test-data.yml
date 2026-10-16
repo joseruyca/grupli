@@ -1,0 +1,25 @@
+name: Grupli authorized test reset
+on:
+  push:
+    branches: [main]
+    paths: ['scripts/reset_grupli_test_data.sql']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: grupli-supabase-release
+  cancel-in-progress: false
+jobs:
+  reset:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Reset only the fingerprint-guarded test account set
+        env:
+          GRUPLI_DATABASE_URL: ${{ secrets.GRUPLI_DATABASE_URL }}
+          GRUPLI_DATABASE_CA_CERT: ${{ secrets.GRUPLI_DATABASE_CA_CERT }}
+        run: python3 scripts/reset_grupli_test_data.py
