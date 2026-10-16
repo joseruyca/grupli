@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:grupli/main.dart';
 
 void main() {
@@ -10,7 +11,7 @@ void main() {
     var calls = 0;
     var finished = false;
     String? saved;
-    await tester.pumpWidget(MaterialApp(home: PasswordRecoveryScreen(
+    await tester.pumpWidget(MaterialApp(locale: const Locale('es'), supportedLocales: const [Locale('es')], localizationsDelegates: GlobalMaterialLocalizations.delegates, home: PasswordRecoveryScreen(
       onSaved: () => finished = true,
       savePassword: (value) { calls++; saved = value; return pending.future; },
     )));
