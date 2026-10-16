@@ -15,6 +15,7 @@ void main() {
       onSaved: () => finished = true,
       savePassword: (value) { calls++; saved = value; return pending.future; },
     )));
+    await tester.pumpAndSettle();
     final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), ' secret123 ');
     await tester.enterText(fields.at(1), 'different');
