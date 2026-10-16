@@ -505,3 +505,73 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+class PasswordRecoveryScreen extends StatefulWidget {
+  final VoidCallback onSaved;
+  final Future<void> Function(String)? savePassword;
+  const PasswordRecoveryScreen({super.key, required this.onSaved, this.savePassword});
+
+  @override
+  State<PasswordRecoveryScreen> createState() => _PasswordRecoveryScreenState();
+}
+
+class _PasswordRecoveryScreenState extends State<PasswordRecoveryScreen> {
+  final password = TextEditingController();
+  final confirmation = TextEditingController();
+  bool loading = false;
+  bool hidden = true;
+  String? error;
+
+  @override
+  void dispose() {
+    password.dispose();
+    confirmation.dispose();
+    super.dispose();
+  }
+
+  Future<void> save() async {
+    if (loading) return;
+    if (password.text.length < 8 || password.text != confirmation.text) {
+      setState(() => error = tr(context, es: 'Usa al menos 8 caracteres y repite la misma contraseña.', en: 'Use at least 8 characters and repeat the same password.'));
+      return;
+    }
+    setState(() { loading = true; error = null; });
+    try {
+      final customSave = widget.savePassword;
+      if (customSave != null) {
+        await customSave(password.text);
+      } else {
+        await AppData.sb.auth.updateUser(UserAttributes(password: password.text));
+      }
+      if (mounted) widget.onSaved();
+    } catch (e) {
+      if (mounted) setState(() => error = humanError(e));
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => DirectPage(child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(tr(context, es: 'Nueva contraseña', en: 'New password'), style: Theme.of(context).textTheme.headlineMedium),
+      const SizedBox(height: 12),
+      Text(tr(context, es: 'Elige una contraseña de al menos 8 caracteres para proteger tu cuenta.', en: 'Choose a password with at least 8 characters to protect your account.')),
+      const SizedBox(height: 24),
+      TextField(controller: password, obscureText: hidden, autocorrect: false, enableSuggestions: false,
+        autofillHints: const [AutofillHints.newPassword], textInputAction: TextInputAction.next,
+        decoration: InputDecoration(labelText: tr(context, es: 'Contraseña', en: 'Password'),
+          suffixIcon: IconButton(tooltip: tr(context, es: 'Mostrar u ocultar contraseña', en: 'Show or hide password'),
+            onPressed: () => setState(() => hidden = !hidden), icon: Icon(hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined)))),
+      const SizedBox(height: 16),
+      TextField(controller: confirmation, obscureText: hidden, autocorrect: false, enableSuggestions: false,
+        autofillHints: const [AutofillHints.newPassword], textInputAction: TextInputAction.done,
+        onSubmitted: (_) => save(), decoration: InputDecoration(labelText: tr(context, es: 'Repetir contraseña', en: 'Repeat password'))),
+      if (error != null) ...[const SizedBox(height: 12), Text(error!, style: const TextStyle(color: Colors.red))],
+      const SizedBox(height: 24),
+      FilledButton(onPressed: loading ? null : save,
+        child: Text(loading ? tr(context, es: 'Guardando…', en: 'Saving…') : tr(context, es: 'Guardar contraseña', en: 'Save password'))),
+    ],
+  ));
+}
