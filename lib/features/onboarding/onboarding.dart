@@ -76,6 +76,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return DirectPage(
       scroll: false,
       padding: const EdgeInsets.fromLTRB(22, 18, 22, 24),
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 12, 22, 18),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Semantics(
+            label: appIsEnglish ? 'Step ${index + 1} of ${slides.length}' : 'Paso ${index + 1} de ${slides.length}',
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(slides.length, (i) => AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: i == index ? 28 : 8, height: 8,
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(color: i == index ? AppColors.tealDark : AppColors.line, borderRadius: BorderRadius.circular(99)),
+            ))),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(width: double.infinity, child: ElevatedButton.icon(
+            onPressed: next,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(0, 52),
+              backgroundColor: AppColors.tealDark, foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            ),
+            icon: Icon(last ? Icons.check_rounded : Icons.arrow_forward_rounded),
+            label: Text(last ? (appIsEnglish ? 'Start' : 'Empezar') : (appIsEnglish ? 'Next' : 'Siguiente')),
+          )),
+        ]),
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Container(
@@ -97,35 +123,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             itemBuilder: (context, i) => OnboardingSlide(data: slides[i], index: i),
           ),
         ),
-        const SizedBox(height: 16),
-        Row(children: [
-          ...List.generate(slides.length, (i) => AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: i == index ? 28 : 8,
-                height: 8,
-                margin: const EdgeInsets.only(right: 7),
-                decoration: BoxDecoration(
-                  color: i == index ? AppColors.tealDark : AppColors.line,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-              )),
-          const Spacer(),
-          SizedBox(
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: next,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.tealDark,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-              ),
-              icon: Icon(last ? Icons.check_rounded : Icons.arrow_forward_rounded),
-              label: Text(last ? (appIsEnglish ? 'Start' : 'Empezar') : (appIsEnglish ? 'Next' : 'Siguiente'), style: const TextStyle(fontWeight: FontWeight.w900)),
-            ),
-          ),
-        ]),
       ]),
     );
   }
@@ -180,15 +177,22 @@ class _OnboardingSlideState extends State<OnboardingSlide> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Expanded(
+    return LayoutBuilder(builder: (context, constraints) => SingleChildScrollView(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SizedBox(
+        height: (constraints.maxHeight * .55).clamp(160.0, 360.0),
         child: AnimatedBuilder(
           animation: _controller,
-          builder: (context, _) => _IntroSceneFrame(
+          builder: (context, _) => ExcludeSemantics(child: FittedBox(
+            fit: BoxFit.contain,
+            child: SizedBox(width: 320, height: 420,
+              child: MediaQuery.withNoTextScaling(context: context, child: _IntroSceneFrame(
             index: widget.index,
             data: widget.data,
             progress: _controller.value,
-          ),
+          )),
+          ))),
         ),
       ),
       const SizedBox(height: 28),
@@ -214,7 +218,8 @@ class _OnboardingSlideState extends State<OnboardingSlide> with SingleTickerProv
         child: Text(widget.data.body, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.muted, height: 1.42)),
       ),
       const SizedBox(height: 4),
-    ]);
+    ]),
+    ));
   }
 }
 
