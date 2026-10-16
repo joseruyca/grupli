@@ -743,6 +743,8 @@ class _AppRootState extends State<AppRoot> {
   void initState() {
     super.initState();
     _session = Supabase.instance.client.auth.currentSession;
+    _recoveringPassword = Uri.base.queryParameters['type'] == 'recovery' ||
+        Uri.base.fragment.split('&').contains('type=recovery');
     _loadFirstRunState();
     unawaited(_startAppLinkListener());
     _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
@@ -756,6 +758,9 @@ class _AppRootState extends State<AppRoot> {
       if (event.session != null) {
         PushNotificationService.tryRegisterSilently();
       }
+    }, onError: (Object error, StackTrace stackTrace) {
+      // Keep the current screen usable during transient offline token refreshes.
+      // An explicit signedOut event remains responsible for clearing the session.
     });
   }
 
