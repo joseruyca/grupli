@@ -2,7 +2,7 @@ name: Grupli RPC security
 on:
   push:
     branches: [main, 'release/grupli-security']
-    paths: ['scripts/harden_grupli_rpc.*', 'supabase/tests/rpc_hardening.sql', '.github/workflows/supabase-hardening.yml']
+    paths: ['scripts/harden_grupli_rpc.*', 'supabase/tests/rpc_hardening.sql', 'supabase/tests/bootstrap.sql', '.github/workflows/supabase-hardening.yml']
 permissions:
   contents: read
 concurrency:
