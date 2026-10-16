@@ -1587,7 +1587,1297 @@ Map<String, dynamic> tournamentScheduleConfig(Map<String, dynamic> tournament) {
 
 String tournamentStatusLabel(String status) {
   switch (status) {
-    case 'draft':…12293 tokens truncated….map(
+    case 'draft':
+      return 'Borrador';
+    case 'scheduled':
+      return 'Programado';
+    case 'active':
+      return 'En curso';
+    case 'paused':
+      return 'Pausado';
+    case 'finished':
+      return 'Finalizado';
+    case 'cancelled':
+      return 'Cancelado';
+    default:
+      return 'En curso';
+  }
+}
+
+Color tournamentStatusColor(String status) {
+  switch (status) {
+    case 'finished':
+      return AppColors.green;
+    case 'paused':
+      return AppColors.amber;
+    case 'cancelled':
+      return AppColors.red;
+    case 'draft':
+      return AppColors.muted;
+    case 'scheduled':
+      return AppColors.blue;
+    default:
+      return AppColors.green;
+  }
+}
+
+String matchStatusLabel(String status) {
+  switch (status) {
+    case 'scheduled':
+      return 'Programado';
+    case 'played':
+      return 'Jugado';
+    case 'postponed':
+      return 'Aplazado';
+    case 'cancelled':
+      return 'Cancelado';
+    case 'no_show':
+      return 'No presentado';
+    case 'walkover':
+      return 'Victoria admin.';
+    case 'bye':
+      return 'Descanso';
+    default:
+      return 'Pendiente';
+  }
+}
+
+Color matchStatusColor(String status) {
+  switch (status) {
+    case 'played':
+      return AppColors.green;
+    case 'scheduled':
+      return AppColors.blue;
+    case 'postponed':
+      return AppColors.amber;
+    case 'cancelled':
+      return AppColors.red;
+    case 'no_show':
+      return AppColors.red;
+    case 'walkover':
+      return AppColors.orange;
+    case 'bye':
+      return AppColors.violet;
+    default:
+      return AppColors.muted;
+  }
+}
+
+String tournamentMatchDateText(Map<String, dynamic> match) {
+  final raw = AppData.text(match['scheduled_at']);
+  if (raw.isEmpty) return 'Sin fecha';
+  final dt = DateTime.tryParse(raw)?.toLocal();
+  if (dt == null) return 'Sin fecha';
+  return DateFormat('EEE d MMM · HH:mm', appDateLocale).format(dt);
+}
+
+DateTime? tournamentScheduledAtForIndex(
+    Map<String, dynamic>? cfg, int round, int orderInsideRound) {
+  if (cfg == null || cfg['enabled'] != true) return null;
+  final raw = AppData.text(cfg['first_start_at']);
+  final first = DateTime.tryParse(raw)?.toLocal();
+  if (first == null) return null;
+  final daysBetweenRounds =
+      max(0, AppData.intValue(cfg['days_between_rounds'], 7));
+  final interval = max(15, AppData.intValue(cfg['interval_minutes'], 60));
+  final courts = max(
+      1,
+      AppData.intValue(
+          cfg['courts_count'], AppData.intValue(cfg['matches_per_round'], 1)));
+  final wave = max(0, orderInsideRound) ~/ courts;
+  return first.add(Duration(
+      days: max(0, round - 1) * daysBetweenRounds, minutes: wave * interval));
+}
+
+String tournamentCourtNameForIndex(
+    Map<String, dynamic>? cfg, int orderInsideRound) {
+  if (cfg == null) return '';
+  final base = AppData.text(cfg['court_name']).trim();
+  final courts = max(
+      1,
+      AppData.intValue(
+          cfg['courts_count'], AppData.intValue(cfg['matches_per_round'], 1)));
+  if (courts <= 1) return base;
+  final number = (max(0, orderInsideRound) % courts) + 1;
+  if (base.isEmpty) return 'Pista $number';
+  if (RegExp(r'\d+$').hasMatch(base)) return base;
+  return '$base $number';
+}
+
+String tournamentMatchAgendaNotes(Map<String, dynamic> match) {
+  final roundName = AppData.text(
+      match['round_name'], 'Jornada ${AppData.intValue(match['round'], 1)}');
+  final status = AppData.text(match['status'], 'pending');
+  final courtLine = AppData.text(match['court_name']).isEmpty
+      ? ''
+      : '\nPista/Mesa: ${AppData.text(match['court_name'])}';
+  final statusLine = status == 'postponed'
+      ? '\nEstado: partido aplazado'
+      : status == 'played'
+          ? '\nEstado: resultado registrado'
+          : '';
+  final notes = AppData.text(match['notes']);
+  final notesLine = notes.isEmpty ? '' : '\n\n$notes';
+  return 'Partido de torneo · $roundName$statusLine$courtLine$notesLine';
+}
+
+String tournamentMatchAgendaTitle(String tournamentName,
+    Map<String, dynamic> match, Map<String, String> names) {
+  final a = tournamentMatchSideName(match, names, true);
+  final b = tournamentMatchSideName(match, names, false);
+  final base = '$tournamentName: $a vs $b';
+  return AppData.text(match['status']) == 'postponed'
+      ? 'Aplazado · $base'
+      : base;
+}
+
+bool tournamentMatchHasAgendaEvent(Map<String, dynamic> match) =>
+    AppData.text(match['event_id']).isNotEmpty;
+
+bool tournamentMatchHasScheduledDate(Map<String, dynamic> match) =>
+    AppData.text(match['scheduled_at']).isNotEmpty;
+
+String tournamentMatchAgendaSyncLabel(Map<String, dynamic> match) {
+  final status = AppData.text(match['status'], 'pending');
+  if (status == 'cancelled') return 'Agenda cancelada';
+  if (status == 'bye') return 'Descanso';
+  if (tournamentMatchHasAgendaEvent(match)) return 'En Agenda';
+  if (tournamentMatchHasScheduledDate(match)) return 'Falta Agenda';
+  return 'Sin fecha';
+}
+
+IconData tournamentMatchAgendaSyncIcon(Map<String, dynamic> match) {
+  final status = AppData.text(match['status'], 'pending');
+  if (status == 'cancelled') return Icons.event_busy_rounded;
+  if (status == 'bye') return Icons.weekend_rounded;
+  if (tournamentMatchHasAgendaEvent(match))
+    return Icons.event_available_rounded;
+  if (tournamentMatchHasScheduledDate(match)) return Icons.event_note_rounded;
+  return Icons.event_rounded;
+}
+
+Color tournamentMatchAgendaSyncColor(Map<String, dynamic> match) {
+  final status = AppData.text(match['status'], 'pending');
+  if (status == 'cancelled') return AppColors.red;
+  if (status == 'bye') return AppColors.violet;
+  if (tournamentMatchHasAgendaEvent(match)) return AppColors.green;
+  if (tournamentMatchHasScheduledDate(match)) return AppColors.amber;
+  return AppColors.muted;
+}
+
+String eliminationRoundName(int round, int size) {
+  if (size <= 2) return 'Final';
+  if (size <= 4) return round <= 1 ? 'Semifinal' : 'Final';
+  if (size <= 8) {
+    if (round <= 1) return 'Cuartos';
+    if (round == 2) return 'Semifinal';
+    return 'Final';
+  }
+  return 'Ronda $round';
+}
+
+List<List<(String, String)>> generateRoundRobinIds(List<String> ids) {
+  if (ids.length < 2) return const <List<(String, String)>>[];
+  final rotation = <String?>[...ids];
+  if (rotation.length.isOdd) rotation.add(null);
+  final n = rotation.length;
+  final rounds = <List<(String, String)>>[];
+  for (var round = 1; round < n; round++) {
+    final pairs = <(String, String)>[];
+    for (var i = 0; i < n ~/ 2; i++) {
+      final a = rotation[i];
+      final b = rotation[n - 1 - i];
+      if (a == null || b == null) continue;
+      final swap = round.isEven;
+      pairs.add((swap ? b : a, swap ? a : b));
+    }
+    rounds.add(pairs);
+    final fixed = rotation.first;
+    final rest = rotation.sublist(1);
+    rest.insert(0, rest.removeLast());
+    rotation
+      ..clear()
+      ..add(fixed)
+      ..addAll(rest);
+  }
+  return rounds;
+}
+
+class AmericanoGeneratedMatch {
+  final int round;
+  final int courtIndex;
+  final List<String> sideA;
+  final List<String> sideB;
+  final List<String> resting;
+  const AmericanoGeneratedMatch({
+    required this.round,
+    required this.courtIndex,
+    required this.sideA,
+    required this.sideB,
+    required this.resting,
+  });
+}
+
+int recommendedAmericanoRounds(int players, int courts) {
+  if (players < 4) return 1;
+  final activeCourts = max(1, min(courts, players ~/ 4));
+  final allPartnerPairs = players * (players - 1) ~/ 2;
+  final partnerPairsPerRound = activeCourts * 2;
+  return max(
+      1, min(40, (allPartnerPairs / max(1, partnerPairsPerRound)).ceil()));
+}
+
+String americanoRulesText(int players, int courts, int rounds) {
+  final recommended = recommendedAmericanoRounds(players, courts);
+  if (players < 4) return 'El americano necesita al menos 4 jugadores.';
+  final roundText = rounds >= recommended
+      ? 'Con $rounds rondas hay margen para rotar bien las parejas.'
+      : 'Con $rounds rondas quizá no todos jueguen con todas las parejas; recomendado: $recommended.';
+  return 'Ranking individual: cada jugador suma los puntos que consigue en cada partido, aunque juegue con parejas distintas. $roundText';
+}
+
+String americanoPairKey(String a, String b) {
+  final pair = [a, b]..sort();
+  return pair.join('|');
+}
+
+int americanoPairCount(Map<String, int> map, String a, String b) {
+  return map[americanoPairKey(a, b)] ?? 0;
+}
+
+void americanoIncrementPair(Map<String, int> map, String a, String b) {
+  final key = americanoPairKey(a, b);
+  map[key] = (map[key] ?? 0) + 1;
+}
+
+List<List<String>> americanoSideSplits(List<String> group) {
+  if (group.length < 4) return const [];
+  final a = group[0];
+  final b = group[1];
+  final c = group[2];
+  final d = group[3];
+  return [
+    [a, b, c, d],
+    [a, c, b, d],
+    [a, d, b, c],
+  ];
+}
+
+List<AmericanoGeneratedMatch> generateAmericanoRoundsIds(List<String> ids,
+    {required int rounds, required int courts}) {
+  final clean = ids.where((id) => id.trim().isNotEmpty).toList();
+  if (clean.length < 4) return const [];
+
+  final maxCourts = max(1, min(courts, clean.length ~/ 4));
+  final targetRounds = max(1, rounds);
+  final partnerCounts = <String, int>{};
+  final opponentCounts = <String, int>{};
+  final restCounts = <String, int>{for (final id in clean) id: 0};
+  final playedCounts = <String, int>{for (final id in clean) id: 0};
+  final output = <AmericanoGeneratedMatch>[];
+
+  for (var round = 1; round <= targetRounds; round++) {
+    final rotated = [...clean];
+    final shift = (round - 1) % rotated.length;
+    final shifted = [...rotated.skip(shift), ...rotated.take(shift)];
+    final orderRank = {for (var i = 0; i < shifted.length; i++) shifted[i]: i};
+
+    shifted.sort((a, b) {
+      final playedCompare =
+          (playedCounts[a] ?? 0).compareTo(playedCounts[b] ?? 0);
+      if (playedCompare != 0) return playedCompare;
+      final restCompare = (restCounts[b] ?? 0).compareTo(restCounts[a] ?? 0);
+      if (restCompare != 0) return restCompare;
+      return (orderRank[a] ?? 0).compareTo(orderRank[b] ?? 0);
+    });
+
+    final activeSlots = maxCourts * 4;
+    final active = shifted.take(activeSlots).toList();
+    final resting = shifted.skip(activeSlots).toList();
+    for (final id in resting) {
+      restCounts[id] = (restCounts[id] ?? 0) + 1;
+    }
+
+    final remaining = [...active];
+    var court = 0;
+    while (remaining.length >= 4 && court < maxCourts) {
+      List<String>? best;
+      var bestScore = 1 << 30;
+
+      for (var a = 0; a < remaining.length - 3; a++) {
+        for (var b = a + 1; b < remaining.length - 2; b++) {
+          for (var c = b + 1; c < remaining.length - 1; c++) {
+            for (var d = c + 1; d < remaining.length; d++) {
+              final group = [
+                remaining[a],
+                remaining[b],
+                remaining[c],
+                remaining[d]
+              ];
+              for (final split in americanoSideSplits(group)) {
+                final p1 = split[0];
+                final p2 = split[1];
+                final q1 = split[2];
+                final q2 = split[3];
+
+                final partnerPenalty =
+                    americanoPairCount(partnerCounts, p1, p2) +
+                        americanoPairCount(partnerCounts, q1, q2);
+                final opponentPenalty =
+                    americanoPairCount(opponentCounts, p1, q1) +
+                        americanoPairCount(opponentCounts, p1, q2) +
+                        americanoPairCount(opponentCounts, p2, q1) +
+                        americanoPairCount(opponentCounts, p2, q2);
+
+                final groupPlayed = group.fold<int>(
+                    0, (value, id) => value + (playedCounts[id] ?? 0));
+                final groupRested = group.fold<int>(
+                    0, (value, id) => value + (restCounts[id] ?? 0));
+
+                final score = (partnerPenalty * 10000) +
+                    (opponentPenalty * 80) +
+                    (groupPlayed * 12) -
+                    (groupRested * 6);
+
+                if (score < bestScore) {
+                  bestScore = score;
+                  best = split;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (best == null) break;
+      final sideA = [best[0], best[1]];
+      final sideB = [best[2], best[3]];
+      output.add(AmericanoGeneratedMatch(
+          round: round,
+          courtIndex: court,
+          sideA: sideA,
+          sideB: sideB,
+          resting: resting));
+
+      americanoIncrementPair(partnerCounts, sideA[0], sideA[1]);
+      americanoIncrementPair(partnerCounts, sideB[0], sideB[1]);
+      for (final a in sideA) {
+        for (final b in sideB) {
+          americanoIncrementPair(opponentCounts, a, b);
+        }
+      }
+      for (final id in best) {
+        playedCounts[id] = (playedCounts[id] ?? 0) + 1;
+      }
+      remaining.removeWhere((id) => best!.contains(id));
+      court++;
+    }
+  }
+
+  return output;
+}
+
+List<String> americanoSideIds(Map<String, dynamic> match, String key) {
+  final details = matchResultDetails(match);
+  final raw = details[key];
+  if (raw is List) {
+    return raw
+        .map((e) => e?.toString() ?? '')
+        .where((e) => e.isNotEmpty && e != 'null')
+        .toList();
+  }
+  final fallback = key == 'side_a_ids'
+      ? AppData.text(match['team_a'])
+      : AppData.text(match['team_b']);
+  if (fallback.isEmpty || fallback == 'null') return const [];
+  return [fallback];
+}
+
+List<String> americanoRestIds(Map<String, dynamic> match) {
+  final details = matchResultDetails(match);
+  final raw = details['rest_ids'];
+  if (raw is List)
+    return raw
+        .map((e) => e?.toString() ?? '')
+        .where((e) => e.isNotEmpty && e != 'null')
+        .toList();
+  return const [];
+}
+
+bool isAmericanoMatch(Map<String, dynamic> match) {
+  final details = matchResultDetails(match);
+  return details['americano'] == true;
+}
+
+String tournamentMatchSideName(
+    Map<String, dynamic> match, Map<String, String> names, bool sideA) {
+  final ids = isAmericanoMatch(match)
+      ? americanoSideIds(match, sideA ? 'side_a_ids' : 'side_b_ids')
+      : [AppData.text(match[sideA ? 'team_a' : 'team_b'])];
+  if (ids.isEmpty || ids.first == 'null')
+    return sideA ? 'Pendiente' : 'Pase directo';
+  return ids.map((id) => names[id] ?? 'Pendiente').join(' / ');
+}
+
+String americanoRestText(
+    Map<String, dynamic> match, Map<String, String> names) {
+  final rest = americanoRestIds(match);
+  if (rest.isEmpty) return '';
+  return rest.map((id) => names[id] ?? 'Participante').join(', ');
+}
+
+String tournamentFormatLabel(String format) {
+  switch (format) {
+    case 'eliminatoria':
+      return 'Eliminatoria';
+    case 'americano':
+      return 'Americano';
+    case 'manual':
+      return 'Manual';
+    default:
+      return 'Liga';
+  }
+}
+
+String tournamentFormatSubtitle(String format) {
+  switch (format) {
+    case 'eliminatoria':
+      return appIsEnglish
+          ? 'Single-elimination bracket: winners advance and losers are out.'
+          : 'Cuadro directo: quien gana avanza y quien pierde queda fuera.';
+    case 'americano':
+      return appIsEnglish
+          ? 'Rounds by court with rotating pairs, rests and an individual ranking.'
+          : 'Rondas por pista con parejas rotativas, descansos y ranking individual.';
+    case 'manual':
+      return appIsEnglish
+          ? 'Manual pairings, custom dates and full control.'
+          : 'Emparejamientos a mano, fechas a medida y control total.';
+    default:
+      return appIsEnglish
+          ? 'Round robin league with automatic standings.'
+          : 'Liga todos contra todos con clasificación automática.';
+  }
+}
+
+String scoringTypeLabel(String type) {
+  switch (type) {
+    case 'football':
+      return appIsEnglish ? 'Football' : 'Fútbol';
+    case 'tennis_padel':
+      return appIsEnglish ? 'Tennis / Padel' : 'Tenis / Pádel';
+    case 'basketball':
+      return appIsEnglish ? 'Basketball' : 'Baloncesto';
+    case 'volleyball':
+      return appIsEnglish ? 'Volleyball' : 'Voleibol';
+    case 'ping_pong':
+      return appIsEnglish ? 'Ping pong' : 'Ping pong';
+    case 'cards_mus':
+      return appIsEnglish ? 'Mus / Cards' : 'Mus / Cartas';
+    case 'darts':
+      return appIsEnglish ? 'Darts' : 'Dardos';
+    case 'billiards':
+      return appIsEnglish ? 'Billiards' : 'Billar';
+    case 'esports':
+      return appIsEnglish ? 'Esports' : 'Esports';
+    case 'custom':
+      return appIsEnglish ? 'Custom' : 'Personalizado';
+    default:
+      return appIsEnglish ? 'General' : 'General';
+  }
+}
+
+String scoringTableContractChip(String type, [dynamic raw]) {
+  final model = scoringResultModel(type, raw);
+  if (model == 'goals') return appIsEnglish ? 'Goals table' : 'Tabla por goles';
+  if (model == 'sets_games')
+    return appIsEnglish ? 'Sets/games table' : 'Tabla por sets/juegos';
+  if (model == 'sets_points')
+    return appIsEnglish ? 'Sets/points table' : 'Tabla por sets/puntos';
+  if (model == 'total_points')
+    return appIsEnglish ? 'Points table' : 'Tabla por puntos';
+  if (type == 'basketball')
+    return appIsEnglish ? 'Points table' : 'Tabla por puntos';
+  return appIsEnglish ? 'Adapted table' : 'Tabla adaptada';
+}
+
+String scoringTypeSubtitle(String type) {
+  switch (type) {
+    case 'football':
+      return appIsEnglish
+          ? 'Win = 3 points, draw = 1. Tiebreak by goal difference.'
+          : 'Victoria 3 puntos, empate 1. Desempate por diferencia de goles.';
+    case 'tennis_padel':
+      return appIsEnglish
+          ? 'Set-based result: register each set and calculate sets/games for tiebreaks.'
+          : 'Resultado por sets: registra cada set y calcula sets/juegos para desempatar.';
+    case 'basketball':
+      return appIsEnglish
+          ? 'Win = 2 points. The score represents points scored.'
+          : 'Victoria 2 puntos. El marcador representa puntos anotados.';
+    case 'volleyball':
+      return appIsEnglish
+          ? 'Sets to 25 and a short fifth set. Ideal for best of 3 or 5.'
+          : 'Sets a 25 y quinto set corto. Ideal para mejor de 3 o 5.';
+    case 'ping_pong':
+      return appIsEnglish
+          ? 'Fast sets to 11. The app calculates sets and points for each partial.'
+          : 'Sets rápidos a 11. La app calcula sets y puntos de cada parcial.';
+    case 'cards_mus':
+      return appIsEnglish
+          ? 'Win = 1 point. Useful for games, stones, hands or rounds.'
+          : 'Victoria 1 punto. Sirve para juegos, piedras, manos o rondas.';
+    case 'darts':
+      return appIsEnglish
+          ? 'Direct scoring for 301/501 games or rounds.'
+          : 'Puntuación directa para partidas a 301/501 o rondas.';
+    case 'billiards':
+      return appIsEnglish
+          ? 'Games or balls won with a simple score.'
+          : 'Partidas o bolas ganadas con marcador simple.';
+    case 'esports':
+      return appIsEnglish
+          ? 'Maps, rounds or points. Flexible for games and online tournaments.'
+          : 'Mapas, rondas o puntos. Flexible para videojuegos y torneos online.';
+    case 'custom':
+      return appIsEnglish
+          ? 'Flexible: direct score or by sets/rounds, with editable points and units.'
+          : 'Flexible: marcador directo o por sets/rondas, con puntos y unidades editables.';
+    default:
+      return appIsEnglish
+          ? 'Simple system: win 3, draw 1, loss 0.'
+          : 'Sistema simple: victoria 3, empate 1, derrota 0.';
+  }
+}
+
+Map<String, dynamic> scoringConfigForType(String type) {
+  switch (type) {
+    case 'football':
+      return {
+        'win': 3,
+        'draw': 1,
+        'loss': 0,
+        'unit': 'goles',
+        'allowDraw': true,
+        'result_mode': 'simple',
+        'score_model': 'goals',
+        'score_label': 'goles',
+        'ranking_label': 'DG',
+      };
+    case 'tennis_padel':
+      return {
+        'win': 2,
+        'draw': 0,
+        'loss': 0,
+        'unit': 'sets',
+        'allowDraw': false,
+        'result_mode': 'sets',
+        'score_model': 'sets_games',
+        'best_of': 3,
+        'set_label': 'juegos',
+        'ranking_label': 'DS',
+      };
+    case 'basketball':
+      return {
+        'win': 2,
+        'draw': 0,
+        'loss': 1,
+        'unit': 'puntos',
+        'allowDraw': false,
+        'result_mode': 'simple',
+        'score_model': 'total_points',
+        'score_label': 'puntos',
+        'ranking_label': 'DP',
+      };
+    case 'volleyball':
+      return {
+        'win': 2,
+        'draw': 0,
+        'loss': 0,
+        'unit': 'sets',
+        'allowDraw': false,
+        'result_mode': 'sets',
+        'score_model': 'sets_points',
+        'best_of': 5,
+        'set_label': 'puntos',
+        'target_score': 25,
+        'ranking_label': 'DS',
+      };
+    case 'ping_pong':
+      return {
+        'win': 2,
+        'draw': 0,
+        'loss': 0,
+        'unit': 'sets',
+        'allowDraw': false,
+        'result_mode': 'sets',
+        'score_model': 'sets_points',
+        'best_of': 5,
+        'set_label': 'puntos',
+        'target_score': 11,
+        'ranking_label': 'DS',
+      };
+    case 'cards_mus':
+      return {
+        'win': 1,
+        'draw': 0,
+        'loss': 0,
+        'unit': 'juegos',
+        'allowDraw': false,
+        'result_mode': 'simple',
+        'score_model': 'games',
+        'score_label': 'juegos',
+        'ranking_label': 'DIF',
+      };
+    case 'darts':
+      return {
+        'win': 2,
+        'draw': 0,
+        'loss': 0,
+        'unit': 'puntos',
+        'allowDraw': false,
+        'result_mode': 'simple',
+        'score_model': 'target_points',
+        'score_label': 'puntos',
+        'target_score': 501,
+        'ranking_label': 'DIF',
+      };
+    case 'billiards':
+      return {
+        'win': 1,
+        'draw': 0,
+        'loss': 0,
+        'unit': 'partidas',
+        'allowDraw': false,
+        'result_mode': 'simple',
+        'score_model': 'games',
+        'score_label': 'partidas',
+        'ranking_label': 'DIF',
+      };
+    case 'esports':
+      return {
+        'win': 3,
+        'draw': 1,
+        'loss': 0,
+        'unit': 'mapas',
+        'allowDraw': true,
+        'result_mode': 'simple',
+        'score_model': 'games',
+        'score_label': 'mapas',
+        'ranking_label': 'DIF',
+      };
+    case 'custom':
+      return {
+        'win': 3,
+        'draw': 1,
+        'loss': 0,
+        'unit': 'puntos',
+        'allowDraw': true,
+        'result_mode': 'simple',
+        'score_model': 'manual_points',
+        'score_label': 'puntos',
+        'ranking_label': 'DIF',
+      };
+    default:
+      return {
+        'win': 3,
+        'draw': 1,
+        'loss': 0,
+        'unit': 'puntos',
+        'allowDraw': true,
+        'result_mode': 'simple',
+        'score_model': 'manual_points',
+        'score_label': 'puntos',
+        'ranking_label': 'DIF',
+      };
+  }
+}
+
+Map<String, dynamic> resolvedScoringConfig(String type, [dynamic raw]) {
+  final base = Map<String, dynamic>.from(scoringConfigForType(type));
+  if (raw is Map) {
+    for (final entry in raw.entries) {
+      base[entry.key.toString()] = entry.value;
+    }
+  }
+  return base;
+}
+
+int scoringWinPoints(String type, [dynamic raw]) =>
+    AppData.intValue(resolvedScoringConfig(type, raw)['win'], 3);
+int scoringDrawPoints(String type, [dynamic raw]) =>
+    AppData.intValue(resolvedScoringConfig(type, raw)['draw'], 1);
+int scoringLossPoints(String type, [dynamic raw]) =>
+    AppData.intValue(resolvedScoringConfig(type, raw)['loss'], 0);
+String scoringMetricUnit(String type, [dynamic raw]) =>
+    AppData.text(resolvedScoringConfig(type, raw)['unit'], 'puntos');
+bool scoringAllowDraw(String type, [dynamic raw]) =>
+    resolvedScoringConfig(type, raw)['allowDraw'] == true;
+bool scoringUsesSetMode(String type, [dynamic raw]) =>
+    scoringResultModel(type, raw).startsWith('sets');
+int scoringBestOf(String type, [dynamic raw]) =>
+    max(1, AppData.intValue(resolvedScoringConfig(type, raw)['best_of'], 3));
+String scoringScoreLabel(String type, [dynamic raw]) => AppData.text(
+    resolvedScoringConfig(type, raw)['score_label'],
+    scoringMetricUnit(type, raw));
+String scoringSetLabel(String type, [dynamic raw]) =>
+    AppData.text(resolvedScoringConfig(type, raw)['set_label'], 'juegos');
+String scoringRankingLabel(String type, [dynamic raw]) =>
+    AppData.text(resolvedScoringConfig(type, raw)['ranking_label'], 'DIF');
+
+String scoringResultModel(String type, [dynamic raw]) {
+  final cfg = resolvedScoringConfig(type, raw);
+  final model = AppData.text(cfg['score_model']);
+  if (model.isNotEmpty) return model;
+  return AppData.text(cfg['result_mode'], 'simple') == 'sets'
+      ? 'sets_points'
+      : 'manual_points';
+}
+
+bool scoringUsesGameSetMode(String type, [dynamic raw]) =>
+    scoringResultModel(type, raw) == 'sets_games';
+bool scoringUsesPointSetMode(String type, [dynamic raw]) =>
+    scoringResultModel(type, raw) == 'sets_points';
+
+String scoringTableForLabel(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return 'GF';
+    case 'sets_games':
+    case 'sets_points':
+      return 'SF';
+    case 'total_points':
+      return 'PF';
+    default:
+      return '+';
+  }
+}
+
+String scoringTableAgainstLabel(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return 'GC';
+    case 'sets_games':
+    case 'sets_points':
+      return 'SC';
+    case 'total_points':
+      return 'PC';
+    default:
+      return '-';
+  }
+}
+
+String scoringTableDifferenceLabel(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return 'DG';
+    case 'sets_games':
+    case 'sets_points':
+      return 'DS';
+    case 'total_points':
+      return 'DP';
+    default:
+      return 'DIF';
+  }
+}
+
+String scoringSecondaryForLabel(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'sets_games':
+      return 'JF';
+    case 'sets_points':
+      return 'PF';
+    default:
+      return '+2';
+  }
+}
+
+String scoringSecondaryAgainstLabel(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'sets_games':
+      return 'JC';
+    case 'sets_points':
+      return 'PC';
+    default:
+      return '-2';
+  }
+}
+
+String scoringSecondaryDifferenceLabel(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'sets_games':
+      return 'DJ';
+    case 'sets_points':
+      return 'DP';
+    default:
+      return 'DIF2';
+  }
+}
+
+String scoringResultInputTitle(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return appIsEnglish ? 'Goals result' : 'Resultado por goles';
+    case 'sets_games':
+      return appIsEnglish
+          ? 'Sets and games result'
+          : 'Resultado por sets y juegos';
+    case 'sets_points':
+      return appIsEnglish
+          ? 'Sets and points result'
+          : 'Resultado por sets y puntos';
+    case 'total_points':
+      return appIsEnglish
+          ? 'Total points result'
+          : 'Resultado por puntos totales';
+    case 'games':
+      return appIsEnglish
+          ? 'Games/matches result'
+          : 'Resultado por juegos/partidas';
+    default:
+      return appIsEnglish ? 'Editable result' : 'Resultado editable';
+  }
+}
+
+String scoringResultInputHelp(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return appIsEnglish
+          ? "Enter each team's goals. The table will update points, goals for, goals against and difference."
+          : 'Escribe los goles de cada equipo. La tabla actualizará puntos, goles a favor, goles en contra y diferencia.';
+    case 'sets_games':
+      return appIsEnglish
+          ? 'Write each set on a line, for example 6-4 or 7-5. The app calculates sets, games and tiebreaks.'
+          : 'Escribe cada set en una línea, por ejemplo 6-4 o 7-5. La app calcula sets, juegos y desempates.';
+    case 'sets_points':
+      return appIsEnglish
+          ? 'Write each partial on a line, for example 25-21 or 15-12. The app calculates sets, points and tiebreaks.'
+          : 'Escribe cada parcial en una línea, por ejemplo 25-21 o 15-12. La app calcula sets, puntos y desempates.';
+    case 'total_points':
+      return appIsEnglish
+          ? 'Enter the final score in points. The table will calculate wins and difference.'
+          : 'Escribe el marcador final de puntos. La tabla calculará victorias y diferencia.';
+    case 'games':
+      return appIsEnglish
+          ? 'Enter games, matches or maps won by each side.'
+          : 'Escribe juegos, partidas o mapas ganados por cada lado.';
+    default:
+      return appIsEnglish
+          ? 'Flexible score. The standings will use the rules configured for this tournament.'
+          : 'Marcador flexible. La clasificación usará las reglas configuradas para este torneo.';
+  }
+}
+
+String scoringCreationHelp(String type, [dynamic raw]) {
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return appIsEnglish
+          ? 'Football: goals-based score. The table uses points, GF, GA and GD.'
+          : 'Fútbol: marcador por goles. La tabla usa puntos, GF, GC y DG.';
+    case 'sets_games':
+      return appIsEnglish
+          ? 'Tennis/Padel: enter full sets. The table uses wins, sets, games and tiebreaks.'
+          : 'Tenis/Pádel: introduces sets completos. La tabla usa victorias, sets, juegos y desempates.';
+    case 'sets_points':
+      return appIsEnglish
+          ? 'Volleyball/Ping pong: enter full sets. The table uses wins, sets, points and tiebreaks.'
+          : 'Voleibol/Ping pong: introduces sets completos. La tabla usa victorias, sets, puntos y desempates.';
+    case 'total_points':
+      return appIsEnglish
+          ? 'Basketball: points-based score. The table uses wins, points for/against and difference.'
+          : 'Baloncesto: marcador por puntos. La tabla usa victorias, puntos a favor/en contra y diferencia.';
+    default:
+      return scoringConfigFullText(type, raw);
+  }
+}
+
+String scoringEmoji(String type) {
+  switch (type) {
+    case 'football':
+      return '⚽';
+    case 'tennis_padel':
+      return '🎾';
+    case 'basketball':
+      return '🏀';
+    case 'volleyball':
+      return '🏐';
+    case 'ping_pong':
+      return '🏓';
+    case 'cards_mus':
+      return '🃏';
+    case 'darts':
+      return '🎯';
+    case 'billiards':
+      return '🎱';
+    case 'esports':
+      return '🎮';
+    case 'custom':
+      return '✨';
+    default:
+      return '⭐';
+  }
+}
+
+String scoringValidationText(String type, [dynamic raw]) {
+  final cfg = resolvedScoringConfig(type, raw);
+  switch (scoringResultModel(type, cfg)) {
+    case 'goals':
+      return appIsEnglish
+          ? 'Real football: goals, draws allowed, GF/GA/GD and league points.'
+          : 'Fútbol real: goles, empate permitido, GF/GC/DG y puntos de liga.';
+    case 'sets_games':
+      return appIsEnglish
+          ? 'Racket sports: each set stores games. Enter all partial scores to close the match.'
+          : 'Raqueta: cada set guarda juegos. Introduce todos los parciales para cerrar el partido.';
+    case 'sets_points':
+      return appIsEnglish
+          ? 'Sets: each partial stores points. The match cannot end tied on sets.'
+          : 'Sets: cada parcial guarda puntos. No puede quedar empate a sets.';
+    case 'total_points':
+      return appIsEnglish
+          ? 'Basketball: total points, no draws, point difference.'
+          : 'Baloncesto: puntos totales, sin empate, diferencia de puntos.';
+    default:
+      if (!scoringAllowDraw(type, cfg))
+        return appIsEnglish
+            ? 'This system cannot end in a draw.'
+            : 'El marcador no puede quedar empatado en este sistema.';
+      return appIsEnglish
+          ? 'This system allows draws and calculates points and difference automatically.'
+          : 'Este sistema permite empate y calcula puntos y diferencia automáticamente.';
+  }
+}
+
+bool tournamentFeatureIsPremium(String feature) =>
+    GrupliPremium.isPremiumFeature(feature);
+
+String scoringConfigShortText(String type, [dynamic raw]) {
+  final cfg = resolvedScoringConfig(type, raw);
+  switch (scoringResultModel(type, cfg)) {
+    case 'goals':
+      return appIsEnglish ? 'Goals · GF/GA/GD' : 'Goles · GF/GC/DG';
+    case 'sets_games':
+      return appIsEnglish
+          ? 'Sets + games · best of ${scoringBestOf(type, cfg)}'
+          : 'Sets + juegos · mejor de ${scoringBestOf(type, cfg)}';
+    case 'sets_points':
+      return appIsEnglish
+          ? 'Sets + points · best of ${scoringBestOf(type, cfg)}'
+          : 'Sets + puntos · mejor de ${scoringBestOf(type, cfg)}';
+    case 'total_points':
+      return appIsEnglish
+          ? 'Total points · difference'
+          : 'Puntos totales · diferencia';
+    default:
+      return appIsEnglish
+          ? 'Win ${scoringWinPoints(type, cfg)} · draw ${scoringDrawPoints(type, cfg)} · loss ${scoringLossPoints(type, cfg)}'
+          : 'Victoria ${scoringWinPoints(type, cfg)} · empate ${scoringDrawPoints(type, cfg)} · derrota ${scoringLossPoints(type, cfg)}';
+  }
+}
+
+String tournamentClassificationTitle(String format, String scoringType,
+    [dynamic scoringConfig]) {
+  if (format == 'americano')
+    return appIsEnglish ? 'Individual ranking' : 'Ranking individual';
+  if (format == 'eliminatoria')
+    return appIsEnglish ? 'Knockout bracket' : 'Cuadro de eliminatoria';
+  switch (scoringResultModel(scoringType, scoringConfig)) {
+    case 'goals':
+      return appIsEnglish ? 'Goals standings' : 'Clasificacion por goles';
+    case 'sets_games':
+      return appIsEnglish
+          ? 'Sets/games standings'
+          : 'Clasificacion por sets y juegos';
+    case 'sets_points':
+      return appIsEnglish
+          ? 'Sets/points standings'
+          : 'Clasificacion por sets y puntos';
+    case 'total_points':
+      return appIsEnglish ? 'Points standings' : 'Clasificacion por puntos';
+    default:
+      return appIsEnglish ? 'Tournament standings' : 'Clasificacion del torneo';
+  }
+}
+
+String tournamentClassificationSummary(
+  String format,
+  String scoringType, {
+  dynamic scoringConfig,
+  List<String>? tieBreakers,
+}) {
+  final breakers =
+      tieBreakers ?? TournamentEngineV2.defaultTieBreakers(scoringType, format);
+  final order =
+      standingsOrderTextForScoring(breakers, scoringType, scoringConfig);
+  if (format == 'americano') {
+    final unit = scoringUsesGameSetMode(scoringType, scoringConfig)
+        ? (appIsEnglish ? 'games' : 'juegos')
+        : scoringUsesPointSetMode(scoringType, scoringConfig)
+            ? (appIsEnglish ? 'points' : 'puntos')
+            : scoringScoreLabel(scoringType, scoringConfig);
+    return appIsEnglish
+        ? 'Individual ranking: each player adds $unit even when partner changes. Order: $order.'
+        : 'Ranking individual: cada jugador suma $unit aunque cambie de pareja. Orden: $order.';
+  }
+  if (format == 'eliminatoria') {
+    return appIsEnglish
+        ? 'Single-elimination bracket: each match decides who advances. Tiebreaks follow this order: $order.'
+        : 'Cuadro directo: cada partido decide quien avanza. El desempate sigue este orden: $order.';
+  }
+  switch (scoringResultModel(scoringType, scoringConfig)) {
+    case 'goals':
+      return appIsEnglish
+          ? 'The table prioritizes points and then wins, head-to-head, goal difference, goals for and no-shows. Order: $order.'
+          : 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de goles, goles a favor y no presentados. Orden: $order.';
+    case 'sets_games':
+      return appIsEnglish
+          ? 'The table prioritizes points and then wins, head-to-head, set difference, game difference and games for. Order: $order.'
+          : 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de sets, diferencia de juegos y juegos a favor. Orden: $order.';
+    case 'sets_points':
+      return appIsEnglish
+          ? 'The table prioritizes points and then wins, head-to-head, set difference, point difference and points for. Order: $order.'
+          : 'La tabla prioriza puntos y luego victorias, enfrentamiento directo, diferencia de sets, diferencia de puntos y puntos a favor. Orden: $order.';
+    case 'total_points':
+      return appIsEnglish
+          ? 'The table prioritizes wins, point difference and points for. Order: $order.'
+          : 'La tabla prioriza victorias, diferencia de puntos y puntos a favor. Orden: $order.';
+    default:
+      return appIsEnglish
+          ? 'The table uses the configured points and tiebreakers for this tournament. Order: $order.'
+          : 'La tabla usa la configuracion de puntos y los desempates definidos para este torneo. Orden: $order.';
+  }
+}
+
+String tieBreakerLabel(String value) {
+  switch (value) {
+    case 'points':
+      return appIsEnglish ? 'points' : 'puntos';
+    case 'wins':
+      return appIsEnglish ? 'wins' : 'victorias';
+    case 'direct':
+      return appIsEnglish ? 'head-to-head' : 'directo';
+    case 'difference':
+      return appIsEnglish ? 'difference' : 'diferencia';
+    case 'for':
+      return appIsEnglish ? 'for' : 'a favor';
+    case 'set_difference':
+      return appIsEnglish ? 'sets' : 'sets';
+    case 'game_difference':
+      return appIsEnglish ? 'games' : 'juegos';
+    case 'games_for':
+      return appIsEnglish ? 'games for' : 'juegos a favor';
+    case 'manual':
+      return appIsEnglish ? 'manual' : 'manual';
+    case 'no_shows':
+      return appIsEnglish ? 'no-shows' : 'no presentados';
+    default:
+      return value;
+  }
+}
+
+String tieBreakerLabelForScoring(String value, String scoringType,
+    [dynamic raw]) {
+  switch (value) {
+    case 'set_difference':
+      return appIsEnglish ? 'set difference' : 'diferencia de sets';
+    case 'game_difference':
+      if (scoringUsesGameSetMode(scoringType, raw))
+        return appIsEnglish ? 'game difference' : 'diferencia de juegos';
+      if (scoringUsesPointSetMode(scoringType, raw))
+        return appIsEnglish
+            ? 'set point difference'
+            : 'diferencia de puntos de set';
+      return tieBreakerLabel(value);
+    case 'games_for':
+      if (scoringUsesGameSetMode(scoringType, raw))
+        return appIsEnglish ? 'games for' : 'juegos a favor';
+      if (scoringUsesPointSetMode(scoringType, raw))
+        return appIsEnglish ? 'set points for' : 'puntos de set a favor';
+      return tieBreakerLabel(value);
+    case 'difference':
+      if (scoringResultModel(scoringType, raw) == 'goals')
+        return appIsEnglish ? 'goal difference' : 'diferencia de goles';
+      if (scoringResultModel(scoringType, raw) == 'total_points')
+        return appIsEnglish ? 'point difference' : 'diferencia de puntos';
+      return tieBreakerLabel(value);
+    case 'for':
+      if (scoringResultModel(scoringType, raw) == 'goals')
+        return appIsEnglish ? 'goals for' : 'goles a favor';
+      if (scoringResultModel(scoringType, raw) == 'total_points')
+        return appIsEnglish ? 'points for' : 'puntos a favor';
+      return tieBreakerLabel(value);
+    default:
+      return tieBreakerLabel(value);
+  }
+}
+
+String scoringConfigFullText(String type, [dynamic raw]) {
+  final cfg = resolvedScoringConfig(type, raw);
+  switch (scoringResultModel(type, cfg)) {
+    case 'goals':
+      return appIsEnglish
+          ? 'The score is recorded in goals. The standings use league points, goals for, goals against and goal difference.'
+          : 'Se registra el marcador en goles. La clasificación usa puntos de liga, goles a favor, goles en contra y diferencia de goles.';
+    case 'sets_games':
+      return appIsEnglish
+          ? 'Each set is recorded with its games. The app calculates sets won, total games and tiebreaks.'
+          : 'Se registra cada set con sus juegos. La app calcula sets ganados, juegos totales y desempates.';
+    case 'sets_points':
+      return appIsEnglish
+          ? 'Each set is recorded with its points. The app calculates sets won, total points and tiebreaks.'
+          : 'Se registra cada set con sus puntos. La app calcula sets ganados, puntos totales y desempates.';
+    case 'total_points':
+      return appIsEnglish
+          ? 'The total points score is recorded. The standings use wins, points for/against and difference.'
+          : 'Se registra el marcador total de puntos. La clasificación usa victorias, puntos a favor/en contra y diferencia.';
+    default:
+      return appIsEnglish
+          ? 'Direct score in ${scoringScoreLabel(type, cfg)}. The standings use win ${scoringWinPoints(type, cfg)}, draw ${scoringDrawPoints(type, cfg)} and loss ${scoringLossPoints(type, cfg)}.'
+          : 'Marcador directo en ${scoringScoreLabel(type, cfg)}. La clasificación usa victoria ${scoringWinPoints(type, cfg)}, empate ${scoringDrawPoints(type, cfg)} y derrota ${scoringLossPoints(type, cfg)}.';
+  }
+}
+
+String standingsHeaderForScoring(String type, [dynamic raw]) {
+  if (scoringUsesSetMode(type, raw))
+    return appIsEnglish
+        ? 'PTS · GD · ${scoringSetLabel(type, raw).toUpperCase()}'
+        : 'PTS · DP · ${scoringSetLabel(type, raw).toUpperCase()}';
+  return appIsEnglish
+      ? 'PTS · ${scoringRankingLabel(type, raw)} · GP'
+      : 'PTS · ${scoringRankingLabel(type, raw)} · PJ';
+}
+
+String standingDetailText(TeamStanding standing, String scoringType,
+    [dynamic scoringConfig]) {
+  final model = scoringResultModel(scoringType, scoringConfig);
+  if (standing.americanoRawScore) {
+    final unit = scoringUsesGameSetMode(scoringType, scoringConfig)
+        ? 'juegos'
+        : scoringUsesPointSetMode(scoringType, scoringConfig)
+            ? 'puntos'
+            : scoringScoreLabel(scoringType, scoringConfig);
+    return '${standing.played} partidos · $unit ${standing.goalsFor}-${standing.goalsAgainst} · victorias ${standing.wins}';
+  }
+  switch (model) {
+    case 'goals':
+      return '${standing.wins}G · ${standing.draws}E · ${standing.losses}P · GF ${standing.goalsFor} · GC ${standing.goalsAgainst} · DG ${standing.goalDifference}';
+    case 'sets_games':
+      return '${standing.wins}G · ${standing.losses}P · sets ${standing.goalsFor}-${standing.goalsAgainst} · juegos ${standing.secondaryFor}-${standing.secondaryAgainst}';
+    case 'sets_points':
+      return '${standing.wins}G · ${standing.losses}P · sets ${standing.goalsFor}-${standing.goalsAgainst} · puntos ${standing.secondaryFor}-${standing.secondaryAgainst}';
+    case 'total_points':
+      return '${standing.wins}G · ${standing.losses}P · PF ${standing.goalsFor} · PC ${standing.goalsAgainst} · DP ${standing.goalDifference}';
+    default:
+      return '${standing.wins}G · ${standing.draws}E · ${standing.losses}P · ${scoringMetricUnit(scoringType, scoringConfig)} ${standing.goalsFor}-${standing.goalsAgainst}';
+  }
+}
+
+String standingMetricText(TeamStanding standing, String scoringType,
+    [dynamic scoringConfig]) {
+  if (scoringUsesSetMode(scoringType, scoringConfig)) {
+    return '${scoringTableDifferenceLabel(scoringType, scoringConfig)} ${standing.goalDifference} · ${scoringSecondaryDifferenceLabel(scoringType, scoringConfig)} ${standing.secondaryDifference}';
+  }
+  return 'PTS · ${scoringRankingLabel(scoringType, scoringConfig)} ${standing.goalDifference}';
+}
+
+String standingMainStatLabel(String scoringType, [dynamic scoringConfig]) {
+  if (scoringUsesGameSetMode(scoringType, scoringConfig)) return 'Sets';
+  if (scoringUsesPointSetMode(scoringType, scoringConfig)) return 'Sets';
+  if (scoringResultModel(scoringType, scoringConfig) == 'goals') return 'Goles';
+  if (scoringResultModel(scoringType, scoringConfig) == 'total_points')
+    return 'Puntos';
+  return scoringScoreLabel(scoringType, scoringConfig);
+}
+
+String standingSecondaryStatLabel(String scoringType, [dynamic scoringConfig]) {
+  if (scoringUsesGameSetMode(scoringType, scoringConfig)) return 'Juegos';
+  if (scoringUsesPointSetMode(scoringType, scoringConfig))
+    return 'Puntos de set';
+  if (scoringResultModel(scoringType, scoringConfig) == 'goals')
+    return 'Diferencia de goles';
+  if (scoringResultModel(scoringType, scoringConfig) == 'total_points')
+    return 'Diferencia de puntos';
+  return 'Diferencia';
+}
+
+String standingForAgainstText(TeamStanding standing, String scoringType,
+    [dynamic scoringConfig]) {
+  if (standing.americanoRawScore) {
+    final unit = scoringUsesGameSetMode(scoringType, scoringConfig)
+        ? 'juegos'
+        : scoringUsesPointSetMode(scoringType, scoringConfig)
+            ? 'puntos'
+            : scoringScoreLabel(scoringType, scoringConfig);
+    return '$unit ${standing.goalsFor}-${standing.goalsAgainst}';
+  }
+  if (scoringUsesSetMode(scoringType, scoringConfig)) {
+    final secondary = scoringUsesGameSetMode(scoringType, scoringConfig)
+        ? 'juegos'
+        : 'puntos';
+    return 'sets ${standing.goalsFor}-${standing.goalsAgainst} · $secondary ${standing.secondaryFor}-${standing.secondaryAgainst}';
+  }
+  final model = scoringResultModel(scoringType, scoringConfig);
+  if (model == 'goals')
+    return 'GF ${standing.goalsFor} · GC ${standing.goalsAgainst} · DG ${standing.goalDifference}';
+  if (model == 'total_points')
+    return 'PF ${standing.goalsFor} · PC ${standing.goalsAgainst} · DP ${standing.goalDifference}';
+  return '${scoringScoreLabel(scoringType, scoringConfig)} ${standing.goalsFor}-${standing.goalsAgainst} · DIF ${standing.goalDifference}';
+}
+
+String standingWinRateText(TeamStanding standing) {
+  if (standing.played <= 0) return '0%';
+  final value = ((standing.wins / standing.played) * 100).round();
+  return '$value%';
+}
+
+String tournamentStatsIntroText(String scoringType, [dynamic scoringConfig]) {
+  if (scoringUsesGameSetMode(scoringType, scoringConfig)) {
+    return appIsEnglish
+        ? 'The table uses points, wins, sets and real games to rank the standings.'
+        : 'La tabla usa puntos, victorias, sets y juegos reales para ordenar la clasificación.';
+  }
+  if (scoringUsesPointSetMode(scoringType, scoringConfig)) {
+    return appIsEnglish
+        ? 'The table uses points, wins, sets and partial points to rank the standings.'
+        : 'La tabla usa puntos, victorias, sets y puntos de parcial para ordenar la clasificación.';
+  }
+  if (scoringResultModel(scoringType, scoringConfig) == 'goals') {
+    return appIsEnglish
+        ? 'The table uses points, wins, draws, goals for, goals against and difference.'
+        : 'La tabla usa puntos, victorias, empates, goles a favor, goles en contra y diferencia.';
+  }
+  if (scoringResultModel(scoringType, scoringConfig) == 'total_points') {
+    return appIsEnglish
+        ? 'The table uses wins, points for, points against and difference.'
+        : 'La tabla usa victorias, puntos a favor, puntos en contra y diferencia.';
+  }
+  return appIsEnglish
+      ? 'The table uses points, wins and difference according to the configured score.'
+      : 'La tabla usa puntos, victorias y diferencia según el marcador configurado.';
+}
+
+String matchInputLabel(String type, bool local, [dynamic raw]) {
+  final side = local ? 'Local' : 'Visitante';
+  switch (scoringResultModel(type, raw)) {
+    case 'goals':
+      return '$side goles';
+    case 'total_points':
+      return '$side puntos';
+    case 'games':
+      return '$side juegos';
+    default:
+      if (scoringUsesSetMode(type, raw)) return '$side sets';
+      return '$side ${scoringScoreLabel(type, raw)}';
+  }
+}
+
+List<Map<String, int>> matchDetailSets(Map<String, dynamic> match) {
+  final details = AppData.asMap(match['result_details']);
+  final rawSets = details['sets'];
+  if (rawSets is! List) return const [];
+  return rawSets
+      .whereType<Map>()
+      .map(
           (e) => {'a': AppData.intValue(e['a']), 'b': AppData.intValue(e['b'])})
       .toList();
 }
