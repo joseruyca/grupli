@@ -181,6 +181,7 @@ class _OnboardingSlideState extends State<OnboardingSlide> with SingleTickerProv
       padding: const EdgeInsets.only(bottom: 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SizedBox(
+        width: double.infinity,
         height: (constraints.maxHeight * .55).clamp(160.0, 360.0),
         child: AnimatedBuilder(
           animation: _controller,
@@ -369,7 +370,7 @@ class _GroupPrivateScene extends StatelessWidget {
               ]),
             ),
             const SizedBox(height: 12),
-            Text(appIsEnglish ? 'The Penguins' : 'Los pingüino', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w900, height: 1)),
+            Text(appIsEnglish ? 'The Penguins' : 'Los pingüinos', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w900, height: 1)),
             const SizedBox(height: 5),
             Text(appIsEnglish ? 'Agenda, expenses and tournaments for the group' : 'Agenda, gastos y torneos del grupo', style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w700)),
             const SizedBox(height: 14),

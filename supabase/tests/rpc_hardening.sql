@@ -19,9 +19,10 @@ insert into public.group_members(group_id,user_id,role) values
 select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000002',true);
 set local role authenticated;
 do $$ begin
- begin insert into public.group_members(group_id,user_id,role) values('40000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000003','owner'); raise exception 'Admin created extra owner'; exception when insufficient_privilege then null; end;
+ begin insert into public.group_members(group_id,user_id,role) values('40000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000003','owner'); raise exception 'Admin created extra owner'; exception when others then if sqlstate<>'42501' and sqlerrm<>'owner_protected' then raise; end if; end;
  insert into public.group_members(group_id,user_id,role) values('40000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000003','member');
- begin update public.group_members set role='owner' where group_id='40000000-0000-0000-0000-000000000001' and user_id='30000000-0000-0000-0000-000000000003'; raise exception 'Admin escalated member to owner'; exception when insufficient_privilege then null; end;
+ begin update public.group_members set role='owner' where group_id='40000000-0000-0000-0000-000000000001' and user_id='30000000-0000-0000-0000-000000000003'; raise exception 'Admin escalated member to owner'; exception when others then if sqlstate<>'42501' and sqlerrm<>'owner_protected' then raise; end if; end;
+ if not exists(select 1 from public.group_members where group_id='40000000-0000-0000-0000-000000000001' and user_id='30000000-0000-0000-0000-000000000003' and role='member') then raise exception 'Member role changed'; end if;
  raise notice 'PASS privileged RPC grants, diagnostic view and membership role escalation';
 end $$;
 reset role;
