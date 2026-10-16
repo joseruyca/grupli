@@ -121,7 +121,8 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> submit() async {
-    if (email.text.trim().isEmpty || password.text.length < 6) {
+    if (loading) return;
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim()) || password.text.length < 6) {
       await showToast(context, tr(context, es: 'Introduce email y contraseña de al menos 6 caracteres.', en: 'Enter an email and a password with at least 6 characters.'), danger: true);
       return;
     }
@@ -129,16 +130,30 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       await PendingInviteStore.save(widget.inviteCode ?? InviteLinks.currentCode);
       if (widget.register) {
-        await AppData.sb.auth.signUp(email: email.text.trim(), password: password.text.trim());
+        final response = await AppData.sb.auth.signUp(
+          email: email.text.trim(),
+          password: password.text,
+          emailRedirectTo: AppConfig.appBaseUrl,
+        );
+        if (response.session == null) {
+          if (!mounted) return;
+          await showDialog<void>(context: context, builder: (context) => AlertDialog(
+            title: Text(tr(context, es: 'Revisa tu correo', en: 'Check your email')),
+            content: Text(tr(context, es: 'Si el registro se ha completado, recibirás un enlace para confirmar tu correo. Revisa también la carpeta de spam y después inicia sesión.', en: 'If registration completed, you will receive a link to confirm your email. Check your spam folder too, then sign in.')),
+            actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(tr(context, es: 'Entendido', en: 'Got it')))],
+          ));
+          return;
+        }
       } else {
         // En APK puede quedar una sesión local vieja de otra instalación o de una prueba anterior.
         // La limpiamos solo en el dispositivo antes de iniciar sesión para evitar bucles de sesión caducada.
         await AppData.clearLocalSession();
-        await AppData.sb.auth.signInWithPassword(email: email.text.trim(), password: password.text.trim());
+        await AppData.sb.auth.signInWithPassword(email: email.text.trim(), password: password.text);
       }
       await AppData.ensureProfile();
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
+      if (!mounted) return;
       await showToast(context, humanError(e), danger: true);
     } finally {
       if (mounted) setState(() => loading = false);
@@ -146,8 +161,9 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> resetPassword() async {
+    if (loading) return;
     final mail = email.text.trim();
-    if (mail.isEmpty) {
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(mail)) {
       await showToast(context, tr(context, es: 'Introduce tu email y te enviaremos un enlace para cambiar la contraseña.', en: 'Enter your email and we will send you a password reset link.'), danger: true);
       return;
     }
@@ -168,12 +184,17 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> oauth(OAuthProvider provider) async {
+    if (loading) return;
+    setState(() => loading = true);
     try {
       await PendingInviteStore.save(widget.inviteCode ?? InviteLinks.currentCode);
       await AppData.clearLocalSession();
       await AppData.sb.auth.signInWithOAuth(provider, redirectTo: Uri.base.origin);
     } catch (e) {
+      if (!mounted) return;
       await showToast(context, humanError(e), danger: true);
+    } finally {
+      if (mounted) setState(() => loading = false);
     }
   }
 
@@ -194,12 +215,17 @@ class _AuthScreenState extends State<AuthScreen> {
         const OrDivider(),
         const SizedBox(height: 22),
         FieldLabel(tr(context, es: 'Correo electrónico', en: 'Email')),
-        TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: InputDecoration(prefixIcon: const Icon(Icons.mail_outline_rounded), hintText: tr(context, es: 'tu@email.com', en: 'you@email.com'))),
+        TextField(controller: email, keyboardType: TextInputType.emailAddress, autofillHints: const [AutofillHints.email], textInputAction: TextInputAction.next, autocorrect: false, decoration: InputDecoration(prefixIcon: const Icon(Icons.mail_outline_rounded), hintText: tr(context, es: 'tu@email.com', en: 'you@email.com'))),
         const SizedBox(height: 15),
         FieldLabel(tr(context, es: 'Contraseña', en: 'Password')),
         TextField(
           controller: password,
           obscureText: hidden,
+          autocorrect: false,
+          enableSuggestions: false,
+          autofillHints: [widget.register ? AutofillHints.newPassword : AutofillHints.password],
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => submit(),
           decoration: InputDecoration(prefixIcon: const Icon(Icons.lock_outline_rounded), hintText: '••••••••', suffixIcon: IconButton(icon: Icon(hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined), onPressed: () => setState(() => hidden = !hidden))),
         ),
         if (!widget.register)
