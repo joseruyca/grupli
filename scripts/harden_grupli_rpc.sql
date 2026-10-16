@@ -1,6 +1,14 @@
 begin;
 set local lock_timeout='5s';
 set local statement_timeout='30s';
+-- Compatibility RPC: account email must never grant application ownership.
+create or replace function public.ensure_owner_admin()
+returns void language plpgsql security invoker set search_path=pg_catalog,public as $$
+begin
+ if auth.uid() is null then raise exception 'Authentication required' using errcode='42501'; end if;
+end $$;
+revoke execute on function public.ensure_owner_admin() from public,anon;
+grant execute on function public.ensure_owner_admin() to authenticated,service_role;
 do $$ declare f record; sig text; begin
  for f in select p.oid::regprocedure::text as signature,p.prorettype='trigger'::regtype as is_trigger
  from pg_proc p join pg_namespace n on n.oid=p.pronamespace

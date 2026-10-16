@@ -112,6 +112,32 @@ class _AuthScreenState extends State<AuthScreen> {
   final password = TextEditingController();
   bool loading = false;
   bool hidden = true;
+  bool googleEnabled = false;
+  bool appleEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    loadProviders();
+  }
+
+  Future<void> loadProviders() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.supabaseUrl}/auth/v1/settings'),
+        headers: {'apikey': AppConfig.supabaseAnonKey},
+      ).timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200 || !mounted) return;
+      final settings = jsonDecode(response.body) as Map<String, dynamic>;
+      final external = settings['external'] as Map<String, dynamic>?;
+      setState(() {
+        googleEnabled = external?['google'] == true;
+        appleEnabled = external?['apple'] == true;
+      });
+    } catch (_) {
+      // Email access stays available when provider discovery is unavailable.
+    }
+  }
 
   @override
   void dispose() {
@@ -208,12 +234,16 @@ class _AuthScreenState extends State<AuthScreen> {
         const SizedBox(height: 4),
         Text(widget.register ? tr(context, es: 'Empieza a organizar tus grupos privados.', en: 'Start organizing your private groups.') : tr(context, es: 'Inicia sesión para continuar.', en: 'Sign in to continue.'), style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 24),
-        SocialButton(label: tr(context, es: 'Continuar con Google', en: 'Continue with Google'), icon: 'G', onTap: () => oauth(OAuthProvider.google)),
-        const SizedBox(height: 10),
-        SocialButton(label: tr(context, es: 'Continuar con Apple', en: 'Continue with Apple'), icon: '', onTap: () => oauth(OAuthProvider.apple)),
-        const SizedBox(height: 24),
-        const OrDivider(),
-        const SizedBox(height: 22),
+        if (googleEnabled || appleEnabled) ...[
+          if (googleEnabled)
+            SocialButton(label: tr(context, es: 'Continuar con Google', en: 'Continue with Google'), icon: 'G', onTap: () => oauth(OAuthProvider.google)),
+          if (googleEnabled && appleEnabled) const SizedBox(height: 10),
+          if (appleEnabled)
+            SocialButton(label: tr(context, es: 'Continuar con Apple', en: 'Continue with Apple'), icon: '', onTap: () => oauth(OAuthProvider.apple)),
+          const SizedBox(height: 24),
+          const OrDivider(),
+          const SizedBox(height: 22),
+        ],
         FieldLabel(tr(context, es: 'Correo electrónico', en: 'Email')),
         TextField(controller: email, keyboardType: TextInputType.emailAddress, autofillHints: const [AutofillHints.email], textInputAction: TextInputAction.next, autocorrect: false, decoration: InputDecoration(prefixIcon: const Icon(Icons.mail_outline_rounded), hintText: tr(context, es: 'tu@email.com', en: 'you@email.com'))),
         const SizedBox(height: 15),

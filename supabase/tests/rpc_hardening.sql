@@ -25,5 +25,12 @@ do $$ begin
  if not exists(select 1 from public.group_members where group_id='40000000-0000-0000-0000-000000000001' and user_id='30000000-0000-0000-0000-000000000003' and role='member') then raise exception 'Member role changed'; end if;
  raise notice 'PASS privileged RPC grants, diagnostic view and membership role escalation';
 end $$;
+select set_config('request.jwt.claims','{"email":"joseruyca@gmail.com"}',true);
+select public.ensure_owner_admin();
 reset role;
+do $$ begin
+ if exists(select 1 from public.app_admins where user_id='30000000-0000-0000-0000-000000000002') then
+ raise exception 'Unverified email granted application privileges'; end if;
+ raise notice 'PASS unverified email cannot acquire application ownership';
+end $$;
 rollback;
