@@ -186,7 +186,7 @@ class _OnboardingSlideState extends State<OnboardingSlide> with SingleTickerProv
           animation: _controller,
           builder: (context, _) => ExcludeSemantics(child: FittedBox(
             fit: BoxFit.contain,
-            child: SizedBox(width: 320, height: 420,
+            child: SizedBox(width: 320, height: 480,
               child: MediaQuery.withNoTextScaling(child: _IntroSceneFrame(
             index: widget.index,
             data: widget.data,
@@ -333,7 +333,6 @@ class _GroupPrivateScene extends StatelessWidget {
         offset: Offset(0, sin(progress * pi * 2) * 4),
         child: Container(
           width: 250,
-          constraints: const BoxConstraints(maxHeight: 330),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(.96),
@@ -418,7 +417,7 @@ class _AgendaScene extends StatelessWidget {
             return Expanded(
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
-                height: active ? 58 : 50,
+                height: active ? 64 : 58,
                 margin: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
                   color: active ? AppColors.teal : AppColors.surface,
