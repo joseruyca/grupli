@@ -1,0 +1,59 @@
+name: Grupli RPC security
+on:
+  push:
+    branches: [main, 'release/grupli-security']
+    paths: ['scripts/harden_grupli_rpc.*', 'supabase/tests/rpc_hardening.sql', '.github/workflows/supabase-hardening.yml']
+permissions:
+  contents: read
+concurrency:
+  group: grupli-rpc-security-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: isolated-qa-only
+          POSTGRES_DB: grupli_qa
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: isolated-qa-only
+      PGDATABASE: grupli_qa
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Test permissions, triggers and existing finance flows
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/all_in_one.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/patches/20261013_finance_security.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/patches/20261013_group_ownership.sql
+          psql -X -v ON_ERROR_STOP=1 -c 'create view public.v_grupli_security_diagnostics as select true as ok;'
+          psql -X -v ON_ERROR_STOP=1 -f scripts/harden_grupli_rpc.sql
+          psql -X -v ON_ERROR_STOP=1 -f scripts/harden_grupli_rpc.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/tests/finance_security.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/tests/rpc_hardening.sql
+  apply:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    concurrency:
+      group: grupli-supabase-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Apply reviewed permissions patch and verify
+        env:
+          GRUPLI_DATABASE_URL: ${{ secrets.GRUPLI_DATABASE_URL }}
+          GRUPLI_DATABASE_CA_CERT: ${{ secrets.GRUPLI_DATABASE_CA_CERT }}
+        run: python3 scripts/harden_grupli_rpc.py
