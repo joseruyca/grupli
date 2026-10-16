@@ -1,4 +1,4 @@
-﻿part of grupli_app;
+part of grupli_app;
 
 class MembersScreen extends StatefulWidget {
   final Map<String, dynamic> group;
@@ -127,6 +127,32 @@ class _MembersScreenState extends State<MembersScreen> {
     }
   }
 
+  Future<void> _transferOwnership(List<Map<String, dynamic>> members) async {
+    final candidates = members.where((m) => m['user_id']?.toString() != AppData.user?.id).toList();
+    if (candidates.isEmpty) {
+      await showToast(context, tr(context, es: 'Invita a otro miembro antes de transferir la organización.', en: 'Invite another member before transferring ownership.'));
+      return;
+    }
+    final chosen = await showDialog<Map<String, dynamic>>(context: context, builder: (dialogContext) => SimpleDialog(
+      title: Text(tr(context, es: 'Nuevo responsable del grupo', en: 'New group owner')),
+      children: candidates.map((m) => SimpleDialogOption(onPressed: () => Navigator.pop(dialogContext, m), child: Text(memberName(m)))).toList(),
+    ));
+    if (chosen == null || !mounted) return;
+    final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+      title: Text(tr(context, es: 'Transferir organización', en: 'Transfer ownership')),
+      content: Text(tr(context, es: '${memberName(chosen)} será el responsable. Tú seguirás como administrador. Los planes, cuentas y torneos se conservan.', en: '${memberName(chosen)} will become the owner. You will remain an admin. Plans, expenses and tournaments are preserved.')),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(tr(context, es: 'Cancelar', en: 'Cancel'))), TextButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(tr(context, es: 'Transferir', en: 'Transfer')))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      await AppData.transferGroup(widget.group['id'].toString(), chosen['user_id'].toString());
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) await showToast(context, humanError(e), danger: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final groupName = AppData.text(widget.group['name'], 'Grupo');
@@ -225,6 +251,10 @@ class _MembersScreenState extends State<MembersScreen> {
                   const SizedBox(height: 16),
                   PermissionMatrixCard(),
                   const SizedBox(height: 16),
+                  if (isOwner) ...[
+                    SecondaryButton(label: tr(context, es: 'Transferir organización', en: 'Transfer ownership'), icon: Icons.swap_horiz_rounded, onTap: () => _transferOwnership(members)),
+                    const SizedBox(height: 12),
+                  ],
                   if (isOwner)
                     AppCard(
                       color: AppColors.tealSoft,

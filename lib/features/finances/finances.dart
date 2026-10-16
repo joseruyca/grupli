@@ -433,12 +433,13 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
 
   void syncCustomShares(List<Map<String, dynamic>> members) {
     final ids = selected.toList();
-    final equal = ids.isEmpty ? 0.0 : amountValue / ids.length;
+    final equalShares = ids.isEmpty ? <String, double>{} : FinanceMoney.splitEqual(amountValue, ids);
     for (final member in members) {
       final id = member['user_id'].toString();
       final controller = customShares.putIfAbsent(id, () => TextEditingController());
       if (selected.contains(id) && controller.text.trim().isEmpty) {
-        controller.text = equal > 0 ? equal.toStringAsFixed(2).replaceAll('.', ',') : '';
+        final share = equalShares[id] ?? 0.0;
+        controller.text = share > 0 ? share.toStringAsFixed(2).replaceAll('.', ',') : '';
       }
       if (!selected.contains(id)) controller.text = '';
     }
@@ -452,18 +453,8 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
     if (splitMode == 'custom') {
       return {for (final id in selected) id: double.parse(customShareFor(id).toStringAsFixed(2))};
     }
-    final ids = selected.toList();
-    if (ids.isEmpty) return {};
-    final totalCents = (amountValue * 100).round();
-    final base = totalCents ~/ ids.length;
-    var remainder = totalCents - (base * ids.length);
-    final result = <String, double>{};
-    for (final id in ids) {
-      final cents = base + (remainder > 0 ? 1 : 0);
-      if (remainder > 0) remainder--;
-      result[id] = double.parse((cents / 100).toStringAsFixed(2));
-    }
-    return result;
+    if (selected.isEmpty) return {};
+    return FinanceMoney.splitEqual(amountValue, selected);
   }
 
   Future<void> save(List<Map<String, dynamic>> members) async {
@@ -474,7 +465,7 @@ class _CreateExpenseScreenState extends State<CreateExpenseScreen> {
     }
     if (splitMode == 'custom') {
       final total = customTotal();
-      if ((total - value).abs() > .05) {
+      if (FinanceMoney.cents(total) != FinanceMoney.cents(value)) {
         await showToast(context, tr(context, es: 'Los importes personalizados deben sumar ${money(value)}.', en: 'Custom amounts must add up to ${money(value)}.'), danger: true);
         return;
       }
@@ -929,10 +920,10 @@ class FinanceMyStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = summary.myNet > 0.01 ? AppColors.green : summary.myNet < -0.01 ? AppColors.red : AppColors.teal;
-    final title = summary.myNet > 0.01
+    final color = summary.myNet >= 0.01 ? AppColors.green : summary.myNet <= -0.01 ? AppColors.red : AppColors.teal;
+    final title = summary.myNet >= 0.01
         ? tr(context, es: 'Te deben ${money(summary.myNet)}', en: 'You are owed ${money(summary.myNet)}')
-        : summary.myNet < -0.01
+        : summary.myNet <= -0.01
             ? tr(context, es: 'Debes ${money(-summary.myNet)}', en: 'You owe ${money(-summary.myNet)}')
             : tr(context, es: 'Tú estás a cero', en: 'You are settled');
     final body = settlements.isEmpty
@@ -1114,8 +1105,8 @@ class FinanceBalanceBarRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final positive = value > 0.01;
-    final negative = value < -0.01;
+    final positive = value >= 0.01;
+    final negative = value <= -0.01;
     final color = positive ? AppColors.green : negative ? AppColors.red : AppColors.muted;
     final label = positive ? tr(context, es: 'le deben', en: 'owe') : negative ? tr(context, es: 'debe', en: 'owes') : tr(context, es: 'en equilibrio', en: 'even');
     final factor = max(.12, min(1.0, value.abs() / max(1.0, maxValue)));
@@ -1313,7 +1304,7 @@ class FinanceAutoBalanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasPending = summary.pendingAmount > 0.01;
+    final hasPending = summary.pendingAmount >= 0.01;
     final color = hasPending ? AppColors.teal : AppColors.green;
     final title = hasPending ? tr(context, es: 'Cuentas compensadas', en: 'Balanced accounts') : tr(context, es: 'Todo cuadrado', en: 'All settled');
     final body = hasPending
@@ -1387,13 +1378,13 @@ class FinanceSplitPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ok = !customMode || diff.abs() <= .05;
+    final ok = !customMode || diff.abs() < .005;
     final color = ok ? AppColors.teal : AppColors.red;
     final text = participants == 0
         ? tr(context, es: 'Elige al menos un participante.', en: 'Choose at least one participant.')
         : customMode
             ? (ok ? tr(context, es: 'Reparto manual equilibrado · total ${money(customTotal)}', en: 'Balanced manual split · total ${money(customTotal)}') : tr(context, es: 'Faltan/sobran ${money(diff.abs())} para cuadrar el total', en: '${money(diff.abs())} missing/excess to balance the total'))
-            : tr(context, es: '$participants participantes · cada uno debe ${money(equalShare)} · luego se optimiza en Saldos', en: '$participants participants · each owes ${money(equalShare)} · then it is optimized in Balances');
+            : tr(context, es: '$participants participantes · reparto a partes iguales con ajuste de céntimos', en: '$participants participants · equal split with remaining cents allocated');
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -1446,11 +1437,11 @@ class FinanceSummary {
 
   double get settlementAmount => double.parse(settlements.fold<double>(0, (sum, debt) => sum + debt.amount).toStringAsFixed(2));
 
-  int get peopleWithBalance => balances.values.where((value) => value.abs() > 0.01).length;
+  int get peopleWithBalance => balances.values.where((value) => value.abs() >= 0.01).length;
 
-  int get debtorsCount => balances.values.where((value) => value < -0.01).length;
+  int get debtorsCount => balances.values.where((value) => value <= -0.01).length;
 
-  int get creditorsCount => balances.values.where((value) => value > 0.01).length;
+  int get creditorsCount => balances.values.where((value) => value >= 0.01).length;
 
   double get compensatedAmount {
     final value = pendingAmount - settlementAmount;
@@ -1458,12 +1449,12 @@ class FinanceSummary {
   }
 
   List<MapEntry<String, double>> get sortedBalances {
-    final list = balances.entries.where((entry) => entry.value.abs() > 0.01).toList();
+    final list = balances.entries.where((entry) => entry.value.abs() >= 0.01).toList();
     list.sort((a, b) => b.value.abs().compareTo(a.value.abs()));
     return list;
   }
 
-  factory FinanceSummary.from(List<Map<String, dynamic>> expenses, List<Map<String, dynamic>> members, List<Map<String, dynamic>> settlementPayments) {
+  factory FinanceSummary.from(List<Map<String, dynamic>> expenses, List<Map<String, dynamic>> members, List<Map<String, dynamic>> settlementPayments, {String? currentUserId}) {
     final names = <String, String>{};
     final avatars = <String, String>{};
     final balances = <String, double>{};
@@ -1515,8 +1506,8 @@ class FinanceSummary {
     }
 
     final settlements = buildSettlements(balances, names, avatars);
-    final netPending = balances.values.where((value) => value > 0.01).fold<double>(0, (sum, value) => sum + value);
-    final myId = AppData.user?.id ?? '';
+    final netPending = balances.values.where((value) => value >= 0.01).fold<double>(0, (sum, value) => sum + value);
+    final myId = currentUserId ?? AppData.user?.id ?? '';
     return FinanceSummary(
       names: names,
       avatars: avatars,
@@ -1720,13 +1711,13 @@ String financeMemberName(String userId, List<Map<String, dynamic>> members) {
 }
 
 String _financeMainTitle(FinanceSummary summary) {
-  if (summary.pendingAmount <= 0.01) {
+  if (summary.pendingAmount < 0.01) {
     return appIsEnglish ? 'All settled' : 'Todo está cuadrado';
   }
-  if (summary.myNet > 0.01) {
+  if (summary.myNet >= 0.01) {
     return appIsEnglish ? 'You are owed ${money(summary.myNet)}' : 'Te deben ${money(summary.myNet)}';
   }
-  if (summary.myNet < -0.01) {
+  if (summary.myNet <= -0.01) {
     return appIsEnglish ? 'You owe ${money(-summary.myNet)}' : 'Debes ${money(-summary.myNet)}';
   }
   return appIsEnglish ? 'There are pending payments' : 'Hay pagos pendientes';
@@ -1754,8 +1745,8 @@ class BalanceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = value > 0.01 ? AppColors.green : value < -0.01 ? AppColors.red : AppColors.muted;
-    final label = value > 0.01 ? 'Le deben' : value < -0.01 ? 'Debe' : 'En equilibrio';
+    final color = value >= 0.01 ? AppColors.green : value <= -0.01 ? AppColors.red : AppColors.muted;
+    final label = value >= 0.01 ? 'Le deben' : value <= -0.01 ? 'Debe' : 'En equilibrio';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       child: Row(children: [
@@ -1805,7 +1796,7 @@ class FinanceHumanNextStepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final clean = summary.pendingAmount <= 0.01;
+    final clean = summary.pendingAmount < 0.01;
     final firstDebt = summary.settlements.isEmpty ? null : summary.settlements.first;
     final title = clean
         ? tr(context, es: 'Todo está cuadrado', en: 'All settled')

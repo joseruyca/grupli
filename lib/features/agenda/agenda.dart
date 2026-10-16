@@ -958,7 +958,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         final minPeople = AppData.intValue(event['min_people'], 2);
         final mine = myAttendanceStatus(event);
         final pending = max(0, data.members.length - yes - maybe - no);
-        final canManageEvent = AppData.text(event['created_by']).isNotEmpty &&
+        final canManageEvent = groupCanManage(widget.group) ||
             AppData.text(event['created_by']) == (AppData.user?.id ?? '');
 
         return DirectPage(

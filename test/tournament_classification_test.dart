@@ -1,8 +1,10 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:grupli/main.dart';
 
 void main() {
+  setUp(() { appLocale = const Locale('es'); });
   test('football classification uses goals and direct order', () {
     final title = tournamentClassificationTitle('liga', 'football', scoringConfigForType('football'));
     final summary = tournamentClassificationSummary('liga', 'football', scoringConfig: scoringConfigForType('football'));

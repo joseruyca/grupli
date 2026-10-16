@@ -1,0 +1,58 @@
+name: Grupli quality
+on:
+  push:
+    branches: [main, 'release/**']
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: grupli-qa-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  flutter:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Install pinned Flutter SDK
+        run: |
+          git clone https://github.com/flutter/flutter.git --depth 1 --branch 3.41.6 "$RUNNER_TEMP/flutter"
+          test "$(git -C "$RUNNER_TEMP/flutter" rev-parse HEAD)" = db50e20168db8fee486b9abf32fc912de3bc5b6a
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - run: flutter test
+      - run: flutter build web --release --no-tree-shake-icons --no-wasm-dry-run
+  database:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: isolated-qa-only
+          POSTGRES_DB: grupli_qa
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: isolated-qa-only
+      PGDATABASE: grupli_qa
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/all_in_one.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/patches/20261013_finance_security.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/patches/20261013_finance_security.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/patches/20261013_group_ownership.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/finance_security.sql
