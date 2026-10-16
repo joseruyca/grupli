@@ -735,6 +735,7 @@ class _AppRootState extends State<AppRoot> {
   StreamSubscription<Uri>? _appLinksSub;
   String? _lastHandledInviteCode;
   DateTime? _lastHandledInviteAt;
+  bool _recoveringPassword = false;
   bool _ready = false;
   bool _showOnboarding = false;
 
@@ -742,17 +743,24 @@ class _AppRootState extends State<AppRoot> {
   void initState() {
     super.initState();
     _session = Supabase.instance.client.auth.currentSession;
+    _recoveringPassword = Uri.base.queryParameters['type'] == 'recovery' ||
+        Uri.base.fragment.split('&').contains('type=recovery');
     _loadFirstRunState();
     unawaited(_startAppLinkListener());
     _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
       if (!mounted) return;
       setState(() {
         _session = event.session;
+        if (event.event == AuthChangeEvent.passwordRecovery) _recoveringPassword = true;
+        if (event.event == AuthChangeEvent.signedOut) _recoveringPassword = false;
         if (_session != null) _showOnboarding = false;
       });
       if (event.session != null) {
         PushNotificationService.tryRegisterSilently();
       }
+    }, onError: (Object error, StackTrace stackTrace) {
+      // Keep the current screen usable during transient offline token refreshes.
+      // An explicit signedOut event remains responsible for clearing the session.
     });
   }
 
@@ -860,7 +868,11 @@ class _AppRootState extends State<AppRoot> {
             ? (_showOnboarding
                 ? OnboardingScreen(onFinish: _finishOnboarding)
                 : WelcomeScreen(onShowIntro: _restartOnboarding))
-            : const AuthedShell();
+            : _recoveringPassword
+                ? PasswordRecoveryScreen(onSaved: () {
+                    if (mounted) setState(() => _recoveringPassword = false);
+                  })
+                : const AuthedShell();
     return AppSurface(child: child);
   }
 }

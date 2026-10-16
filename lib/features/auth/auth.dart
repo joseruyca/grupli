@@ -112,6 +112,32 @@ class _AuthScreenState extends State<AuthScreen> {
   final password = TextEditingController();
   bool loading = false;
   bool hidden = true;
+  bool googleEnabled = false;
+  bool appleEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    loadProviders();
+  }
+
+  Future<void> loadProviders() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.supabaseUrl}/auth/v1/settings'),
+        headers: {'apikey': AppConfig.supabaseAnonKey},
+      ).timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200 || !mounted) return;
+      final settings = jsonDecode(response.body) as Map<String, dynamic>;
+      final external = settings['external'] as Map<String, dynamic>?;
+      setState(() {
+        googleEnabled = external?['google'] == true;
+        appleEnabled = external?['apple'] == true;
+      });
+    } catch (_) {
+      // Email access stays available when provider discovery is unavailable.
+    }
+  }
 
   @override
   void dispose() {
@@ -208,12 +234,16 @@ class _AuthScreenState extends State<AuthScreen> {
         const SizedBox(height: 4),
         Text(widget.register ? tr(context, es: 'Empieza a organizar tus grupos privados.', en: 'Start organizing your private groups.') : tr(context, es: 'Inicia sesión para continuar.', en: 'Sign in to continue.'), style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(height: 24),
-        SocialButton(label: tr(context, es: 'Continuar con Google', en: 'Continue with Google'), icon: 'G', onTap: () => oauth(OAuthProvider.google)),
-        const SizedBox(height: 10),
-        SocialButton(label: tr(context, es: 'Continuar con Apple', en: 'Continue with Apple'), icon: '', onTap: () => oauth(OAuthProvider.apple)),
-        const SizedBox(height: 24),
-        const OrDivider(),
-        const SizedBox(height: 22),
+        if (googleEnabled || appleEnabled) ...[
+          if (googleEnabled)
+            SocialButton(label: tr(context, es: 'Continuar con Google', en: 'Continue with Google'), icon: 'G', onTap: () => oauth(OAuthProvider.google)),
+          if (googleEnabled && appleEnabled) const SizedBox(height: 10),
+          if (appleEnabled)
+            SocialButton(label: tr(context, es: 'Continuar con Apple', en: 'Continue with Apple'), icon: '', onTap: () => oauth(OAuthProvider.apple)),
+          const SizedBox(height: 24),
+          const OrDivider(),
+          const SizedBox(height: 22),
+        ],
         FieldLabel(tr(context, es: 'Correo electrónico', en: 'Email')),
         TextField(controller: email, keyboardType: TextInputType.emailAddress, autofillHints: const [AutofillHints.email], textInputAction: TextInputAction.next, autocorrect: false, decoration: InputDecoration(prefixIcon: const Icon(Icons.mail_outline_rounded), hintText: tr(context, es: 'tu@email.com', en: 'you@email.com'))),
         const SizedBox(height: 15),
@@ -474,4 +504,74 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
+
+class PasswordRecoveryScreen extends StatefulWidget {
+  final VoidCallback onSaved;
+  final Future<void> Function(String)? savePassword;
+  const PasswordRecoveryScreen({super.key, required this.onSaved, this.savePassword});
+
+  @override
+  State<PasswordRecoveryScreen> createState() => _PasswordRecoveryScreenState();
+}
+
+class _PasswordRecoveryScreenState extends State<PasswordRecoveryScreen> {
+  final password = TextEditingController();
+  final confirmation = TextEditingController();
+  bool loading = false;
+  bool hidden = true;
+  String? error;
+
+  @override
+  void dispose() {
+    password.dispose();
+    confirmation.dispose();
+    super.dispose();
+  }
+
+  Future<void> save() async {
+    if (loading) return;
+    if (password.text.length < 8 || password.text != confirmation.text) {
+      setState(() => error = tr(context, es: 'Usa al menos 8 caracteres y repite la misma contraseña.', en: 'Use at least 8 characters and repeat the same password.'));
+      return;
+    }
+    setState(() { loading = true; error = null; });
+    try {
+      final customSave = widget.savePassword;
+      if (customSave != null) {
+        await customSave(password.text);
+      } else {
+        await AppData.sb.auth.updateUser(UserAttributes(password: password.text));
+      }
+      if (mounted) widget.onSaved();
+    } catch (e) {
+      if (mounted) setState(() => error = humanError(e));
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => DirectPage(child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(tr(context, es: 'Nueva contraseña', en: 'New password'), style: Theme.of(context).textTheme.headlineMedium),
+      const SizedBox(height: 12),
+      Text(tr(context, es: 'Elige una contraseña de al menos 8 caracteres para proteger tu cuenta.', en: 'Choose a password with at least 8 characters to protect your account.')),
+      const SizedBox(height: 24),
+      TextField(controller: password, obscureText: hidden, autocorrect: false, enableSuggestions: false,
+        autofillHints: const [AutofillHints.newPassword], textInputAction: TextInputAction.next,
+        decoration: InputDecoration(labelText: tr(context, es: 'Contraseña', en: 'Password'),
+          suffixIcon: IconButton(tooltip: tr(context, es: 'Mostrar u ocultar contraseña', en: 'Show or hide password'),
+            onPressed: () => setState(() => hidden = !hidden), icon: Icon(hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined)))),
+      const SizedBox(height: 16),
+      TextField(controller: confirmation, obscureText: hidden, autocorrect: false, enableSuggestions: false,
+        autofillHints: const [AutofillHints.newPassword], textInputAction: TextInputAction.done,
+        onSubmitted: (_) => save(), decoration: InputDecoration(labelText: tr(context, es: 'Repetir contraseña', en: 'Repeat password'))),
+      if (error != null) ...[const SizedBox(height: 12), Text(error!, style: const TextStyle(color: Colors.red))],
+      const SizedBox(height: 24),
+      FilledButton(onPressed: loading ? null : save,
+        child: Text(loading ? tr(context, es: 'Guardando…', en: 'Saving…') : tr(context, es: 'Guardar contraseña', en: 'Save password'))),
+    ],
+  ));
 }
