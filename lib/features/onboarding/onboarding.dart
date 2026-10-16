@@ -187,7 +187,7 @@ class _OnboardingSlideState extends State<OnboardingSlide> with SingleTickerProv
           builder: (context, _) => ExcludeSemantics(child: FittedBox(
             fit: BoxFit.contain,
             child: SizedBox(width: 320, height: 420,
-              child: MediaQuery.withNoTextScaling(context: context, child: _IntroSceneFrame(
+              child: MediaQuery.withNoTextScaling(child: _IntroSceneFrame(
             index: widget.index,
             data: widget.data,
             progress: _controller.value,

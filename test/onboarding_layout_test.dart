@@ -23,6 +23,7 @@ void main() {
         final next = find.text('Siguiente');
         expect(tester.getRect(next).bottom, lessThanOrEqualTo(size.height));
         await tester.tap(next);
+        await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
       }
       await tester.tap(find.text('Empezar'));
